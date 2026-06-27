@@ -1,0 +1,103 @@
+{
+    "name": "tbtop/cms",
+    "description": "Minimal tbtop + json-render CMS core for Laravel.",
+    "keywords": [
+        "Tbtop",
+        "laravel",
+        "cms",
+        "json-render"
+    ],
+    "homepage": "https://github.com/DiVotek/tbtop-cms",
+    "support": {
+        "issues": "https://github.com/DiVotek/tbtop-cms/issues",
+        "source": "https://github.com/DiVotek/tbtop-cms"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "DiVotek",
+            "email": "support@divotek.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^11.0||^12.0",
+        "spatie/laravel-package-tools": "^1.16"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.0",
+        "nunomaduro/collision": "^8.0",
+        "orchestra/testbench": "^9.0||^10.0",
+        "pestphp/pest": "^3.7||^4.0",
+        "pestphp/pest-plugin-arch": "^3.0||^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0||^4.0",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "rector/rector": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Tbtop\\Cms\\": "src/",
+            "Tbtop\\Cms\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tbtop\\Cms\\Tests\\": "tests/",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "@php vendor/bin/testbench serve --ansi"
+        ],
+        "analyse": "phpstan analyse",
+        "analyse:changed": "git diff --name-only --diff-filter=ACMR HEAD | grep -E '^(src|config|database)/.*\\.php$' | xargs -r phpstan analyse",
+        "lint": "pint",
+        "lint:changed": "git diff --name-only --diff-filter=ACMR HEAD | grep '\\.php$' | xargs -r pint",
+        "test:lint": "pint --test",
+        "test:lint:changed": "git diff --name-only --diff-filter=ACMR HEAD | grep '\\.php$' | xargs -r pint --test",
+        "refactor": "rector",
+        "refactor:changed": "git diff --name-only --diff-filter=ACMR HEAD | grep -E '^(src|config|database)/.*\\.php$' | xargs -r rector process",
+        "test:refactor": "rector --dry-run",
+        "test:refactor:changed": "git diff --name-only --diff-filter=ACMR HEAD | grep -E '^(src|config|database)/.*\\.php$' | xargs -r rector process --dry-run",
+        "test": "pest",
+        "test:changed": "git diff --name-only --diff-filter=ACMR HEAD -- tests | grep '\\.php$' | xargs -r pest",
+        "test:coverage": "pest --coverage",
+        "test:all:changed": [
+            "@test:lint:changed",
+            "@analyse:changed",
+            "@test:refactor:changed",
+            "@test:changed"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Tbtop\\Cms\\CmsServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
