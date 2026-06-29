@@ -20,6 +20,8 @@ return new class extends Migration
 
             $table->unique(['page_id', 'locale']);
             $table->unique(['locale', 'path']);
+
+            $table->timestamps();
         });
     }
 

@@ -18,8 +18,6 @@ class PageSlug extends Model
 {
     protected $guarded = [];
 
-    public $timestamps = false;
-
     /** @return BelongsTo<Page, $this> */
     public function page(): BelongsTo
     {
