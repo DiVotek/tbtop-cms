@@ -19,7 +19,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           coverage: none
 
       - name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           coverage: none
 
       - name: Install dependencies
@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.3', '8.4']
+        php: ['8.4']
         testbench: ['^9.0', '^10.0']
     steps:
       - uses: actions/checkout@v4
