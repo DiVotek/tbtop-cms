@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('languages', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
-            $table->string('locale', 2)->unique();
+            $table->string('locale', 5)->unique();
             $table->boolean('is_default')->default(false);
             $table->boolean('is_admin_active')->default(false);
             $table->boolean('is_frontend_active')->default(false);

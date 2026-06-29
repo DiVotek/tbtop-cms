@@ -39,3 +39,17 @@ it('keeps the locale immutable when editing an existing language', function (): 
     expect($language->locale)->toBe('en')
         ->and($language->name)->toBe('English (UK)');
 });
+
+it('accepts a regional locale up to the column width', function (): void {
+    $language = LanguageForm::save([
+        'name' => 'Portuguese (Brazil)',
+        'locale' => 'pt-BR',
+        'is_default' => true,
+        'is_admin_active' => true,
+        'is_frontend_active' => true,
+        'sort_order' => 0,
+    ]);
+
+    expect($language->exists)->toBeTrue()
+        ->and($language->locale)->toBe('pt-BR');
+});
