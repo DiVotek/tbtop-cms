@@ -8,10 +8,19 @@ use DomainException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageHierarchy;
+use Tbtop\Cms\Page\Support\PageSlugWriter;
 
 class PageObserver
 {
-    public function __construct(private readonly PageTypeRegistry $registry) {}
+    public function __construct(
+        private readonly PageTypeRegistry $registry,
+        private readonly PageSlugWriter $slugs,
+    ) {}
+
+    public function saved(Page $page): void
+    {
+        $this->slugs->sync($page);
+    }
 
     public function creating(Page $page): void
     {
@@ -42,6 +51,8 @@ class PageObserver
         if ($children->exists()) {
             throw new DomainException("Cannot delete page [{$page->id}]: it has children.");
         }
+
+        $this->slugs->remove($page);
     }
 
     private function guardSystemStatus(Page $page): void

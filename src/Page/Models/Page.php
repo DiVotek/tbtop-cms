@@ -69,6 +69,17 @@ class Page extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    /** @return HasMany<PageSlug, $this> */
+    public function slugs(): HasMany
+    {
+        return $this->hasMany(PageSlug::class);
+    }
+
+    public function pathFor(string $locale): ?string
+    {
+        return $this->slugs->firstWhere('locale', $locale)?->path;
+    }
+
     protected static function newFactory(): PageFactory
     {
         return PageFactory::new();

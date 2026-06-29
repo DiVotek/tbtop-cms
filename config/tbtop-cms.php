@@ -4,6 +4,7 @@ declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\DashboardPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
+use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 
 return [
     'languages' => [
@@ -23,6 +24,11 @@ return [
         'home' => [
             'name' => 'Home',
             'title' => 'Home',
+        ],
+    ],
+    'frontend' => [
+        'middleware' => [
+            SetLanguage::class,
         ],
     ],
     'admin' => [
