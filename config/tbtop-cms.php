@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\DashboardPage;
+use Tbtop\Cms\Admin\Pages\LanguagesPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
+use Tbtop\Cms\Admin\Pages\PagesPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 
@@ -40,6 +42,8 @@ return [
             'dashboard' => DashboardPage::class,
             'profile' => ProfilePage::class,
             'login' => LoginPage::class,
+            'languages' => LanguagesPage::class,
+            'pages' => PagesPage::class,
         ],
     ],
 ];
