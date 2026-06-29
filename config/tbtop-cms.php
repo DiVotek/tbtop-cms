@@ -19,6 +19,7 @@ return [
         'types' => [],
         'home' => [
             'name' => 'Home',
+            'title' => 'Home',
         ],
     ],
 ];

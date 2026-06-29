@@ -15,13 +15,14 @@ class PageSeeder extends Seeder
     {
         $locale = app(Languages::class)->defaultLocale() ?: (string) (config('app.fallback_locale') ?: 'en');
         $name = (string) config('tbtop-cms.pages.home.name', 'Home');
+        $title = (string) config('tbtop-cms.pages.home.title', $name);
 
         Page::firstOrCreate(
             ['is_system' => true, 'type' => 'page'],
             [
                 'status' => PageStatus::Published,
                 'name' => [$locale => $name],
-                'title' => [$locale => $name],
+                'title' => [$locale => $title],
                 'is_indexable' => true,
                 'sort_order' => 0,
             ],

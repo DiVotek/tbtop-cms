@@ -29,7 +29,8 @@ it('seeds the home name under the default locale', function (): void {
 
     $home = Page::where('is_system', true)->first();
 
-    expect($home->getTranslation('name', 'en'))->toBe('Home');
+    expect($home->getTranslation('name', 'en'))->toBe('Home')
+        ->and($home->getTranslation('title', 'en'))->toBe('Home');
 });
 
 it('seeds the home name under a fallback locale when none is configured', function (): void {
