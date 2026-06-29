@@ -76,7 +76,7 @@ class LanguagesPage extends AdminPage
     {
         return EditAction::make(
             $s,
-            $s->form('languageEdit', LanguageForm::fields($s)),
+            $s->form('languageEdit', LanguageForm::fields($s, isEdit: true)),
             static fn (ActionCtx $ctx): array => LanguageForm::load((int) ($ctx->row['id'] ?? 0)),
             static fn (ActionCtx $ctx): Language => LanguageForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
             name: 'languageEdit',

@@ -11,11 +11,17 @@ use Tbtop\Cms\Language\Models\Language;
 class LanguageForm
 {
     /** @return list<Field> */
-    public static function fields(S $s): array
+    public static function fields(S $s, bool $isEdit = false): array
     {
+        $locale = $s->text('locale')->label('Locale')->required()->rules('max:5');
+
+        if ($isEdit) {
+            $locale->meta('disabled', true)->helperText('Locale cannot be changed after creation.');
+        }
+
         return [
             $s->text('name')->label('Name')->required(),
-            $s->text('locale')->label('Locale')->required()->rules('max:5'),
+            $locale,
             $s->checkbox('is_default')->label('Default language'),
             $s->checkbox('is_admin_active')->label('Active in admin'),
             $s->checkbox('is_frontend_active')->label('Active on site'),
@@ -29,12 +35,16 @@ class LanguageForm
         $language = $id !== null ? Language::query()->findOrFail($id) : new Language;
         $language->fill([
             'name' => (string) ($form['name'] ?? ''),
-            'locale' => (string) ($form['locale'] ?? ''),
             'is_default' => (bool) ($form['is_default'] ?? false),
             'is_admin_active' => (bool) ($form['is_admin_active'] ?? false),
             'is_frontend_active' => (bool) ($form['is_frontend_active'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
         ]);
+
+        if (! $language->exists) {
+            $language->locale = (string) ($form['locale'] ?? '');
+        }
+
         $language->save();
 
         return $language;

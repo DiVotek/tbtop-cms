@@ -101,6 +101,17 @@ class CmsServiceProvider extends PackageServiceProvider
 
     private function wireContentLocales(): void
     {
-        ContentLocales::sync($this->app->make(Languages::class));
+        $this->syncContentLocales();
+
+        Language::saved(function (): void {
+            $this->syncContentLocales();
+        });
+    }
+
+    private function syncContentLocales(): void
+    {
+        $languages = $this->app->make(Languages::class);
+        $languages->refresh();
+        ContentLocales::sync($languages);
     }
 }

@@ -34,3 +34,10 @@ it('keeps the configured default when no language is admin-active', function ():
 
     expect(config('tbtop-admin.content_locales'))->toBe(['en']);
 });
+
+it('re-syncs content locales when a language is saved', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+    Language::factory()->create(['locale' => 'uk', 'is_admin_active' => true]);
+
+    expect(config('tbtop-admin.content_locales'))->toBe(['en', 'uk']);
+});
