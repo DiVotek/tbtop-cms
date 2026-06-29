@@ -113,7 +113,11 @@ class PageSlugWriter
             ?: $page->getTranslation('name', $this->languages->defaultLocale(), false));
         $slug = Str::slug($name);
 
-        return $slug !== '' ? $slug : 'page-' . $page->getKey();
+        if ($slug === '') {
+            return 'page-' . $page->getKey();
+        }
+
+        return rtrim(mb_substr($slug, 0, 120), '-');
     }
 
     private function parentPath(Page $page, string $locale): string

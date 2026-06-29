@@ -15,8 +15,8 @@ return new class extends Migration
             // No FK: package migrations load alphabetically, so page_slugs precedes pages.
             $table->unsignedBigInteger('page_id');
             $table->string('locale', 5);
-            $table->string('slug');
-            $table->string('path');
+            $table->string('slug', 160);
+            $table->string('path', 600);
 
             $table->unique(['page_id', 'locale']);
             $table->unique(['locale', 'path']);

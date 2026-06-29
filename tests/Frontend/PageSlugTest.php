@@ -116,3 +116,12 @@ it('localizes breadcrumb paths and labels for a non-default locale', function ()
         ->assertJsonPath('breadcrumbs.0.label', 'Blog UA')
         ->assertJsonPath('breadcrumbs.0.url', '/uk/' . $category->pathFor('uk'));
 });
+
+it('caps an overly long slug', function (): void {
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => str_repeat('word ', 60)],
+    ]);
+
+    expect(strlen($page->pathFor('en')))->toBeLessThanOrEqual(120);
+});
