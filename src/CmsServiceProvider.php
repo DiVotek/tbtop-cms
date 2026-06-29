@@ -11,8 +11,11 @@ use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
+use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Support\PageSlugWriter;
 
 class CmsServiceProvider extends PackageServiceProvider
 {
@@ -23,6 +26,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasMigration('create_languages_table')
             ->hasMigration('create_pages_table')
+            ->hasMigration('create_page_slugs_table')
             ->hasMigration('create_cms_user_profiles_table')
             ->hasCommands([
                 CreateAdminCommand::class,
@@ -36,12 +40,15 @@ class CmsServiceProvider extends PackageServiceProvider
     {
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
+        $this->app->scoped(PageResolver::class);
+        $this->app->scoped(Cms::class);
         $this->registerAdminPanel();
     }
 
     public function packageBooted(): void
     {
         $this->wireAdminLoginRedirect();
+        $this->wireLocaleSlugBackfill();
     }
 
     private function registerAdminPanel(): void
@@ -72,5 +79,21 @@ class CmsServiceProvider extends PackageServiceProvider
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
 
         Route::redirect('login', $prefix . '/login')->name('login');
+    }
+
+    private function wireLocaleSlugBackfill(): void
+    {
+        Language::saved(function (Language $language): void {
+            $activated = $language->wasRecentlyCreated
+                ? $language->is_frontend_active
+                : ($language->wasChanged('is_frontend_active') && $language->is_frontend_active);
+
+            if (! $activated) {
+                return;
+            }
+
+            app(Languages::class)->refresh();
+            app(PageSlugWriter::class)->backfillLocale($language->locale);
+        });
     }
 }
