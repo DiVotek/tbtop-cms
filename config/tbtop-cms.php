@@ -1,6 +1,9 @@
 <?php
 
 declare(strict_types=1);
+use Tbtop\Cms\Admin\Pages\DashboardPage;
+use Tbtop\Cms\Admin\Pages\LoginPage;
+use Tbtop\Cms\Admin\Pages\ProfilePage;
 
 return [
     'languages' => [
@@ -20,6 +23,17 @@ return [
         'home' => [
             'name' => 'Home',
             'title' => 'Home',
+        ],
+    ],
+    'admin' => [
+        'autoregister' => true,
+        'prefix' => 'admin',
+        'guard' => 'web',
+        'model' => 'App\\Models\\User',
+        'pages' => [
+            'dashboard' => DashboardPage::class,
+            'profile' => ProfilePage::class,
+            'login' => LoginPage::class,
         ],
     ],
 ];
