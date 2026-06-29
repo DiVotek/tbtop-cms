@@ -67,3 +67,25 @@ it('loads translations and localized paths for editing', function (): void {
     expect($row['name'])->toBe(['en' => 'Contact'])
         ->and($row['paths'])->toBe(['en' => 'contact']);
 });
+
+it('locks system page structure but allows content edits', function (): void {
+    $page = Page::factory()->create([
+        'name' => ['en' => 'Home'],
+        'title' => ['en' => 'Home'],
+        'is_system' => true,
+        'status' => PageStatus::Published,
+    ]);
+
+    PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Draft->value,
+        'name' => ['en' => 'Home Updated'],
+        'title' => ['en' => 'Home'],
+        'parent_id' => '',
+    ], $page->id);
+
+    $page->refresh();
+
+    expect($page->status)->toBe(PageStatus::Published)
+        ->and($page->getTranslation('name', 'en'))->toBe('Home Updated');
+});

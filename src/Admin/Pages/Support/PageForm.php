@@ -47,20 +47,37 @@ class PageForm
         $parentId = self::nullableInt($form['parent_id'] ?? null);
         self::guardParent($page, $parentId);
 
-        $page->fill([
-            'type' => (string) ($form['type'] ?? ''),
-            'parent_id' => $parentId,
-            'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
+        $page->fill(self::fillAttributes($page, $form, $parentId));
+        $page->save();
+
+        return $page;
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    private static function fillAttributes(Page $page, array $form, ?int $parentId): array
+    {
+        $attributes = [
             'name' => $form['name'] ?? [],
             'title' => $form['title'] ?? [],
             'heading' => $form['heading'] ?? [],
             'summary' => $form['summary'] ?? [],
             'is_indexable' => (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
-        ]);
-        $page->save();
+        ];
 
-        return $page;
+        if ($page->exists && $page->is_system) {
+            return $attributes;
+        }
+
+        return [
+            ...$attributes,
+            'type' => (string) ($form['type'] ?? ''),
+            'parent_id' => $parentId,
+            'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
+        ];
     }
 
     /** @return array<string, mixed> */
