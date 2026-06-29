@@ -31,3 +31,14 @@ it('seeds the home name under the default locale', function (): void {
 
     expect($home->getTranslation('name', 'en'))->toBe('Home');
 });
+
+it('seeds the home name under a fallback locale when none is configured', function (): void {
+    config()->set('app.fallback_locale', 'en');
+
+    (new PageSeeder)->run();
+
+    $translations = Page::where('is_system', true)->first()->getTranslations('name');
+
+    expect($translations)->toHaveKey('en')
+        ->and($translations)->not->toHaveKey('');
+});

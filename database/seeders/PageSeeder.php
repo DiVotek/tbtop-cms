@@ -13,7 +13,7 @@ class PageSeeder extends Seeder
 {
     public function run(): void
     {
-        $locale = app(Languages::class)->defaultLocale();
+        $locale = app(Languages::class)->defaultLocale() ?: (string) (config('app.fallback_locale') ?: 'en');
         $name = (string) config('tbtop-cms.pages.home.name', 'Home');
 
         Page::firstOrCreate(
