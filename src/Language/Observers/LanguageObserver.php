@@ -12,6 +12,8 @@ class LanguageObserver
 {
     public function saving(Language $language): void
     {
+        $this->guardLastDefaultNotUnset($language);
+
         if ($language->is_default) {
             $language->is_admin_active = true;
             $language->is_frontend_active = true;
@@ -76,6 +78,24 @@ class LanguageObserver
         if ($frontendTurnedOn && ! $language->is_admin_active && ! $adminFlippedOff) {
             throw new DomainException(
                 "Language '{$language->locale}' cannot be frontend-active without being admin-active."
+            );
+        }
+    }
+
+    private function guardLastDefaultNotUnset(Language $language): void
+    {
+        if (! $language->exists || ! $language->isDirty('is_default') || $language->is_default) {
+            return;
+        }
+
+        $anotherDefaultExists = Language::query()
+            ->where('is_default', true)
+            ->whereKeyNot($language->getKey())
+            ->exists();
+
+        if (! $anotherDefaultExists) {
+            throw new DomainException(
+                "Language '{$language->locale}' is the only default and cannot be unset. Assign another default first."
             );
         }
     }

@@ -72,3 +72,11 @@ it('rejects turning frontend active on while admin stays off', function (): void
 
     expect(fn () => $language->update(['is_frontend_active' => true]))->toThrow(DomainException::class);
 });
+
+it('forbids unsetting the only default language', function (): void {
+    $language = Language::factory()->default()->create(['locale' => 'en']);
+
+    expect(fn () => $language->update(['is_default' => false]))->toThrow(DomainException::class);
+
+    expect(Language::where('is_default', true)->count())->toBe(1);
+});
