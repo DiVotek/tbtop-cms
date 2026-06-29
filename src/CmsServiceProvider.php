@@ -11,6 +11,7 @@ use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
+use Tbtop\Cms\Admin\ContentLocales;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
@@ -49,6 +50,7 @@ class CmsServiceProvider extends PackageServiceProvider
     {
         $this->wireAdminLoginRedirect();
         $this->wireLocaleSlugBackfill();
+        $this->wireContentLocales();
     }
 
     private function registerAdminPanel(): void
@@ -95,5 +97,10 @@ class CmsServiceProvider extends PackageServiceProvider
             app(Languages::class)->refresh();
             app(PageSlugWriter::class)->backfillLocale($language->locale);
         });
+    }
+
+    private function wireContentLocales(): void
+    {
+        ContentLocales::sync($this->app->make(Languages::class));
     }
 }
