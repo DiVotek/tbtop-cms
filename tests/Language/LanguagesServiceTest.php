@@ -76,3 +76,14 @@ it('seeds the configured default language', function (): void {
 
     expect(Language::where('locale', 'en')->where('is_default', true)->exists())->toBeTrue();
 });
+
+it('preserves the existing default when the target is gone', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+    $uk = Language::factory()->create(['locale' => 'uk']);
+    $uk->delete();
+
+    expect(fn () => app(Languages::class)->setDefault('uk'))->toThrow(InvalidArgumentException::class);
+
+    expect(app(Languages::class)->defaultLocale())->toBe('en')
+        ->and(Language::where('is_default', true)->count())->toBe(1);
+});

@@ -90,13 +90,15 @@ class Languages
 
     public function setDefault(string $locale): void
     {
-        if (! Language::query()->where('locale', $locale)->exists()) {
-            throw new InvalidArgumentException("Language '{$locale}' does not exist.");
-        }
-
         DB::transaction(function () use ($locale): void {
+            $target = Language::query()->where('locale', $locale)->lockForUpdate()->first();
+
+            if ($target === null) {
+                throw new InvalidArgumentException("Language '{$locale}' does not exist.");
+            }
+
             Language::query()->where('is_default', true)->lockForUpdate()->update(['is_default' => false]);
-            Language::query()->where('locale', $locale)->lockForUpdate()->update([
+            Language::query()->whereKey($target->getKey())->update([
                 'is_default' => true,
                 'is_admin_active' => true,
                 'is_frontend_active' => true,
