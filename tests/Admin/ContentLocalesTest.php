@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\ContentLocales;
+use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
 
@@ -35,9 +37,16 @@ it('keeps the configured default when no language is admin-active', function ():
     expect(config('tbtop-admin.content_locales'))->toBe(['en']);
 });
 
-it('re-syncs content locales when a language is saved', function (): void {
+it('syncs content locales on an admin request', function (): void {
+    config(['tbtop-cms.admin.model' => AdminUser::class]);
+    config(['auth.providers.users.model' => AdminUser::class]);
     Language::factory()->default()->create(['locale' => 'en']);
     Language::factory()->create(['locale' => 'uk', 'is_admin_active' => true]);
+
+    $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
+    CmsUserProfile::create(['user_id' => $user->id]);
+
+    $this->actingAs($user, 'web')->get('/admin/pages', ['X-Inertia' => 'true'])->assertOk();
 
     expect(config('tbtop-admin.content_locales'))->toBe(['en', 'uk']);
 });
