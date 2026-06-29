@@ -26,6 +26,8 @@ class PageSlugWriter
         if ($changed) {
             $this->cascadeChildren($page);
         }
+
+        $page->unsetRelation('slugs');
     }
 
     public function backfillLocale(string $locale): void

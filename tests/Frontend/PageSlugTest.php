@@ -125,3 +125,14 @@ it('caps an overly long slug', function (): void {
 
     expect(strlen($page->pathFor('en')))->toBeLessThanOrEqual(120);
 });
+
+it('refreshes the cached path on the same instance after reparent', function (): void {
+    $root = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Root']]);
+    $child = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Child']]);
+
+    expect($child->pathFor('en'))->toBe('child');
+
+    $child->update(['parent_id' => $root->id]);
+
+    expect($child->pathFor('en'))->toBe('root/child');
+});
