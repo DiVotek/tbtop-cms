@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tbtop\Cms\Page\Models;
+
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Translatable\HasTranslations;
+use Tbtop\Cms\Database\Factories\PageFactory;
+use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Observers\PageObserver;
+
+/**
+ * @property int $id
+ * @property string $type
+ * @property int|null $parent_id
+ * @property PageStatus $status
+ * @property string|null $name
+ * @property string|null $title
+ * @property string|null $heading
+ * @property string|null $summary
+ * @property array<int, array<string, mixed>>|null $content
+ * @property array<string, mixed>|null $seo
+ * @property bool $is_indexable
+ * @property bool $is_system
+ * @property int $sort_order
+ * @property int $lock_version
+ * @property int|null $created_by
+ * @property int|null $updated_by
+ */
+#[ObservedBy(PageObserver::class)]
+class Page extends Model
+{
+    /** @use HasFactory<PageFactory> */
+    use HasFactory;
+
+    use HasTranslations;
+    use SoftDeletes;
+
+    protected $guarded = [];
+
+    /** @var list<string> */
+    public array $translatable = ['name', 'title', 'heading', 'summary', 'content'];
+
+    /** @var array<string, string> */
+    protected $casts = [
+        'status' => PageStatus::class,
+        'seo' => 'array',
+        'is_indexable' => 'boolean',
+        'is_system' => 'boolean',
+        'sort_order' => 'integer',
+        'lock_version' => 'integer',
+    ];
+
+    /** @return BelongsTo<Page, $this> */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /** @return HasMany<Page, $this> */
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    protected static function newFactory(): PageFactory
+    {
+        return PageFactory::new();
+    }
+}

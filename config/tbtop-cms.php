@@ -15,4 +15,10 @@ return [
             ],
         ],
     ],
+    'pages' => [
+        'types' => [],
+        'home' => [
+            'name' => 'Home',
+        ],
+    ],
 ];
