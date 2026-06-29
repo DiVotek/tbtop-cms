@@ -33,7 +33,13 @@ class PageObserver
             throw new DomainException("Cannot delete system page [{$page->id}].");
         }
 
-        if ($page->children()->exists()) {
+        $children = Page::query()->where('parent_id', $page->id);
+
+        if ($page->isForceDeleting()) {
+            $children->withTrashed();
+        }
+
+        if ($children->exists()) {
             throw new DomainException("Cannot delete page [{$page->id}]: it has children.");
         }
     }

@@ -13,6 +13,7 @@ class PageHierarchy
     public static function assert(Page $page, PageTypeRegistry $registry): void
     {
         self::assertTypeRegistered($page, $registry);
+        self::assertChildrenAllowed($page, $registry);
         self::assertParentRequirement($page, $registry);
 
         if ($page->parent_id === null) {
@@ -30,6 +31,21 @@ class PageHierarchy
     {
         if (! $registry->has($page->type)) {
             throw new DomainException("Page type [{$page->type}] is not registered.");
+        }
+    }
+
+    private static function assertChildrenAllowed(Page $page, PageTypeRegistry $registry): void
+    {
+        if (! $page->exists || ! $page->isDirty('type')) {
+            return;
+        }
+
+        $allowed = $registry->get($page->type)->allowedChildren();
+
+        foreach ($page->children()->distinct()->pluck('type')->all() as $childType) {
+            if (! in_array($childType, $allowed, true)) {
+                throw new DomainException("Page type [{$page->type}] cannot contain existing [{$childType}] child.");
+            }
         }
     }
 
@@ -76,6 +92,7 @@ class PageHierarchy
     {
         $type = $registry->get($page->type);
 
+        // Leaf types do not extend nesting; depth is bounded by their containers.
         if ($type->allowedChildren() === []) {
             return;
         }

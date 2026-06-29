@@ -115,3 +115,28 @@ it('rejects an unregistered page type', function (): void {
     expect(fn () => Page::factory()->create(['type' => 'widget']))
         ->toThrow(DomainException::class);
 });
+
+it('rejects changing a parent type so it no longer allows its children', function (): void {
+    $category = Page::factory()->category()->create();
+    Page::factory()->article()->create(['parent_id' => $category->id]);
+
+    expect(fn () => $category->update(['type' => 'page']))->toThrow(DomainException::class);
+});
+
+it('forbids force-deleting a page whose only children are trashed', function (): void {
+    $category = Page::factory()->category()->create();
+    $article = Page::factory()->article()->create(['parent_id' => $category->id]);
+    $article->delete();
+
+    expect(fn () => $category->forceDelete())->toThrow(DomainException::class);
+});
+
+it('allows soft-deleting a page whose only children are trashed', function (): void {
+    $category = Page::factory()->category()->create();
+    $article = Page::factory()->article()->create(['parent_id' => $category->id]);
+    $article->delete();
+
+    $category->delete();
+
+    expect($category->trashed())->toBeTrue();
+});

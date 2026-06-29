@@ -15,5 +15,6 @@ interface PageTypeInterface
 
     public function requiresParent(): bool;
 
+    /** Max nesting depth for container types; leaf types are not depth-checked. */
     public function maxDepth(): int;
 }
