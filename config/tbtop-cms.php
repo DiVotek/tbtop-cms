@@ -4,9 +4,12 @@ declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\DashboardPage;
 use Tbtop\Cms\Admin\Pages\LanguagesPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
+use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Admin\Pages\RedirectsPage;
+use Tbtop\Cms\Admin\Pages\SeoSettingsPage;
+use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 
 return [
@@ -32,6 +35,11 @@ return [
     'blocks' => [
         'types' => [],
     ],
+    'settings' => [
+        'secret' => [
+            'notifications.mail.smtp_password',
+        ],
+    ],
     'frontend' => [
         'middleware' => [
             SetLanguage::class,
@@ -49,6 +57,9 @@ return [
             'languages' => LanguagesPage::class,
             'pages' => PagesPage::class,
             'redirects' => RedirectsPage::class,
+            'site_settings' => SiteSettingsPage::class,
+            'seo_settings' => SeoSettingsPage::class,
+            'notification_settings' => NotificationSettingsPage::class,
         ],
     ],
 ];

@@ -21,6 +21,7 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
 use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
 use Tbtop\Cms\Redirect\RedirectResolver;
+use Tbtop\Cms\Settings\Settings;
 
 class CmsServiceProvider extends PackageServiceProvider
 {
@@ -34,6 +35,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_page_slugs_table')
             ->hasMigration('create_cms_user_profiles_table')
             ->hasMigration('create_redirects_table')
+            ->hasMigration('create_settings_table')
             ->hasCommands([
                 CreateAdminCommand::class,
                 GrantAdminCommand::class,
@@ -50,6 +52,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(BlockContentResolver::class);
         $this->app->scoped(PageResolver::class);
         $this->app->scoped(RedirectResolver::class);
+        $this->app->scoped(Settings::class);
         $this->app->scoped(Cms::class);
         $this->registerAdminPanel();
     }
