@@ -86,3 +86,21 @@ it('does not resolve a draft page', function (): void {
 
     $this->getJson('/secret')->assertNotFound();
 });
+
+it('redirects the default-locale prefix to the clean URL', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/en/about')->assertRedirect('/about')->assertStatus(301);
+});
+
+it('redirects the bare default-locale prefix to the site root', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/en')->assertRedirect('/');
+});
+
+it('preserves the query string when canonicalizing the locale prefix', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/en/about?ref=x')->assertRedirect('/about?ref=x');
+});

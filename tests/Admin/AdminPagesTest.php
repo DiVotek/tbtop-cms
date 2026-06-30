@@ -40,3 +40,16 @@ it('redirects a guest away from the pages admin', function (): void {
 it('redirects a guest away from the languages admin', function (): void {
     $this->get('/admin/languages')->assertRedirect(route('login'));
 });
+
+it('shows the redirects admin to an admin user', function (): void {
+    $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
+    CmsUserProfile::create(['user_id' => $user->id]);
+
+    $this->actingAs($user, 'web')
+        ->get('/admin/redirects', ['X-Inertia' => 'true'])
+        ->assertOk();
+});
+
+it('redirects a guest away from the redirects admin', function (): void {
+    $this->get('/admin/redirects')->assertRedirect(route('login'));
+});

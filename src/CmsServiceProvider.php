@@ -14,8 +14,11 @@ use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
+use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
+use Tbtop\Cms\Redirect\RedirectResolver;
 
 class CmsServiceProvider extends PackageServiceProvider
 {
@@ -28,6 +31,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_pages_table')
             ->hasMigration('create_page_slugs_table')
             ->hasMigration('create_cms_user_profiles_table')
+            ->hasMigration('create_redirects_table')
             ->hasCommands([
                 CreateAdminCommand::class,
                 GrantAdminCommand::class,
@@ -41,6 +45,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->scoped(PageResolver::class);
+        $this->app->scoped(RedirectResolver::class);
         $this->app->scoped(Cms::class);
         $this->registerAdminPanel();
     }
@@ -49,6 +54,7 @@ class CmsServiceProvider extends PackageServiceProvider
     {
         $this->wireAdminLoginRedirect();
         $this->wireLocaleSlugBackfill();
+        $this->wireRedirectMaintenance();
     }
 
     private function registerAdminPanel(): void
@@ -95,5 +101,10 @@ class CmsServiceProvider extends PackageServiceProvider
             app(Languages::class)->refresh();
             app(PageSlugWriter::class)->backfillLocale($language->locale);
         });
+    }
+
+    private function wireRedirectMaintenance(): void
+    {
+        PageSlug::observe(PageSlugRedirects::class);
     }
 }
