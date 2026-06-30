@@ -37,6 +37,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_cms_user_profiles_table')
             ->hasMigration('create_redirects_table')
             ->hasMigration('create_cms_settings_table')
+            ->hasMigration('create_cms_templates_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
