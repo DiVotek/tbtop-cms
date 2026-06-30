@@ -48,7 +48,7 @@ class PageController
                 'title' => $page->getTranslation('title', $locale),
                 'heading' => $page->getTranslation('heading', $locale),
                 'summary' => $page->getTranslation('summary', $locale),
-                'content' => $page->getTranslation('content', $locale),
+                'content' => $page->content ?? [],
                 'seo' => $page->seo,
             ],
             'locale' => $locale,

@@ -45,11 +45,12 @@ class Page extends Model
     protected $guarded = [];
 
     /** @var list<string> */
-    public array $translatable = ['name', 'title', 'heading', 'summary', 'content'];
+    public array $translatable = ['name', 'title', 'heading', 'summary'];
 
     /** @var array<string, string> */
     protected $casts = [
         'status' => PageStatus::class,
+        'content' => 'array',
         'seo' => 'array',
         'is_indexable' => 'boolean',
         'is_system' => 'boolean',

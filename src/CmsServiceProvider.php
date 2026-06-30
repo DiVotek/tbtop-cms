@@ -11,6 +11,8 @@ use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
+use Tbtop\Cms\Block\BlockContentResolver;
+use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
@@ -44,6 +46,8 @@ class CmsServiceProvider extends PackageServiceProvider
     {
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
+        $this->app->singleton(BlockRegistry::class);
+        $this->app->scoped(BlockContentResolver::class);
         $this->app->scoped(PageResolver::class);
         $this->app->scoped(RedirectResolver::class);
         $this->app->scoped(Cms::class);
