@@ -57,3 +57,17 @@ it('falls back to global SEO defaults when page fields are empty', function (): 
         ->assertJsonPath('props.seo.canonical', url('/about'))
         ->assertJsonPath('props.seo.noindex', true);
 });
+
+it('falls back to the page summary for the meta description', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'summary' => ['en' => 'A short page summary.'],
+        'seo' => [],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.description', 'A short page summary.');
+});

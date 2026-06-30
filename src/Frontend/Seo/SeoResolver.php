@@ -24,7 +24,7 @@ class SeoResolver
 
         return [
             'title' => $this->title($page, $seo, $locale),
-            'description' => $this->fallback($seo, 'description', 'seo.default_description'),
+            'description' => $this->description($page, $seo, $locale),
             'canonical' => $this->canonical($page, $seo, $locale),
             'ogImage' => $this->ogImage($seo),
             'noindex' => ! $page->is_indexable,
@@ -71,15 +71,21 @@ class SeoResolver
     }
 
     /** @param array<string, mixed> $seo */
-    private function fallback(array $seo, string $key, string $settingKey): string
+    private function description(Page $page, array $seo, string $locale): string
     {
-        $value = $this->str($seo, $key);
+        $override = $this->str($seo, 'description');
 
-        if ($value !== '') {
-            return $value;
+        if ($override !== '') {
+            return $override;
         }
 
-        $global = $this->settings->get($settingKey, '');
+        $summary = (string) $page->getTranslation('summary', $locale, false);
+
+        if ($summary !== '') {
+            return $summary;
+        }
+
+        $global = $this->settings->get('seo.default_description', '');
 
         return is_string($global) ? $global : '';
     }
