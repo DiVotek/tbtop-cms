@@ -8,6 +8,14 @@ use Tbtop\Cms\Page\Models\Page;
 
 uses(RefreshDatabase::class);
 
+afterEach(function (): void {
+    $published = config_path('tbtop-cms.php');
+
+    if (is_file($published)) {
+        unlink($published);
+    }
+});
+
 it('prepares default languages and a single home page on a fresh app', function (): void {
     $this->artisan('cms:install')->assertExitCode(0);
 
