@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('settings', function (Blueprint $table): void {
+        Schema::create('cms_settings', function (Blueprint $table): void {
             $table->id();
             $table->string('key')->unique();
             $table->text('value')->nullable();
@@ -21,6 +21,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('settings');
+        Schema::dropIfExists('cms_settings');
     }
 };
