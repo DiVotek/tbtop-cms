@@ -34,7 +34,7 @@ class SeoResolver
     /** @param array<string, mixed> $seo */
     private function title(Page $page, array $seo, string $locale): string
     {
-        $base = $this->str($seo, 'title') ?: (string) $page->getTranslation('title', $locale, false);
+        $base = $this->str($seo, 'title') ?: (string) $page->getTranslation('title', $locale);
         $suffix = (string) $this->settings->get('seo.title_suffix', '');
 
         if ($suffix === '') {
@@ -79,7 +79,7 @@ class SeoResolver
             return $override;
         }
 
-        $summary = (string) $page->getTranslation('summary', $locale, false);
+        $summary = (string) $page->getTranslation('summary', $locale);
 
         if ($summary !== '') {
             return $summary;

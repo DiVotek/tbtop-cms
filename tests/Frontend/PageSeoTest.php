@@ -71,3 +71,19 @@ it('falls back to the page summary for the meta description', function (): void 
         ->assertOk()
         ->assertJsonPath('props.seo.description', 'A short page summary.');
 });
+
+it('uses the default-locale title fallback for a non-default-locale page', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        'title' => ['en' => 'About Page'],
+        'seo' => [],
+    ]);
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.page.title', 'About Page')
+        ->assertJsonPath('props.seo.title', 'About Page — Acme');
+});
