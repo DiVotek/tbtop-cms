@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\PageResolver;
+use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
+use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\RedirectResolver;
 
@@ -19,9 +23,12 @@ class PageController
         private readonly PageResolver $resolver,
         private readonly Breadcrumbs $breadcrumbs,
         private readonly RedirectResolver $redirects,
+        private readonly BlockContentResolver $blocks,
+        private readonly PageSpecAssembler $assembler,
+        private readonly SeoResolver $seo,
     ) {}
 
-    public function __invoke(Request $request): JsonResponse | RedirectResponse
+    public function __invoke(Request $request): Response | RedirectResponse
     {
         $locale = (string) app()->getLocale();
         $path = (string) $request->attributes->get('cms_path', '');
@@ -33,12 +40,19 @@ class PageController
                 ?? throw new NotFoundHttpException;
         }
 
-        return response()->json($this->payload($page, $locale, $path));
+        return Inertia::render($this->component(), $this->props($page, $locale, $path));
+    }
+
+    private function component(): string
+    {
+        return (string) config('tbtop-cms.render.component', 'Cms/Page');
     }
 
     /** @return array<string, mixed> */
-    private function payload(Page $page, string $locale, string $path): array
+    private function props(Page $page, string $locale, string $path): array
     {
+        $resolved = $this->blocks->resolve($page->content ?? [], $page);
+
         return [
             'page' => [
                 'id' => $page->getKey(),
@@ -48,12 +62,11 @@ class PageController
                 'title' => $page->getTranslation('title', $locale),
                 'heading' => $page->getTranslation('heading', $locale),
                 'summary' => $page->getTranslation('summary', $locale),
-                'content' => $page->content ?? [],
-                'seo' => $page->seo,
             ],
-            'locale' => $locale,
-            'path' => $path,
+            'render' => $this->assembler->assemble($resolved),
+            'seo' => $this->seo->resolve($page, $locale),
             'breadcrumbs' => $this->breadcrumbs->forPage($page, $locale),
+            'path' => $path,
         ];
     }
 }
