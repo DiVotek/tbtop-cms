@@ -29,6 +29,9 @@ return [
             'title' => 'Home',
         ],
     ],
+    'blocks' => [
+        'types' => [],
+    ],
     'frontend' => [
         'middleware' => [
             SetLanguage::class,
