@@ -6,6 +6,7 @@ use Tbtop\Cms\Admin\Pages\LanguagesPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
+use Tbtop\Cms\Admin\Pages\RedirectsPage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 
 return [
@@ -44,6 +45,7 @@ return [
             'login' => LoginPage::class,
             'languages' => LanguagesPage::class,
             'pages' => PagesPage::class,
+            'redirects' => RedirectsPage::class,
         ],
     ],
 ];
