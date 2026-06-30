@@ -13,6 +13,7 @@ use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
@@ -37,6 +38,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_redirects_table')
             ->hasMigration('create_cms_settings_table')
             ->hasCommands([
+                InstallCommand::class,
                 CreateAdminCommand::class,
                 GrantAdminCommand::class,
                 RevokeAdminCommand::class,
