@@ -50,11 +50,11 @@ it('derives localized breadcrumbs from ancestors', function (): void {
 
     app(Cms::class)->frontendRoutes();
 
-    $this->getJson('/' . $article->pathFor('en'))
+    $this->get('/' . $article->pathFor('en'), ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonCount(1, 'breadcrumbs')
-        ->assertJsonPath('breadcrumbs.0.label', 'Blog')
-        ->assertJsonPath('breadcrumbs.0.url', '/blog');
+        ->assertJsonCount(1, 'props.breadcrumbs')
+        ->assertJsonPath('props.breadcrumbs.0.label', 'Blog')
+        ->assertJsonPath('props.breadcrumbs.0.url', '/blog');
 });
 
 it('rebuilds descendant paths when an ancestor is reparented', function (): void {
@@ -111,10 +111,10 @@ it('localizes breadcrumb paths and labels for a non-default locale', function ()
 
     app(Cms::class)->frontendRoutes();
 
-    $this->getJson('/uk/' . $article->pathFor('uk'))
+    $this->get('/uk/' . $article->pathFor('uk'), ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('breadcrumbs.0.label', 'Blog UA')
-        ->assertJsonPath('breadcrumbs.0.url', '/uk/' . $category->pathFor('uk'));
+        ->assertJsonPath('props.breadcrumbs.0.label', 'Blog UA')
+        ->assertJsonPath('props.breadcrumbs.0.url', '/uk/' . $category->pathFor('uk'));
 });
 
 it('caps an overly long slug', function (): void {

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
+use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\PageUrl;
 use Tbtop\Cms\Page\Models\Page;
@@ -25,7 +26,7 @@ class Cms
         /** @var list<class-string> $middleware */
         $middleware = (array) config('tbtop-cms.frontend.middleware', [SetLanguage::class]);
 
-        Route::middleware($middleware)
+        Route::middleware([...$middleware, ShareCmsProps::class])
             ->get('{path?}', PageController::class)
             ->where('path', '.*');
     }

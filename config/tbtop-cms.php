@@ -45,6 +45,11 @@ return [
             SetLanguage::class,
         ],
     ],
+    'render' => [
+        'component' => 'Cms/Page',
+        'root_kind' => 'Fragment',
+        'root_view' => null,
+    ],
     'admin' => [
         'autoregister' => true,
         'prefix' => 'admin',

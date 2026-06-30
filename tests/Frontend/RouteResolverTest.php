@@ -23,10 +23,11 @@ it('resolves a default-locale page at a clean URL', function (): void {
 
     app(Cms::class)->frontendRoutes();
 
-    $this->getJson('/about')
+    $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('page.id', $page->id)
-        ->assertJsonPath('locale', 'en');
+        ->assertJsonPath('component', 'Cms/Page')
+        ->assertJsonPath('props.page.id', $page->id)
+        ->assertJsonPath('props.cms.locale', 'en');
 });
 
 it('resolves a non-default-locale page at a prefixed URL', function (): void {
@@ -39,10 +40,11 @@ it('resolves a non-default-locale page at a prefixed URL', function (): void {
 
     app(Cms::class)->frontendRoutes();
 
-    $this->getJson('/uk/' . $page->pathFor('uk'))
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('page.id', $page->id)
-        ->assertJsonPath('locale', 'uk');
+        ->assertJsonPath('component', 'Cms/Page')
+        ->assertJsonPath('props.page.id', $page->id)
+        ->assertJsonPath('props.cms.locale', 'uk');
 });
 
 it('lets a host route win over the CMS catch-all', function (): void {

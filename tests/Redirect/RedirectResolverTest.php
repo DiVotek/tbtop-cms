@@ -20,9 +20,9 @@ it('serves a real page even when a redirect exists at its path', function (): vo
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
     Redirect::create(['locale' => 'en', 'from_path' => 'about', 'to_path' => 'elsewhere', 'status_code' => 301]);
 
-    $this->getJson('/about')
+    $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('page.id', $page->id);
+        ->assertJsonPath('props.page.id', $page->id);
 });
 
 it('redirects after a page lookup miss', function (): void {
