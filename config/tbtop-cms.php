@@ -48,6 +48,9 @@ return [
             SetLanguage::class,
         ],
     ],
+    'forms' => [
+        'throttle' => '10,1',
+    ],
     'render' => [
         'component' => 'Cms/Page',
         'root_kind' => 'Fragment',

@@ -18,7 +18,7 @@ use Tbtop\Cms\Block\BlockRegistry;
  * v1 targets a single registered block kind: every registered block's form
  * fields are unioned into one flat repeater, so two kinds declaring the same
  * field name would collide. Per-kind field namespacing and kind-gated field
- * visibility land with the second block type (#13).
+ * visibility need a polymorphic repeater primitive in the tbtop/admin engine.
  *
  * Block field names must not be `id`, `kind`, or `active`: those are the
  * envelope's reserved keys and always take precedence over row data.

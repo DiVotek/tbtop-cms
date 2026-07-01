@@ -6,6 +6,7 @@ namespace Tbtop\Cms;
 
 use Illuminate\Support\Facades\Route;
 use Tbtop\Cms\Frontend\Breadcrumbs;
+use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
@@ -26,9 +27,13 @@ class Cms
         /** @var list<class-string> $middleware */
         $middleware = (array) config('tbtop-cms.frontend.middleware', [SetLanguage::class]);
 
-        Route::middleware([...$middleware, ShareCmsProps::class])
-            ->get('{path?}', PageController::class)
-            ->where('path', '.*');
+        Route::middleware([...$middleware, ShareCmsProps::class])->group(function (): void {
+            Route::post('_cms/forms/{locale}/{page}/{block}', FormSubmitController::class)
+                ->middleware('throttle:' . config('tbtop-cms.forms.throttle', '10,1'))
+                ->name('tbtop-cms.form.submit');
+
+            Route::get('{path?}', PageController::class)->where('path', '.*');
+        });
     }
 
     public function resolve(string $path, ?string $locale = null): ?Page

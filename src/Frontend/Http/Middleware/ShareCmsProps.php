@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Frontend\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\ViewErrorBag;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Language\Languages;
@@ -32,6 +33,8 @@ class ShareCmsProps
             'languages' => $this->frontendLanguages(),
         ]);
 
+        Inertia::share('errors', Inertia::always($this->validationErrors($request)));
+
         return $next($request);
     }
 
@@ -41,6 +44,24 @@ class ShareCmsProps
         return array_map(
             static fn (array $row): array => ['locale' => $row['locale'], 'name' => $row['name']],
             $this->languages->frontendActive(),
+        );
+    }
+
+    private function validationErrors(Request $request): object
+    {
+        if (! $request->hasSession()) {
+            return (object) [];
+        }
+
+        $bag = $request->session()->get('errors');
+
+        if (! $bag instanceof ViewErrorBag) {
+            return (object) [];
+        }
+
+        return (object) array_map(
+            static fn (array $messages): string => $messages[0],
+            $bag->getBag('default')->getMessages(),
         );
     }
 }
