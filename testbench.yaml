@@ -1,0 +1,12 @@
+laravel: '@testbench'
+
+seeders:
+  - Workbench\Database\Seeders\DatabaseSeeder
+
+workbench:
+  start: '/landing'
+  build:
+    - create-sqlite-db
+    - migrate-fresh
+    - db-seed:
+        --class: 'Workbench\Database\Seeders\DatabaseSeeder'
