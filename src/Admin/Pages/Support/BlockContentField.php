@@ -11,6 +11,15 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
 
+/**
+ * Builds the Pages "Blocks" repeater and maps its rows to and from the stored
+ * {id, kind, active, data} block envelope.
+ *
+ * v1 targets a single registered block kind: every registered block's form
+ * fields are unioned into one flat repeater, so two kinds declaring the same
+ * field name would collide. Per-kind field namespacing and kind-gated field
+ * visibility land with the second block type (#13).
+ */
 class BlockContentField
 {
     public static function make(S $s): Node
