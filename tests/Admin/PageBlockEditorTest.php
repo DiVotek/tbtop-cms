@@ -90,3 +90,22 @@ it('flattens the stored envelope back into editable rows', function (): void {
         ->and($row['active'])->toBeFalse()
         ->and($row['title'])->toBe(['en' => 'Welcome']);
 });
+
+it('keeps envelope metadata when block data reuses a reserved key', function (): void {
+    $page = Page::factory()->create([
+        'name' => ['en' => 'About'],
+        'content' => [[
+            'id' => 'hero-1',
+            'kind' => 'Hero',
+            'active' => false,
+            'data' => ['id' => 'nope', 'active' => 'oops', 'title' => ['en' => 'Kept']],
+        ]],
+    ]);
+
+    $row = PageForm::loadRow($page->id)['content'][0];
+
+    expect($row['id'])->toBe('hero-1')
+        ->and($row['kind'])->toBe('Hero')
+        ->and($row['active'])->toBeFalse()
+        ->and($row['title'])->toBe(['en' => 'Kept']);
+});

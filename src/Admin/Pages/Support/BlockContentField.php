@@ -19,6 +19,9 @@ use Tbtop\Cms\Block\BlockRegistry;
  * fields are unioned into one flat repeater, so two kinds declaring the same
  * field name would collide. Per-kind field namespacing and kind-gated field
  * visibility land with the second block type (#13).
+ *
+ * Block field names must not be `id`, `kind`, or `active`: those are the
+ * envelope's reserved keys and always take precedence over row data.
  */
 class BlockContentField
 {
@@ -88,10 +91,10 @@ class BlockContentField
             $data = is_array($block['data'] ?? null) ? $block['data'] : [];
 
             $rows[] = [
+                ...$data,
                 'id' => (string) ($block['id'] ?? ''),
                 'kind' => (string) ($block['kind'] ?? ''),
                 'active' => (bool) ($block['active'] ?? true),
-                ...$data,
             ];
         }
 
