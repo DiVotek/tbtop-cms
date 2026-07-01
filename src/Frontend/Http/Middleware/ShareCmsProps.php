@@ -33,7 +33,7 @@ class ShareCmsProps
             'languages' => $this->frontendLanguages(),
         ]);
 
-        Inertia::share('errors', fn (): object => $this->validationErrors($request));
+        Inertia::share('errors', Inertia::always($this->validationErrors($request)));
 
         return $next($request);
     }
