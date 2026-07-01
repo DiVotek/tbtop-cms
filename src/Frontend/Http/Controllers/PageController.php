@@ -11,6 +11,7 @@ use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
+use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -26,6 +27,7 @@ class PageController
         private readonly BlockContentResolver $blocks,
         private readonly PageSpecAssembler $assembler,
         private readonly SeoResolver $seo,
+        private readonly FormActionBinder $forms,
     ) {}
 
     public function __invoke(Request $request): Response | RedirectResponse
@@ -51,7 +53,7 @@ class PageController
     /** @return array<string, mixed> */
     private function props(Page $page, string $locale, string $path): array
     {
-        $resolved = $this->blocks->resolve($page->content ?? [], $page);
+        $resolved = $this->forms->bind($this->blocks->resolve($page->content ?? [], $page), $page);
 
         return [
             'page' => [

@@ -55,6 +55,15 @@ class DatabaseSeeder extends Seeder
                     'ctaHref' => 'https://github.com/DiVotek/tbtop-cms',
                 ],
             ],
+            [
+                'id' => (string) Str::ulid(),
+                'kind' => 'ContactForm',
+                'active' => true,
+                'data' => [
+                    'heading' => ['en' => 'Get in touch'],
+                    'recipient' => 'demo@example.test',
+                ],
+            ],
         ];
         $page->save();
     }
