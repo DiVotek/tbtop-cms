@@ -9,7 +9,6 @@ use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Actions\DeleteAction;
-use Tbtop\Admin\Dsl\Actions\EditAction;
 use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -40,6 +39,8 @@ class TemplatesPage extends AdminPage
 
     public function view(S $s): Node
     {
+        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+
         $table = $s->table('templates')
             ->query($this->query(...))
             ->columns([
@@ -49,8 +50,16 @@ class TemplatesPage extends AdminPage
             ->searchable(['name'])
             ->defaultSort('name', 'asc')
             ->emptyState('No templates yet', 'Create your first template.', 'layout-template')
-            ->headerActions([$this->createAction($s)])
-            ->rowActions([$this->applyAction($s), $this->editAction($s), $this->deleteAction($s)]);
+            ->headerActions([
+                $s->action('templateCreate')->label('New template')
+                    ->visit(route('tbtop.cms.template-create-page')),
+            ])
+            ->rowActions([
+                $this->applyAction($s),
+                $s->action('templateEdit')->label('Edit')
+                    ->visit('/' . $prefix . '/templates/{row.id}/edit'),
+                $this->deleteAction($s),
+            ]);
 
         return $s->stack([$table]);
     }
@@ -59,33 +68,6 @@ class TemplatesPage extends AdminPage
     private function query(): Builder
     {
         return Template::query();
-    }
-
-    private function createAction(S $s): ActionBuilder
-    {
-        $form = $s->form('templateCreate', [
-            ...TemplateForm::fields($s),
-            $s->actionsRow([
-                $s->action('templateCreateSave')->label('Create')->color('primary')
-                    ->handle($this->create(...), needs: ['form']),
-                $s->action('templateCreateCancel')->label('Cancel')
-                    ->handle(static fn (): Effects => Effects::make()->closeModal()),
-            ]),
-        ]);
-
-        return $s->action('templateCreate')->label('New template')->modal('New template', $form);
-    }
-
-    private function editAction(S $s): ActionBuilder
-    {
-        return EditAction::make(
-            $s,
-            $s->form('templateEdit', TemplateForm::fields($s)),
-            static fn (ActionCtx $ctx): array => TemplateForm::loadRow((int) ($ctx->row['id'] ?? 0)),
-            static fn (ActionCtx $ctx): Template => TemplateForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
-            name: 'templateEdit',
-            title: 'Edit template',
-        );
     }
 
     private function deleteAction(S $s): ActionBuilder
@@ -110,13 +92,6 @@ class TemplatesPage extends AdminPage
         ]);
 
         return $s->action('templateApply')->label('Apply to page')->modal('Apply to page', $form);
-    }
-
-    private function create(ActionCtx $ctx): Effects
-    {
-        TemplateForm::save($ctx->form);
-
-        return Effects::make()->notify('Template created')->closeModal()->refreshTable();
     }
 
     private function apply(ActionCtx $ctx): Effects
