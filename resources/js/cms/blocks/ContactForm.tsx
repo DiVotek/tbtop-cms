@@ -33,6 +33,11 @@ export function ContactForm({ props }: { props: ContactFormProps }) {
 
     return (
         <form data-testid="contact-form" className="cms-contact-form" onSubmit={submit}>
+            {form.errors.form ? (
+                <p role="alert" data-testid="contact-error" className="cms-contact-form__error">
+                    {form.errors.form}
+                </p>
+            ) : null}
             {props.heading ? <h2>{props.heading}</h2> : null}
             {props.fields.map((field) => (
                 <label key={field.name} className="cms-contact-form__field">

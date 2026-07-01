@@ -6,12 +6,14 @@ namespace Tbtop\Cms\Frontend\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Frontend\Form\FormBlockLocator;
 use Tbtop\Cms\Frontend\Form\LocatedFormBlock;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Throwable;
 
 class FormSubmitController
 {
@@ -37,7 +39,14 @@ class FormSubmitController
         }
 
         $payload = $request->validate($located->block->submitRules($located->data, $located->context));
-        $located->block->handleSubmit($payload, $located->data, $located->context);
+
+        try {
+            $located->block->handleSubmit($payload, $located->data, $located->context);
+        } catch (Throwable $e) {
+            Log::error('form.submit.failed', ['page' => $model->getKey(), 'block' => $block, 'error' => $e->getMessage()]);
+
+            return back()->withErrors(['form' => 'Sorry, we could not process your submission. Please try again.']);
+        }
 
         return back();
     }

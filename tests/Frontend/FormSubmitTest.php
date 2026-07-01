@@ -12,11 +12,12 @@ use Tbtop\Cms\Mail\ContactFormMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
+use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config(['cache.default' => 'array']);
+    config(['cache.default' => 'array', 'session.driver' => 'array']);
     config()->set('tbtop-cms.blocks.types', [ContactForm::class, HeroBlock::class]);
     config()->set('tbtop-cms.forms.throttle', '3,1');
     Language::factory()->default()->create(['locale' => 'en']);
@@ -146,4 +147,23 @@ it('processes a submission under the locale carried by the action url', function
 
     expect(RecordingFormBlock::$locale)->toBe('uk')
         ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
+});
+
+it('gracefully handles a submission whose block handler throws', function (): void {
+    config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Boom'],
+        'content' => [[
+            'id' => 'throw-1',
+            'kind' => 'Throwing',
+            'active' => true,
+            'data' => [],
+        ]],
+    ]);
+
+    $this->post(submitUrl($page, 'throw-1'), ['value' => 'x'])
+        ->assertRedirect()
+        ->assertSessionHasErrors(['form']);
 });
