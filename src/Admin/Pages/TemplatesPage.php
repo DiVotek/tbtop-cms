@@ -39,7 +39,11 @@ class TemplatesPage extends AdminPage
 
     public function view(S $s): Node
     {
-        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+        $editHref = str_replace(
+            '__ROWID__',
+            '{row.id}',
+            route('tbtop.cms.template-edit-page', ['template' => '__ROWID__']),
+        );
 
         $table = $s->table('templates')
             ->query($this->query(...))
@@ -57,7 +61,7 @@ class TemplatesPage extends AdminPage
             ->rowActions([
                 $this->applyAction($s),
                 $s->action('templateEdit')->label('Edit')
-                    ->visit('/' . $prefix . '/templates/{row.id}/edit'),
+                    ->visit($editHref),
                 $this->deleteAction($s),
             ]);
 
