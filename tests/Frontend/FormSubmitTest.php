@@ -11,6 +11,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Mail\ContactFormMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 
 uses(RefreshDatabase::class);
 
@@ -37,9 +38,9 @@ function contactFormPage(): Page
     ]);
 }
 
-function submitUrl(Page $page, string $block): string
+function submitUrl(Page $page, string $block, string $locale = 'en'): string
 {
-    return route('tbtop-cms.form.submit', ['page' => $page->getKey(), 'block' => $block]);
+    return route('tbtop-cms.form.submit', ['locale' => $locale, 'page' => $page->getKey(), 'block' => $block]);
 }
 
 it('exposes the submit action url in the rendered form block props', function (): void {
@@ -119,4 +120,30 @@ it('throttles repeated submissions from the same client', function (): void {
     }
 
     $this->postJson($url, [])->assertStatus(429);
+});
+
+it('processes a submission under the locale carried by the action url', function (): void {
+    Language::factory()->create([
+        'locale' => 'uk',
+        'is_admin_active' => true,
+        'is_frontend_active' => true,
+    ]);
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$locale = null;
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [[
+            'id' => 'rec-1',
+            'kind' => 'Recording',
+            'active' => true,
+            'data' => ['label' => ['en' => 'EN copy', 'uk' => 'UA copy']],
+        ]],
+    ]);
+
+    $this->post(submitUrl($page, 'rec-1', 'uk'), ['value' => 'hello'])->assertRedirect();
+
+    expect(RecordingFormBlock::$locale)->toBe('uk')
+        ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
 });

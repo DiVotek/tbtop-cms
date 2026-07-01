@@ -28,7 +28,7 @@ class Cms
         $middleware = (array) config('tbtop-cms.frontend.middleware', [SetLanguage::class]);
 
         Route::middleware([...$middleware, ShareCmsProps::class])->group(function (): void {
-            Route::post('_cms/forms/{page}/{block}', FormSubmitController::class)
+            Route::post('_cms/forms/{locale}/{page}/{block}', FormSubmitController::class)
                 ->middleware('throttle:' . config('tbtop-cms.forms.throttle', '10,1'))
                 ->name('tbtop-cms.form.submit');
 

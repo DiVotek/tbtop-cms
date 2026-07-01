@@ -33,7 +33,7 @@ class FormActionBinder
             return $block;
         }
 
-        $action = route('tbtop-cms.form.submit', ['page' => $page->getKey(), 'block' => $block->id]);
+        $action = route('tbtop-cms.form.submit', ['locale' => app()->getLocale(), 'page' => $page->getKey(), 'block' => $block->id]);
 
         return new ResolvedBlock($block->id, $block->kind, [...$block->props, 'action' => $action]);
     }
