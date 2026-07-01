@@ -10,6 +10,8 @@ use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Admin\Pages\RedirectsPage;
 use Tbtop\Cms\Admin\Pages\SeoSettingsPage;
 use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
+use Tbtop\Cms\Admin\Pages\TemplateCreatePage;
+use Tbtop\Cms\Admin\Pages\TemplateEditPage;
 use Tbtop\Cms\Admin\Pages\TemplatesPage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 
@@ -67,6 +69,8 @@ return [
             'seo_settings' => SeoSettingsPage::class,
             'notification_settings' => NotificationSettingsPage::class,
             'templates' => TemplatesPage::class,
+            'template_create' => TemplateCreatePage::class,
+            'template_edit' => TemplateEditPage::class,
         ],
     ],
 ];

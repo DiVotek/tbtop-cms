@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
-use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Language\Languages;
@@ -19,8 +18,8 @@ class TemplateForm
         return [
             $s->section(['title' => 'Template'], [
                 $s->text('name')->label('Name')->required(),
-                $s->textarea('content')->label('Blocks (JSON)'),
             ]),
+            BlockContentField::make($s),
         ];
     }
 
@@ -30,7 +29,7 @@ class TemplateForm
         $template = $id !== null ? Template::query()->findOrFail($id) : new Template;
         $template->fill([
             'name' => (string) ($form['name'] ?? ''),
-            'content' => self::decodeContent($form['content'] ?? null),
+            'content' => BlockContentField::toEnvelope($form['content'] ?? null),
         ]);
         $template->save();
 
@@ -44,7 +43,7 @@ class TemplateForm
 
         return [
             'name' => $template->name,
-            'content' => self::encodeContent($template->content),
+            'content' => BlockContentField::toRows($template->content),
         ];
     }
 
@@ -60,30 +59,5 @@ class TemplateForm
         }
 
         return $options;
-    }
-
-    /** @return list<mixed> */
-    private static function decodeContent(mixed $raw): array
-    {
-        if ($raw === null || $raw === '') {
-            return [];
-        }
-
-        $decoded = is_string($raw) ? json_decode($raw, true) : null;
-
-        if (! is_array($decoded)) {
-            throw ValidationException::withMessages(['content' => 'Blocks must be a valid JSON array.']);
-        }
-
-        return array_values($decoded);
-    }
-
-    private static function encodeContent(mixed $content): string
-    {
-        if (! is_array($content) || $content === []) {
-            return '';
-        }
-
-        return (string) json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }
