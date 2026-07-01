@@ -1,8 +1,15 @@
+import "@tbtop/inertia-admin/styles.css";
+
 import { createInertiaApp, type ResolvedComponent } from "@inertiajs/react";
+import { AdminPage } from "@tbtop/inertia-admin";
 import { createRoot } from "react-dom/client";
 
 createInertiaApp({
     resolve: (name) => {
+        if (name === "admin/page") {
+            return AdminPage as ResolvedComponent;
+        }
+
         const pages = import.meta.glob<{ default: ResolvedComponent }>(
             "./pages/**/*.tsx",
         );

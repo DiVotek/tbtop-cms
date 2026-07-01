@@ -6,9 +6,11 @@ namespace Workbench\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
+use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Workbench\App\Models\User;
 
 class DatabaseSeeder extends Seeder
 {
@@ -24,6 +26,12 @@ class DatabaseSeeder extends Seeder
                 'sort_order' => 0,
             ],
         );
+
+        $admin = User::query()->firstOrCreate(
+            ['email' => 'admin@admin.com'],
+            ['name' => 'Admin', 'password' => 'password'],
+        );
+        CmsUserProfile::query()->firstOrCreate(['user_id' => $admin->id]);
 
         if (Page::query()->where('type', 'page')->where('is_system', false)->exists()) {
             return;
