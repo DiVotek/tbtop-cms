@@ -16,4 +16,5 @@ return Application::configure(basePath: $APP_BASE_PATH ?? default_skeleton_path(
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
-    })->create();
+    })->create()
+    ->usePublicPath(dirname(__DIR__) . '/public');

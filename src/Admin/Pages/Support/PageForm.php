@@ -29,6 +29,7 @@ class PageForm
                 $s->checkbox('is_indexable')->label('Indexable in search'),
                 $s->number('sort_order')->label('Sort order'),
             ]),
+            BlockContentField::make($s),
         ];
 
         if ($isEdit) {
@@ -66,6 +67,7 @@ class PageForm
             'summary' => $form['summary'] ?? [],
             'is_indexable' => (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
+            'content' => BlockContentField::toEnvelope($form['content'] ?? null),
         ];
 
         if ($page->exists && $page->is_system) {
@@ -96,6 +98,7 @@ class PageForm
             'is_indexable' => $page->is_indexable,
             'sort_order' => $page->sort_order,
             'paths' => $page->slugs->pluck('path', 'locale')->all(),
+            'content' => BlockContentField::toRows($page->content),
         ];
     }
 
