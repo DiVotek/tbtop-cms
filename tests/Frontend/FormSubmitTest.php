@@ -81,6 +81,10 @@ it('returns 404 when submitting to an unknown block', function (): void {
     $this->postJson(submitUrl($page, 'nope'))->assertNotFound();
 });
 
+it('rejects a non-numeric page route segment before it reaches the controller', function (): void {
+    $this->postJson('/_cms/forms/en/not-a-number/form-1')->assertStatus(405);
+});
+
 it('returns 404 when submitting to a block that is not a form', function (): void {
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
@@ -166,4 +170,37 @@ it('gracefully handles a submission whose block handler throws', function (): vo
     $this->post(submitUrl($page, 'throw-1'), ['value' => 'x'])
         ->assertRedirect()
         ->assertSessionHasErrors(['form']);
+});
+
+it('returns 404 when the block id exists only on a different page', function (): void {
+    $formPage = contactFormPage();
+    $otherPage = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Other'],
+        'content' => [],
+    ]);
+
+    $this->postJson(submitUrl($otherPage, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+    ])->assertNotFound();
+
+    Mail::assertNothingSent();
+});
+
+it('returns 404 when submitting to an inactive block', function (): void {
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Contact'],
+        'content' => [[
+            'id' => 'form-1',
+            'kind' => 'ContactForm',
+            'active' => false,
+            'data' => ['recipient' => 'ops@example.test'],
+        ]],
+    ]);
+
+    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    Mail::assertNothingSent();
 });

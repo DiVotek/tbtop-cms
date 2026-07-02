@@ -22,6 +22,10 @@ class Cms
         private readonly Breadcrumbs $crumbs,
     ) {}
 
+    /**
+     * Must be called from a `web`-middleware-group route file (e.g. `routes/web.php`) —
+     * this does not wrap the group in `web` middleware itself; CSRF/session depend on the host.
+     */
     public function frontendRoutes(): void
     {
         /** @var list<class-string> $middleware */
@@ -29,6 +33,7 @@ class Cms
 
         Route::middleware([...$middleware, ShareCmsProps::class])->group(function (): void {
             Route::post('_cms/forms/{locale}/{page}/{block}', FormSubmitController::class)
+                ->where('page', '[0-9]+')
                 ->middleware('throttle:' . config('tbtop-cms.forms.throttle', '10,1'))
                 ->name('tbtop-cms.form.submit');
 
