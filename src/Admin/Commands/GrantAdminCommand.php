@@ -28,6 +28,11 @@ class GrantAdminCommand extends Command
         }
 
         $this->grantAccess($user);
+
+        if ($this->overridesProfileAccess($user)) {
+            $this->warn("{$email} implements CmsAdmin; access is controlled by canAccessCmsAdmin(), not this profile row.");
+        }
+
         $this->info("Granted CMS admin access to {$email}.");
 
         return self::SUCCESS;

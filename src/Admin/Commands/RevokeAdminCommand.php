@@ -28,6 +28,11 @@ class RevokeAdminCommand extends Command
         }
 
         $this->revokeAccess($user);
+
+        if ($this->overridesProfileAccess($user)) {
+            $this->warn("{$email} implements CmsAdmin; access is controlled by canAccessCmsAdmin(), not this profile row.");
+        }
+
         $this->info("Revoked CMS admin access from {$email}.");
 
         return self::SUCCESS;

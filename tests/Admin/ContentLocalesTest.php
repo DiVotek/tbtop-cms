@@ -25,6 +25,23 @@ it('wires content locales from admin-active languages', function (): void {
         ->and(config('tbtop-admin.default_content_locale'))->toBe('en');
 });
 
+it('falls back to the first admin-active locale when the persisted default is stale (bypassed the model observer)', function (): void {
+    Language::factory()->default()->create(['locale' => 'en', 'sort_order' => 0]);
+    Language::factory()->create(['locale' => 'uk', 'is_admin_active' => true, 'sort_order' => 1]);
+
+    // Simulate a mass update / raw migration that bypasses LanguageObserver, desyncing
+    // is_default from is_admin_active (Eloquent mass updates never fire model events).
+    Language::query()->where('locale', 'en')->update(['is_admin_active' => false]);
+
+    $languages = app(Languages::class);
+    $languages->refresh();
+
+    ContentLocales::sync($languages);
+
+    expect(config('tbtop-admin.content_locales'))->toBe(['uk'])
+        ->and(config('tbtop-admin.default_content_locale'))->toBe('uk');
+});
+
 it('keeps the configured default when no language is admin-active', function (): void {
     config(['tbtop-admin.content_locales' => ['en']]);
     Language::factory()->create(['locale' => 'fr', 'is_admin_active' => false, 'is_frontend_active' => false]);
