@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Language\Observers\LanguageObserver;
 
 uses(RefreshDatabase::class);
 
@@ -79,4 +80,26 @@ it('forbids unsetting the only default language', function (): void {
     expect(fn () => $language->update(['is_default' => false]))->toThrow(DomainException::class);
 
     expect(Language::where('is_default', true)->count())->toBe(1);
+});
+
+it('converges to exactly one default when two concurrent saves race', function (): void {
+    $a = Language::factory()->default()->create(['locale' => 'en']);
+    $b = Language::factory()->create(['locale' => 'uk']);
+    $c = Language::factory()->create(['locale' => 'de']);
+
+    $observer = app(LanguageObserver::class);
+
+    Language::withoutEvents(function () use ($b, $c, $observer): void {
+        Language::whereKey($b->id)->update(['is_default' => true]);
+        Language::whereKey($c->id)->update(['is_default' => true]);
+
+        $b->is_default = true;
+        $observer->saved($b);
+
+        $c->is_default = true;
+        $observer->saved($c);
+    });
+
+    expect(Language::where('is_default', true)->count())->toBe(1)
+        ->and(Language::where('is_default', true)->value('locale'))->toBe('de');
 });
