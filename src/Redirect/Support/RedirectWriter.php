@@ -17,6 +17,12 @@ class RedirectWriter
             return;
         }
 
+        Redirect::query()
+            ->where('locale', $locale)
+            ->where('is_auto', true)
+            ->where('to_path', $from)
+            ->update(['to_path' => $to]);
+
         Redirect::query()->updateOrCreate(
             ['locale' => $locale, 'from_path' => $from],
             ['to_path' => $to, 'status_code' => 301, 'is_auto' => true],
