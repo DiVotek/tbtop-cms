@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Console;
 use Illuminate\Console\Command;
 use Tbtop\Cms\Database\Seeders\LanguageSeeder;
 use Tbtop\Cms\Database\Seeders\PageSeeder;
+use Throwable;
 
 class InstallCommand extends Command
 {
@@ -17,8 +18,15 @@ class InstallCommand extends Command
     public function handle(): int
     {
         $this->publishConfig();
-        $this->runMigrations();
-        $this->seed();
+
+        if (! $this->runMigrations()) {
+            return self::FAILURE;
+        }
+
+        if (! $this->seed()) {
+            return self::FAILURE;
+        }
+
         $this->nextSteps();
 
         return self::SUCCESS;
@@ -36,20 +44,43 @@ class InstallCommand extends Command
         $this->info('Published the CMS config.');
     }
 
-    private function runMigrations(): void
+    private function runMigrations(): bool
     {
         if ($this->option('skip-migrations')) {
-            return;
+            return true;
         }
 
-        $this->call('migrate', ['--force' => true]);
+        try {
+            $exitCode = $this->call('migrate', ['--force' => true]);
+        } catch (Throwable $e) {
+            $this->error("Migration failed: {$e->getMessage()}");
+
+            return false;
+        }
+
+        if ($exitCode !== self::SUCCESS) {
+            $this->error('Migration failed. Resolve the issue above and re-run `cms:install`.');
+
+            return false;
+        }
+
+        return true;
     }
 
-    private function seed(): void
+    private function seed(): bool
     {
-        (new LanguageSeeder)->run();
-        (new PageSeeder)->run();
+        try {
+            (new LanguageSeeder)->run();
+            (new PageSeeder)->run();
+        } catch (Throwable $e) {
+            $this->error("Seeding failed: {$e->getMessage()}");
+
+            return false;
+        }
+
         $this->info('Seeded default languages and ensured the home page.');
+
+        return true;
     }
 
     private function nextSteps(): void
