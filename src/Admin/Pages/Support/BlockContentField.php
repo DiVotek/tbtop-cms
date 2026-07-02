@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -59,6 +60,12 @@ class BlockContentField
 
             if ($kind === '') {
                 continue;
+            }
+
+            if (! app(BlockRegistry::class)->has($kind)) {
+                throw ValidationException::withMessages([
+                    'content' => "Block type [{$kind}] is not registered.",
+                ]);
             }
 
             $out[] = [

@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Redirect\Models\Redirect;
 use Tbtop\Cms\Redirect\Support\RedirectCycle;
+use Tbtop\Cms\Redirect\Support\RedirectPath;
 
 class RedirectValidator
 {
@@ -18,10 +19,20 @@ class RedirectValidator
             throw ValidationException::withMessages(['from_path' => 'From and to paths are required.']);
         }
 
+        self::assertFromNotExternal($data['from']);
         self::assertStatus($data['status']);
         self::assertUnique($data['locale'], $data['from'], $id);
         self::assertNotShadowing($data['locale'], $data['from']);
         RedirectCycle::assertAcyclic($data['locale'], $data['from'], $data['to'], $id);
+    }
+
+    private static function assertFromNotExternal(string $from): void
+    {
+        if (RedirectPath::isExternal($from)) {
+            throw ValidationException::withMessages([
+                'from_path' => 'From path must be a local path, not an external URL.',
+            ]);
+        }
     }
 
     private static function assertStatus(int $status): void

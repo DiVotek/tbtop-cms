@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\TemplateForm;
 use Tbtop\Cms\Language\Models\Language;
@@ -40,6 +41,15 @@ it('folds repeater rows into the block envelope on save', function (): void {
         ->and($template->content[0]['data'])->toBe(['title' => 'Hi'])
         ->and($template->content[0]['id'])->not->toBe('');
 });
+
+it('rejects a block kind that is not registered', function (): void {
+    TemplateForm::save([
+        'name' => 'Landing',
+        'content' => [
+            ['kind' => 'NotARealBlock', 'title' => 'Hi'],
+        ],
+    ]);
+})->throws(ValidationException::class);
 
 it('flattens template content into repeater rows for editing', function (): void {
     $template = Template::create([

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Language\Models\Language;
@@ -42,12 +43,25 @@ class LanguageForm
         ]);
 
         if (! $language->exists) {
-            $language->locale = (string) ($form['locale'] ?? '');
+            $locale = (string) ($form['locale'] ?? '');
+            self::guardLocale($locale);
+            $language->locale = $locale;
         }
 
         $language->save();
 
         return $language;
+    }
+
+    private static function guardLocale(string $locale): void
+    {
+        if ($locale === '') {
+            throw ValidationException::withMessages(['locale' => 'Locale is required.']);
+        }
+
+        if (Language::query()->where('locale', $locale)->exists()) {
+            throw ValidationException::withMessages(['locale' => 'A language with this locale already exists.']);
+        }
     }
 
     /** @return array<string, mixed> */
