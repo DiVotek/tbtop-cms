@@ -25,7 +25,7 @@ class LocaleFlattener
             return $data;
         }
 
-        if (self::isLocaleMap($data, $locales)) {
+        if (self::isLocaleMap($data, $locale, $fallback, $locales)) {
             return $data[$locale] ?? $data[$fallback] ?? null;
         }
 
@@ -42,15 +42,24 @@ class LocaleFlattener
     }
 
     /**
+     * A key no longer in $locales (its language was deleted) doesn't disqualify the
+     * map, as long as $locale or $fallback — the keys actually read below — is present.
+     *
      * @param  array<array-key, mixed>  $data
      * @param  list<string>  $locales
      */
-    private static function isLocaleMap(array $data, array $locales): bool
+    private static function isLocaleMap(array $data, string $locale, string $fallback, array $locales): bool
     {
         if (array_is_list($data)) {
             return false;
         }
 
-        return array_all(array_keys($data), fn ($key): bool => in_array((string) $key, $locales, true));
+        $keys = array_map(static fn (int | string $key): string => (string) $key, array_keys($data));
+
+        if (in_array($locale, $keys, true) || in_array($fallback, $keys, true)) {
+            return true;
+        }
+
+        return array_all($keys, fn (string $key): bool => in_array($key, $locales, true));
     }
 }
