@@ -153,6 +153,29 @@ it('processes a submission under the locale carried by the action url', function
         ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
 });
 
+it('does not discard a non-translatable form field coincidentally shaped like a locale map', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$data = [];
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [[
+            'id' => 'rec-1',
+            'kind' => 'Recording',
+            'active' => true,
+            'data' => [
+                'label' => ['en' => 'EN copy'],
+                'config' => ['en' => 'not-a-translation', 'url' => '/about'],
+            ],
+        ]],
+    ]);
+
+    $this->post(submitUrl($page, 'rec-1'), ['value' => 'hello'])->assertRedirect();
+
+    expect(RecordingFormBlock::$data['config'])->toBe(['en' => 'not-a-translation', 'url' => '/about']);
+});
+
 it('gracefully handles a submission whose block handler throws', function (): void {
     config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
 

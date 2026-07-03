@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Block;
 
 use Illuminate\Support\Facades\Log;
-use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
@@ -63,8 +62,13 @@ class BlockContentResolver
         $block = $this->registry->get($kind);
 
         try {
-            $translatableFields = self::translatableFields($block);
-            $flat = LocaleFlattener::flattenData($data, $ctx->locale, $ctx->fallbackLocale, $locales, $translatableFields);
+            $flat = LocaleFlattener::flattenData(
+                $data,
+                $ctx->locale,
+                $ctx->fallbackLocale,
+                $locales,
+                $block->translatableFields(),
+            );
             $props = $block->resolve($flat, $ctx);
         } catch (Throwable $e) {
             Log::warning('block.resolve_failed', ['kind' => $kind, 'id' => $raw['id'], 'error' => $e->getMessage()]);
@@ -73,19 +77,5 @@ class BlockContentResolver
         }
 
         return new ResolvedBlock($raw['id'], $kind, $props);
-    }
-
-    /** @return list<string> */
-    private static function translatableFields(Block $block): array
-    {
-        $fields = [];
-
-        foreach ($block->form(new S) as $field) {
-            if ($field->isTranslatableField()) {
-                $fields[] = $field->name;
-            }
-        }
-
-        return $fields;
     }
 }

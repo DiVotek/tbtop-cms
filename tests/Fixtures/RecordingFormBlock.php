@@ -25,7 +25,7 @@ class RecordingFormBlock extends Block implements HandlesFormSubmission
     /** @return list<Node> */
     public function form(S $s): array
     {
-        return [$s->text('label')->translatable()];
+        return [$s->text('label')->translatable(), $s->text('config')];
     }
 
     /**

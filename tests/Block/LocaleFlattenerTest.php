@@ -55,16 +55,34 @@ it('flattens each repeater row without treating the row list as a map', function
     expect($out)->toBe(['items' => [['title' => 'A'], ['title' => 'B']]]);
 });
 
-it('still resolves the active locale when a sibling key is no longer a known locale', function (): void {
-    $out = LocaleFlattener::flattenData(['title' => ['en' => 'Hello', 'fr' => 'Bonjour']], 'en', 'uk', ['en', 'uk']);
+it('still resolves the active locale when a sibling key is no longer a known locale, for a field the schema marks translatable', function (): void {
+    $out = LocaleFlattener::flattenData(
+        ['title' => ['en' => 'Hello', 'fr' => 'Bonjour']],
+        'en',
+        'uk',
+        ['en', 'uk'],
+        translatableFields: ['title'],
+    );
 
     expect($out)->toBe(['title' => 'Hello']);
 });
 
-it('still resolves the fallback locale when the active locale is orphaned', function (): void {
-    $out = LocaleFlattener::flattenData(['title' => ['uk' => 'Pryvit', 'fr' => 'Bonjour']], 'en', 'uk', ['en', 'uk']);
+it('still resolves the fallback locale when the active locale is orphaned, for a field the schema marks translatable', function (): void {
+    $out = LocaleFlattener::flattenData(
+        ['title' => ['uk' => 'Pryvit', 'fr' => 'Bonjour']],
+        'en',
+        'uk',
+        ['en', 'uk'],
+        translatableFields: ['title'],
+    );
 
     expect($out)->toBe(['title' => 'Pryvit']);
+});
+
+it('does not tolerate an orphaned locale key without a schema confirming the field is translatable', function (): void {
+    $out = LocaleFlattener::flattenData(['title' => ['en' => 'Hello', 'fr' => 'Bonjour']], 'en', 'uk', ['en', 'uk']);
+
+    expect($out)->toBe(['title' => ['en' => 'Hello', 'fr' => 'Bonjour']]);
 });
 
 it('does not treat a field coincidentally named after the active locale as a locale map when the schema says it is not translatable', function () use ($locales): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Form;
 
+use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\SubmitContext;
@@ -38,7 +39,7 @@ class FormBlockLocator
             return null;
         }
 
-        return new LocatedFormBlock($block, $this->flatten($raw), $this->context($page));
+        return new LocatedFormBlock($block, $this->flatten($raw, $block), $this->context($page));
     }
 
     /**
@@ -60,13 +61,19 @@ class FormBlockLocator
      * @param  array<array-key, mixed>  $raw
      * @return array<string, mixed>
      */
-    private function flatten(array $raw): array
+    private function flatten(array $raw, Block $block): array
     {
         /** @var array<string, mixed> $data */
         $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
         $locales = array_column($this->languages->all(), 'locale');
 
-        return LocaleFlattener::flattenData($data, (string) app()->getLocale(), $this->languages->defaultLocale(), $locales);
+        return LocaleFlattener::flattenData(
+            $data,
+            (string) app()->getLocale(),
+            $this->languages->defaultLocale(),
+            $locales,
+            $block->translatableFields(),
+        );
     }
 
     private function context(Page $page): SubmitContext

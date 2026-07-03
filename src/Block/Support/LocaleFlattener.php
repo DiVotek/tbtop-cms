@@ -22,7 +22,7 @@ class LocaleFlattener
         array $locales,
         ?array $translatableFields = null,
     ): array {
-        $out = self::flatten($data, $locale, $fallback, $locales, $translatableFields, true);
+        $out = self::flatten($data, $locale, $fallback, $locales, $translatableFields, $translatableFields === null);
 
         return is_array($out) ? $out : [];
     }
@@ -43,7 +43,7 @@ class LocaleFlattener
             return $data;
         }
 
-        if ($fieldIsTranslatable && self::isLocaleMap($data, $locale, $fallback, $locales)) {
+        if (self::isLocaleMap($data, $locale, $fallback, $locales, $fieldIsTranslatable)) {
             return $data[$locale] ?? $data[$fallback] ?? null;
         }
 
@@ -69,37 +69,40 @@ class LocaleFlattener
                 $fallback,
                 $locales,
                 $translatableFields,
-                self::isTranslatable((string) $key, $translatableFields),
+                $translatableFields !== null && in_array((string) $key, $translatableFields, true),
             );
         }
 
         return $out;
     }
 
-    /** @param list<string>|null $translatableFields */
-    private static function isTranslatable(string $key, ?array $translatableFields): bool
-    {
-        return $translatableFields === null || in_array($key, $translatableFields, true);
-    }
-
     /**
      * A key no longer in $locales (its language was deleted) doesn't disqualify the map, as
-     * long as $locale or $fallback — the keys actually read below — is present. This is only
-     * reached for fields the schema already confirmed are translatable, so an unrelated key
-     * shaped like a locale code can no longer be misread as one.
+     * long as $locale or $fallback — the keys actually read below — is present. That relaxed
+     * check only applies once the schema has confirmed the field is translatable; without a
+     * schema (or for a field the schema didn't mark translatable), every key must still be a
+     * currently known locale, so an unrelated field can't be misread as a locale map.
      *
      * @param  array<array-key, mixed>  $data
      * @param  list<string>  $locales
      */
-    private static function isLocaleMap(array $data, string $locale, string $fallback, array $locales): bool
-    {
+    private static function isLocaleMap(
+        array $data,
+        string $locale,
+        string $fallback,
+        array $locales,
+        bool $fieldIsTranslatable,
+    ): bool {
         if (array_is_list($data)) {
             return false;
         }
 
         $keys = array_map(static fn (int | string $key): string => (string) $key, array_keys($data));
 
-        return in_array($locale, $keys, true) || in_array($fallback, $keys, true)
-            || array_all($keys, fn (string $key): bool => in_array($key, $locales, true));
+        if ($fieldIsTranslatable && (in_array($locale, $keys, true) || in_array($fallback, $keys, true))) {
+            return true;
+        }
+
+        return array_all($keys, fn (string $key): bool => in_array($key, $locales, true));
     }
 }

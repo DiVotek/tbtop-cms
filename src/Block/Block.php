@@ -22,4 +22,18 @@ abstract class Block
     {
         return $input;
     }
+
+    /** @return list<string> */
+    public function translatableFields(): array
+    {
+        $fields = [];
+
+        foreach ($this->form(new S) as $field) {
+            if ($field->isTranslatableField()) {
+                $fields[] = $field->name;
+            }
+        }
+
+        return $fields;
+    }
 }
