@@ -28,6 +28,20 @@ it('resolves a block with locale-flattened props', function (): void {
         ->and($out[0]->props)->toBe(['title' => 'Hello']);
 });
 
+it('does not discard a non-translatable field coincidentally shaped like a locale map', function (): void {
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'data' => [
+            'title' => ['en' => 'Hello', 'uk' => 'Pryvit'],
+            'image' => ['en' => 'not-a-translation', 'url' => '/about'],
+        ]],
+    ]);
+
+    expect($out[0]->props)->toBe([
+        'title' => 'Hello',
+        'image' => ['en' => 'not-a-translation', 'url' => '/about'],
+    ]);
+});
+
 it('falls back to the default locale for a missing translation', function (): void {
     app()->setLocale('uk');
 

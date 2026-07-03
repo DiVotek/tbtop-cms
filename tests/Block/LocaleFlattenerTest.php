@@ -67,8 +67,32 @@ it('still resolves the fallback locale when the active locale is orphaned', func
     expect($out)->toBe(['title' => 'Pryvit']);
 });
 
-it('does not treat a field coincidentally named after the active locale as a locale map', function () use ($locales): void {
-    $out = LocaleFlattener::flattenData(['settings' => ['en' => 'some value', 'mode' => 'dark']], 'en', 'uk', $locales);
+it('does not treat a field coincidentally named after the active locale as a locale map when the schema says it is not translatable', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        ['settings' => ['en' => 'some value', 'mode' => 'dark']],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: [],
+    );
 
     expect($out)->toBe(['settings' => ['en' => 'some value', 'mode' => 'dark']]);
+});
+
+it('only flattens fields the schema declares translatable', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        [
+            'title' => ['en' => 'Hi', 'uk' => 'Pryvit'],
+            'settings' => ['en' => 'some value', 'url' => '/about'],
+        ],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: ['title'],
+    );
+
+    expect($out)->toBe([
+        'title' => 'Hi',
+        'settings' => ['en' => 'some value', 'url' => '/about'],
+    ]);
 });
