@@ -43,7 +43,8 @@ class LocaleFlattener
 
     /**
      * A key no longer in $locales (its language was deleted) doesn't disqualify the
-     * map, as long as $locale or $fallback — the keys actually read below — is present.
+     * map, as long as $locale or $fallback — the keys actually read below — is present
+     * and every other key still looks like a locale code rather than an unrelated field.
      *
      * @param  array<array-key, mixed>  $data
      * @param  list<string>  $locales
@@ -56,10 +57,22 @@ class LocaleFlattener
 
         $keys = array_map(static fn (int | string $key): string => (string) $key, array_keys($data));
 
-        if (in_array($locale, $keys, true) || in_array($fallback, $keys, true)) {
+        if (array_all($keys, fn (string $key): bool => in_array($key, $locales, true))) {
             return true;
         }
 
-        return array_all($keys, fn (string $key): bool => in_array($key, $locales, true));
+        if (! in_array($locale, $keys, true) && ! in_array($fallback, $keys, true)) {
+            return false;
+        }
+
+        return array_all(
+            $keys,
+            fn (string $key): bool => in_array($key, $locales, true) || self::looksLikeLocale($key),
+        );
+    }
+
+    private static function looksLikeLocale(string $key): bool
+    {
+        return preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $key) === 1;
     }
 }

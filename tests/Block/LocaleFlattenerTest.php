@@ -66,3 +66,9 @@ it('still resolves the fallback locale when the active locale is orphaned', func
 
     expect($out)->toBe(['title' => 'Pryvit']);
 });
+
+it('does not treat a field coincidentally named after the active locale as a locale map', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(['settings' => ['en' => 'some value', 'mode' => 'dark']], 'en', 'uk', $locales);
+
+    expect($out)->toBe(['settings' => ['en' => 'some value', 'mode' => 'dark']]);
+});
