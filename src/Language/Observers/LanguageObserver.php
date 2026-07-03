@@ -45,7 +45,6 @@ class LanguageObserver
                 Language::query()
                     ->where('is_default', true)
                     ->whereKeyNot($language->getKey())
-                    ->lockForUpdate()
                     ->update(['is_default' => false]);
 
                 Language::query()
