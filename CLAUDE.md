@@ -4,7 +4,7 @@ Minimal `tbtop` + `json-render` CMS core for Laravel. Greenfield package; the
 archived `divotek/kit` is a reference only.
 
 Composer: `tbtop/cms` · Namespace: `Tbtop\Cms`
-PHP ^8.3 · Laravel 11 / 12 · No Filament.
+PHP ^8.4 · Laravel 11 / 12 · No Filament.
 
 ## Stack
 

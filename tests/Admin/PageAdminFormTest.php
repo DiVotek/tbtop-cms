@@ -89,3 +89,21 @@ it('locks system page structure but allows content edits', function (): void {
     expect($page->status)->toBe(PageStatus::Published)
         ->and($page->getTranslation('name', 'en'))->toBe('Home Updated');
 });
+
+it('rejects a page type that is not registered', function (): void {
+    PageForm::save([
+        'type' => 'bogus-type',
+        'status' => PageStatus::Draft->value,
+        'name' => ['en' => 'Bad Type'],
+        'parent_id' => '',
+    ]);
+})->throws(ValidationException::class);
+
+it('rejects a status value outside the PageStatus enum', function (): void {
+    PageForm::save([
+        'type' => 'page',
+        'status' => 'archived',
+        'name' => ['en' => 'Bad Status'],
+        'parent_id' => '',
+    ]);
+})->throws(ValidationException::class);

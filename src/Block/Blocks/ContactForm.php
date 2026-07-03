@@ -41,7 +41,7 @@ class ContactForm extends Block implements HandlesFormSubmission
             $s->text('heading')->label('Heading')->translatable(),
             $s->text('submitLabel')->label('Submit button label')->translatable(),
             $s->textarea('successMessage')->label('Success message')->translatable(),
-            $s->text('recipient')->label('Recipient email')->required(),
+            $s->text('recipient')->label('Recipient email')->required()->rules('email'),
         ];
     }
 
@@ -81,8 +81,8 @@ class ContactForm extends Block implements HandlesFormSubmission
     {
         $recipient = trim((string) ($blockData['recipient'] ?? ''));
 
-        if ($recipient === '') {
-            Log::warning('form.contact.no_recipient', ['page' => $ctx->page?->getKey()]);
+        if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
+            Log::warning('form.contact.invalid_recipient', ['page' => $ctx->page?->getKey()]);
 
             return;
         }

@@ -66,3 +66,16 @@ it('breaks the cycle when a page moves back to its old path', function (): void 
     expect(Redirect::query()->where('from_path', 'child')->where('to_path', 'root/child')->exists())->toBeTrue()
         ->and(Redirect::query()->where('from_path', 'root/child')->exists())->toBeFalse();
 });
+
+it('collapses the redirect chain when a page is reparented twice', function (): void {
+    $root1 = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Root1']]);
+    $root2 = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Root2']]);
+    $child = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Child']]);
+
+    $child->update(['parent_id' => $root1->id]);
+    $child->update(['parent_id' => $root2->id]);
+
+    expect(Redirect::query()->where('from_path', 'child')->where('to_path', 'root2/child')->exists())->toBeTrue()
+        ->and(Redirect::query()->where('from_path', 'root1/child')->exists())->toBeTrue()
+        ->and(Redirect::query()->where('to_path', 'root1/child')->exists())->toBeFalse();
+});

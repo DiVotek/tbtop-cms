@@ -81,6 +81,10 @@ it('returns 404 when submitting to an unknown block', function (): void {
     $this->postJson(submitUrl($page, 'nope'))->assertNotFound();
 });
 
+it('rejects a non-numeric page route segment before it reaches the controller', function (): void {
+    $this->postJson('/_cms/forms/en/not-a-number/form-1')->assertStatus(405);
+});
+
 it('returns 404 when submitting to a block that is not a form', function (): void {
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
@@ -149,6 +153,29 @@ it('processes a submission under the locale carried by the action url', function
         ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
 });
 
+it('does not discard a non-translatable form field coincidentally shaped like a locale map', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$data = [];
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [[
+            'id' => 'rec-1',
+            'kind' => 'Recording',
+            'active' => true,
+            'data' => [
+                'label' => ['en' => 'EN copy'],
+                'config' => ['en' => 'not-a-translation', 'url' => '/about'],
+            ],
+        ]],
+    ]);
+
+    $this->post(submitUrl($page, 'rec-1'), ['value' => 'hello'])->assertRedirect();
+
+    expect(RecordingFormBlock::$data['config'])->toBe(['en' => 'not-a-translation', 'url' => '/about']);
+});
+
 it('gracefully handles a submission whose block handler throws', function (): void {
     config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
 
@@ -166,4 +193,37 @@ it('gracefully handles a submission whose block handler throws', function (): vo
     $this->post(submitUrl($page, 'throw-1'), ['value' => 'x'])
         ->assertRedirect()
         ->assertSessionHasErrors(['form']);
+});
+
+it('returns 404 when the block id exists only on a different page', function (): void {
+    $formPage = contactFormPage();
+    $otherPage = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Other'],
+        'content' => [],
+    ]);
+
+    $this->postJson(submitUrl($otherPage, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+    ])->assertNotFound();
+
+    Mail::assertNothingSent();
+});
+
+it('returns 404 when submitting to an inactive block', function (): void {
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Contact'],
+        'content' => [[
+            'id' => 'form-1',
+            'kind' => 'ContactForm',
+            'active' => false,
+            'data' => ['recipient' => 'ops@example.test'],
+        ]],
+    ]);
+
+    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    Mail::assertNothingSent();
 });

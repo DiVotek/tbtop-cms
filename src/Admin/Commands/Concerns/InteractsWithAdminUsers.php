@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Commands\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Tbtop\Cms\Admin\Contracts\CmsAdmin;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 
 trait InteractsWithAdminUsers
@@ -31,5 +32,10 @@ trait InteractsWithAdminUsers
     protected function revokeAccess(Model $user): void
     {
         CmsUserProfile::query()->where('user_id', $user->getKey())->delete();
+    }
+
+    protected function overridesProfileAccess(Model $user): bool
+    {
+        return $user instanceof CmsAdmin;
     }
 }

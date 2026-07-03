@@ -54,3 +54,63 @@ it('flattens each repeater row without treating the row list as a map', function
 
     expect($out)->toBe(['items' => [['title' => 'A'], ['title' => 'B']]]);
 });
+
+it('still resolves the active locale when a sibling key is no longer a known locale, for a field the schema marks translatable', function (): void {
+    $out = LocaleFlattener::flattenData(
+        ['title' => ['en' => 'Hello', 'fr' => 'Bonjour']],
+        'en',
+        'uk',
+        ['en', 'uk'],
+        translatableFields: ['title'],
+    );
+
+    expect($out)->toBe(['title' => 'Hello']);
+});
+
+it('still resolves the fallback locale when the active locale is orphaned, for a field the schema marks translatable', function (): void {
+    $out = LocaleFlattener::flattenData(
+        ['title' => ['uk' => 'Pryvit', 'fr' => 'Bonjour']],
+        'en',
+        'uk',
+        ['en', 'uk'],
+        translatableFields: ['title'],
+    );
+
+    expect($out)->toBe(['title' => 'Pryvit']);
+});
+
+it('does not tolerate an orphaned locale key without a schema confirming the field is translatable', function (): void {
+    $out = LocaleFlattener::flattenData(['title' => ['en' => 'Hello', 'fr' => 'Bonjour']], 'en', 'uk', ['en', 'uk']);
+
+    expect($out)->toBe(['title' => ['en' => 'Hello', 'fr' => 'Bonjour']]);
+});
+
+it('does not treat a field coincidentally named after the active locale as a locale map when the schema says it is not translatable', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        ['settings' => ['en' => 'some value', 'mode' => 'dark']],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: [],
+    );
+
+    expect($out)->toBe(['settings' => ['en' => 'some value', 'mode' => 'dark']]);
+});
+
+it('only flattens fields the schema declares translatable', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        [
+            'title' => ['en' => 'Hi', 'uk' => 'Pryvit'],
+            'settings' => ['en' => 'some value', 'url' => '/about'],
+        ],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: ['title'],
+    );
+
+    expect($out)->toBe([
+        'title' => 'Hi',
+        'settings' => ['en' => 'some value', 'url' => '/about'],
+    ]);
+});

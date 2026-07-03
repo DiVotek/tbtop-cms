@@ -66,3 +66,7 @@ it('loads a redirect row for editing', function (): void {
         ->and($row['locale'])->toBe('en')
         ->and($row['status_code'])->toBe('302');
 });
+
+it('rejects an external URL as the from path', function (): void {
+    RedirectForm::save(['from_path' => 'https://evil.test/x', 'to_path' => 'safe', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);

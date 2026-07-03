@@ -76,3 +76,26 @@ it('renders localized hero props through the page controller', function (): void
         ->assertJsonPath('props.render.elements.hero-1.props.cta.href', 'https://example.test')
         ->assertJsonPath('props.render.elements.hero-1.props.subtitle', null);
 });
+
+it('still resolves a title when a sibling locale key belongs to a since-deleted language', function (): void {
+    config()->set('tbtop-cms.blocks.types', [HeroBlock::class]);
+    Language::factory()->default()->create(['locale' => 'en']);
+    $fr = Language::factory()->create(['locale' => 'fr']);
+    $fr->delete();
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [[
+            'id' => 'hero-1',
+            'kind' => 'Hero',
+            'active' => true,
+            'data' => ['title' => ['en' => 'Welcome', 'fr' => 'Bienvenue']],
+        ]],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.render.elements.hero-1.props.title', 'Welcome');
+});

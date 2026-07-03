@@ -30,3 +30,14 @@ it('is safe to run twice without duplicating data', function (): void {
     expect(Language::count())->toBe(1)
         ->and(Page::where('is_system', true)->count())->toBe(1);
 });
+
+it('fails gracefully instead of throwing when migrations cannot run', function (): void {
+    config(['database.connections.broken' => ['driver' => 'invalid-driver-xyz']]);
+    config(['database.default' => 'broken']);
+
+    try {
+        $this->artisan('cms:install')->assertExitCode(1);
+    } finally {
+        config(['database.default' => 'testing']);
+    }
+});

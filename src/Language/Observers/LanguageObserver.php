@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Language\Observers;
 
 use DomainException;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 
@@ -40,10 +41,16 @@ class LanguageObserver
     public function saved(Language $language): void
     {
         if ($language->is_default) {
-            Language::query()
-                ->where('is_default', true)
-                ->whereKeyNot($language->getKey())
-                ->update(['is_default' => false]);
+            DB::transaction(function () use ($language): void {
+                Language::query()
+                    ->where('is_default', true)
+                    ->whereKeyNot($language->getKey())
+                    ->update(['is_default' => false]);
+
+                Language::query()
+                    ->whereKey($language->getKey())
+                    ->update(['is_default' => true]);
+            });
         }
 
         $this->refreshService();

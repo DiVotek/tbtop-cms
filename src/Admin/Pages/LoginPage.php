@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
@@ -64,16 +66,30 @@ class LoginPage extends Page
     {
         $guard = (string) config('tbtop-cms.admin.guard', 'web');
         $remember = (bool) ($ctx->form['remember'] ?? false);
+        $email = (string) ($ctx->form['email'] ?? '');
+
+        $throttleKey = Str::lower($email) . '|' . $ctx->request->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            throw ValidationException::withMessages([
+                'email' => __('auth.throttle', ['seconds' => $seconds]),
+            ]);
+        }
 
         $ok = auth()->guard($guard)->attempt([
-            'email' => $ctx->form['email'] ?? '',
+            'email' => $email,
             'password' => $ctx->form['password'] ?? '',
         ], $remember);
 
         if (! $ok) {
+            RateLimiter::hit($throttleKey, 60);
+
             throw ValidationException::withMessages(['email' => __('auth.failed')]);
         }
 
+        RateLimiter::clear($throttleKey);
         $ctx->request->session()->regenerate();
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
 

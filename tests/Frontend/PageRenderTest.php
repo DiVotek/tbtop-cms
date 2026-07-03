@@ -67,3 +67,36 @@ it('renders a valid empty spec for a page with no blocks', function (): void {
         ->assertJsonPath('props.render.root', '$root')
         ->assertJsonPath('props.render.elements.$root.children', []);
 });
+
+it('drops a block whose id collides with the reserved root id', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [
+            ['id' => '$root', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'Evil']]],
+            ['id' => 'hero-1', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'Welcome']]],
+        ],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.render.root', '$root')
+        ->assertJsonPath('props.render.elements.$root.type', 'Fragment')
+        ->assertJsonPath('props.render.elements.$root.children', ['hero-1']);
+});
+
+it('drops a block with a duplicate id, keeping the first occurrence', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [
+            ['id' => 'hero-1', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'First']]],
+            ['id' => 'hero-1', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'Second']]],
+        ],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.render.elements.$root.children', ['hero-1'])
+        ->assertJsonPath('props.render.elements.hero-1.props.title', 'First');
+});

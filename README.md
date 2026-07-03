@@ -2,12 +2,13 @@
 
 Minimal `tbtop` + `json-render` CMS core for Laravel.
 
-> Greenfield package, under active construction. This slice ships the package
-> skeleton and tooling only — no domain features yet.
+> Greenfield package. Core CMS domains (languages, pages, redirects, blocks,
+> templates, settings, forms) are implemented; not yet tagged or published to
+> Packagist.
 
 ## Requirements
 
-- PHP `^8.3`
+- PHP `^8.4`
 - Laravel 11 or 12
 
 ## Installation

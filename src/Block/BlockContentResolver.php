@@ -59,10 +59,17 @@ class BlockContentResolver
 
         /** @var array<string, mixed> $data */
         $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+        $block = $this->registry->get($kind);
 
         try {
-            $flat = LocaleFlattener::flattenData($data, $ctx->locale, $ctx->fallbackLocale, $locales);
-            $props = $this->registry->get($kind)->resolve($flat, $ctx);
+            $flat = LocaleFlattener::flattenData(
+                $data,
+                $ctx->locale,
+                $ctx->fallbackLocale,
+                $locales,
+                $block->translatableFields(),
+            );
+            $props = $block->resolve($flat, $ctx);
         } catch (Throwable $e) {
             Log::warning('block.resolve_failed', ['kind' => $kind, 'id' => $raw['id'], 'error' => $e->getMessage()]);
 

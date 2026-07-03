@@ -20,7 +20,7 @@ class ContentLocales
 
         config([
             'tbtop-admin.content_locales' => $locales,
-            'tbtop-admin.default_content_locale' => $default !== '' ? $default : $locales[0],
+            'tbtop-admin.default_content_locale' => in_array($default, $locales, true) ? $default : $locales[0],
         ]);
     }
 }

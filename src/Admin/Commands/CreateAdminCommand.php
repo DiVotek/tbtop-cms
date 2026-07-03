@@ -24,7 +24,15 @@ class CreateAdminCommand extends Command
         $user = $this->findUser($email);
 
         if (! $user instanceof Model) {
-            $password = (string) ($this->option('password') ?: Str::password());
+            $providedPassword = $this->option('password');
+
+            if (is_string($providedPassword) && $providedPassword !== '' && strlen($providedPassword) < 8) {
+                $this->error('The password must be at least 8 characters.');
+
+                return self::FAILURE;
+            }
+
+            $password = (string) ($providedPassword ?: Str::password());
             $model = $this->adminModel();
             $user = (new $model)->forceFill([
                 'email' => $email,
@@ -33,7 +41,7 @@ class CreateAdminCommand extends Command
             ]);
             $user->save();
 
-            if (! $this->option('password')) {
+            if (! $providedPassword) {
                 $this->info("Generated password: {$password}");
             }
         }

@@ -9,6 +9,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 class PageForm
 {
@@ -47,6 +48,7 @@ class PageForm
         $page = $id !== null ? Page::query()->findOrFail($id) : new Page;
         $parentId = self::nullableInt($form['parent_id'] ?? null);
         self::guardParent($page, $parentId);
+        self::guardTypeAndStatus($page, $form);
 
         $page->fill(self::fillAttributes($page, $form, $parentId));
         $page->save();
@@ -111,6 +113,28 @@ class PageForm
         if ($parentId === $page->getKey() || in_array($parentId, self::descendantIds($page), true)) {
             throw ValidationException::withMessages([
                 'parent_id' => 'A page cannot be placed under itself or one of its descendants.',
+            ]);
+        }
+    }
+
+    /** @param array<string, mixed> $form */
+    private static function guardTypeAndStatus(Page $page, array $form): void
+    {
+        if ($page->exists && $page->is_system) {
+            return;
+        }
+
+        $type = (string) ($form['type'] ?? '');
+        if (! app(PageTypeRegistry::class)->has($type)) {
+            throw ValidationException::withMessages([
+                'type' => "Page type [{$type}] is not registered.",
+            ]);
+        }
+
+        $status = (string) ($form['status'] ?? PageStatus::Draft->value);
+        if (PageStatus::tryFrom($status) === null) {
+            throw ValidationException::withMessages([
+                'status' => "Status [{$status}] is not a valid page status.",
             ]);
         }
     }
