@@ -19,7 +19,7 @@ class FormBlockLocator
         private readonly Languages $languages,
     ) {}
 
-    public function locate(Page $page, string $blockId): ?LocatedFormBlock
+    public function locate(Page $page, string $blockId, ?string $locale = null): ?LocatedFormBlock
     {
         $raw = $this->findBlock($page->content ?? [], $blockId);
 
@@ -39,7 +39,9 @@ class FormBlockLocator
             return null;
         }
 
-        return new LocatedFormBlock($block, $this->flatten($raw, $block), $this->context($page));
+        $resolvedLocale = $locale ?? (string) app()->getLocale();
+
+        return new LocatedFormBlock($block, $this->flatten($raw, $block, $resolvedLocale), $this->context($page, $resolvedLocale));
     }
 
     /**
@@ -61,7 +63,7 @@ class FormBlockLocator
      * @param  array<array-key, mixed>  $raw
      * @return array<string, mixed>
      */
-    private function flatten(array $raw, Block $block): array
+    private function flatten(array $raw, Block $block, string $locale): array
     {
         /** @var array<string, mixed> $data */
         $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
@@ -69,15 +71,15 @@ class FormBlockLocator
 
         return LocaleFlattener::flattenData(
             $data,
-            (string) app()->getLocale(),
+            $locale,
             $this->languages->defaultLocale(),
             $locales,
             $block->translatableFields(),
         );
     }
 
-    private function context(Page $page): SubmitContext
+    private function context(Page $page, string $locale): SubmitContext
     {
-        return new SubmitContext((string) app()->getLocale(), $this->languages->defaultLocale(), $page);
+        return new SubmitContext($locale, $this->languages->defaultLocale(), $page);
     }
 }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\DashboardPage;
+use Tbtop\Cms\Admin\Pages\FormSubmissionsPage;
 use Tbtop\Cms\Admin\Pages\LanguagesPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
@@ -56,6 +57,7 @@ return [
     ],
     'forms' => [
         'throttle' => '10,1',
+        'store' => true,
     ],
     'render' => [
         'component' => 'Cms/Page',
@@ -80,6 +82,7 @@ return [
             'templates' => TemplatesPage::class,
             'template_create' => TemplateCreatePage::class,
             'template_edit' => TemplateEditPage::class,
+            'form_submissions' => FormSubmissionsPage::class,
         ],
     ],
 ];

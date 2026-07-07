@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Cms;
+use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Mail\ContactFormMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -73,6 +75,65 @@ it('rejects a submission that fails server-side validation', function (): void {
         ->assertJsonValidationErrors(['name', 'email', 'message']);
 
     Mail::assertNothingSent();
+    expect(FormSubmission::query()->count())->toBe(0);
+});
+
+it('persists a handled submission after a successful submit', function (): void {
+    $page = contactFormPage();
+
+    $this->post(submitUrl($page, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+
+    expect($submission->status)->toBe(SubmissionStatus::Handled)
+        ->and($submission->handled_at)->not->toBeNull()
+        ->and($submission->error)->toBeNull()
+        ->and($submission->page_id)->toBe($page->getKey())
+        ->and($submission->block_id)->toBe('form-1')
+        ->and($submission->kind)->toBe('ContactForm')
+        ->and($submission->payload)->toBe(['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hello there']);
+});
+
+it('persists a failed submission when the block handler throws', function (): void {
+    config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Boom'],
+        'content' => [[
+            'id' => 'throw-1',
+            'kind' => 'Throwing',
+            'active' => true,
+            'data' => [],
+        ]],
+    ]);
+
+    $this->post(submitUrl($page, 'throw-1'), ['value' => 'x'])
+        ->assertRedirect()
+        ->assertSessionHasErrors(['form']);
+
+    $submission = FormSubmission::query()->sole();
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toBe('handler boom')
+        ->and($submission->handled_at)->toBeNull();
+});
+
+it('does not persist a submission when forms.store is disabled', function (): void {
+    config()->set('tbtop-cms.forms.store', false);
+    $page = contactFormPage();
+
+    $this->post(submitUrl($page, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+    ])->assertRedirect();
+
+    expect(FormSubmission::query()->count())->toBe(0);
 });
 
 it('returns 404 when submitting to an unknown block', function (): void {
