@@ -73,10 +73,12 @@ it('returns 404 for sitemap and robots when the config disables it', function ()
 it('serves robots.txt with a sitemap reference', function (): void {
     app(Cms::class)->frontendRoutes();
 
-    $this->get('/robots.txt')
+    $response = $this->get('/robots.txt')
         ->assertOk()
-        ->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
         ->assertSee('User-agent: *', false)
         ->assertSee('Allow: /', false)
         ->assertSee(url('sitemap.xml'), false);
+
+    expect(strtolower((string) $response->headers->get('Content-Type')))
+        ->toBe('text/plain; charset=utf-8');
 });
