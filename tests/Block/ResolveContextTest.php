@@ -32,3 +32,17 @@ it('returns null for a missing media id', function (): void {
 
     expect($ctx->mediaUrl(999999))->toBeNull();
 });
+
+it('renders richtext to html via the resolve context', function (): void {
+    $ctx = app(ResolveContext::class, ['locale' => 'en', 'fallbackLocale' => 'en']);
+
+    $value = [
+        'root' => [
+            'children' => [
+                ['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => 'hi', 'format' => 0]]],
+            ],
+        ],
+    ];
+
+    expect($ctx->richtextHtml($value))->toBe('<p>hi</p>');
+});

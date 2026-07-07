@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Block;
 
+use Tbtop\Cms\Frontend\Render\RichtextHtmlRenderer;
 use Tbtop\Cms\Page\Models\Page;
 
 final readonly class ResolveContext
@@ -13,6 +14,7 @@ final readonly class ResolveContext
         public string $fallbackLocale,
         public ?Page $page = null,
         private ?MediaUrlResolver $mediaUrlResolver = null,
+        private ?RichtextHtmlRenderer $richtextHtmlRenderer = null,
     ) {}
 
     public function mediaUrl(string | int $id): ?string
@@ -20,5 +22,12 @@ final readonly class ResolveContext
         $resolver = $this->mediaUrlResolver ?? app(MediaUrlResolver::class);
 
         return $resolver->resolve($id);
+    }
+
+    public function richtextHtml(mixed $value): string
+    {
+        $renderer = $this->richtextHtmlRenderer ?? app(RichtextHtmlRenderer::class);
+
+        return $renderer->render($value);
     }
 }
