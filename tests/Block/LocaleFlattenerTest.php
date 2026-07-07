@@ -114,3 +114,85 @@ it('only flattens fields the schema declares translatable', function () use ($lo
         'settings' => ['en' => 'some value', 'url' => '/about'],
     ]);
 });
+
+it('flattens a translatable field nested inside a repeater via its dotted path', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        ['items' => [
+            ['caption' => ['en' => 'A', 'uk' => 'Ah'], 'url' => '/a'],
+            ['caption' => ['en' => 'B', 'uk' => 'Be'], 'url' => '/b'],
+        ]],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: ['items.caption'],
+    );
+
+    expect($out)->toBe(['items' => [
+        ['caption' => 'A', 'url' => '/a'],
+        ['caption' => 'B', 'url' => '/b'],
+    ]]);
+});
+
+it('flattens a translatable field nested two repeaters deep via its dotted path', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        ['items' => [
+            ['gallery' => [
+                ['caption' => ['en' => 'A', 'uk' => 'Ah']],
+            ]],
+        ]],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: ['items.gallery.caption'],
+    );
+
+    expect($out)->toBe(['items' => [
+        ['gallery' => [
+            ['caption' => 'A'],
+        ]],
+    ]]);
+});
+
+it('does not let a top-level non-translatable field collide with a same-named translatable nested field', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        [
+            'title' => ['label' => 'Hi', 'weight' => 3],
+            'items' => [
+                ['title' => ['en' => 'A', 'uk' => 'Ah']],
+            ],
+        ],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: ['items.title'],
+    );
+
+    expect($out)->toBe([
+        'title' => ['label' => 'Hi', 'weight' => 3],
+        'items' => [
+            ['title' => 'A'],
+        ],
+    ]);
+});
+
+it('does not let a translatable top-level field collide with a same-named non-translatable nested field', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(
+        [
+            'title' => ['en' => 'Hi', 'uk' => 'Pryvit'],
+            'items' => [
+                ['title' => ['label' => 'A', 'weight' => 3]],
+            ],
+        ],
+        'en',
+        'uk',
+        $locales,
+        translatableFields: ['title'],
+    );
+
+    expect($out)->toBe([
+        'title' => 'Hi',
+        'items' => [
+            ['title' => ['label' => 'A', 'weight' => 3]],
+        ],
+    ]);
+});

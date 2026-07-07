@@ -9,10 +9,8 @@ class LocaleFlattener
     /**
      * @param  array<string, mixed>  $data
      * @param  list<string>  $locales
-     * @param  list<string>|null  $translatableFields  Field names the block schema declares
-     *                                                 translatable. Null preserves the old
-     *                                                 shape-guessing behavior for callers that
-     *                                                 can't supply a schema.
+     * @param  list<string>|null  $translatableFields  Dotted field paths the schema declares
+     *                                                 translatable. Null keeps the legacy behavior.
      * @return array<string, mixed>
      */
     public static function flattenData(
@@ -22,7 +20,7 @@ class LocaleFlattener
         array $locales,
         ?array $translatableFields = null,
     ): array {
-        $out = self::flatten($data, $locale, $fallback, $locales, $translatableFields, $translatableFields === null);
+        $out = self::flatten($data, $locale, $fallback, $locales, $translatableFields, '', $translatableFields === null);
 
         return is_array($out) ? $out : [];
     }
@@ -37,6 +35,7 @@ class LocaleFlattener
         string $fallback,
         array $locales,
         ?array $translatableFields,
+        string $path,
         bool $fieldIsTranslatable,
     ): mixed {
         if (! is_array($data) || $data === []) {
@@ -55,6 +54,7 @@ class LocaleFlattener
                     $fallback,
                     $locales,
                     $translatableFields,
+                    $path,
                     $fieldIsTranslatable,
                 ),
                 $data,
@@ -63,13 +63,15 @@ class LocaleFlattener
 
         $out = [];
         foreach ($data as $key => $value) {
+            $childPath = $path === '' ? (string) $key : "{$path}.{$key}";
             $out[$key] = self::flatten(
                 $value,
                 $locale,
                 $fallback,
                 $locales,
                 $translatableFields,
-                $translatableFields !== null && in_array((string) $key, $translatableFields, true),
+                $childPath,
+                $translatableFields !== null && in_array($childPath, $translatableFields, true),
             );
         }
 
@@ -77,11 +79,8 @@ class LocaleFlattener
     }
 
     /**
-     * A key no longer in $locales (its language was deleted) doesn't disqualify the map, as
-     * long as $locale or $fallback — the keys actually read below — is present. That relaxed
-     * check only applies once the schema has confirmed the field is translatable; without a
-     * schema (or for a field the schema didn't mark translatable), every key must still be a
-     * currently known locale, so an unrelated field can't be misread as a locale map.
+     * Orphaned locale keys are tolerated only once the schema confirms the field is
+     * translatable; otherwise every key must be a currently known locale.
      *
      * @param  array<array-key, mixed>  $data
      * @param  list<string>  $locales
