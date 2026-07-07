@@ -99,17 +99,18 @@ it('throws on an unknown kind when strict mode is enabled', function (): void {
 it('throws with the original error as previous when strict mode is enabled', function (): void {
     config()->set('tbtop-cms.blocks.strict', true);
 
+    $caught = null;
+
     try {
         app(BlockContentResolver::class)->resolve([
             ['id' => 'x', 'kind' => 'Broken', 'active' => true, 'data' => []],
         ]);
     } catch (BlockResolutionException $e) {
-        expect($e->kind)->toBe('Broken')
-            ->and($e->getPrevious())->toBeInstanceOf(RuntimeException::class)
-            ->and($e->getPrevious()?->getMessage())->toBe('boom');
-
-        return;
+        $caught = $e;
     }
 
-    $this->fail('Expected BlockResolutionException was not thrown.');
+    expect($caught)->toBeInstanceOf(BlockResolutionException::class)
+        ->and($caught?->kind)->toBe('Broken')
+        ->and($caught?->getPrevious())->toBeInstanceOf(RuntimeException::class)
+        ->and($caught?->getPrevious()?->getMessage())->toBe('boom');
 });
