@@ -37,6 +37,12 @@ return [
     ],
     'blocks' => [
         'types' => [],
+        'strict' => false,
+    ],
+    'seo' => [
+        'sitemap' => [
+            'enabled' => true,
+        ],
     ],
     'settings' => [
         'secret' => [

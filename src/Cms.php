@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
+use Tbtop\Cms\Frontend\Http\Controllers\RobotsController;
+use Tbtop\Cms\Frontend\Http\Controllers\SitemapController;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
@@ -37,8 +39,20 @@ class Cms
                 ->middleware('throttle:' . config('tbtop-cms.forms.throttle', '10,1'))
                 ->name('tbtop-cms.form.submit');
 
+            $this->seoRoutes();
+
             Route::get('{path?}', PageController::class)->where('path', '.*');
         });
+    }
+
+    private function seoRoutes(): void
+    {
+        if (! config('tbtop-cms.seo.sitemap.enabled', true)) {
+            return;
+        }
+
+        Route::get('sitemap.xml', SitemapController::class)->name('tbtop-cms.sitemap');
+        Route::get('robots.txt', RobotsController::class)->name('tbtop-cms.robots');
     }
 
     public function resolve(string $path, ?string $locale = null): ?Page
