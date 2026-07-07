@@ -54,7 +54,9 @@ class LayoutEditPage extends Page
         $slot = request()->route('slot');
         $slot = is_string($slot) ? $slot : '';
 
-        return in_array($slot, Slots::all(), true) ? $slot : Slots::HEADER;
+        abort_unless(in_array($slot, Slots::all(), true), 404);
+
+        return $slot;
     }
 
     private function listUrl(): string

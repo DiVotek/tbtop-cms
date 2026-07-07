@@ -97,6 +97,12 @@ it('prefills the edit page with the existing slot record', function (): void {
         ->assertJsonPath('props.data.layoutEditor.content.0.title', 'Hi');
 });
 
+it('returns 404 for an unknown slot in the edit url', function (): void {
+    $this->actingAs(makeLayoutAdmin(), 'web')
+        ->get('/admin/layout/typo/edit', ['X-Inertia' => 'true'])
+        ->assertNotFound();
+});
+
 it('redirects a guest away from the layout admin', function (): void {
     $this->get('/admin/layout')->assertRedirect(route('login'));
 });
