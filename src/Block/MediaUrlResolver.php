@@ -9,7 +9,7 @@ use Tbtop\Admin\Uploads\UploadUrl;
 
 class MediaUrlResolver
 {
-    public function resolve(string|int $id): ?string
+    public function resolve(string | int $id): ?string
     {
         $media = Media::query()->find($id);
 
