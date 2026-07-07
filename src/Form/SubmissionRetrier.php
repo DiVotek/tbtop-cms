@@ -26,7 +26,7 @@ class SubmissionRetrier
             return;
         }
 
-        $located = $this->locator->locate($page, $submission->block_id);
+        $located = $this->locator->locate($page, $submission->block_id, $submission->locale);
 
         if (! $located instanceof LocatedFormBlock) {
             $this->markFailed($submission, 'Form block no longer exists on the page.');
