@@ -26,14 +26,29 @@ abstract class Block
     /** @return list<string> */
     public function translatableFields(): array
     {
-        $fields = [];
+        return self::collectTranslatablePaths($this->form(new S), '');
+    }
 
-        foreach ($this->form(new S) as $field) {
+    /**
+     * @param  list<Field>  $fields
+     * @return list<string>
+     */
+    private static function collectTranslatablePaths(array $fields, string $prefix): array
+    {
+        $paths = [];
+
+        foreach ($fields as $field) {
+            $path = $prefix === '' ? $field->name : "{$prefix}.{$field->name}";
+
             if ($field->isTranslatableField()) {
-                $fields[] = $field->name;
+                $paths[] = $path;
             }
+
+            /** @var list<Field> $children */
+            $children = $field->childFields();
+            $paths = [...$paths, ...self::collectTranslatablePaths($children, $path)];
         }
 
-        return $fields;
+        return $paths;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Block\BlockContentResolver;
+use Tbtop\Cms\Block\BlockResolutionException;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\BrokenBlock;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
@@ -85,4 +86,31 @@ it('preserves block order', function (): void {
     ]);
 
     expect(array_map(fn (object $b): string => $b->id, $out))->toBe(['a', 'b']);
+});
+
+it('throws on an unknown kind when strict mode is enabled', function (): void {
+    config()->set('tbtop-cms.blocks.strict', true);
+
+    app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'Ghost', 'active' => true, 'data' => []],
+    ]);
+})->throws(BlockResolutionException::class);
+
+it('throws with the original error as previous when strict mode is enabled', function (): void {
+    config()->set('tbtop-cms.blocks.strict', true);
+
+    $caught = null;
+
+    try {
+        app(BlockContentResolver::class)->resolve([
+            ['id' => 'x', 'kind' => 'Broken', 'active' => true, 'data' => []],
+        ]);
+    } catch (BlockResolutionException $e) {
+        $caught = $e;
+    }
+
+    expect($caught)->toBeInstanceOf(BlockResolutionException::class)
+        ->and($caught?->kind)->toBe('Broken')
+        ->and($caught?->getPrevious())->toBeInstanceOf(RuntimeException::class)
+        ->and($caught?->getPrevious()?->getMessage())->toBe('boom');
 });

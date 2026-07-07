@@ -30,6 +30,7 @@ class ShareCmsProps
         Inertia::share('cms', fn (): array => [
             'settings' => $this->settings->forFrontend(),
             'locale' => (string) app()->getLocale(),
+            'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
         ]);
 
@@ -38,11 +39,15 @@ class ShareCmsProps
         return $next($request);
     }
 
-    /** @return list<array{locale: string, name: string}> */
+    /** @return list<array{locale: string, name: string, is_default: bool}> */
     private function frontendLanguages(): array
     {
         return array_map(
-            static fn (array $row): array => ['locale' => $row['locale'], 'name' => $row['name']],
+            static fn (array $row): array => [
+                'locale' => $row['locale'],
+                'name' => $row['name'],
+                'is_default' => $row['is_default'],
+            ],
             $this->languages->frontendActive(),
         );
     }

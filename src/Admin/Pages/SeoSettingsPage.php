@@ -33,6 +33,7 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_title_suffix' => 'seo.title_suffix',
             'seo_default_description' => 'seo.default_description',
             'seo_default_og_image' => 'seo.default_og_image',
+            'seo_indexing_enabled' => 'seo.indexing_enabled',
         ];
     }
 
@@ -43,6 +44,7 @@ class SeoSettingsPage extends SettingsPageBase
             $s->text('seo_title_suffix')->label('Title suffix')->rules('nullable|max:255'),
             $s->textarea('seo_default_description')->label('Default description')->rules('nullable|max:500'),
             $s->media('seo_default_og_image')->label('Default OG image'),
+            $s->boolean('seo_indexing_enabled')->label('Allow search engines to index this site'),
         ];
     }
 }

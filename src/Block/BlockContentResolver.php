@@ -15,6 +15,7 @@ class BlockContentResolver
     public function __construct(
         private readonly BlockRegistry $registry,
         private readonly Languages $languages,
+        private readonly MediaUrlResolver $mediaUrlResolver,
     ) {}
 
     /**
@@ -26,11 +27,12 @@ class BlockContentResolver
         $locale = app()->getLocale();
         $fallback = $this->languages->defaultLocale();
         $locales = array_column($this->languages->all(), 'locale');
-        $ctx = new ResolveContext($locale, $fallback, $page);
+        $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver);
+        $strict = (bool) config('tbtop-cms.blocks.strict', false);
 
         $resolved = [];
         foreach ($content as $raw) {
-            $block = $this->resolveOne($raw, $ctx, $locales);
+            $block = $this->resolveOne($raw, $ctx, $locales, $strict);
             if ($block instanceof ResolvedBlock) {
                 $resolved[] = $block;
             }
@@ -40,7 +42,7 @@ class BlockContentResolver
     }
 
     /** @param list<string> $locales */
-    private function resolveOne(mixed $raw, ResolveContext $ctx, array $locales): ?ResolvedBlock
+    private function resolveOne(mixed $raw, ResolveContext $ctx, array $locales, bool $strict): ?ResolvedBlock
     {
         if (! is_array($raw) || ! is_string($raw['kind'] ?? null) || ! is_string($raw['id'] ?? null)) {
             return null;
@@ -52,6 +54,10 @@ class BlockContentResolver
 
         $kind = $raw['kind'];
         if (! $this->registry->has($kind)) {
+            if ($strict) {
+                throw BlockResolutionException::unknownKind($kind);
+            }
+
             Log::warning('block.unknown', ['kind' => $kind]);
 
             return null;
@@ -71,6 +77,10 @@ class BlockContentResolver
             );
             $props = $block->resolve($flat, $ctx);
         } catch (Throwable $e) {
+            if ($strict) {
+                throw BlockResolutionException::resolveFailed($kind, $e);
+            }
+
             Log::warning('block.resolve_failed', ['kind' => $kind, 'id' => $raw['id'], 'error' => $e->getMessage()]);
 
             return null;
