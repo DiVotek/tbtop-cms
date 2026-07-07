@@ -56,6 +56,7 @@ return [
     ],
     'forms' => [
         'throttle' => '10,1',
+        'store' => true,
     ],
     'render' => [
         'component' => 'Cms/Page',
