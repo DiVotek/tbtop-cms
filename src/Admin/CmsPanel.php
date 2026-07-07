@@ -8,6 +8,7 @@ use Tbtop\Admin\Pages\Page;
 use Tbtop\Admin\Panels\Panel;
 use Tbtop\Admin\Panels\PanelConfig;
 use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
+use Tbtop\Cms\Admin\Http\Middleware\ShareAdminAuth;
 use Tbtop\Cms\Admin\Http\Middleware\SyncContentLocales;
 
 class CmsPanel extends Panel
@@ -18,7 +19,8 @@ class CmsPanel extends Panel
             ->id('cms')
             ->prefix((string) config('tbtop-cms.admin.prefix', 'admin'))
             ->guard((string) config('tbtop-cms.admin.guard', 'web'))
-            ->middleware(['web', EnsureCmsAdmin::class, SyncContentLocales::class])
+            ->middleware(['web', EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
+            ->chrome(CmsChrome::class)
             ->pages($this->pages());
     }
 
