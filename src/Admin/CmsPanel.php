@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin;
 
+use Tbtop\Admin\Navigation\NavItem;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Admin\Panels\Panel;
 use Tbtop\Admin\Panels\PanelConfig;
@@ -15,13 +16,30 @@ class CmsPanel extends Panel
 {
     public function configure(PanelConfig $panel): PanelConfig
     {
+        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+
         return $panel
             ->id('cms')
-            ->prefix((string) config('tbtop-cms.admin.prefix', 'admin'))
+            ->prefix($prefix)
             ->guard((string) config('tbtop-cms.admin.guard', 'web'))
             ->middleware(['web', EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
             ->chrome(CmsChrome::class)
+            ->navigation('topbar-sidebar')
+            ->userMenuItems($this->userMenuItems($prefix))
             ->pages($this->pages());
+    }
+
+    /**
+     * Profile-menu links in the top bar. Profile lives here, not in the
+     * sidebar nav.
+     *
+     * @return list<NavItem>
+     */
+    private function userMenuItems(string $prefix): array
+    {
+        return [
+            NavItem::make('Profile')->url('/' . trim($prefix, '/') . '/profile')->icon('user'),
+        ];
     }
 
     /** @return list<class-string<Page>> */

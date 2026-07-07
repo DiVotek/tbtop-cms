@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tbtop\Admin\Dsl\ActionBuilder;
+use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\CmsChrome;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
+use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
@@ -158,4 +162,66 @@ it('loads the payload for the view action', function (): void {
     ])->assertOk()
         ->assertJsonPath('data.payload.name', 'Ada')
         ->assertJsonPath('data.payload.email', 'ada@example.test');
+});
+
+function submissionWithLead(LeadStatus $lead): FormSubmission
+{
+    return FormSubmission::query()->create([
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada'],
+        'status' => SubmissionStatus::Handled,
+        'lead_status' => $lead,
+    ]);
+}
+
+function inboxActionOptions(): array
+{
+    $header = (new CmsChrome)->header(new S);
+    foreach ($header->options['children'] as $child) {
+        $node = $child instanceof ActionBuilder ? $child->toNode() : $child;
+        if ($node->name === 'inbox') {
+            return $node->options;
+        }
+    }
+
+    return [];
+}
+
+it('shows the unread lead count on the inbox badge', function (): void {
+    submissionWithLead(LeadStatus::New);
+    submissionWithLead(LeadStatus::New);
+    submissionWithLead(LeadStatus::Read);
+    submissionWithLead(LeadStatus::Processed);
+
+    expect(inboxActionOptions()['badge'])->toBe('2');
+});
+
+it('omits the inbox badge when nothing is unread', function (): void {
+    submissionWithLead(LeadStatus::Read);
+
+    expect(inboxActionOptions())->not->toHaveKey('badge');
+});
+
+it('marks a new submission read when its payload is opened', function (): void {
+    actingAsCmsAdmin();
+    $submission = submissionWithLead(LeadStatus::New);
+
+    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk();
+
+    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Read);
+});
+
+it('leaves an already-read submission unchanged when reopened', function (): void {
+    actingAsCmsAdmin();
+    $submission = submissionWithLead(LeadStatus::Processed);
+
+    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk();
+
+    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Processed);
 });

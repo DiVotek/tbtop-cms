@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
@@ -24,10 +25,14 @@ class FormSubmissionsPage extends AdminPage
         return 'form-submissions';
     }
 
-    /** @return array<string, mixed>|null */
+    /**
+     * Reached from the Inbox button in the top bar, not the sidebar nav.
+     *
+     * @return array<string, mixed>|null
+     */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Form submissions', 'order' => 45];
+        return null;
     }
 
     #[\Override]
@@ -41,14 +46,15 @@ class FormSubmissionsPage extends AdminPage
         $table = $s->table('formSubmissions')
             ->query($this->query(...))
             ->columns([
-                Column::make('kind')->label('Kind'),
+                Column::make('lead_status')->label('Status')->badge([
+                    LeadStatus::New->value => Color::Danger,
+                    LeadStatus::Read->value => Color::Info,
+                    LeadStatus::Processed->value => Color::Success,
+                    LeadStatus::Discarded->value => Color::Gray,
+                ]),
+                Column::make('kind')->label('Form'),
                 Column::make('page')->label('Page')->formatUsing($this->formatPage(...)),
                 Column::make('locale')->label('Locale'),
-                Column::make('status')->label('Status')->badge([
-                    SubmissionStatus::Pending->value => Color::Warning,
-                    SubmissionStatus::Handled->value => Color::Success,
-                    SubmissionStatus::Failed->value => Color::Danger,
-                ]),
                 Column::make('created_at')->label('Submitted')->datetime(),
             ])
             ->defaultSort('created_at', 'desc')
@@ -120,8 +126,17 @@ class FormSubmissionsPage extends AdminPage
     private function loadPayload(ActionCtx $ctx): array
     {
         $submission = FormSubmission::query()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $this->markRead($submission);
 
         return ['payload' => array_map(self::stringifyValue(...), $submission->payload)];
+    }
+
+    /** Opening a submission clears its unread state. */
+    private function markRead(FormSubmission $submission): void
+    {
+        if ($submission->lead_status === LeadStatus::New) {
+            $submission->forceFill(['lead_status' => LeadStatus::Read])->save();
+        }
     }
 
     private static function stringifyValue(mixed $value): string
