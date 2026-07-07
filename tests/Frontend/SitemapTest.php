@@ -7,6 +7,7 @@ use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Settings\Settings;
 
 uses(RefreshDatabase::class);
 
@@ -62,12 +63,17 @@ it('excludes draft and non-indexable pages', function (): void {
     expect($response->getContent())->not->toContain('draft')->not->toContain('hidden');
 });
 
-it('returns 404 for sitemap and robots when the config disables it', function (): void {
+it('returns 404 for sitemap but keeps robots reachable when the sitemap config disables it', function (): void {
     config(['tbtop-cms.seo.sitemap.enabled' => false]);
     app(Cms::class)->frontendRoutes();
 
     $this->get('/sitemap.xml')->assertNotFound();
-    $this->get('/robots.txt')->assertNotFound();
+
+    $response = $this->get('/robots.txt')
+        ->assertOk()
+        ->assertSee('User-agent: *', false)
+        ->assertSee('Allow: /', false)
+        ->assertDontSee('Sitemap:', false);
 });
 
 it('serves robots.txt with a sitemap reference', function (): void {
@@ -81,4 +87,29 @@ it('serves robots.txt with a sitemap reference', function (): void {
 
     expect(strtolower((string) $response->headers->get('Content-Type')))
         ->toBe('text/plain; charset=utf-8');
+});
+
+it('disallows all crawling and 404s the sitemap when indexing is disabled', function (): void {
+    app(Settings::class)->set('seo.indexing_enabled', false);
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/sitemap.xml')->assertNotFound();
+
+    $response = $this->get('/robots.txt')
+        ->assertOk()
+        ->assertSee('User-agent: *', false)
+        ->assertSee('Disallow: /', false)
+        ->assertDontSee('Sitemap:', false)
+        ->assertDontSee('Allow: /', false);
+});
+
+it('allows indexing by default when the setting is absent', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/robots.txt')
+        ->assertOk()
+        ->assertSee('Allow: /', false)
+        ->assertDontSee('Disallow: /', false);
+
+    $this->get('/sitemap.xml')->assertOk();
 });

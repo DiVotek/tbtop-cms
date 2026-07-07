@@ -47,12 +47,13 @@ class Cms
 
     private function seoRoutes(): void
     {
+        Route::get('robots.txt', RobotsController::class)->name('tbtop-cms.robots');
+
         if (! config('tbtop-cms.seo.sitemap.enabled', true)) {
             return;
         }
 
         Route::get('sitemap.xml', SitemapController::class)->name('tbtop-cms.sitemap');
-        Route::get('robots.txt', RobotsController::class)->name('tbtop-cms.robots');
     }
 
     public function resolve(string $path, ?string $locale = null): ?Page
