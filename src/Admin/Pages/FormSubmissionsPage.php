@@ -71,9 +71,10 @@ class FormSubmissionsPage extends AdminPage
             return '(page deleted)';
         }
 
-        $title = $this->firstLocaleValue($page['title'] ?? null);
-        if ($title !== null) {
-            return $title;
+        $name = $this->firstLocaleValue($page['name'] ?? null)
+            ?? $this->firstLocaleValue($page['title'] ?? null);
+        if ($name !== null) {
+            return $name;
         }
 
         $path = $page['slugs'][0]['path'] ?? null;
