@@ -17,6 +17,7 @@ use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
@@ -39,6 +40,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_cms_settings_table')
             ->hasMigration('create_cms_templates_table')
             ->hasMigration('create_cms_form_submissions_table')
+            ->hasMigration('create_cms_layouts_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -54,6 +56,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->singleton(BlockRegistry::class);
         $this->app->scoped(BlockContentResolver::class);
+        $this->app->scoped(LayoutResolver::class);
         $this->app->scoped(PageResolver::class);
         $this->app->scoped(RedirectResolver::class);
         $this->app->scoped(Settings::class);
