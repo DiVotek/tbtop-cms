@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
+use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
@@ -140,6 +141,18 @@ it('declares the retry row action hidden when the submission is not failed', fun
         ->toContain('"retry"');
 });
 
+it('shows both the lead status and the mail delivery status columns', function (): void {
+    actingAsCmsAdmin();
+
+    $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.structure');
+
+    expect(json_encode($structure))
+        ->toContain('"lead_status"')
+        ->toContain('"status"');
+});
+
 it('loads the payload for the view action', function (): void {
     actingAsCmsAdmin();
     $page = contactPageForListing();
@@ -158,4 +171,90 @@ it('loads the payload for the view action', function (): void {
     ])->assertOk()
         ->assertJsonPath('data.payload.name', 'Ada')
         ->assertJsonPath('data.payload.email', 'ada@example.test');
+});
+
+function submissionWithLead(LeadStatus $lead): FormSubmission
+{
+    return FormSubmission::query()->create([
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada'],
+        'status' => SubmissionStatus::Handled,
+        'lead_status' => $lead,
+    ]);
+}
+
+/**
+ * The Inbox action's options as the client receives them: rendered through
+ * the shell and read off the serialized chrome header, not the DSL tree.
+ *
+ * @return array<string, mixed>
+ */
+function inboxActionOptions(): array
+{
+    $header = test()->get('/admin/form-submissions', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.tbtop.chrome.header');
+
+    return findNodeByName($header, 'inbox')['options'] ?? [];
+}
+
+/**
+ * @param  array<string, mixed>  $node
+ * @return array<string, mixed>|null
+ */
+function findNodeByName(array $node, string $name): ?array
+{
+    if (($node['name'] ?? null) === $name) {
+        return $node;
+    }
+
+    foreach ($node['options']['children'] ?? [] as $child) {
+        $found = findNodeByName($child, $name);
+        if ($found !== null) {
+            return $found;
+        }
+    }
+
+    return null;
+}
+
+it('shows the unread lead count on the inbox badge', function (): void {
+    actingAsCmsAdmin();
+    submissionWithLead(LeadStatus::New);
+    submissionWithLead(LeadStatus::New);
+    submissionWithLead(LeadStatus::Read);
+    submissionWithLead(LeadStatus::Processed);
+
+    expect(inboxActionOptions()['badge'])->toBe('2');
+});
+
+it('omits the inbox badge when nothing is unread', function (): void {
+    actingAsCmsAdmin();
+    submissionWithLead(LeadStatus::Read);
+
+    expect(inboxActionOptions())->not->toHaveKey('badge');
+});
+
+it('marks a new submission read when its payload is opened', function (): void {
+    actingAsCmsAdmin();
+    $submission = submissionWithLead(LeadStatus::New);
+
+    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk();
+
+    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Read);
+});
+
+it('leaves an already-read submission unchanged when reopened', function (): void {
+    actingAsCmsAdmin();
+    $submission = submissionWithLead(LeadStatus::Processed);
+
+    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk();
+
+    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Processed);
 });

@@ -40,6 +40,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_cms_settings_table')
             ->hasMigration('create_cms_templates_table')
             ->hasMigration('create_cms_form_submissions_table')
+            ->hasMigration('update_cms_form_submissions_add_lead_status_table')
             ->hasMigration('create_cms_layouts_table')
             ->hasCommands([
                 InstallCommand::class,

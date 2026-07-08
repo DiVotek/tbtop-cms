@@ -19,10 +19,14 @@ class ProfilePage extends Page
         return 'profile';
     }
 
-    /** @return array<string, mixed>|null */
+    /**
+     * Hidden from the sidebar — reached via the top-bar profile menu.
+     *
+     * @return array<string, mixed>|null
+     */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Profile', 'order' => 90];
+        return null;
     }
 
     #[\Override]
