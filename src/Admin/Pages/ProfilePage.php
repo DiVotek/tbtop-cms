@@ -20,7 +20,7 @@ class ProfilePage extends Page
     }
 
     /**
-     * Reached from the profile menu in the top bar, not the sidebar nav.
+     * Hidden from the sidebar — reached via the top-bar profile menu.
      *
      * @return array<string, mixed>|null
      */

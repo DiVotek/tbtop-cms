@@ -26,7 +26,7 @@ class FormSubmissionsPage extends AdminPage
     }
 
     /**
-     * Reached from the Inbox button in the top bar, not the sidebar nav.
+     * Hidden from the sidebar — reached via the top-bar Inbox button.
      *
      * @return array<string, mixed>|null
      */

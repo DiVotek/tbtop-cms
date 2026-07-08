@@ -29,12 +29,7 @@ class CmsPanel extends Panel
             ->pages($this->pages());
     }
 
-    /**
-     * Profile-menu links in the top bar. Profile lives here, not in the
-     * sidebar nav.
-     *
-     * @return list<NavItem>
-     */
+    /** @return list<NavItem> */
     private function userMenuItems(string $prefix): array
     {
         return [
