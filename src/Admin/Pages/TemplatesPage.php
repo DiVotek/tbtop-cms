@@ -28,7 +28,11 @@ class TemplatesPage extends AdminPage
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Templates', 'order' => 40];
+        return [
+            'group' => 'design',
+            'label' => __('tbtop-cms::nav.items.templates'),
+            'order' => 10,
+        ];
     }
 
     #[\Override]

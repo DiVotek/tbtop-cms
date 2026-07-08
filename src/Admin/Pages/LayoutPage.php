@@ -20,7 +20,11 @@ class LayoutPage extends AdminPage
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Layout', 'order' => 42];
+        return [
+            'group' => 'design',
+            'label' => __('tbtop-cms::nav.items.layout'),
+            'order' => 20,
+        ];
     }
 
     #[\Override]

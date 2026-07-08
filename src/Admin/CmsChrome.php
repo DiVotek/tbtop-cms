@@ -38,7 +38,7 @@ class CmsChrome extends Chrome
     {
         return [
             $s->themeToggle(),
-            $s->localeSwitcher(),
+            $s->localeSwitcher('dropdown'),
             $s->notifications(),
             $this->inbox($s),
             $s->action('view-site')

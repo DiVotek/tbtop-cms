@@ -27,7 +27,11 @@ class LanguagesPage extends AdminPage
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Languages', 'order' => 20];
+        return [
+            'group' => 'settings',
+            'label' => __('tbtop-cms::nav.items.languages'),
+            'order' => 10,
+        ];
     }
 
     #[\Override]
