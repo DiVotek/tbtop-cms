@@ -52,6 +52,11 @@ class FormSubmissionsPage extends AdminPage
                     LeadStatus::Processed->value => Color::Success,
                     LeadStatus::Discarded->value => Color::Gray,
                 ]),
+                Column::make('status')->label('Delivery')->badge([
+                    SubmissionStatus::Pending->value => Color::Warning,
+                    SubmissionStatus::Handled->value => Color::Success,
+                    SubmissionStatus::Failed->value => Color::Danger,
+                ]),
                 Column::make('kind')->label('Form'),
                 Column::make('page')->label('Page')->formatUsing($this->formatPage(...)),
                 Column::make('locale')->label('Locale'),

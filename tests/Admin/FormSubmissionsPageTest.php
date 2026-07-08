@@ -141,6 +141,18 @@ it('declares the retry row action hidden when the submission is not failed', fun
         ->toContain('"retry"');
 });
 
+it('shows both the lead status and the mail delivery status columns', function (): void {
+    actingAsCmsAdmin();
+
+    $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.structure');
+
+    expect(json_encode($structure))
+        ->toContain('"lead_status"')
+        ->toContain('"status"');
+});
+
 it('loads the payload for the view action', function (): void {
     actingAsCmsAdmin();
     $page = contactPageForListing();
