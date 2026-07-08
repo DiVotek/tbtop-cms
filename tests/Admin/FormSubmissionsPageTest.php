@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
-use Tbtop\Admin\Dsl\ActionBuilder;
-use Tbtop\Admin\Dsl\S;
-use Tbtop\Cms\Admin\CmsChrome;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\LeadStatus;
@@ -176,20 +173,43 @@ function submissionWithLead(LeadStatus $lead): FormSubmission
     ]);
 }
 
+/**
+ * The Inbox action's options as the client receives them: rendered through
+ * the shell and read off the serialized chrome header, not the DSL tree.
+ *
+ * @return array<string, mixed>
+ */
 function inboxActionOptions(): array
 {
-    $header = (new CmsChrome)->header(new S);
-    foreach ($header->options['children'] as $child) {
-        $node = $child instanceof ActionBuilder ? $child->toNode() : $child;
-        if ($node->name === 'inbox') {
-            return $node->options;
+    $header = test()->get('/admin/form-submissions', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.tbtop.chrome.header');
+
+    return findNodeByName($header, 'inbox')['options'] ?? [];
+}
+
+/**
+ * @param  array<string, mixed>  $node
+ * @return array<string, mixed>|null
+ */
+function findNodeByName(array $node, string $name): ?array
+{
+    if (($node['name'] ?? null) === $name) {
+        return $node;
+    }
+
+    foreach ($node['options']['children'] ?? [] as $child) {
+        $found = findNodeByName($child, $name);
+        if ($found !== null) {
+            return $found;
         }
     }
 
-    return [];
+    return null;
 }
 
 it('shows the unread lead count on the inbox badge', function (): void {
+    actingAsCmsAdmin();
     submissionWithLead(LeadStatus::New);
     submissionWithLead(LeadStatus::New);
     submissionWithLead(LeadStatus::Read);
@@ -199,6 +219,7 @@ it('shows the unread lead count on the inbox badge', function (): void {
 });
 
 it('omits the inbox badge when nothing is unread', function (): void {
+    actingAsCmsAdmin();
     submissionWithLead(LeadStatus::Read);
 
     expect(inboxActionOptions())->not->toHaveKey('badge');
