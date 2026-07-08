@@ -26,6 +26,8 @@ class CmsPanel extends Panel
             ->middleware(['web', EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
             ->chrome(CmsChrome::class)
             ->locales(['en', 'uk'])
+            ->density('compact')
+            ->maxContentWidth('full')
             ->navigation('topbar-sidebar')
             ->userMenuItems($this->userMenuItems($prefix))
             ->navigationGroups($this->navigationGroups())

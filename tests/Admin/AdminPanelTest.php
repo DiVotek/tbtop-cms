@@ -17,3 +17,12 @@ it('configures the CMS chrome for the shell', function (): void {
 
     expect($config->getChrome())->toBe(CmsChrome::class);
 });
+
+it('configures a compact, full-width appearance', function (): void {
+    $config = (new CmsPanel)->configure(new PanelConfig);
+
+    expect($config->appearance())->toMatchArray([
+        'density' => 'compact',
+        'maxWidth' => 'full',
+    ]);
+});
