@@ -17,7 +17,11 @@ class NotificationSettingsPage extends SettingsPageBase
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Notification settings', 'order' => 60];
+        return [
+            'group' => 'settings',
+            'label' => __('tbtop-cms::nav.items.notification_settings'),
+            'order' => 40,
+        ];
     }
 
     #[\Override]

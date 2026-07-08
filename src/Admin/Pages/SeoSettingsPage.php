@@ -17,7 +17,11 @@ class SeoSettingsPage extends SettingsPageBase
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'SEO settings', 'order' => 50];
+        return [
+            'group' => 'settings',
+            'label' => __('tbtop-cms::nav.items.seo_settings'),
+            'order' => 30,
+        ];
     }
 
     #[\Override]

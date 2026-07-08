@@ -53,6 +53,7 @@ class CmsServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->loadTranslations();
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->singleton(BlockRegistry::class);
@@ -70,6 +71,20 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireAdminLoginRedirect();
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
+    }
+
+    /**
+     * Register package translations from a normalized path. Spatie's
+     * hasTranslations() points the loader at `src/../resources/lang`; that
+     * `/..` segment loads empty and poisons the translator's cache, so we
+     * register the resolved path ourselves instead.
+     */
+    private function loadTranslations(): void
+    {
+        $path = realpath(__DIR__ . '/../resources/lang');
+        if ($path !== false) {
+            $this->loadTranslationsFrom($path, 'tbtop-cms');
+        }
     }
 
     private function registerAdminPanel(): void

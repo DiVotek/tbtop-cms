@@ -27,7 +27,11 @@ class RedirectsPage extends AdminPage
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Redirects', 'order' => 30];
+        return [
+            'group' => 'content',
+            'label' => __('tbtop-cms::nav.items.redirects'),
+            'order' => 20,
+        ];
     }
 
     #[\Override]

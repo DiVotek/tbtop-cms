@@ -17,7 +17,11 @@ class SiteSettingsPage extends SettingsPageBase
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Site settings', 'order' => 40];
+        return [
+            'group' => 'settings',
+            'label' => __('tbtop-cms::nav.items.site_settings'),
+            'order' => 20,
+        ];
     }
 
     #[\Override]

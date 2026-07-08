@@ -29,7 +29,11 @@ class PagesPage extends AdminPage
     /** @return array<string, mixed>|null */
     public static function nav(): ?array
     {
-        return ['group' => 'CMS', 'label' => 'Pages', 'order' => 10];
+        return [
+            'group' => 'content',
+            'label' => __('tbtop-cms::nav.items.pages'),
+            'order' => 10,
+        ];
     }
 
     #[\Override]
