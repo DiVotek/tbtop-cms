@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Spatie\Translatable\HasTranslations;
 use Tbtop\Cms\Database\Factories\PageFactory;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -32,6 +33,8 @@ use Tbtop\Cms\Page\Observers\PageObserver;
  * @property int $lock_version
  * @property int|null $created_by
  * @property int|null $updated_by
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 #[ObservedBy(PageObserver::class)]
 class Page extends Model
