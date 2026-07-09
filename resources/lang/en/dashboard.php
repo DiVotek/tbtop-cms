@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'title' => 'Dashboard',
+    'welcome' => 'Welcome to the tbtop CMS.',
+    'actions' => [
+        'refresh' => 'Refresh',
+        'view_site' => 'View site',
+        'new_page' => 'New page',
+    ],
+    'stats' => [
+        'pages' => 'Pages',
+        'pages_description' => ':published published · :draft draft',
+        'submissions_new' => 'New submissions',
+        'submissions_needs_review' => 'needs review',
+        'media' => 'Media',
+        'media_description' => ':size on disk',
+        'templates_layouts' => 'Templates & layouts',
+        'templates_layouts_description' => ':templates templates · :layouts layouts',
+    ],
+    'charts' => [
+        'leads_by_status' => 'Leads by status',
+        'submissions_daily' => 'Submissions over time',
+        'period' => 'Period',
+        'period_7' => 'Last 7 days',
+        'period_30' => 'Last 30 days',
+        'period_90' => 'Last 90 days',
+        'series_submissions' => 'Submissions',
+    ],
+    'lead_status' => [
+        'new' => 'New',
+        'read' => 'Read',
+        'processed' => 'Processed',
+        'discarded' => 'Discarded',
+    ],
+    'recent' => [
+        'pages_title' => 'Recently updated pages',
+        'submissions_title' => 'Latest submissions',
+        'open_pages' => 'Open pages',
+        'open_submissions' => 'Open submissions',
+    ],
+    'system' => [
+        'title' => 'System',
+        'versions_title' => 'Versions',
+        'infrastructure_title' => 'Infrastructure',
+        'php_version' => 'PHP version',
+        'laravel_version' => 'Laravel version',
+        'admin_version' => 'tbtop/admin version',
+        'cms_version' => 'tbtop/cms version',
+        'db_driver' => 'Database driver',
+        'db_size' => 'Database size',
+        'cache_driver' => 'Cache driver',
+        'queue_driver' => 'Queue driver',
+        'not_available' => 'n/a',
+        'cpu_title' => 'CPU load',
+        'cpu_description' => '1 minute average',
+        'memory_title' => 'Memory',
+        'memory_description' => ':percent% used',
+        'memory_description_php_process' => 'PHP process · :percent% of limit',
+        'disk_title' => 'Disk',
+        'disk_description' => 'used space',
+    ],
+];

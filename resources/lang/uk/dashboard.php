@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'title' => 'Панель керування',
+    'welcome' => 'Ласкаво просимо до tbtop CMS.',
+    'actions' => [
+        'refresh' => 'Оновити',
+        'view_site' => 'Переглянути сайт',
+        'new_page' => 'Нова сторінка',
+    ],
+    'stats' => [
+        'pages' => 'Сторінки',
+        'pages_description' => ':published опубліковано · :draft чернетки',
+        'submissions_new' => 'Нові звернення',
+        'submissions_needs_review' => 'потребують перевірки',
+        'media' => 'Медіа',
+        'media_description' => ':size на диску',
+        'templates_layouts' => 'Шаблони та макети',
+        'templates_layouts_description' => ':templates шаблонів · :layouts макетів',
+    ],
+    'charts' => [
+        'leads_by_status' => 'Звернення за статусом',
+        'submissions_daily' => 'Звернення в часі',
+        'period' => 'Період',
+        'period_7' => 'Останні 7 днів',
+        'period_30' => 'Останні 30 днів',
+        'period_90' => 'Останні 90 днів',
+        'series_submissions' => 'Звернення',
+    ],
+    'lead_status' => [
+        'new' => 'Нове',
+        'read' => 'Прочитано',
+        'processed' => 'Опрацьовано',
+        'discarded' => 'Відхилено',
+    ],
+    'recent' => [
+        'pages_title' => 'Нещодавно оновлені сторінки',
+        'submissions_title' => 'Останні звернення',
+        'open_pages' => 'Відкрити сторінки',
+        'open_submissions' => 'Відкрити звернення',
+    ],
+    'system' => [
+        'title' => 'Система',
+        'versions_title' => 'Версії',
+        'infrastructure_title' => 'Інфраструктура',
+        'php_version' => 'Версія PHP',
+        'laravel_version' => 'Версія Laravel',
+        'admin_version' => 'Версія tbtop/admin',
+        'cms_version' => 'Версія tbtop/cms',
+        'db_driver' => 'Драйвер бази даних',
+        'db_size' => 'Розмір бази даних',
+        'cache_driver' => 'Драйвер кешу',
+        'queue_driver' => 'Драйвер черги',
+        'not_available' => 'н/д',
+        'cpu_title' => 'Навантаження CPU',
+        'cpu_description' => 'Середнє за 1 хвилину',
+        'memory_title' => "Пам'ять",
+        'memory_description' => 'використано :percent%',
+        'memory_description_php_process' => 'Процес PHP · :percent% від ліміту',
+        'disk_title' => 'Диск',
+        'disk_description' => 'зайнято місця',
+    ],
+];

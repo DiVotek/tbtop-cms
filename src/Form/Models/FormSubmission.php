@@ -23,6 +23,8 @@ use Tbtop\Cms\Page\Models\Page;
  * @property LeadStatus $lead_status
  * @property string|null $error
  * @property Carbon|null $handled_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class FormSubmission extends Model
 {
