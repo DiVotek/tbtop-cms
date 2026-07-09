@@ -11,6 +11,13 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 
 class PageFormOptions
 {
+    /**
+     * Sentinel for "no parent". Radix Select forbids an empty-string item
+     * value (it crashes the whole page), so the option carries this marker
+     * and PageForm maps it back to null on save.
+     */
+    public const NO_PARENT = 'none';
+
     /** @return list<array{value: string, label: string}> */
     public static function types(): array
     {
@@ -37,7 +44,7 @@ class PageFormOptions
     {
         $default = app(Languages::class)->defaultLocale();
 
-        $options = [['value' => '', 'label' => '— None —']];
+        $options = [['value' => self::NO_PARENT, 'label' => '— None —']];
 
         foreach (Page::query()->orderBy('sort_order')->orderBy('id')->get() as $page) {
             $name = $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey());
