@@ -125,7 +125,7 @@ class SystemMetrics
             return null;
         }
 
-        $count = substr_count((string) file_get_contents('/proc/cpuinfo'), "\nprocessor\t:");
+        $count = preg_match_all('/^processor\s*:/m', (string) file_get_contents('/proc/cpuinfo'));
 
         return $count > 0 ? $count : null;
     }

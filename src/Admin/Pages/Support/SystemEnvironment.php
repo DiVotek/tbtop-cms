@@ -69,18 +69,18 @@ class SystemEnvironment
 
     private static function databaseSize(): string
     {
-        $driver = (string) config('database.connections.' . config('database.default') . '.driver');
+        $connection = 'database.connections.' . config('database.default');
+        $driver = (string) config($connection . '.driver');
 
         return match ($driver) {
-            'sqlite' => Number::fileSize((int) filesize((string) config('database.connections.sqlite.database'))),
-            'mysql' => Number::fileSize(self::mysqlDatabaseSize()),
+            'sqlite' => Number::fileSize((int) filesize((string) config($connection . '.database'))),
+            'mysql', 'mariadb' => Number::fileSize(self::mysqlDatabaseSize((string) config($connection . '.database'))),
             default => __('tbtop-cms::dashboard.system.not_available'),
         };
     }
 
-    private static function mysqlDatabaseSize(): int
+    private static function mysqlDatabaseSize(string $database): int
     {
-        $database = (string) config('database.connections.mysql.database');
         $row = DB::selectOne(
             'select sum(data_length + index_length) as bytes from information_schema.tables where table_schema = ?',
             [$database],
