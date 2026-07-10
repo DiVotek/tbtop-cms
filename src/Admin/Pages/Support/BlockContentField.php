@@ -14,15 +14,18 @@ use Tbtop\Cms\Block\BlockRegistry;
 
 /**
  * Builds the Pages "Blocks" repeater and maps its rows to and from the stored
- * {id, kind, active, data} block envelope.
+ * {id, kind, active, sort, data} block envelope.
  *
  * v1 targets a single registered block kind: every registered block's form
  * fields are unioned into one flat repeater, so two kinds declaring the same
  * field name would collide. Per-kind field namespacing and kind-gated field
  * visibility need a polymorphic repeater primitive in the tbtop/admin engine.
  *
- * Block field names must not be `id`, `kind`, or `active`: those are the
- * envelope's reserved keys and always take precedence over row data.
+ * Block field names must not be `id`, `kind`, `active`, or `sort`: those are
+ * the envelope's reserved keys and always take precedence over row data.
+ * This repeater form has no `sort` field of its own (v1 has no drag-reorder
+ * UI here) — toEnvelope() only preserves a `sort` a caller already placed on
+ * the row (e.g. PageEditBlocks::toRows()), it never assigns one.
  */
 class BlockContentField
 {
@@ -68,11 +71,19 @@ class BlockContentField
                 ]);
             }
 
-            $out[] = [
+            $entry = [
                 'id' => self::rowId($row),
                 'kind' => $kind,
                 'active' => (bool) ($row['active'] ?? true),
-                'data' => Arr::except($row, ['id', 'kind', 'active']),
+            ];
+
+            if (is_numeric($row['sort'] ?? null)) {
+                $entry['sort'] = (int) $row['sort'];
+            }
+
+            $out[] = [
+                ...$entry,
+                'data' => Arr::except($row, ['id', 'kind', 'active', 'sort']),
             ];
         }
 

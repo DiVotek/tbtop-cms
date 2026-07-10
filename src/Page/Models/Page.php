@@ -48,7 +48,7 @@ class Page extends Model
     protected $guarded = [];
 
     /** @var list<string> */
-    public array $translatable = ['name', 'title', 'heading', 'summary'];
+    public array $translatable = ['name', 'title', 'heading', 'summary', 'body'];
 
     /**
      * Transient (not persisted, not an Eloquent attribute) per-locale slug

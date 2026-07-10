@@ -15,6 +15,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditBlockTabs;
 use Tbtop\Cms\Admin\Pages\Support\PageEditSidebar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
+use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -84,9 +85,12 @@ class PageEditPage extends AdminPage
         $saveTop = $this->saveAction($s, 'saveTop');
         $saveFooter = $this->saveAction($s, 'save');
 
-        $footer = $page->is_system
-            ? $s->flex([$s->spacer(), $saveFooter], justify: 'end')
-            : $s->flex([$this->deleteAction($s), $s->spacer(), $saveFooter], justify: 'end');
+        $footer = EditFooter::build(
+            $s,
+            route('tbtop.cms.pages-page'),
+            $saveFooter,
+            $page->is_system ? null : $this->deleteAction($s),
+        );
 
         $form = $s->form('pageEditor', [
             PageEditStatusBar::build($s, $page, $this->viewOnSiteAction($s), $saveTop),

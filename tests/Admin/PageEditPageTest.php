@@ -83,7 +83,7 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
         ->and($tabs[3]['label'])->toBe('+ Add block');
 
     $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
-    expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary')
+    expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary', 'body')
         ->and($generalFieldNames)->not->toContain('type', 'parent_id', 'status', 'sort_order');
 
     $seoFieldNames = array_column($tabs[1]['body']['options']['children'], 'name');
@@ -97,9 +97,29 @@ it('prefixes block fields with block_{id}_ inside the block tab', function (): v
 
     $tabs = editFormTabs($page->id);
     $blockTab = $tabs[2];
-    $names = array_column($blockTab['body']['options']['children'], 'name');
+    $names = [];
+    collectFieldNames($blockTab['body'], $names);
 
-    expect($names)->toContain('block_blk1_heading', 'block_blk1_body', 'block_blk1_active');
+    expect($names)->toContain('block_blk1_heading', 'block_blk1_body', 'block_blk1_active', 'block_blk1_sort');
+});
+
+it('orders block tabs by sort, not by their position in content', function (): void {
+    $page = pageWithBlocks([
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 2, 'data' => ['heading' => 'First saved']],
+        ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 1, 'data' => ['heading' => 'Second saved']],
+    ]);
+
+    $tabs = editFormTabs($page->id);
+
+    // Both blocks share the label "Simple", so identify each tab by the
+    // block_{id}_sort field it carries rather than by label text.
+    $firstNames = [];
+    collectFieldNames($tabs[2]['body'], $firstNames);
+    $secondNames = [];
+    collectFieldNames($tabs[3]['body'], $secondNames);
+
+    expect($firstNames)->toContain('block_blk2_sort')
+        ->and($secondNames)->toContain('block_blk1_sort');
 });
 
 it('preserves the translatable flag and required rule when renaming a block field', function (): void {
@@ -127,6 +147,18 @@ it('round-trips a translatable block field through save', function (): void {
     )->assertRedirect();
 
     expect($page->refresh()->content[0]['data'])->toBe(['title' => ['en' => 'Updated']]);
+});
+
+it('round-trips the rich-text body through save as a per-locale map', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $lexical = ['root' => ['type' => 'root', 'children' => []]];
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...baseEditPayload(), 'body' => ['en' => $lexical]],
+    )->assertRedirect();
+
+    expect($page->refresh()->getTranslation('body', 'en'))->toBe($lexical);
 });
 
 it('keeps the sidebar cards for status/type/parent/sort_order out of the General tab', function (): void {
@@ -205,8 +237,8 @@ it('saves general and SEO fields including the seo json column', function (): vo
 
 it('round-trips two blocks through save: data, active, and order are preserved', function (): void {
     $page = pageWithBlocks([
-        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'One', 'body' => 'First']],
-        ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Two', 'body' => 'Second']],
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'One', 'body' => 'First']],
+        ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 1, 'data' => ['heading' => 'Two', 'body' => 'Second']],
     ]);
 
     test()->actingAs(makePageEditAdmin(), 'web')->post(
@@ -216,9 +248,11 @@ it('round-trips two blocks through save: data, active, and order are preserved',
             'block_blk1_heading' => 'One Updated',
             'block_blk1_body' => 'First Updated',
             'block_blk1_active' => true,
+            'block_blk1_sort' => 0,
             'block_blk2_heading' => 'Two',
             'block_blk2_body' => 'Second',
             'block_blk2_active' => false,
+            'block_blk2_sort' => 1,
         ],
     )->assertRedirect();
 
@@ -228,9 +262,76 @@ it('round-trips two blocks through save: data, active, and order are preserved',
         ->and($content[0]['id'])->toBe('blk1')
         ->and($content[0]['data'])->toBe(['heading' => 'One Updated', 'body' => 'First Updated'])
         ->and($content[0]['active'])->toBeTrue()
+        ->and($content[0]['sort'])->toBe(0)
         ->and($content[1]['id'])->toBe('blk2')
         ->and($content[1]['data'])->toBe(['heading' => 'Two', 'body' => 'Second'])
-        ->and($content[1]['active'])->toBeFalse();
+        ->and($content[1]['active'])->toBeFalse()
+        ->and($content[1]['sort'])->toBe(1);
+});
+
+it('reorders the envelope when block_{id}_sort is changed on save', function (): void {
+    $page = pageWithBlocks([
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'One']],
+        ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 1, 'data' => ['heading' => 'Two']],
+    ]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [
+            ...baseEditPayload(),
+            'block_blk1_heading' => 'One',
+            'block_blk1_active' => true,
+            'block_blk1_sort' => 5,
+            'block_blk2_heading' => 'Two',
+            'block_blk2_active' => true,
+            'block_blk2_sort' => 1,
+        ],
+    )->assertRedirect();
+
+    $content = $page->refresh()->content;
+
+    expect(array_column($content, 'id'))->toBe(['blk2', 'blk1'])
+        ->and($content[0]['sort'])->toBe(1)
+        ->and($content[1]['sort'])->toBe(5);
+});
+
+it('reads a legacy envelope without sort in its stored order, then assigns sort on save', function (): void {
+    $page = pageWithBlocks([
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'One']],
+        ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Two']],
+    ]);
+
+    expect($page->content[0])->not->toHaveKey('sort');
+
+    $admin = makePageEditAdmin();
+    $session = test()->actingAs($admin, 'web');
+
+    $tabsJson = $session->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json();
+    $form = findNodeByKind($tabsJson['props']['structure'], 'form');
+    $tabsNode = findNodeByKind($form, 'tabs');
+    $tabs = $tabsNode['options']['tabs'];
+    $firstNames = [];
+    collectFieldNames($tabs[2]['body'], $firstNames);
+    expect($firstNames)->toContain('block_blk1_sort');
+
+    $session->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [
+            ...baseEditPayload(),
+            'block_blk1_heading' => 'One',
+            'block_blk1_active' => true,
+            'block_blk1_sort' => 0,
+            'block_blk2_heading' => 'Two',
+            'block_blk2_active' => true,
+            'block_blk2_sort' => 1,
+        ],
+    )->assertRedirect();
+
+    $content = $page->refresh()->content;
+
+    expect(array_column($content, 'id'))->toBe(['blk1', 'blk2'])
+        ->and($content[0]['sort'])->toBe(0)
+        ->and($content[1]['sort'])->toBe(1);
 });
 
 it('adds a new block via pageBlockAdd_{kind} and persists general fields from the payload', function (): void {
@@ -247,10 +348,38 @@ it('adds a new block via pageBlockAdd_{kind} and persists general fields from th
     expect($page->content)->toHaveCount(1)
         ->and($page->content[0]['kind'])->toBe('Simple')
         ->and($page->content[0]['active'])->toBeTrue()
+        ->and($page->content[0]['sort'])->toBe(0)
         ->and($page->getTranslation('name', 'en'))->toBe('Renamed');
 
     $effects = collect($response->json('effects'))->pluck('kind');
     expect($effects)->toContain('redirect', 'notify');
+});
+
+it('appends a new block after the highest existing sort', function (): void {
+    $page = pageWithBlocks([
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 3, 'data' => ['heading' => 'One']],
+        ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 7, 'data' => ['heading' => 'Two']],
+    ]);
+
+    $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Simple",
+        ['payload' => ['form' => [
+            ...baseEditPayload(),
+            'block_blk1_heading' => 'One',
+            'block_blk1_active' => true,
+            'block_blk1_sort' => 3,
+            'block_blk2_heading' => 'Two',
+            'block_blk2_active' => true,
+            'block_blk2_sort' => 7,
+        ]]],
+    );
+
+    $response->assertOk();
+    $content = $page->refresh()->content;
+
+    expect($content)->toHaveCount(3)
+        ->and($content[2]['sort'])->toBe(8)
+        ->and($content[2]['active'])->toBeTrue();
 });
 
 it('removes a block via pageBlockRemove_{id} and keeps the other blocks intact', function (): void {
@@ -306,8 +435,7 @@ it('hides delete from the form footer for system pages', function (): void {
     $form = findNodeByKind(pageEditStructure($system->id)['props']['structure'], 'form');
     $footerActions = footerActionNames($form);
 
-    expect($footerActions)->not->toContain('pageEditDelete')
-        ->and($footerActions)->toContain('save');
+    expect($footerActions)->toBe(['cancel', 'save']);
 });
 
 it('keeps delete in the form footer for regular pages', function (): void {
@@ -316,7 +444,7 @@ it('keeps delete in the form footer for regular pages', function (): void {
     $form = findNodeByKind(pageEditStructure($regular->id)['props']['structure'], 'form');
     $footerActions = footerActionNames($form);
 
-    expect($footerActions)->toContain('pageEditDelete', 'save');
+    expect($footerActions)->toBe(['pageEditDelete', 'cancel', 'save']);
 });
 
 it('deletes a regular page and redirects to the list', function (): void {
@@ -424,6 +552,26 @@ function collectNodesByKind(array $node, string $kind, array &$out): void
     foreach ((array) ($node['options']['tabs'] ?? []) as $tab) {
         if (is_array($tab) && isset($tab['body']) && is_array($tab['body'])) {
             collectNodesByKind($tab['body'], $kind, $out);
+        }
+    }
+}
+
+/**
+ * Recursively collects every field `name` under a node, regardless of
+ * nesting depth — the active/sort pair lives inside a nested flex row, so a
+ * flat array_column() over the top-level children misses them.
+ *
+ * @param  array<string, mixed>  $node
+ * @param  list<string>  $names
+ */
+function collectFieldNames(array $node, array &$names): void
+{
+    if (isset($node['name']) && is_string($node['name'])) {
+        $names[] = $node['name'];
+    }
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (is_array($child)) {
+            collectFieldNames($child, $names);
         }
     }
 }

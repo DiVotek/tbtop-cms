@@ -19,6 +19,13 @@ class BlockContentResolver
     ) {}
 
     /**
+     * Sorted here, not in PageSpecAssembler: this is the single boundary
+     * every consumer of the raw envelope's block order passes through (page
+     * render today; any future consumer of resolve() inherits it for free),
+     * and it's the one place that still has each block's `id` handy to
+     * disambiguate the stable-sort fallback deterministically by original
+     * position rather than by an assembler-side reindex.
+     *
      * @param  array<int, mixed>  $content
      * @return list<ResolvedBlock>
      */
@@ -31,7 +38,7 @@ class BlockContentResolver
         $strict = (bool) config('tbtop-cms.blocks.strict', false);
 
         $resolved = [];
-        foreach ($content as $raw) {
+        foreach (self::sorted($content) as $raw) {
             $block = $this->resolveOne($raw, $ctx, $locales, $strict);
             if ($block instanceof ResolvedBlock) {
                 $resolved[] = $block;
@@ -39,6 +46,30 @@ class BlockContentResolver
         }
 
         return $resolved;
+    }
+
+    /**
+     * Envelope blocks ordered by `sort`; blocks missing it (legacy content
+     * saved before the field existed) fall back to their array index, so
+     * un-migrated pages keep rendering in their current order. usort() is
+     * stable in PHP >= 8.0, so equal `sort` values preserve array order.
+     *
+     * @param  array<int, mixed>  $content
+     * @return list<mixed>
+     */
+    private static function sorted(array $content): array
+    {
+        $index = 0;
+        $withSort = [];
+        foreach ($content as $raw) {
+            $sort = is_array($raw) && is_int($raw['sort'] ?? null) ? $raw['sort'] : $index;
+            $withSort[] = [$sort, $raw];
+            $index++;
+        }
+
+        usort($withSort, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+        return array_column($withSort, 1);
     }
 
     /** @param list<string> $locales */

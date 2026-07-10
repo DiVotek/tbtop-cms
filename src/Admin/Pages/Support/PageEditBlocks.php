@@ -26,6 +26,10 @@ use Tbtop\Cms\Page\Models\Page;
 final class PageEditBlocks
 {
     /**
+     * Rows are re-sorted by the (possibly form-edited) `sort` value before
+     * returning, so BlockContentField::toEnvelope() persists the envelope
+     * already ordered — PageForm::save() never needs a second sort pass.
+     *
      * @param  array<string, mixed>  $form
      * @return list<array<string, mixed>>
      */
@@ -42,22 +46,29 @@ final class PageEditBlocks
                 'id' => $id,
                 'kind' => $kind,
                 'active' => self::activeFor($form, $id, $block),
+                'sort' => self::sortFromForm($form, $id, $block),
                 ...($registry->has($kind) ? self::dataFor($form, $id, $registry, $kind) : self::existingData($block)),
             ];
         }
+
+        usort($rows, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
         return $rows;
     }
 
     /**
      * The current envelope's block entries, guarded to well-formed rows
-     * (has id + kind). Shared with PageEditBlockTabs, which needs the same
-     * read for tab construction and record() prefill.
+     * (has id + kind), sorted by the envelope's `sort` field. Shared with
+     * PageEditBlockTabs, which needs the same read for tab construction
+     * (tab order) and record() prefill.
      *
      * Reads $page->content through a mixed-typed local rather than trusting
      * the model's `array<int, array<string, mixed>>` cast PHPDoc as a
      * runtime guarantee — the JSON column can hold anything written outside
      * Eloquent, so each element is still checked before use.
+     *
+     * Legacy blocks predating the `sort` field fall back to their array
+     * index, so existing pages keep their current order until re-saved.
      *
      * @return list<array<string, mixed>>
      */
@@ -71,13 +82,24 @@ final class PageEditBlocks
         }
 
         $blocks = [];
+        $index = 0;
         foreach ($content as $block) {
             if (is_array($block) && isset($block['id'], $block['kind'])) {
+                $block['sort'] = self::sortFor($block, $index);
                 $blocks[] = $block;
             }
+            $index++;
         }
 
+        usort($blocks, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
+
         return $blocks;
+    }
+
+    /** @param  array<string, mixed>  $block */
+    private static function sortFor(array $block, int $index): int
+    {
+        return is_int($block['sort'] ?? null) ? $block['sort'] : $index;
     }
 
     /**
@@ -89,6 +111,22 @@ final class PageEditBlocks
         $key = "block_{$id}_active";
 
         return array_key_exists($key, $form) ? (bool) $form[$key] : (bool) ($block['active'] ?? true);
+    }
+
+    /**
+     * Reads the tab's `block_{id}_sort` number field. Missing or non-numeric
+     * input (blank string, cleared field) falls back to the block's prior
+     * sort rather than corrupting the order.
+     *
+     * @param  array<string, mixed>  $form
+     * @param  array<string, mixed>  $block
+     */
+    private static function sortFromForm(array $form, string $id, array $block): int
+    {
+        $key = "block_{$id}_sort";
+        $value = $form[$key] ?? null;
+
+        return is_numeric($value) ? (int) $value : (int) $block['sort'];
     }
 
     /**

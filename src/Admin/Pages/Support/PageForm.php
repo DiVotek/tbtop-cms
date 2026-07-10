@@ -56,6 +56,7 @@ class PageForm
             $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
             $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable(),
             $s->textarea('summary')->label(__('tbtop-cms::pages.fields.summary'))->translatable(),
+            $s->richtext('body')->label(__('tbtop-cms::pages.fields.body'))->translatable(),
         ];
     }
 
@@ -104,6 +105,7 @@ class PageForm
             'title' => $form['title'] ?? [],
             'heading' => $form['heading'] ?? [],
             'summary' => $form['summary'] ?? [],
+            'body' => $form['body'] ?? [],
             // The create form has no is_indexable field — new pages are always
             // indexable by default; edits keep the form-submitted value.
             'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
@@ -191,6 +193,7 @@ class PageForm
             'title' => $page->getTranslations('title'),
             'heading' => $page->getTranslations('heading'),
             'summary' => $page->getTranslations('summary'),
+            'body' => $page->getTranslations('body'),
             'type' => $page->type,
             'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
             'status' => $page->status->value,

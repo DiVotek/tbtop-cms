@@ -17,6 +17,10 @@ use Tbtop\Cms\Page\Models\Page;
  * `block_{id}_*` via PrefixedField), plus a trailing "+ Add block" tab with
  * one server action per registered kind. Each tab also owns its own
  * "remove block" action.
+ *
+ * Tabs are built in PageEditBlocks::blocks() order, i.e. sorted by the
+ * envelope's `sort` field — reordering a block's `block_{id}_sort` number
+ * field and saving moves its tab on the next page load.
  */
 final class PageEditBlockTabs
 {
@@ -51,6 +55,7 @@ final class PageEditBlockTabs
             $kind = (string) $block['kind'];
             $data = is_array($block['data'] ?? null) ? $block['data'] : [];
             $values["block_{$id}_active"] = (bool) ($block['active'] ?? true);
+            $values["block_{$id}_sort"] = (int) $block['sort'];
 
             if (! $registry->has($kind)) {
                 continue;
@@ -85,7 +90,10 @@ final class PageEditBlockTabs
 
         $body = $s->stack([
             ...$fields,
-            $s->checkbox("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
+            $s->flex([
+                $s->checkbox("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
+                $s->number("block_{$id}_sort")->label(__('tbtop-cms::pages.blocks.sort')),
+            ], gap: 4, align: 'end'),
             $s->flex([self::removeAction($s, $page, $id), $s->spacer()]),
         ]);
 
@@ -147,12 +155,26 @@ final class PageEditBlockTabs
 
     private static function handleAdd(ActionCtx $ctx, Page $page, string $kind): Effects
     {
-        $newRow = ['id' => (string) Str::ulid(), 'kind' => $kind, 'active' => true];
-        $rows = [...PageEditBlocks::toRows($ctx->form, $page), $newRow];
+        $existingRows = PageEditBlocks::toRows($ctx->form, $page);
+        $newRow = ['id' => (string) Str::ulid(), 'kind' => $kind, 'active' => true, 'sort' => self::nextSort($existingRows)];
+        $rows = [...$existingRows, $newRow];
 
         PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
 
         return Effects::make()->notify(__('tbtop-cms::pages.blocks.added'))
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
+    }
+
+    /**
+     * New blocks are appended, not inserted — max(existing sort) + 1 puts
+     * them last regardless of what sort values the existing rows carry.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private static function nextSort(array $rows): int
+    {
+        $sorts = array_map(static fn (array $row): int => (int) ($row['sort'] ?? 0), $rows);
+
+        return $sorts === [] ? 0 : max($sorts) + 1;
     }
 }

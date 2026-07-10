@@ -47,6 +47,7 @@ return [
         'slug' => 'Slug',
         'heading' => 'Heading',
         'summary' => 'Summary',
+        'body' => 'Content',
         'type' => 'Type',
         'parent' => 'Parent',
         'status' => 'Status',
@@ -72,6 +73,7 @@ return [
     ],
     'blocks' => [
         'active' => 'Active',
+        'sort' => 'Order',
         'add' => 'Add :kind',
         'added' => 'Block added',
         'remove' => 'Remove block',
