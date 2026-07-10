@@ -19,15 +19,9 @@ use Tbtop\Cms\Page\Models\Page;
  * SEO). Not in the nav — reached via the pages list's row click / quick-edit
  * actions.
  *
- * The "Основне"/"SEO" groups are rendered as two stacked sections rather than
- * S::tabs(): tabs() stores its content under options['tabs'][*]['body'],
- * which neither RuleWalker::collect() nor TranslatableRecord::normalize()
- * walk (both only look at options['children']). Inside a real S::tabs() form,
- * required()/translatable() fields would silently drop out of $ctx->form on
- * submit (FormSubmitController passes $request->validate($form->collectRules())
- * straight into the handler — an empty rule set means the key never reaches
- * $validated). That's a framework gap, not a style choice; sections are the
- * only grouping primitive that currently participates in both walkers.
+ * The General/SEO groups are real S::tabs(): since tbtop/admin 0.2.19 the
+ * form walkers (RuleWalker, TranslatableRecord) recurse into tab bodies, so
+ * fields inside tabs validate and reach $ctx->form like any other field.
  */
 class PageEditPage extends AdminPage
 {
@@ -67,17 +61,7 @@ class PageEditPage extends AdminPage
         ];
     }
 
-    /**
-     * Only ->visit() header actions would work without this wiring: the
-     * ActionController's per-request S is rebuilt from view() alone
-     * (ResolvedPage::fromRequest never calls headerActions()), so a
-     * ->handle() action built only inside headerActions() registers on the
-     * GET render but 404s on its own POST .../actions/{name} dispatch. Delete
-     * is therefore also (re-)built as a byproduct of view() — see
-     * registerDeleteAction() — so both paths see the same action name.
-     *
-     * @return list<ActionBuilder|Node>
-     */
+    /** @return list<ActionBuilder|Node> */
     #[\Override]
     public function headerActions(S $s): array
     {
@@ -93,8 +77,10 @@ class PageEditPage extends AdminPage
     public function view(S $s): Node
     {
         $form = $s->form('pageEditor', [
-            $s->section(['title' => __('tbtop-cms::pages.tabs_edit.general')], PageForm::generalFields($s)),
-            $s->section(['title' => __('tbtop-cms::pages.tabs_edit.seo')], PageForm::seoFields($s)),
+            $s->tabs([
+                ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s))],
+                ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s))],
+            ]),
             $s->actionsRow([
                 $s->action('save')->label(__('tbtop-cms::pages.actions.save'))->color('primary')
                     ->keybinding('mod+s')->submit(),
@@ -103,17 +89,7 @@ class PageEditPage extends AdminPage
             ->record(PageForm::loadRow($this->pageId()))
             ->onSubmit($this->save(...));
 
-        $this->registerDeleteAction($s);
-
         return $s->stack([$form]);
-    }
-
-    /** Registers (without rendering) the delete action so it exists in $s->collectedActions() on the action-dispatch path. */
-    private function registerDeleteAction(S $s): void
-    {
-        if (! $this->page()->is_system) {
-            $this->deleteAction($s);
-        }
     }
 
     private function save(ActionCtx $ctx): Effects

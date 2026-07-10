@@ -56,7 +56,7 @@ it('redirects a guest away from the edit page', function (): void {
     test()->get("/admin/pages/{$page->id}/edit")->assertRedirect(route('login'));
 });
 
-it('wires two sections (General/SEO) with their fields', function (): void {
+it('wires two tabs (General/SEO) with their fields', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $structure = pageEditStructure($page->id)['props']['structure'];
@@ -64,19 +64,18 @@ it('wires two sections (General/SEO) with their fields', function (): void {
     $form = findNodeByKind($structure, 'form');
     expect($form)->not->toBeNull();
 
-    $sections = array_values(array_filter(
-        $form['options']['children'],
-        static fn (array $child): bool => ($child['kind'] ?? null) === 'section',
-    ));
+    $tabsNode = findNodeByKind($form, 'tabs');
+    expect($tabsNode)->not->toBeNull();
 
-    expect($sections)->toHaveCount(2)
-        ->and($sections[0]['options']['title'])->toBe('General')
-        ->and($sections[1]['options']['title'])->toBe('SEO');
+    $tabs = $tabsNode['options']['tabs'];
+    expect($tabs)->toHaveCount(2)
+        ->and($tabs[0]['label'])->toBe('General')
+        ->and($tabs[1]['label'])->toBe('SEO');
 
-    $generalFieldNames = array_column($sections[0]['options']['children'], 'name');
+    $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
     expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary', 'type', 'parent_id', 'status', 'sort_order');
 
-    $seoFieldNames = array_column($sections[1]['options']['children'], 'name');
+    $seoFieldNames = array_column($tabs[1]['body']['options']['children'], 'name');
     expect($seoFieldNames)->toContain('seo_title', 'seo_description', 'is_indexable');
 });
 
