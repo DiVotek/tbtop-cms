@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Validation\ValidationException;
+use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -14,33 +15,30 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 
 class PageForm
 {
-    /** @return list<Node> */
-    public static function fields(S $s, bool $isEdit): array
+    /**
+     * Fields for the pages-list create modal. A deliberately small subset —
+     * heading/summary/is_indexable/sort_order/blocks/status are edit-only;
+     * is_indexable defaults to true and status to draft server-side on create
+     * (see fillAttributes()), and sort_order/blocks are refined after the
+     * record exists.
+     *
+     * @return list<Node>
+     */
+    public static function fields(S $s): array
     {
-        $sections = [
-            $s->section(['title' => 'Content'], [
-                $s->text('name')->label('Name')->required()->translatable(),
-                $s->text('title')->label('Title')->translatable(),
-                $s->text('heading')->label('Heading')->translatable(),
-                $s->textarea('summary')->label('Summary')->translatable(),
+        return [
+            $s->section(['title' => __('tbtop-cms::pages.sections.content')], [
+                $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
+                $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
+                $s->slug('slug')->label(__('tbtop-cms::pages.fields.slug'))->required()
+                    ->translatable()->fromField('name'),
             ]),
-            $s->section(['title' => 'Settings'], [
-                $s->select('type')->label('Type')->required()->options(PageFormOptions::types()),
-                $s->select('parent_id')->label('Parent')->options(PageFormOptions::parents()),
-                $s->select('status')->label('Status')->required()->options(PageFormOptions::statuses()),
-                $s->checkbox('is_indexable')->label('Indexable in search'),
-                $s->number('sort_order')->label('Sort order'),
+            $s->section(['title' => __('tbtop-cms::pages.sections.settings')], [
+                $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
+                $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents())
+                    ->hiddenIf(Cond::notIn('type', ['category', 'article'])),
             ]),
-            BlockContentField::make($s),
         ];
-
-        if ($isEdit) {
-            $sections[] = $s->section(['title' => 'URLs'], [
-                $s->text('paths')->label('Path')->translatable()->meta('disabled', true),
-            ]);
-        }
-
-        return $sections;
     }
 
     /**
@@ -77,58 +75,21 @@ class PageForm
         ];
     }
 
-    /**
-     * Row-action "quick edit" fields — a small whitelisted subset.
-     *
-     * @return list<Field>
-     */
-    public static function quickFields(S $s): array
-    {
-        return [
-            $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
-            $s->select('status')->label(__('tbtop-cms::pages.fields.status'))->required()->options(PageFormOptions::statuses()),
-            $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents()),
-            $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
-        ];
-    }
-
     /** @param array<string, mixed> $form */
     public static function save(array $form, ?int $id = null): Page
     {
         $page = $id !== null ? Page::query()->findOrFail($id) : new Page;
+        $isCreate = ! $page->exists;
         $parentId = self::nullableInt($form['parent_id'] ?? null);
         self::guardParent($page, $parentId);
         self::guardTypeAndStatus($page, $form);
 
-        $page->fill(self::fillAttributes($page, $form, $parentId));
-        $page->save();
+        $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
 
-        return $page;
-    }
-
-    /**
-     * Partial save for the list's quick-edit modal. Whitelisted to name/status/
-     * parent/sort_order only — every other attribute (heading, summary, content,
-     * seo, ...) is left untouched, unlike save()'s full fillAttributes().
-     *
-     * @param  array<string, mixed>  $form
-     */
-    public static function saveQuick(array $form, int $id): Page
-    {
-        $page = Page::query()->findOrFail($id);
-        $parentId = self::nullableInt($form['parent_id'] ?? null);
-        self::guardParent($page, $parentId);
-
-        $attributes = ['name' => $form['name'] ?? [], 'sort_order' => (int) ($form['sort_order'] ?? 0)];
-
-        if (! $page->is_system) {
-            $status = (string) ($form['status'] ?? $page->status->value);
-            self::guardStatus($status);
-            $attributes['parent_id'] = $parentId;
-            $attributes['status'] = $status;
+        if ($isCreate) {
+            $page->pendingSlugOverrides = self::stringMap($form['slug'] ?? null);
         }
 
-        $page->fill($attributes);
         $page->save();
 
         return $page;
@@ -138,14 +99,16 @@ class PageForm
      * @param  array<string, mixed>  $form
      * @return array<string, mixed>
      */
-    private static function fillAttributes(Page $page, array $form, ?int $parentId): array
+    private static function fillAttributes(Page $page, array $form, ?int $parentId, bool $isCreate): array
     {
         $attributes = [
             'name' => $form['name'] ?? [],
             'title' => $form['title'] ?? [],
             'heading' => $form['heading'] ?? [],
             'summary' => $form['summary'] ?? [],
-            'is_indexable' => (bool) ($form['is_indexable'] ?? false),
+            // The create form has no is_indexable field — new pages are always
+            // indexable by default; edits keep the form-submitted value.
+            'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
             'content' => BlockContentField::toEnvelope($form['content'] ?? null),
             'seo' => self::seoAttribute($form),
@@ -161,6 +124,50 @@ class PageForm
             'parent_id' => $parentId,
             'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
         ];
+    }
+
+    /**
+     * Create-only: when a locale's title is empty but its name is set, fall
+     * the title back to the name — the create form has no heading/summary
+     * but title still drives <title>/OG tags, so it should not start blank.
+     * Edits never run this: an admin clearing the title on the edit page
+     * means it, and re-filling it from the name would override that intent.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    private static function withTitleFallback(array $form): array
+    {
+        $name = self::stringMap($form['name'] ?? null);
+        $title = self::stringMap($form['title'] ?? null);
+
+        foreach ($name as $locale => $value) {
+            if ($value !== '' && ($title[$locale] ?? '') === '') {
+                $title[$locale] = $value;
+            }
+        }
+
+        $form['title'] = $title;
+
+        return $form;
+    }
+
+    /** @return array<string, string> */
+    private static function stringMap(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $map = [];
+
+        foreach ($value as $locale => $entry) {
+            if (is_string($locale)) {
+                $map[$locale] = (string) $entry;
+            }
+        }
+
+        return $map;
     }
 
     /**
@@ -195,23 +202,6 @@ class PageForm
             'content' => BlockContentField::toRows($page->content),
             'seo_title' => (string) ($seo['title'] ?? ''),
             'seo_description' => (string) ($seo['description'] ?? ''),
-        ];
-    }
-
-    /**
-     * Fields for the list's quick-edit modal.
-     *
-     * @return array<string, mixed>
-     */
-    public static function loadQuickRow(int $id): array
-    {
-        $page = Page::query()->findOrFail($id);
-
-        return [
-            'name' => $page->getTranslations('name'),
-            'status' => $page->status->value,
-            'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
-            'sort_order' => $page->sort_order,
         ];
     }
 
@@ -272,7 +262,7 @@ class PageForm
 
     private static function nullableInt(mixed $value): ?int
     {
-        if ($value === null || $value === '' || $value === PageFormOptions::NO_PARENT) {
+        if (in_array($value, [null, '', PageFormOptions::NO_PARENT], true)) {
             return null;
         }
 

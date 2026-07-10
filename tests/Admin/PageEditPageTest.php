@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
-use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -118,24 +117,63 @@ it('saves general and SEO fields including the seo json column', function (): vo
         ->and($page->seo)->toBe(['title' => 'Meta title', 'description' => 'Meta description']);
 });
 
-it('hides delete for system pages and keeps it for regular pages', function (): void {
+it('keeps an intentionally cleared title on edit instead of re-filling it from the name', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'Custom Title'],
+    ]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [
+            'name' => ['en' => 'About'],
+            'title' => ['en' => ''],
+            'heading' => ['en' => ''],
+            'summary' => ['en' => ''],
+            'type' => 'page',
+            'parent_id' => 'none',
+            'status' => PageStatus::Published->value,
+            'sort_order' => 0,
+            'seo_title' => '',
+            'seo_description' => '',
+            'is_indexable' => true,
+        ],
+    )->assertRedirect();
+
+    expect($page->refresh()->getTranslation('title', 'en', false))->toBe('');
+});
+
+it('keeps only view-on-site in header actions', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $headerActions = array_column(
+        test()->actingAs(makePageEditAdmin(), 'web')->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
+            ->assertOk()->json('props.headerActions') ?? [],
+        'name',
+    );
+
+    expect($headerActions)->toBe(['pageEditView']);
+});
+
+it('hides delete from the form footer for system pages', function (): void {
     $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
+
+    $form = findNodeByKind(pageEditStructure($system->id)['props']['structure'], 'form');
+    $footerActions = footerActionNames($form);
+
+    expect($footerActions)->not->toContain('pageEditDelete')
+        ->and($footerActions)->toContain('save');
+});
+
+it('keeps delete in the form footer for regular pages', function (): void {
     $regular = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
-    $admin = makePageEditAdmin();
 
-    $systemActions = array_column(
-        test()->actingAs($admin, 'web')->get("/admin/pages/{$system->id}/edit", ['X-Inertia' => 'true'])
-            ->assertOk()->json('props.headerActions') ?? [],
-        'name',
-    );
-    $regularActions = array_column(
-        test()->actingAs($admin, 'web')->get("/admin/pages/{$regular->id}/edit", ['X-Inertia' => 'true'])
-            ->assertOk()->json('props.headerActions') ?? [],
-        'name',
-    );
+    $form = findNodeByKind(pageEditStructure($regular->id)['props']['structure'], 'form');
+    $footerActions = footerActionNames($form);
 
-    expect($systemActions)->not->toContain('pageEditDelete')
-        ->and($regularActions)->toContain('pageEditDelete');
+    expect($footerActions)->toContain('pageEditDelete', 'save');
 });
 
 it('deletes a regular page and redirects to the list', function (): void {
@@ -149,33 +187,6 @@ it('deletes a regular page and redirects to the list', function (): void {
 
     $effects = collect($response->json('effects'))->pluck('kind');
     expect($effects)->toContain('redirect');
-});
-
-it('quick-save does not clear heading, summary, or content', function (): void {
-    $page = Page::create([
-        'type' => 'page',
-        'status' => PageStatus::Published,
-        'name' => ['en' => 'About'],
-        'heading' => ['en' => 'Keep me'],
-        'summary' => ['en' => 'Keep this too'],
-        'content' => [['id' => 'a', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => 'Hi']]],
-    ]);
-
-    PageForm::saveQuick([
-        'name' => ['en' => 'About Renamed'],
-        'status' => PageStatus::Draft->value,
-        'parent_id' => 'none',
-        'sort_order' => 3,
-    ], $page->id);
-
-    $page->refresh();
-
-    expect($page->getTranslation('name', 'en'))->toBe('About Renamed')
-        ->and($page->status)->toBe(PageStatus::Draft)
-        ->and($page->sort_order)->toBe(3)
-        ->and($page->getTranslation('heading', 'en'))->toBe('Keep me')
-        ->and($page->getTranslation('summary', 'en'))->toBe('Keep this too')
-        ->and($page->content)->toHaveCount(1);
 });
 
 /** @param array<string, mixed> $node @return array<string, mixed>|null */
@@ -195,4 +206,29 @@ function findNodeByKind(array $node, string $kind): ?array
     }
 
     return null;
+}
+
+/**
+ * Action names inside the form's footer flex node (delete/spacer/save).
+ *
+ * @param  array<string, mixed>|null  $form
+ * @return list<string>
+ */
+function footerActionNames(?array $form): array
+{
+    if ($form === null) {
+        return [];
+    }
+
+    $flex = findNodeByKind($form, 'flex');
+    expect($flex)->not->toBeNull();
+
+    $names = [];
+    foreach ((array) ($flex['options']['children'] ?? []) as $child) {
+        if (is_array($child) && ($child['kind'] ?? null) === 'action') {
+            $names[] = $child['name'];
+        }
+    }
+
+    return $names;
 }

@@ -13,12 +13,21 @@ class PageSlugWriter
 {
     public function __construct(private readonly Languages $languages) {}
 
-    public function sync(Page $page): void
+    /**
+     * @param  array<string, string>  $slugOverrides  Locale => author-chosen slug base
+     *                                                (e.g. from the create form's slug
+     *                                                field). Only consulted when a
+     *                                                locale has no existing PageSlug row
+     *                                                yet; an empty/missing override for a
+     *                                                locale falls back to generating the
+     *                                                base from the name, same as before.
+     */
+    public function sync(Page $page, array $slugOverrides = []): void
     {
         $changed = false;
 
         foreach ($this->locales() as $locale) {
-            if ($this->writeRow($page, $locale)) {
+            if ($this->writeRow($page, $locale, $slugOverrides[$locale] ?? '')) {
                 $changed = true;
             }
         }
@@ -44,7 +53,7 @@ class PageSlugWriter
 
     private function writeDown(Page $page, string $locale): void
     {
-        $this->writeRow($page, $locale);
+        $this->writeRow($page, $locale, '');
 
         foreach (Page::query()->where('parent_id', $page->getKey())->get() as $child) {
             $this->writeDown($child, $locale);
@@ -58,14 +67,14 @@ class PageSlugWriter
         }
     }
 
-    private function writeRow(Page $page, string $locale): bool
+    private function writeRow(Page $page, string $locale, string $slugOverride): bool
     {
         $existing = PageSlug::query()
             ->where('page_id', $page->getKey())
             ->where('locale', $locale)
             ->first();
 
-        $base = $existing !== null ? $existing->slug : $this->slugBase($page, $locale);
+        $base = $existing !== null ? $existing->slug : $this->slugBaseFor($page, $locale, $slugOverride);
         [$slug, $path] = $this->resolve($page, $locale, $base);
 
         if ($existing !== null && $existing->slug === $slug && $existing->path === $path) {
@@ -103,6 +112,24 @@ class PageSlugWriter
             $slug = $base . '-' . $suffix;
             $suffix++;
         }
+    }
+
+    /**
+     * An explicit author-chosen slug (from the create form) wins over the
+     * name-derived default; an empty override falls back to slugBase()'s
+     * existing name-generation behavior.
+     */
+    private function slugBaseFor(Page $page, string $locale, string $slugOverride): string
+    {
+        if ($slugOverride !== '') {
+            $slug = Str::slug($slugOverride);
+
+            if ($slug !== '') {
+                return rtrim(mb_substr($slug, 0, 120), '-');
+            }
+        }
+
+        return $this->slugBase($page, $locale);
     }
 
     private function slugBase(Page $page, string $locale): string

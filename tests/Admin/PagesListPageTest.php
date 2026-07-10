@@ -74,10 +74,9 @@ it('renders the divotek-style pages list wire shape', function (): void {
         ->and($opts['columnToggle'] ?? null)->toBeFalse()
         ->and($opts['recordUrl'] ?? null)->toBeTrue();
 
-    // Row actions: icon-only quick edit + external view-on-site link.
+    // Row actions: only the external view-on-site link (quick-edit removed; the row itself links to the edit page).
     $actions = array_column($opts['rowActions'], null, 'name');
-    expect(array_keys($actions))->toBe(['pageQuickEdit', 'pageView'])
-        ->and($actions['pageQuickEdit']['options']['spec']['type'] ?? $actions['pageQuickEdit']['spec']['type'] ?? null)->toBe('modal')
+    expect(array_keys($actions))->toBe(['pageView'])
         ->and($actions['pageView']['options']['spec']['type'] ?? $actions['pageView']['spec']['type'] ?? null)->not->toBeNull();
 });
 
@@ -124,4 +123,33 @@ it('offers no empty-string parent option (Radix SelectItem crash guard)', functi
 
     expect($values)->not->toContain('')
         ->and($values[0])->toBe(PageFormOptions::NO_PARENT);
+});
+
+it('only offers categories as parent options', function (): void {
+    $category = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+    Page::create(['type' => 'article', 'parent_id' => $category->id, 'status' => 'draft', 'name' => ['en' => 'Post']]);
+
+    $options = PageFormOptions::parents();
+
+    expect(array_column($options, 'value'))->toBe([PageFormOptions::NO_PARENT, (string) $category->id])
+        ->and(array_column($options, 'label')[1])->toBe('Blog');
+});
+
+it('sorts the list as a tree: each child directly after its parent, siblings by created_at ascending', function (): void {
+    $blog = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog'], 'created_at' => '2026-07-01 00:00:00']);
+    $news = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'News'], 'created_at' => '2026-07-02 00:00:00']);
+    $blogSub1 = Page::create(['type' => 'article', 'parent_id' => $blog->id, 'status' => 'published', 'name' => ['en' => 'BlogSub1'], 'created_at' => '2026-07-03 00:00:00']);
+    $newsSub = Page::create(['type' => 'article', 'parent_id' => $news->id, 'status' => 'published', 'name' => ['en' => 'NewsSub'], 'created_at' => '2026-07-04 00:00:00']);
+    $blogSub2 = Page::create(['type' => 'article', 'parent_id' => $blog->id, 'status' => 'published', 'name' => ['en' => 'BlogSub2'], 'created_at' => '2026-07-05 00:00:00']);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect(array_column($rows, 'id'))->toBe([
+        $blog->id,
+        $blogSub1->id,
+        $blogSub2->id,
+        $news->id,
+        $newsSub->id,
+    ]);
 });

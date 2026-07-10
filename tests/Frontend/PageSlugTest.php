@@ -8,6 +8,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\Support\PageSlugWriter;
 
 uses(RefreshDatabase::class);
 
@@ -115,6 +116,32 @@ it('localizes breadcrumb paths and labels for a non-default locale', function ()
         ->assertOk()
         ->assertJsonPath('props.breadcrumbs.0.label', 'Blog UA')
         ->assertJsonPath('props.breadcrumbs.0.url', '/uk/' . $category->pathFor('uk'));
+});
+
+it('uses an explicit slug override for the first write instead of deriving from the name', function (): void {
+    $page = Page::factory()->make(['status' => PageStatus::Published, 'name' => ['en' => 'About Us']]);
+    $page->pendingSlugOverrides = ['en' => 'custom-slug'];
+    $page->save();
+
+    expect($page->pathFor('en'))->toBe('custom-slug');
+});
+
+it('ignores an empty slug override and falls back to deriving the slug from the name', function (): void {
+    $page = Page::factory()->make(['status' => PageStatus::Published, 'name' => ['en' => 'About Us']]);
+    $page->pendingSlugOverrides = ['en' => ''];
+    $page->save();
+
+    expect($page->pathFor('en'))->toBe('about-us');
+});
+
+it('does not re-apply an override on a later save (only consulted on first write)', function (): void {
+    $writer = app(PageSlugWriter::class);
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About Us']]);
+    expect($page->pathFor('en'))->toBe('about-us');
+
+    $writer->sync($page, ['en' => 'should-not-apply']);
+
+    expect($page->fresh()->pathFor('en'))->toBe('about-us');
 });
 
 it('caps an overly long slug', function (): void {

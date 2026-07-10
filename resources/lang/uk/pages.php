@@ -33,9 +33,14 @@ return [
         'general' => 'Основне',
         'seo' => 'SEO',
     ],
+    'sections' => [
+        'content' => 'Контент',
+        'settings' => 'Налаштування',
+    ],
     'fields' => [
         'name' => 'Назва',
         'title' => 'Заголовок',
+        'slug' => 'Слаг',
         'heading' => 'Підзаголовок',
         'summary' => 'Опис',
         'type' => 'Тип',
@@ -45,6 +50,7 @@ return [
         'is_indexable' => 'Індексувати в пошуку',
         'seo_title' => 'SEO-заголовок',
         'seo_description' => 'SEO-опис',
+        'no_parent' => '— Немає —',
     ],
     'actions' => [
         'new' => 'Нова',
@@ -55,8 +61,6 @@ return [
         'created' => 'Сторінку створено',
         'save' => 'Зберегти',
         'saved' => 'Сторінку збережено',
-        'quick_edit' => 'Швидке редагування',
-        'quick_edit_title' => 'Швидке редагування',
         'delete' => 'Видалити',
         'delete_title' => 'Видалити сторінку?',
         'delete_confirm' => 'Цю дію неможливо скасувати.',

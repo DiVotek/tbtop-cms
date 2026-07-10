@@ -33,9 +33,14 @@ return [
         'general' => 'General',
         'seo' => 'SEO',
     ],
+    'sections' => [
+        'content' => 'Content',
+        'settings' => 'Settings',
+    ],
     'fields' => [
         'name' => 'Name',
         'title' => 'Title',
+        'slug' => 'Slug',
         'heading' => 'Heading',
         'summary' => 'Summary',
         'type' => 'Type',
@@ -45,6 +50,7 @@ return [
         'is_indexable' => 'Indexable in search',
         'seo_title' => 'Meta title',
         'seo_description' => 'Meta description',
+        'no_parent' => '— None —',
     ],
     'actions' => [
         'new' => 'New',
@@ -55,8 +61,6 @@ return [
         'created' => 'Page created',
         'save' => 'Save',
         'saved' => 'Page saved',
-        'quick_edit' => 'Quick edit',
-        'quick_edit_title' => 'Quick edit',
         'delete' => 'Delete',
         'delete_title' => 'Delete page?',
         'delete_confirm' => 'This cannot be undone.',

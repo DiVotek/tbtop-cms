@@ -19,7 +19,10 @@ class PageObserver
 
     public function saved(Page $page): void
     {
-        $this->slugs->sync($page);
+        $overrides = $page->pendingSlugOverrides;
+        $page->pendingSlugOverrides = [];
+
+        $this->slugs->sync($page, $overrides);
     }
 
     public function creating(Page $page): void

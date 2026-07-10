@@ -65,26 +65,24 @@ class PageEditPage extends AdminPage
     #[\Override]
     public function headerActions(S $s): array
     {
-        $actions = [$this->viewOnSiteAction($s)];
-
-        if (! $this->page()->is_system) {
-            $actions[] = $this->deleteAction($s);
-        }
-
-        return $actions;
+        return [$this->viewOnSiteAction($s)];
     }
 
     public function view(S $s): Node
     {
+        $save = $s->action('save')->label(__('tbtop-cms::pages.actions.save'))->color('primary')
+            ->keybinding('mod+s')->submit();
+
+        $footer = $this->page()->is_system
+            ? $s->flex([$s->spacer(), $save], justify: 'end')
+            : $s->flex([$this->deleteAction($s), $s->spacer(), $save], justify: 'end');
+
         $form = $s->form('pageEditor', [
             $s->tabs([
                 ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s))],
                 ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s))],
             ]),
-            $s->actionsRow([
-                $s->action('save')->label(__('tbtop-cms::pages.actions.save'))->color('primary')
-                    ->keybinding('mod+s')->submit(),
-            ]),
+            $footer,
         ])
             ->record(PageForm::loadRow($this->pageId()))
             ->onSubmit($this->save(...));

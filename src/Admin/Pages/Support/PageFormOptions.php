@@ -24,7 +24,7 @@ class PageFormOptions
         $options = [];
 
         foreach (app(PageTypeRegistry::class)->all() as $type) {
-            $options[] = ['value' => $type->key(), 'label' => $type->label()];
+            $options[] = ['value' => $type->key(), 'label' => self::typeLabel($type->key(), $type->label())];
         }
 
         return $options;
@@ -34,23 +34,44 @@ class PageFormOptions
     public static function statuses(): array
     {
         return array_map(
-            static fn (PageStatus $status): array => ['value' => $status->value, 'label' => ucfirst($status->value)],
+            static fn (PageStatus $status): array => [
+                'value' => $status->value,
+                'label' => __('tbtop-cms::pages.status.' . $status->value),
+            ],
             PageStatus::cases(),
         );
     }
 
-    /** @return list<array{value: string, label: string}> */
+    /**
+     * Only categories are valid parents — categories are the sole grouping
+     * container in the page hierarchy (see PageTypeRegistry/CategoryType).
+     *
+     * @return list<array{value: string, label: string}>
+     */
     public static function parents(): array
     {
         $default = app(Languages::class)->defaultLocale();
 
-        $options = [['value' => self::NO_PARENT, 'label' => '— None —']];
+        $options = [['value' => self::NO_PARENT, 'label' => __('tbtop-cms::pages.fields.no_parent')]];
 
-        foreach (Page::query()->orderBy('sort_order')->orderBy('id')->get() as $page) {
+        foreach (Page::query()->where('type', 'category')->orderBy('sort_order')->orderBy('id')->get() as $page) {
             $name = $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey());
             $options[] = ['value' => (string) $page->getKey(), 'label' => $name];
         }
 
         return $options;
+    }
+
+    /**
+     * Registry labels aren't guaranteed to be translated; fall back through
+     * pages.types.* (already used for the list's type column) before the
+     * raw registry label.
+     */
+    private static function typeLabel(string $key, string $fallback): string
+    {
+        $translationKey = 'tbtop-cms::pages.types.' . $key;
+        $label = __($translationKey);
+
+        return $label === $translationKey ? $fallback : $label;
     }
 }
