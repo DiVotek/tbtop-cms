@@ -32,6 +32,7 @@ final class PageEditStatusBar
     {
         return $s->flex([
             self::statusBadge($s, $page),
+            $s->unsavedIndicator(),
             $s->spacer(),
             ...self::timestamps($s, $page),
             $viewOnSite,
