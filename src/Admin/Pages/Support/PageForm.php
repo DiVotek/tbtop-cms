@@ -95,7 +95,7 @@ class PageForm
             'heading' => $page->getTranslations('heading'),
             'summary' => $page->getTranslations('summary'),
             'type' => $page->type,
-            'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : '',
+            'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
             'status' => $page->status->value,
             'is_indexable' => $page->is_indexable,
             'sort_order' => $page->sort_order,
@@ -157,7 +157,7 @@ class PageForm
 
     private static function nullableInt(mixed $value): ?int
     {
-        if ($value === null || $value === '') {
+        if ($value === null || $value === '' || $value === PageFormOptions::NO_PARENT) {
             return null;
         }
 
