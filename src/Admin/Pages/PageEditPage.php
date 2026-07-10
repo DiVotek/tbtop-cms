@@ -19,15 +19,9 @@ use Tbtop\Cms\Page\Models\Page;
  * SEO). Not in the nav — reached via the pages list's row click / quick-edit
  * actions.
  *
- * The "Основне"/"SEO" groups are rendered as two stacked sections rather than
- * S::tabs(): tabs() stores its content under options['tabs'][*]['body'],
- * which neither RuleWalker::collect() nor TranslatableRecord::normalize()
- * walk (both only look at options['children']). Inside a real S::tabs() form,
- * required()/translatable() fields would silently drop out of $ctx->form on
- * submit (FormSubmitController passes $request->validate($form->collectRules())
- * straight into the handler — an empty rule set means the key never reaches
- * $validated). That's a framework gap, not a style choice; sections are the
- * only grouping primitive that currently participates in both walkers.
+ * The General/SEO groups are real S::tabs(): since tbtop/admin 0.2.19 the
+ * form walkers (RuleWalker, TranslatableRecord) recurse into tab bodies, so
+ * fields inside tabs validate and reach $ctx->form like any other field.
  */
 class PageEditPage extends AdminPage
 {
