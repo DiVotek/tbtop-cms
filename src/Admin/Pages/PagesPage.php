@@ -9,14 +9,15 @@ use Illuminate\Support\Facades\DB;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
-use Tbtop\Admin\Dsl\Actions\EditAction;
 use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
+use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 
@@ -67,11 +68,11 @@ class PagesPage extends AdminPage
             ->columns([
                 Column::make('name')->label(__('tbtop-cms::pages.columns.title'))->translatable()->emphasized(),
                 Column::make('type')->label(__('tbtop-cms::pages.columns.type'))
-                    ->formatUsing(self::typeLabel(...))
+                    ->formatUsing($this->typeLabel(...))
                     ->muted()->uppercase(),
                 Column::make('parent_name')->label(__('tbtop-cms::pages.columns.parent'))->translatable()->muted(),
                 Column::make('status')->label(__('tbtop-cms::pages.columns.status'))
-                    ->formatUsing(self::statusLabel(...))
+                    ->formatUsing($this->statusLabel(...))
                     ->badge([
                         __('tbtop-cms::pages.status.published') => 'success',
                         __('tbtop-cms::pages.status.draft') => 'warning',
@@ -80,20 +81,19 @@ class PagesPage extends AdminPage
                     ->date(__('tbtop-cms::pages.date_format'))->muted(),
             ])
             ->tabs([
-                self::tab('all'),
-                self::tab('categories')
-                    ->query(static fn (Builder $q): Builder => $q->where('type', 'category')),
-                self::tab('pages')
-                    ->query(static fn (Builder $q): Builder => $q->where('type', '!=', 'category')->whereNull('parent_id')),
-                self::tab('articles')
-                    ->query(static fn (Builder $q): Builder => $q->where('type', '!=', 'category')->whereNotNull('parent_id')),
+                $this->tab('all'),
+                $this->tab('categories')
+                    ->query(static fn (Builder $q): Builder => $q->where('pages.type', 'category')),
+                $this->tab('pages')
+                    ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNull('pages.parent_id')),
+                $this->tab('articles')
+                    ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNotNull('pages.parent_id')),
             ])
             ->toolbar(false)
-            ->defaultSort('sort_order', 'asc')
+            ->defaultSort('sort_key', 'asc')
             ->emptyState(__('tbtop-cms::pages.empty'))
             ->recordUrl(static fn (Page $row): string => route('tbtop.cms.page-edit-page', ['page' => $row->id]))
             ->rowActions([
-                $this->quickEditAction($s),
                 $this->viewOnSiteAction($s),
             ]);
 
@@ -105,7 +105,7 @@ class PagesPage extends AdminPage
     {
         $default = app(Languages::class)->defaultLocale();
 
-        return Page::query()->select('pages.*')
+        $query = Page::query()->select('pages.*')
             ->selectSub(
                 PageSlug::query()->select('path')
                     ->whereColumn('page_id', 'pages.id')
@@ -120,34 +120,24 @@ class PagesPage extends AdminPage
                     ->limit(1),
                 'parent_name',
             );
+
+        return PageSortKey::apply($query);
     }
 
     private function createAction(S $s): ActionBuilder
     {
+        $cancel = $s->action('pageCreateCancel')->label(__('tbtop-cms::pages.actions.cancel'))
+            ->handle(static fn (): Effects => Effects::make()->closeModal());
+        $create = $s->action('pageCreateSave')->label(__('tbtop-cms::pages.actions.create'))->color('primary')
+            ->handle($this->create(...), needs: ['form']);
+
         $form = $s->form('pageCreate', [
-            ...PageForm::fields($s, isEdit: false),
-            $s->actionsRow([
-                $s->action('pageCreateSave')->label(__('tbtop-cms::pages.actions.create'))->color('primary')
-                    ->handle($this->create(...), needs: ['form']),
-                $s->action('pageCreateCancel')->label(__('tbtop-cms::pages.actions.cancel'))
-                    ->handle(static fn (): Effects => Effects::make()->closeModal()),
-            ]),
-        ]);
+            ...PageForm::fields($s),
+            $s->flex([$s->spacer(), $cancel, $create], justify: 'end'),
+        ])->record(['status' => PageStatus::Draft->value]);
 
         return $s->action('pageCreate')->label(__('tbtop-cms::pages.actions.new'))->icon('plus')->color('primary')
             ->modal(__('tbtop-cms::pages.actions.create_title'), $form);
-    }
-
-    private function quickEditAction(S $s): ActionBuilder
-    {
-        return EditAction::make(
-            $s,
-            $s->form('pageQuickEdit', PageForm::quickFields($s)),
-            static fn (ActionCtx $ctx): array => PageForm::loadQuickRow((int) ($ctx->row['id'] ?? 0)),
-            static fn (ActionCtx $ctx): Page => PageForm::saveQuick($ctx->form, (int) ($ctx->row['id'] ?? 0)),
-            name: 'pageQuickEdit',
-            title: __('tbtop-cms::pages.actions.quick_edit_title'),
-        )->label('')->icon('pencil')->tooltip(__('tbtop-cms::pages.actions.quick_edit'));
     }
 
     private function viewOnSiteAction(S $s): ActionBuilder
@@ -158,7 +148,7 @@ class PagesPage extends AdminPage
             ->visit('/{path}', newTab: true);
     }
 
-    private static function tab(string $name): Tab
+    private function tab(string $name): Tab
     {
         $label = __('tbtop-cms::pages.tabs.' . $name);
 
@@ -166,17 +156,17 @@ class PagesPage extends AdminPage
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
     }
 
-    private static function typeLabel(mixed $value): string
+    private function typeLabel(mixed $value): string
     {
-        $key = 'tbtop-cms::pages.types.' . (string) $value;
+        $key = 'tbtop-cms::pages.types.' . $value;
         $label = __($key);
 
         return $label === $key ? ucfirst((string) $value) : $label;
     }
 
-    private static function statusLabel(mixed $value): string
+    private function statusLabel(mixed $value): string
     {
-        $key = 'tbtop-cms::pages.status.' . (string) $value;
+        $key = 'tbtop-cms::pages.status.' . $value;
         $label = __($key);
 
         return $label === $key ? ucfirst((string) $value) : $label;

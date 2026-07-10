@@ -50,6 +50,15 @@ class Page extends Model
     /** @var list<string> */
     public array $translatable = ['name', 'title', 'heading', 'summary'];
 
+    /**
+     * Transient (not persisted, not an Eloquent attribute) per-locale slug
+     * bases set by the create form before save(); PageObserver::saved()
+     * reads and clears this to seed PageSlugWriter::sync() on first write.
+     *
+     * @var array<string, string>
+     */
+    public array $pendingSlugOverrides = [];
+
     /** @var array<string, string> */
     protected $casts = [
         'status' => PageStatus::class,

@@ -23,6 +23,7 @@ class CmsChrome extends Chrome
      *
      * @return list<mixed>
      */
+    #[\Override]
     protected function sidebarItems(S $s): array
     {
         return [$s->navMenu()];
@@ -34,6 +35,7 @@ class CmsChrome extends Chrome
      *
      * @return list<mixed>
      */
+    #[\Override]
     protected function headerItems(S $s): array
     {
         return [
@@ -42,9 +44,9 @@ class CmsChrome extends Chrome
             $s->notifications(),
             $this->inbox($s),
             $s->action('view-site')
-                ->label('View site')
+                ->label(__('tbtop-cms::chrome.view_site.label'))
                 ->icon('external-link')
-                ->tooltip('Open the live site')
+                ->tooltip(__('tbtop-cms::chrome.view_site.tooltip'))
                 ->size('sm')
                 ->visit('/', newTab: true),
             $s->userMenu(),
@@ -56,9 +58,9 @@ class CmsChrome extends Chrome
     {
         $unread = FormSubmission::query()->unread()->count();
         $action = $s->action('inbox')
-            ->label('Inbox')
+            ->label(__('tbtop-cms::chrome.inbox.label'))
             ->icon('inbox')
-            ->tooltip('Form submissions')
+            ->tooltip(__('tbtop-cms::chrome.inbox.tooltip'))
             ->size('sm')
             ->visit('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions');
 
