@@ -156,7 +156,8 @@ it('renders the status bar as the first child of the form with a status badge', 
     $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
     $firstChild = $form['options']['children'][0];
 
-    expect($firstChild['kind'])->toBe('section');
+    expect($firstChild['kind'])->toBe('flex')
+        ->and($firstChild['options']['variant'])->toBe('card');
 
     $badge = findNodeByKind($firstChild, 'displayValue');
     expect($badge)->not->toBeNull()
@@ -294,7 +295,7 @@ it('places view-on-site and a top save action in the status bar', function (): v
 
     $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][0];
-    $names = array_column($statusBar['options']['children'][0]['options']['children'], 'name');
+    $names = array_column($statusBar['options']['children'], 'name');
 
     expect($names)->toContain('pageEditView', 'saveTop');
 });

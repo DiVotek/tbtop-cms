@@ -17,17 +17,17 @@ final class PageEditSidebar
     public static function build(S $s): Node
     {
         return $s->stack([
-            $s->section(['title' => __('tbtop-cms::pages.sections.publication')], [
+            $s->section(['title' => __('tbtop-cms::pages.sections.publication'), 'variant' => 'card'], [
                 $s->select('status')->label(__('tbtop-cms::pages.fields.status'))
                     ->required()->options(PageFormOptions::statuses()),
             ]),
-            $s->section(['title' => __('tbtop-cms::pages.sections.structure')], [
+            $s->section(['title' => __('tbtop-cms::pages.sections.structure'), 'variant' => 'card'], [
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
                     ->required()->options(PageFormOptions::types()),
                 $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
                     ->options(PageFormOptions::parents()),
             ]),
-            $s->section(['title' => __('tbtop-cms::pages.sections.ordering')], [
+            $s->section(['title' => __('tbtop-cms::pages.sections.ordering'), 'variant' => 'card'], [
                 $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
             ]),
         ]);

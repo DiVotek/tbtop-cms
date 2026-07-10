@@ -30,15 +30,13 @@ final class PageEditStatusBar
 
     public static function build(S $s, Page $page, ActionBuilder $viewOnSite, ActionBuilder $saveTop): Node
     {
-        return $s->section(['variant' => 'card'], [
-            $s->flex([
-                self::statusBadge($s, $page),
-                $s->spacer(),
-                ...self::timestamps($s, $page),
-                $viewOnSite,
-                $saveTop,
-            ], align: 'center', gap: 3),
-        ]);
+        return $s->flex([
+            self::statusBadge($s, $page),
+            $s->spacer(),
+            ...self::timestamps($s, $page),
+            $viewOnSite,
+            $saveTop,
+        ], align: 'center', gap: 3, wrap: true, variant: 'card', class: 'text-xs');
     }
 
     private static function statusBadge(S $s, Page $page): DisplayValueBlock
