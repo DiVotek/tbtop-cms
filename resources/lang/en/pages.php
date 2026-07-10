@@ -40,6 +40,7 @@ return [
         'publication' => 'Publication',
         'structure' => 'Structure',
         'ordering' => 'Ordering',
+        'social' => 'Social networks',
     ],
     'fields' => [
         'name' => 'Name',
@@ -55,6 +56,12 @@ return [
         'is_indexable' => 'Indexable in search',
         'seo_title' => 'Meta title',
         'seo_description' => 'Meta description',
+        'seo_focus_keyword' => 'Focus keyword',
+        'og_title' => 'OG title',
+        'og_title_placeholder' => 'Defaults to the meta title',
+        'og_description' => 'OG description',
+        'og_description_placeholder' => 'Defaults to the meta description',
+        'og_image' => 'OG image',
         'no_parent' => '— None —',
     ],
     'actions' => [

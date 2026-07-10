@@ -40,6 +40,7 @@ return [
         'publication' => 'Публікація',
         'structure' => 'Структура',
         'ordering' => 'Сортування',
+        'social' => 'Соцмережі',
     ],
     'fields' => [
         'name' => 'Назва',
@@ -55,6 +56,12 @@ return [
         'is_indexable' => 'Індексувати в пошуку',
         'seo_title' => 'SEO-заголовок',
         'seo_description' => 'SEO-опис',
+        'seo_focus_keyword' => 'Фокусне ключове слово',
+        'og_title' => 'OG заголовок',
+        'og_title_placeholder' => 'За замовчуванням — мета-заголовок',
+        'og_description' => 'OG опис',
+        'og_description_placeholder' => 'За замовчуванням — мета-опис',
+        'og_image' => 'OG зображення',
         'no_parent' => '— Немає —',
     ],
     'actions' => [

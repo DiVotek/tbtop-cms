@@ -86,8 +86,10 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
     expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary', 'body')
         ->and($generalFieldNames)->not->toContain('type', 'parent_id', 'status', 'sort_order');
 
-    $seoFieldNames = array_column($tabs[1]['body']['options']['children'], 'name');
-    expect($seoFieldNames)->toContain('seo_title', 'seo_description', 'is_indexable');
+    $seoFieldNames = [];
+    collectFieldNames($tabs[1]['body'], $seoFieldNames);
+    expect($seoFieldNames)->toContain('seo_title', 'seo_description', 'seo_focus_keyword', 'og_title', 'og_description', 'og_image')
+        ->and($seoFieldNames)->not->toContain('is_indexable');
 });
 
 it('prefixes block fields with block_{id}_ inside the block tab', function (): void {
@@ -179,7 +181,19 @@ it('keeps the sidebar cards for status/type/parent/sort_order out of the General
         }
     }
 
-    expect($sidebarFieldNames)->toContain('status', 'type', 'parent_id', 'sort_order');
+    expect($sidebarFieldNames)->toContain('status', 'type', 'parent_id', 'sort_order', 'is_indexable');
+});
+
+it('puts status and is_indexable together in the sidebar Publication card', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $grid = findNodeByKind($form, 'grid');
+    $sidebar = $grid['options']['children'][1];
+    $publicationCard = $sidebar['options']['children'][0];
+
+    $names = array_column($publicationCard['options']['children'], 'name');
+    expect($names)->toBe(['status', 'is_indexable']);
 });
 
 it('renders the status bar as the first child of the form with a status badge', function (): void {
@@ -223,6 +237,10 @@ it('saves general and SEO fields including the seo json column', function (): vo
             'sort_order' => 5,
             'seo_title' => 'Meta title',
             'seo_description' => 'Meta description',
+            'seo_focus_keyword' => 'widgets',
+            'og_title' => 'OG title',
+            'og_description' => 'OG description',
+            'og_image' => '42',
             'is_indexable' => true,
         ],
     );
@@ -232,7 +250,38 @@ it('saves general and SEO fields including the seo json column', function (): vo
 
     expect($page->getTranslation('name', 'en'))->toBe('About Updated')
         ->and($page->sort_order)->toBe(5)
-        ->and($page->seo)->toBe(['title' => 'Meta title', 'description' => 'Meta description']);
+        ->and($page->seo)->toBe([
+            'title' => 'Meta title',
+            'description' => 'Meta description',
+            'focus_keyword' => 'widgets',
+            'og_title' => 'OG title',
+            'og_description' => 'OG description',
+            'og_image' => '42',
+        ]);
+});
+
+it('round-trips the new SEO keys back into the edit form via loadRow', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $session = test()->actingAs(makePageEditAdmin(), 'web');
+
+    $session->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [
+            ...baseEditPayload(),
+            'seo_focus_keyword' => 'widgets',
+            'og_title' => 'OG title',
+            'og_description' => 'OG description',
+            'og_image' => '42',
+        ],
+    )->assertRedirect();
+
+    $pageEditor = $session->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.pageEditor');
+
+    expect($pageEditor['seo_focus_keyword'])->toBe('widgets')
+        ->and($pageEditor['og_title'])->toBe('OG title')
+        ->and($pageEditor['og_description'])->toBe('OG description')
+        ->and($pageEditor['og_image'])->toBe('42');
 });
 
 it('round-trips two blocks through save: data, active, and order are preserved', function (): void {
@@ -474,6 +523,10 @@ function baseEditPayload(): array
         'sort_order' => 0,
         'seo_title' => '',
         'seo_description' => '',
+        'seo_focus_keyword' => '',
+        'og_title' => '',
+        'og_description' => '',
+        'og_image' => '',
         'is_indexable' => true,
     ];
 }
