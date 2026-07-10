@@ -69,15 +69,25 @@ it('renders the divotek-style pages list wire shape', function (): void {
         ->and($cols['status']['badge']['colors'])->toBe(['Published' => 'success', 'Draft' => 'warning'])
         ->and($cols['updated_at']['kind'] ?? null)->toBe('date');
 
-    // Toolbar (search + column toggle) hidden; row click opens the edit action.
+    // Toolbar (search + column toggle) hidden; the whole row links to the edit page.
     expect($opts['searchInput'] ?? null)->toBeFalse()
         ->and($opts['columnToggle'] ?? null)->toBeFalse()
-        ->and($opts['rowClick'] ?? null)->toBe('pageEdit');
+        ->and($opts['recordUrl'] ?? null)->toBeTrue();
 
-    // Row actions: hidden edit (rowClick target) + external view-on-site link.
+    // Row actions: icon-only quick edit + external view-on-site link.
     $actions = array_column($opts['rowActions'], null, 'name');
-    expect(($actions['pageEdit']['meta']['hidden'] ?? false))->toBeTrue()
+    expect(array_keys($actions))->toBe(['pageQuickEdit', 'pageView'])
+        ->and($actions['pageQuickEdit']['options']['spec']['type'] ?? $actions['pageQuickEdit']['spec']['type'] ?? null)->toBe('modal')
         ->and($actions['pageView']['options']['spec']['type'] ?? $actions['pageView']['spec']['type'] ?? null)->not->toBeNull();
+});
+
+it('links each row to its dedicated edit page', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['_recordUrl'])->toEndWith("/admin/pages/{$page->id}/edit");
 });
 
 it('scopes the tab queries by page type and parent', function (): void {

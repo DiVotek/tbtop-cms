@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Validation\ValidationException;
+use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -42,6 +43,55 @@ class PageForm
         return $sections;
     }
 
+    /**
+     * Fields for the "Основне" tab of the dedicated edit page.
+     *
+     * @return list<Node|Field>
+     */
+    public static function generalFields(S $s): array
+    {
+        return [
+            $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
+            $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
+            $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable(),
+            $s->textarea('summary')->label(__('tbtop-cms::pages.fields.summary'))->translatable(),
+            $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
+            $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents()),
+            $s->select('status')->label(__('tbtop-cms::pages.fields.status'))->required()->options(PageFormOptions::statuses()),
+            $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
+            BlockContentField::make($s),
+        ];
+    }
+
+    /**
+     * Fields for the "SEO" tab of the dedicated edit page.
+     *
+     * @return list<Field>
+     */
+    public static function seoFields(S $s): array
+    {
+        return [
+            $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title')),
+            $s->textarea('seo_description')->label(__('tbtop-cms::pages.fields.seo_description')),
+            $s->checkbox('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
+        ];
+    }
+
+    /**
+     * Row-action "quick edit" fields — a small whitelisted subset.
+     *
+     * @return list<Field>
+     */
+    public static function quickFields(S $s): array
+    {
+        return [
+            $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
+            $s->select('status')->label(__('tbtop-cms::pages.fields.status'))->required()->options(PageFormOptions::statuses()),
+            $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents()),
+            $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
+        ];
+    }
+
     /** @param array<string, mixed> $form */
     public static function save(array $form, ?int $id = null): Page
     {
@@ -51,6 +101,34 @@ class PageForm
         self::guardTypeAndStatus($page, $form);
 
         $page->fill(self::fillAttributes($page, $form, $parentId));
+        $page->save();
+
+        return $page;
+    }
+
+    /**
+     * Partial save for the list's quick-edit modal. Whitelisted to name/status/
+     * parent/sort_order only — every other attribute (heading, summary, content,
+     * seo, ...) is left untouched, unlike save()'s full fillAttributes().
+     *
+     * @param  array<string, mixed>  $form
+     */
+    public static function saveQuick(array $form, int $id): Page
+    {
+        $page = Page::query()->findOrFail($id);
+        $parentId = self::nullableInt($form['parent_id'] ?? null);
+        self::guardParent($page, $parentId);
+
+        $attributes = ['name' => $form['name'] ?? [], 'sort_order' => (int) ($form['sort_order'] ?? 0)];
+
+        if (! $page->is_system) {
+            $status = (string) ($form['status'] ?? $page->status->value);
+            self::guardStatus($status);
+            $attributes['parent_id'] = $parentId;
+            $attributes['status'] = $status;
+        }
+
+        $page->fill($attributes);
         $page->save();
 
         return $page;
@@ -70,6 +148,7 @@ class PageForm
             'is_indexable' => (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
             'content' => BlockContentField::toEnvelope($form['content'] ?? null),
+            'seo' => self::seoAttribute($form),
         ];
 
         if ($page->exists && $page->is_system) {
@@ -84,10 +163,23 @@ class PageForm
         ];
     }
 
+    /**
+     * @param  array<string, mixed>  $form
+     * @return array{title: string, description: string}
+     */
+    private static function seoAttribute(array $form): array
+    {
+        return [
+            'title' => (string) ($form['seo_title'] ?? ''),
+            'description' => (string) ($form['seo_description'] ?? ''),
+        ];
+    }
+
     /** @return array<string, mixed> */
     public static function loadRow(int $id): array
     {
         $page = Page::query()->with('slugs')->findOrFail($id);
+        $seo = is_array($page->seo) ? $page->seo : [];
 
         return [
             'name' => $page->getTranslations('name'),
@@ -101,6 +193,25 @@ class PageForm
             'sort_order' => $page->sort_order,
             'paths' => $page->slugs->pluck('path', 'locale')->all(),
             'content' => BlockContentField::toRows($page->content),
+            'seo_title' => (string) ($seo['title'] ?? ''),
+            'seo_description' => (string) ($seo['description'] ?? ''),
+        ];
+    }
+
+    /**
+     * Fields for the list's quick-edit modal.
+     *
+     * @return array<string, mixed>
+     */
+    public static function loadQuickRow(int $id): array
+    {
+        $page = Page::query()->findOrFail($id);
+
+        return [
+            'name' => $page->getTranslations('name'),
+            'status' => $page->status->value,
+            'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
+            'sort_order' => $page->sort_order,
         ];
     }
 
@@ -131,7 +242,11 @@ class PageForm
             ]);
         }
 
-        $status = (string) ($form['status'] ?? PageStatus::Draft->value);
+        self::guardStatus((string) ($form['status'] ?? PageStatus::Draft->value));
+    }
+
+    private static function guardStatus(string $status): void
+    {
         if (PageStatus::tryFrom($status) === null) {
             throw ValidationException::withMessages([
                 'status' => "Status [{$status}] is not a valid page status.",

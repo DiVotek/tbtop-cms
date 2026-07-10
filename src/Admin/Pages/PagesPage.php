@@ -91,10 +91,9 @@ class PagesPage extends AdminPage
             ->toolbar(false)
             ->defaultSort('sort_order', 'asc')
             ->emptyState(__('tbtop-cms::pages.empty'))
-            ->rowClick('pageEdit')
+            ->recordUrl(static fn (Page $row): string => route('tbtop.cms.page-edit-page', ['page' => $row->id]))
             ->rowActions([
-                // Hidden: exists only as the rowClick target (title/row opens edit).
-                $this->editAction($s)->meta('hidden', true),
+                $this->quickEditAction($s),
                 $this->viewOnSiteAction($s),
             ]);
 
@@ -139,16 +138,16 @@ class PagesPage extends AdminPage
             ->modal(__('tbtop-cms::pages.actions.create_title'), $form);
     }
 
-    private function editAction(S $s): ActionBuilder
+    private function quickEditAction(S $s): ActionBuilder
     {
         return EditAction::make(
             $s,
-            $s->form('pageEdit', PageForm::fields($s, isEdit: true)),
-            static fn (ActionCtx $ctx): array => PageForm::loadRow((int) ($ctx->row['id'] ?? 0)),
-            static fn (ActionCtx $ctx): Page => PageForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
-            name: 'pageEdit',
-            title: __('tbtop-cms::pages.actions.edit_title'),
-        );
+            $s->form('pageQuickEdit', PageForm::quickFields($s)),
+            static fn (ActionCtx $ctx): array => PageForm::loadQuickRow((int) ($ctx->row['id'] ?? 0)),
+            static fn (ActionCtx $ctx): Page => PageForm::saveQuick($ctx->form, (int) ($ctx->row['id'] ?? 0)),
+            name: 'pageQuickEdit',
+            title: __('tbtop-cms::pages.actions.quick_edit_title'),
+        )->label('')->icon('pencil')->tooltip(__('tbtop-cms::pages.actions.quick_edit'));
     }
 
     private function viewOnSiteAction(S $s): ActionBuilder
@@ -185,8 +184,10 @@ class PagesPage extends AdminPage
 
     private function create(ActionCtx $ctx): Effects
     {
-        PageForm::save($ctx->form);
+        $page = PageForm::save($ctx->form);
 
-        return Effects::make()->notify(__('tbtop-cms::pages.actions.created'))->closeModal()->refreshTable();
+        return Effects::make()->notify(__('tbtop-cms::pages.actions.created'))->closeModal()->redirect(
+            route('tbtop.cms.page-edit-page', ['page' => $page->id]),
+        );
     }
 }
