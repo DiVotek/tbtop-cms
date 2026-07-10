@@ -7,6 +7,8 @@ interface Seo {
     description: string;
     canonical: string;
     ogImage: string | null;
+    ogTitle: string;
+    ogDescription: string;
     noindex: boolean;
 }
 
@@ -26,6 +28,8 @@ export default function CmsPage() {
                 {seo.description ? <meta name="description" content={seo.description} /> : null}
                 {seo.canonical ? <link rel="canonical" href={seo.canonical} /> : null}
                 {seo.noindex ? <meta name="robots" content="noindex" /> : null}
+                {seo.ogTitle ? <meta property="og:title" content={seo.ogTitle} /> : null}
+                {seo.ogDescription ? <meta property="og:description" content={seo.ogDescription} /> : null}
                 {seo.ogImage ? <meta property="og:image" content={seo.ogImage} /> : null}
             </Head>
             <JSONUIProvider registry={registry}>

@@ -42,7 +42,10 @@ class PageForm
     }
 
     /**
-     * Fields for the "Основне" tab of the dedicated edit page.
+     * Fields for the "Основне" tab of the dedicated edit page. status/type/
+     * parent_id/sort_order live in the sidebar cards (PageEditSidebar); the
+     * block content lives in its own per-block tabs (PageEditBlockTabs) —
+     * neither belongs to this tab anymore.
      *
      * @return list<Node|Field>
      */
@@ -53,25 +56,32 @@ class PageForm
             $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
             $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable(),
             $s->textarea('summary')->label(__('tbtop-cms::pages.fields.summary'))->translatable(),
-            $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
-            $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents()),
-            $s->select('status')->label(__('tbtop-cms::pages.fields.status'))->required()->options(PageFormOptions::statuses()),
-            $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
-            BlockContentField::make($s),
+            $s->richtext('body')->label(__('tbtop-cms::pages.fields.body'))->translatable(),
         ];
     }
 
     /**
-     * Fields for the "SEO" tab of the dedicated edit page.
+     * Fields for the "SEO" tab of the dedicated edit page. is_indexable lives
+     * in the sidebar's "Publication" card (PageEditSidebar), not here.
      *
-     * @return list<Field>
+     * @return list<Node|Field>
      */
     public static function seoFields(S $s): array
     {
         return [
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title')),
             $s->textarea('seo_description')->label(__('tbtop-cms::pages.fields.seo_description')),
-            $s->checkbox('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
+            $s->text('seo_focus_keyword')->label(__('tbtop-cms::pages.fields.seo_focus_keyword')),
+            $s->section(['title' => __('tbtop-cms::pages.sections.social')], [
+                // Text has no client-side placeholder wiring (unlike textarea);
+                // helperText renders instead so the "defaults to..." hint is
+                // still visible.
+                $s->text('og_title')->label(__('tbtop-cms::pages.fields.og_title'))
+                    ->helperText(__('tbtop-cms::pages.fields.og_title_placeholder')),
+                $s->textarea('og_description')->label(__('tbtop-cms::pages.fields.og_description'))
+                    ->set('placeholder', __('tbtop-cms::pages.fields.og_description_placeholder')),
+                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image')),
+            ]),
         ];
     }
 
@@ -106,6 +116,7 @@ class PageForm
             'title' => $form['title'] ?? [],
             'heading' => $form['heading'] ?? [],
             'summary' => $form['summary'] ?? [],
+            'body' => $form['body'] ?? [],
             // The create form has no is_indexable field — new pages are always
             // indexable by default; edits keep the form-submitted value.
             'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
@@ -172,13 +183,17 @@ class PageForm
 
     /**
      * @param  array<string, mixed>  $form
-     * @return array{title: string, description: string}
+     * @return array{title: string, description: string, focus_keyword: string, og_title: string, og_description: string, og_image: string}
      */
     private static function seoAttribute(array $form): array
     {
         return [
             'title' => (string) ($form['seo_title'] ?? ''),
             'description' => (string) ($form['seo_description'] ?? ''),
+            'focus_keyword' => (string) ($form['seo_focus_keyword'] ?? ''),
+            'og_title' => (string) ($form['og_title'] ?? ''),
+            'og_description' => (string) ($form['og_description'] ?? ''),
+            'og_image' => (string) ($form['og_image'] ?? ''),
         ];
     }
 
@@ -193,6 +208,7 @@ class PageForm
             'title' => $page->getTranslations('title'),
             'heading' => $page->getTranslations('heading'),
             'summary' => $page->getTranslations('summary'),
+            'body' => $page->getTranslations('body'),
             'type' => $page->type,
             'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
             'status' => $page->status->value,
@@ -202,6 +218,10 @@ class PageForm
             'content' => BlockContentField::toRows($page->content),
             'seo_title' => (string) ($seo['title'] ?? ''),
             'seo_description' => (string) ($seo['description'] ?? ''),
+            'seo_focus_keyword' => (string) ($seo['focus_keyword'] ?? ''),
+            'og_title' => (string) ($seo['og_title'] ?? ''),
+            'og_description' => (string) ($seo['og_description'] ?? ''),
+            'og_image' => (string) ($seo['og_image'] ?? ''),
         ];
     }
 

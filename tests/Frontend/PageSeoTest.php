@@ -72,6 +72,63 @@ it('falls back to the page summary for the meta description', function (): void 
         ->assertJsonPath('props.seo.description', 'A short page summary.');
 });
 
+it('falls back og:title/og:description to the resolved meta title/description when unset', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'summary' => ['en' => 'A short page summary.'],
+        'seo' => [],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        // og:title falls back to the bare meta title (no title_suffix appended).
+        ->assertJsonPath('props.seo.ogTitle', 'About Page')
+        ->assertJsonPath('props.seo.ogDescription', 'A short page summary.');
+});
+
+it('lets explicit og_title/og_description overrides win over the meta fallback', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'seo' => [
+            'title' => 'Meta title',
+            'description' => 'Meta description',
+            'og_title' => 'Custom OG title',
+            'og_description' => 'Custom OG description',
+        ],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogTitle', 'Custom OG title')
+        ->assertJsonPath('props.seo.ogDescription', 'Custom OG description');
+});
+
+it('ships ogTitle/ogDescription/ogImage props for the CmsPage <Head> to render as og: meta tags', function (): void {
+    // No Inertia SSR is configured in this app (client-side <Head> only, see
+    // CmsPage.tsx), so og: tags never land in server-rendered HTML — the wire
+    // contract this test guards is the seo.og* props CmsPage consumes.
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'seo' => [
+            'og_title' => 'Custom OG title',
+            'og_description' => 'Custom OG description',
+            'og_image' => 'page.jpg',
+        ],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogTitle', 'Custom OG title')
+        ->assertJsonPath('props.seo.ogDescription', 'Custom OG description')
+        ->assertJsonPath('props.seo.ogImage', 'page.jpg');
+});
+
 it('uses the default-locale title fallback for a non-default-locale page', function (): void {
     Language::factory()->create(['locale' => 'uk']);
 

@@ -32,10 +32,15 @@ return [
     'tabs_edit' => [
         'general' => 'Основне',
         'seo' => 'SEO',
+        'add_block' => '+ Додати блок',
     ],
     'sections' => [
         'content' => 'Контент',
         'settings' => 'Налаштування',
+        'publication' => 'Публікація',
+        'structure' => 'Структура',
+        'ordering' => 'Сортування',
+        'social' => 'Соцмережі',
     ],
     'fields' => [
         'name' => 'Назва',
@@ -43,6 +48,7 @@ return [
         'slug' => 'Слаг',
         'heading' => 'Підзаголовок',
         'summary' => 'Опис',
+        'body' => 'Контент',
         'type' => 'Тип',
         'parent' => 'Батьківська',
         'status' => 'Статус',
@@ -50,6 +56,12 @@ return [
         'is_indexable' => 'Індексувати в пошуку',
         'seo_title' => 'SEO-заголовок',
         'seo_description' => 'SEO-опис',
+        'seo_focus_keyword' => 'Фокусне ключове слово',
+        'og_title' => 'OG заголовок',
+        'og_title_placeholder' => 'За замовчуванням — мета-заголовок',
+        'og_description' => 'OG опис',
+        'og_description_placeholder' => 'За замовчуванням — мета-опис',
+        'og_image' => 'OG зображення',
         'no_parent' => '— Немає —',
     ],
     'actions' => [
@@ -65,5 +77,19 @@ return [
         'delete_title' => 'Видалити сторінку?',
         'delete_confirm' => 'Цю дію неможливо скасувати.',
         'deleted' => 'Сторінку видалено',
+    ],
+    'blocks' => [
+        'active' => 'Активний',
+        'sort' => 'Порядок',
+        'add' => 'Додати :kind',
+        'added' => 'Блок додано',
+        'remove' => 'Видалити блок',
+        'remove_title' => 'Видалити блок?',
+        'remove_confirm' => 'Цю дію неможливо скасувати.',
+        'removed' => 'Блок видалено',
+    ],
+    'status_bar' => [
+        'updated' => 'Оновлено',
+        'created' => 'Створено',
     ],
 ];

@@ -32,10 +32,15 @@ return [
     'tabs_edit' => [
         'general' => 'General',
         'seo' => 'SEO',
+        'add_block' => '+ Add block',
     ],
     'sections' => [
         'content' => 'Content',
         'settings' => 'Settings',
+        'publication' => 'Publication',
+        'structure' => 'Structure',
+        'ordering' => 'Ordering',
+        'social' => 'Social networks',
     ],
     'fields' => [
         'name' => 'Name',
@@ -43,6 +48,7 @@ return [
         'slug' => 'Slug',
         'heading' => 'Heading',
         'summary' => 'Summary',
+        'body' => 'Content',
         'type' => 'Type',
         'parent' => 'Parent',
         'status' => 'Status',
@@ -50,6 +56,12 @@ return [
         'is_indexable' => 'Indexable in search',
         'seo_title' => 'Meta title',
         'seo_description' => 'Meta description',
+        'seo_focus_keyword' => 'Focus keyword',
+        'og_title' => 'OG title',
+        'og_title_placeholder' => 'Defaults to the meta title',
+        'og_description' => 'OG description',
+        'og_description_placeholder' => 'Defaults to the meta description',
+        'og_image' => 'OG image',
         'no_parent' => '— None —',
     ],
     'actions' => [
@@ -65,5 +77,19 @@ return [
         'delete_title' => 'Delete page?',
         'delete_confirm' => 'This cannot be undone.',
         'deleted' => 'Page deleted',
+    ],
+    'blocks' => [
+        'active' => 'Active',
+        'sort' => 'Order',
+        'add' => 'Add :kind',
+        'added' => 'Block added',
+        'remove' => 'Remove block',
+        'remove_title' => 'Remove block?',
+        'remove_confirm' => 'This cannot be undone.',
+        'removed' => 'Block removed',
+    ],
+    'status_bar' => [
+        'updated' => 'Updated',
+        'created' => 'Created',
     ],
 ];

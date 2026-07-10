@@ -88,6 +88,26 @@ it('preserves block order', function (): void {
     expect(array_map(fn (object $b): string => $b->id, $out))->toBe(['a', 'b']);
 });
 
+it('orders resolved blocks by the envelope sort field, not array position', function (): void {
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'sort' => 2, 'data' => ['title' => ['en' => 'A']]],
+        ['id' => 'b', 'kind' => 'Hero', 'active' => true, 'sort' => 1, 'data' => ['title' => ['en' => 'B']]],
+    ]);
+
+    expect(array_map(fn (object $b): string => $b->id, $out))->toBe(['b', 'a']);
+});
+
+it('falls back to array index for legacy blocks with no sort field', function (): void {
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'A']]],
+        ['id' => 'b', 'kind' => 'Hero', 'active' => true, 'sort' => 0, 'data' => ['title' => ['en' => 'B']]],
+    ]);
+
+    // 'a' has no sort (falls back to its index, 0); 'b' explicitly claims
+    // sort 0 too — the stable sort keeps 'a' first since it appeared first.
+    expect(array_map(fn (object $b): string => $b->id, $out))->toBe(['a', 'b']);
+});
+
 it('throws on an unknown kind when strict mode is enabled', function (): void {
     config()->set('tbtop-cms.blocks.strict', true);
 

@@ -6,7 +6,6 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -14,15 +13,18 @@ use Tbtop\Cms\Block\BlockRegistry;
 
 /**
  * Builds the Pages "Blocks" repeater and maps its rows to and from the stored
- * {id, kind, active, data} block envelope.
+ * {id, kind, active, sort, data} block envelope.
  *
  * v1 targets a single registered block kind: every registered block's form
  * fields are unioned into one flat repeater, so two kinds declaring the same
  * field name would collide. Per-kind field namespacing and kind-gated field
  * visibility need a polymorphic repeater primitive in the tbtop/admin engine.
  *
- * Block field names must not be `id`, `kind`, or `active`: those are the
- * envelope's reserved keys and always take precedence over row data.
+ * Block field names must not be `id`, `kind`, `active`, or `sort`: those are
+ * the envelope's reserved keys and always take precedence over row data.
+ * This repeater form has no `sort` field of its own (v1 has no drag-reorder
+ * UI here) — toEnvelope() only preserves a `sort` a caller already placed on
+ * the row (e.g. PageEditBlocks::toRows()), it never assigns one.
  */
 class BlockContentField
 {
@@ -62,17 +64,24 @@ class BlockContentField
                 continue;
             }
 
-            if (! app(BlockRegistry::class)->has($kind)) {
-                throw ValidationException::withMessages([
-                    'content' => "Block type [{$kind}] is not registered.",
-                ]);
-            }
-
-            $out[] = [
+            // A kind absent from the registry is NOT rejected: a block type
+            // deregistered from the site config must not make every page
+            // that still holds one unsavable. The row round-trips verbatim
+            // (its data was already carried over by the caller) and simply
+            // renders nothing on the frontend until re-registered.
+            $entry = [
                 'id' => self::rowId($row),
                 'kind' => $kind,
                 'active' => (bool) ($row['active'] ?? true),
-                'data' => Arr::except($row, ['id', 'kind', 'active']),
+            ];
+
+            if (is_numeric($row['sort'] ?? null)) {
+                $entry['sort'] = (int) $row['sort'];
+            }
+
+            $out[] = [
+                ...$entry,
+                'data' => Arr::except($row, ['id', 'kind', 'active', 'sort']),
             ];
         }
 

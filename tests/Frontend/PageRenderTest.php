@@ -39,6 +39,23 @@ it('assembles resolved blocks into a json-render spec', function (): void {
         ->assertJsonPath('props.render.elements.hero-2.props.title', 'Second');
 });
 
+it('orders rendered blocks by sort, not by their position in content', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [
+            ['id' => 'hero-1', 'kind' => 'Hero', 'sort' => 2, 'data' => ['title' => ['en' => 'Second']]],
+            ['id' => 'hero-2', 'kind' => 'Hero', 'sort' => 1, 'data' => ['title' => ['en' => 'First']]],
+        ],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.render.elements.$root.children', ['hero-2', 'hero-1'])
+        ->assertJsonPath('props.render.elements.hero-2.props.title', 'First')
+        ->assertJsonPath('props.render.elements.hero-1.props.title', 'Second');
+});
+
 it('drops a block that throws while resolving', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,

@@ -16,25 +16,38 @@ class SeoResolver
     ) {}
 
     /**
-     * @return array{title: string, description: string, canonical: string, ogImage: string|null, noindex: bool}
+     * @return array{title: string, description: string, canonical: string, ogImage: string|null, ogTitle: string, ogDescription: string, noindex: bool}
      */
     public function resolve(Page $page, string $locale): array
     {
         $seo = $page->seo ?? [];
+        $metaTitle = $this->metaTitle($page, $seo, $locale);
+        $metaDescription = $this->description($page, $seo, $locale);
 
         return [
-            'title' => $this->title($page, $seo, $locale),
-            'description' => $this->description($page, $seo, $locale),
+            'title' => $this->title($metaTitle),
+            'description' => $metaDescription,
             'canonical' => $this->canonical($page, $seo, $locale),
             'ogImage' => $this->ogImage($seo),
+            'ogTitle' => $this->str($seo, 'og_title') ?: $metaTitle,
+            'ogDescription' => $this->str($seo, 'og_description') ?: $metaDescription,
             'noindex' => ! $page->is_indexable,
         ];
     }
 
-    /** @param array<string, mixed> $seo */
-    private function title(Page $page, array $seo, string $locale): string
+    /**
+     * The meta title before the global suffix is appended — also the base
+     * that og:title falls back to when no og_title override is set.
+     *
+     * @param  array<string, mixed>  $seo
+     */
+    private function metaTitle(Page $page, array $seo, string $locale): string
     {
-        $base = $this->str($seo, 'title') ?: (string) $page->getTranslation('title', $locale);
+        return $this->str($seo, 'title') ?: (string) $page->getTranslation('title', $locale);
+    }
+
+    private function title(string $base): string
+    {
         $suffix = (string) $this->settings->get('seo.title_suffix', '');
 
         if ($suffix === '') {
