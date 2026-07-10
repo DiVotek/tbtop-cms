@@ -17,7 +17,6 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 
@@ -134,7 +133,7 @@ class PagesPage extends AdminPage
         $form = $s->form('pageCreate', [
             ...PageForm::fields($s),
             $s->flex([$s->spacer(), $cancel, $create], justify: 'end'),
-        ])->record(['status' => PageStatus::Draft->value]);
+        ]);
 
         return $s->action('pageCreate')->label(__('tbtop-cms::pages.actions.new'))->icon('plus')->color('primary')
             ->modal(__('tbtop-cms::pages.actions.create_title'), $form);

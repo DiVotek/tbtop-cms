@@ -17,9 +17,10 @@ class PageForm
 {
     /**
      * Fields for the pages-list create modal. A deliberately small subset —
-     * heading/summary/is_indexable/sort_order/blocks are edit-only; is_indexable
-     * defaults to true server-side on create (see fillAttributes()), and
-     * sort_order/blocks are refined after the record exists.
+     * heading/summary/is_indexable/sort_order/blocks/status are edit-only;
+     * is_indexable defaults to true and status to draft server-side on create
+     * (see fillAttributes()), and sort_order/blocks are refined after the
+     * record exists.
      *
      * @return list<Node>
      */
@@ -36,7 +37,6 @@ class PageForm
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
                 $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents())
                     ->hiddenIf(Cond::notIn('type', ['category', 'article'])),
-                $s->select('status')->label(__('tbtop-cms::pages.fields.status'))->required()->options(PageFormOptions::statuses()),
             ]),
         ];
     }

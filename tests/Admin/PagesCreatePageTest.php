@@ -57,12 +57,12 @@ function pageCreateFormChildren(): array
     return $children;
 }
 
-it('composes the create form with name/title/slug in Content and type/parent/status in Settings', function (): void {
+it('composes the create form with name/title/slug in Content and type/parent in Settings', function (): void {
     $children = pageCreateFormChildren();
     $names = array_column($children, 'name');
 
-    expect($names)->toContain('name', 'title', 'slug', 'type', 'parent_id', 'status')
-        ->and($names)->not->toContain('heading', 'summary', 'is_indexable', 'sort_order', 'content');
+    expect($names)->toContain('name', 'title', 'slug', 'type', 'parent_id')
+        ->and($names)->not->toContain('heading', 'summary', 'is_indexable', 'sort_order', 'content', 'status');
 
     $byName = array_column($children, null, 'name');
     expect($byName['slug']['kind'])->toBe('slug')
@@ -81,12 +81,21 @@ it('hides parent_id unless type is category or article', function (): void {
         ->and($hiddenIf['value'])->toBe(['category', 'article']);
 });
 
-it('defaults the create form status to draft', function (): void {
-    // FormBuilder::record() reaches the client through the page's `data`
-    // props (PageController::collectedForms()), not inline on the action node.
-    $data = test()->get('/admin/pages', ['X-Inertia' => 'true'])->assertOk()->json('props.data');
+it('creates a page as draft when the form sends no status (status is edit-only)', function (): void {
+    $this->postJson('/admin/pages/actions/pageCreateSave', [
+        'payload' => [
+            'form' => [
+                'name' => ['en' => 'Statusless'],
+                'title' => ['en' => ''],
+                'slug' => ['en' => ''],
+                'type' => 'page',
+                'parent_id' => 'none',
+            ],
+        ],
+    ])->assertOk();
 
-    expect($data['pageCreate']['status'] ?? null)->toBe(PageStatus::Draft->value);
+    $page = Page::query()->where('type', 'page')->firstOrFail();
+    expect($page->status)->toBe(PageStatus::Draft);
 });
 
 it('creates a page using the submitted per-locale slug instead of deriving it from the name', function (): void {
@@ -98,7 +107,6 @@ it('creates a page using the submitted per-locale slug instead of deriving it fr
                 'slug' => ['en' => 'custom-about'],
                 'type' => 'page',
                 'parent_id' => 'none',
-                'status' => PageStatus::Draft->value,
             ],
         ],
     ]);
@@ -118,7 +126,6 @@ it('falls back to name-derived slug generation when the slug field is left empty
                 'slug' => ['en' => ''],
                 'type' => 'page',
                 'parent_id' => 'none',
-                'status' => PageStatus::Draft->value,
             ],
         ],
     ])->assertOk();
@@ -136,7 +143,6 @@ it('falls the title back to the name per locale when title is left empty', funct
                 'slug' => ['en' => ''],
                 'type' => 'page',
                 'parent_id' => 'none',
-                'status' => PageStatus::Draft->value,
             ],
         ],
     ])->assertOk();
@@ -154,7 +160,6 @@ it('keeps an explicit title over the name fallback', function (): void {
                 'slug' => ['en' => ''],
                 'type' => 'page',
                 'parent_id' => 'none',
-                'status' => PageStatus::Draft->value,
             ],
         ],
     ])->assertOk();
@@ -172,7 +177,6 @@ it('always creates pages as indexable, since the create form has no is_indexable
                 'slug' => ['en' => ''],
                 'type' => 'page',
                 'parent_id' => 'none',
-                'status' => PageStatus::Draft->value,
             ],
         ],
     ])->assertOk();
@@ -190,7 +194,6 @@ it('redirects to the new page edit screen after create', function (): void {
                 'slug' => ['en' => ''],
                 'type' => 'page',
                 'parent_id' => 'none',
-                'status' => PageStatus::Draft->value,
             ],
         ],
     ]);
