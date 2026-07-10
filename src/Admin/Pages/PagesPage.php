@@ -97,11 +97,6 @@ class PagesPage extends AdminPage
                 $this->viewOnSiteAction($s),
             ]);
 
-        // Same ResolvedPage gap as PageEditPage: actions built only inside
-        // headerActions() 404 on their own POST dispatch (fromRequest() rebuilds
-        // $s from view() alone), so the create action registers here too.
-        $this->createAction($s);
-
         return $s->stack([$table]);
     }
 
