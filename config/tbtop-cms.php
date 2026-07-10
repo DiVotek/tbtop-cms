@@ -8,6 +8,7 @@ use Tbtop\Cms\Admin\Pages\LayoutEditPage;
 use Tbtop\Cms\Admin\Pages\LayoutPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
+use Tbtop\Cms\Admin\Pages\PageEditPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Admin\Pages\RedirectsPage;
@@ -77,6 +78,7 @@ return [
             'login' => LoginPage::class,
             'languages' => LanguagesPage::class,
             'pages' => PagesPage::class,
+            'page_edit' => PageEditPage::class,
             'redirects' => RedirectsPage::class,
             'site_settings' => SiteSettingsPage::class,
             'seo_settings' => SeoSettingsPage::class,
