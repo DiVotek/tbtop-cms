@@ -117,6 +117,34 @@ it('saves general and SEO fields including the seo json column', function (): vo
         ->and($page->seo)->toBe(['title' => 'Meta title', 'description' => 'Meta description']);
 });
 
+it('keeps an intentionally cleared title on edit instead of re-filling it from the name', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'Custom Title'],
+    ]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [
+            'name' => ['en' => 'About'],
+            'title' => ['en' => ''],
+            'heading' => ['en' => ''],
+            'summary' => ['en' => ''],
+            'type' => 'page',
+            'parent_id' => 'none',
+            'status' => PageStatus::Published->value,
+            'sort_order' => 0,
+            'seo_title' => '',
+            'seo_description' => '',
+            'is_indexable' => true,
+        ],
+    )->assertRedirect();
+
+    expect($page->refresh()->getTranslation('title', 'en', false))->toBe('');
+});
+
 it('keeps only view-on-site in header actions', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 

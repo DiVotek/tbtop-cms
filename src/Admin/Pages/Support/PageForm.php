@@ -84,7 +84,7 @@ class PageForm
         self::guardParent($page, $parentId);
         self::guardTypeAndStatus($page, $form);
 
-        $page->fill(self::fillAttributes($page, self::withTitleFallback($form), $parentId, $isCreate));
+        $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
 
         if ($isCreate) {
             $page->pendingSlugOverrides = self::stringMap($form['slug'] ?? null);
@@ -127,9 +127,11 @@ class PageForm
     }
 
     /**
-     * When a locale's title is empty but its name is set, fall the title
-     * back to the name — the create form no longer collects heading/summary
-     * but title still drives <title>/OG tags, so it should not stay blank.
+     * Create-only: when a locale's title is empty but its name is set, fall
+     * the title back to the name — the create form has no heading/summary
+     * but title still drives <title>/OG tags, so it should not start blank.
+     * Edits never run this: an admin clearing the title on the edit page
+     * means it, and re-filling it from the name would override that intent.
      *
      * @param  array<string, mixed>  $form
      * @return array<string, mixed>
