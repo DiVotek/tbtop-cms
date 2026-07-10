@@ -6,7 +6,6 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -65,12 +64,11 @@ class BlockContentField
                 continue;
             }
 
-            if (! app(BlockRegistry::class)->has($kind)) {
-                throw ValidationException::withMessages([
-                    'content' => "Block type [{$kind}] is not registered.",
-                ]);
-            }
-
+            // A kind absent from the registry is NOT rejected: a block type
+            // deregistered from the site config must not make every page
+            // that still holds one unsavable. The row round-trips verbatim
+            // (its data was already carried over by the caller) and simply
+            // renders nothing on the frontend until re-registered.
             $entry = [
                 'id' => self::rowId($row),
                 'kind' => $kind,

@@ -151,6 +151,30 @@ it('round-trips a translatable block field through save', function (): void {
     expect($page->refresh()->content[0]['data'])->toBe(['title' => ['en' => 'Updated']]);
 });
 
+it('preserves a block whose kind is no longer registered instead of crashing on save', function (): void {
+    $page = pageWithBlocks([
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'Hi']],
+        ['id' => 'ghost1', 'kind' => 'Ghost', 'active' => true, 'sort' => 1, 'data' => ['legacy' => 'value']],
+    ]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [
+            ...baseEditPayload(),
+            'name' => ['en' => 'Renamed via save'],
+            'block_blk1_heading' => 'Hi', 'block_blk1_active' => true, 'block_blk1_sort' => 0,
+        ],
+    )->assertRedirect()->assertSessionHasNoErrors();
+
+    // The save must have actually run — not bounced off validation.
+    expect($page->refresh()->getTranslation('name', 'en'))->toBe('Renamed via save');
+
+    $ghost = collect($page->content)->firstWhere('id', 'ghost1');
+    expect($ghost)->not->toBeNull()
+        ->and($ghost['kind'])->toBe('Ghost')
+        ->and($ghost['data'])->toBe(['legacy' => 'value']);
+});
+
 it('round-trips the rich-text body through save as a per-locale map', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
     $lexical = ['root' => ['type' => 'root', 'children' => []]];
