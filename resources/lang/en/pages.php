@@ -32,10 +32,14 @@ return [
     'tabs_edit' => [
         'general' => 'General',
         'seo' => 'SEO',
+        'add_block' => '+ Add block',
     ],
     'sections' => [
         'content' => 'Content',
         'settings' => 'Settings',
+        'publication' => 'Publication',
+        'structure' => 'Structure',
+        'ordering' => 'Ordering',
     ],
     'fields' => [
         'name' => 'Name',
@@ -65,5 +69,18 @@ return [
         'delete_title' => 'Delete page?',
         'delete_confirm' => 'This cannot be undone.',
         'deleted' => 'Page deleted',
+    ],
+    'blocks' => [
+        'active' => 'Active',
+        'add' => 'Add :kind',
+        'added' => 'Block added',
+        'remove' => 'Remove block',
+        'remove_title' => 'Remove block?',
+        'remove_confirm' => 'This cannot be undone.',
+        'removed' => 'Block removed',
+    ],
+    'status_bar' => [
+        'updated' => 'Updated',
+        'created' => 'Created',
     ],
 ];

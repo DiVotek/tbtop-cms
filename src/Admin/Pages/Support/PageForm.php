@@ -42,7 +42,10 @@ class PageForm
     }
 
     /**
-     * Fields for the "Основне" tab of the dedicated edit page.
+     * Fields for the "Основне" tab of the dedicated edit page. status/type/
+     * parent_id/sort_order live in the sidebar cards (PageEditSidebar); the
+     * block content lives in its own per-block tabs (PageEditBlockTabs) —
+     * neither belongs to this tab anymore.
      *
      * @return list<Node|Field>
      */
@@ -53,11 +56,6 @@ class PageForm
             $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
             $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable(),
             $s->textarea('summary')->label(__('tbtop-cms::pages.fields.summary'))->translatable(),
-            $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
-            $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents()),
-            $s->select('status')->label(__('tbtop-cms::pages.fields.status'))->required()->options(PageFormOptions::statuses()),
-            $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
-            BlockContentField::make($s),
         ];
     }
 

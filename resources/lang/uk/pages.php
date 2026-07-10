@@ -32,10 +32,14 @@ return [
     'tabs_edit' => [
         'general' => 'Основне',
         'seo' => 'SEO',
+        'add_block' => '+ Додати блок',
     ],
     'sections' => [
         'content' => 'Контент',
         'settings' => 'Налаштування',
+        'publication' => 'Публікація',
+        'structure' => 'Структура',
+        'ordering' => 'Сортування',
     ],
     'fields' => [
         'name' => 'Назва',
@@ -65,5 +69,18 @@ return [
         'delete_title' => 'Видалити сторінку?',
         'delete_confirm' => 'Цю дію неможливо скасувати.',
         'deleted' => 'Сторінку видалено',
+    ],
+    'blocks' => [
+        'active' => 'Активний',
+        'add' => 'Додати :kind',
+        'added' => 'Блок додано',
+        'remove' => 'Видалити блок',
+        'remove_title' => 'Видалити блок?',
+        'remove_confirm' => 'Цю дію неможливо скасувати.',
+        'removed' => 'Блок видалено',
+    ],
+    'status_bar' => [
+        'updated' => 'Оновлено',
+        'created' => 'Створено',
     ],
 ];

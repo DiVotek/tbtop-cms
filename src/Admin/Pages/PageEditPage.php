@@ -10,18 +10,23 @@ use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Admin\Pages\Support\PageEditBlocks;
+use Tbtop\Cms\Admin\Pages\Support\PageEditBlockTabs;
+use Tbtop\Cms\Admin\Pages\Support\PageEditSidebar;
+use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
- * Dedicated full-page editor for a single page record (name/content/blocks +
- * SEO). Not in the nav — reached via the pages list's row click / quick-edit
- * actions.
+ * Dedicated full-page editor for a single page record: a status bar (badge,
+ * timestamps, view-on-site, top save), a two-column grid body (tabbed content
+ * + per-block tabs on the left, publication/structure/ordering sections in
+ * the right sidebar), and a footer save/delete row.
  *
- * The General/SEO groups are real S::tabs(): since tbtop/admin 0.2.19 the
- * form walkers (RuleWalker, TranslatableRecord) recurse into tab bodies, so
- * fields inside tabs validate and reach $ctx->form like any other field.
+ * The General/SEO/block groups are real S::tabs(): since tbtop/admin 0.2.19
+ * the form walkers (RuleWalker, TranslatableRecord) recurse into tab bodies,
+ * so fields inside tabs validate and reach $ctx->form like any other field.
  */
 class PageEditPage extends AdminPage
 {
@@ -61,38 +66,64 @@ class PageEditPage extends AdminPage
         ];
     }
 
-    /** @return list<ActionBuilder|Node> */
+    /**
+     * View-on-site and save both moved into the status bar at the top of
+     * the form; the header no longer carries any actions.
+     *
+     * @return list<ActionBuilder|Node>
+     */
     #[\Override]
     public function headerActions(S $s): array
     {
-        return [$this->viewOnSiteAction($s)];
+        return [];
     }
 
     public function view(S $s): Node
     {
-        $save = $s->action('save')->label(__('tbtop-cms::pages.actions.save'))->color('primary')
-            ->keybinding('mod+s')->submit();
+        $page = $this->page();
+        $saveTop = $this->saveAction($s, 'saveTop');
+        $saveFooter = $this->saveAction($s, 'save');
 
-        $footer = $this->page()->is_system
-            ? $s->flex([$s->spacer(), $save], justify: 'end')
-            : $s->flex([$this->deleteAction($s), $s->spacer(), $save], justify: 'end');
+        $footer = $page->is_system
+            ? $s->flex([$s->spacer(), $saveFooter], justify: 'end')
+            : $s->flex([$this->deleteAction($s), $s->spacer(), $saveFooter], justify: 'end');
 
         $form = $s->form('pageEditor', [
-            $s->tabs([
-                ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s))],
-                ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s))],
+            PageEditStatusBar::build($s, $page, $this->viewOnSiteAction($s), $saveTop),
+            $s->grid(['cols' => ['sm' => 1, 'lg' => 3]], [
+                $s->stack([$s->tabs($this->tabs($s, $page))], ['colSpan' => ['sm' => 1, 'lg' => 2]]),
+                PageEditSidebar::build($s),
             ]),
             $footer,
         ])
-            ->record(PageForm::loadRow($this->pageId()))
+            ->record([...PageForm::loadRow($this->pageId()), ...PageEditBlockTabs::recordValues($page)])
             ->onSubmit($this->save(...));
 
         return $s->stack([$form]);
     }
 
+    /** @return list<array{label: string, body: mixed, badge?: string}> */
+    private function tabs(S $s, Page $page): array
+    {
+        return [
+            ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s))],
+            ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s))],
+            ...PageEditBlockTabs::build($s, $page),
+        ];
+    }
+
+    private function saveAction(S $s, string $name): ActionBuilder
+    {
+        $action = $s->action($name)->label(__('tbtop-cms::pages.actions.save'))->color('primary')->submit('pageEditor');
+
+        return $name === 'save' ? $action->keybinding('mod+s') : $action;
+    }
+
     private function save(ActionCtx $ctx): Effects
     {
-        PageForm::save($ctx->form, $this->pageId());
+        $page = $this->page();
+        $rows = PageEditBlocks::toRows($ctx->form, $page);
+        PageForm::save([...$ctx->form, 'content' => $rows], $this->pageId());
 
         return Effects::make()->notify(__('tbtop-cms::pages.actions.saved'))->redirect(
             route('tbtop.cms.page-edit-page', ['page' => $this->pageId()]),
@@ -110,7 +141,7 @@ class PageEditPage extends AdminPage
     /**
      * Not DeleteAction/RecordAction: those helpers are built for table row
      * actions (needs: ['row'], row-scoped model lookup via $ctx->row['id']).
-     * This is a page-level header action with no row payload — the target
+     * This is a page-level footer action with no row payload — the target
      * record is the page resolved from the route param, same as save().
      */
     private function deleteAction(S $s): ActionBuilder
