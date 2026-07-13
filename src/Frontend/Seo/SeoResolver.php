@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo;
 
+use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\PageUrl;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -13,6 +14,7 @@ class SeoResolver
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
+        private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
     /**
@@ -69,18 +71,24 @@ class SeoResolver
         return url($this->url->build((string) $page->pathFor($locale), $locale));
     }
 
-    /** @param array<string, mixed> $seo */
+    /**
+     * og_image and seo.default_og_image are $s->media() fields — both store
+     * a media id, not a URL, so both go through the same id-to-url resolver
+     * as the page override and the global fallback.
+     *
+     * @param  array<string, mixed>  $seo
+     */
     private function ogImage(array $seo): ?string
     {
         $override = $this->str($seo, 'og_image');
 
         if ($override !== '') {
-            return $override;
+            return $this->mediaUrlResolver->resolve($override);
         }
 
         $global = $this->settings->get('seo.default_og_image');
 
-        return is_string($global) && $global !== '' ? $global : null;
+        return is_string($global) && $global !== '' ? $this->mediaUrlResolver->resolve($global) : null;
     }
 
     /** @param array<string, mixed> $seo */

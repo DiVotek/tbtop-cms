@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -13,30 +15,43 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     config(['cache.default' => 'array']);
+    Storage::fake('public');
     Language::factory()->default()->create(['locale' => 'en']);
 
     $settings = app(Settings::class);
     $settings->set('seo.title_suffix', '— Acme');
     $settings->set('seo.default_description', 'Global description');
-    $settings->set('seo.default_og_image', 'global.jpg');
+    $settings->set('seo.default_og_image', (string) media('global.jpg')->getKey());
 
     app(Cms::class)->frontendRoutes();
 });
 
+function media(string $name): Media
+{
+    return Media::create([
+        'name' => $name,
+        'disk' => 'public',
+        'path' => "media/{$name}",
+        'mime' => 'image/jpeg',
+        'size' => 123,
+    ]);
+}
+
 it('lets page SEO overrides win over global defaults', function (): void {
+    $pageImage = media('page.jpg');
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
         'title' => ['en' => 'About Page'],
         'is_indexable' => true,
-        'seo' => ['description' => 'Page description', 'og_image' => 'page.jpg'],
+        'seo' => ['description' => 'Page description', 'og_image' => (string) $pageImage->getKey()],
     ]);
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.seo.title', 'About Page — Acme')
         ->assertJsonPath('props.seo.description', 'Page description')
-        ->assertJsonPath('props.seo.ogImage', 'page.jpg')
+        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page.jpg'))
         ->assertJsonPath('props.seo.noindex', false);
 });
 
@@ -53,9 +68,22 @@ it('falls back to global SEO defaults when page fields are empty', function (): 
         ->assertOk()
         ->assertJsonPath('props.seo.title', 'About Page — Acme')
         ->assertJsonPath('props.seo.description', 'Global description')
-        ->assertJsonPath('props.seo.ogImage', 'global.jpg')
+        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/global.jpg'))
         ->assertJsonPath('props.seo.canonical', url('/about'))
         ->assertJsonPath('props.seo.noindex', true);
+});
+
+it('resolves og_image to null when the stored media id no longer exists', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'seo' => ['og_image' => '999999'],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogImage', null);
 });
 
 it('falls back to the page summary for the meta description', function (): void {
@@ -111,6 +139,7 @@ it('ships ogTitle/ogDescription/ogImage props for the CmsPage <Head> to render a
     // No Inertia SSR is configured in this app (client-side <Head> only, see
     // CmsPage.tsx), so og: tags never land in server-rendered HTML — the wire
     // contract this test guards is the seo.og* props CmsPage consumes.
+    $pageImage = media('page.jpg');
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
@@ -118,7 +147,7 @@ it('ships ogTitle/ogDescription/ogImage props for the CmsPage <Head> to render a
         'seo' => [
             'og_title' => 'Custom OG title',
             'og_description' => 'Custom OG description',
-            'og_image' => 'page.jpg',
+            'og_image' => (string) $pageImage->getKey(),
         ],
     ]);
 
@@ -126,7 +155,7 @@ it('ships ogTitle/ogDescription/ogImage props for the CmsPage <Head> to render a
         ->assertOk()
         ->assertJsonPath('props.seo.ogTitle', 'Custom OG title')
         ->assertJsonPath('props.seo.ogDescription', 'Custom OG description')
-        ->assertJsonPath('props.seo.ogImage', 'page.jpg');
+        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page.jpg'));
 });
 
 it('uses the default-locale title fallback for a non-default-locale page', function (): void {

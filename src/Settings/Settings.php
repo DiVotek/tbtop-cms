@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Settings;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Settings\Models\Setting;
 use Tbtop\Cms\Settings\Support\SettingCodec;
 use Throwable;
@@ -14,8 +15,17 @@ class Settings
 {
     private const string CACHE_KEY = 'tbtop-cms.settings';
 
+    // Settings keys whose stored value is a media id (from an $s->media()
+    // field) rather than the value itself — forFrontend() resolves these to
+    // public URLs so consumers never see a raw id.
+    private const array MEDIA_KEYS = ['site.logo', 'site.favicon', 'seo.default_og_image'];
+
     /** @var array<string, string|null>|null */
     private ?array $memo = null;
+
+    public function __construct(
+        private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
+    ) {}
 
     public function get(string $key, mixed $default = null): mixed
     {
@@ -62,13 +72,21 @@ class Settings
             }
 
             try {
-                $result[$key] = SettingCodec::decode($raw, false);
+                $value = SettingCodec::decode($raw, false);
+                $result[$key] = in_array($key, self::MEDIA_KEYS, true)
+                    ? $this->resolveMediaValue($value)
+                    : $value;
             } catch (Throwable $e) {
                 Log::warning('settings.decode_failed', ['key' => $key, 'error' => $e->getMessage()]);
             }
         }
 
         return $result;
+    }
+
+    private function resolveMediaValue(mixed $id): ?string
+    {
+        return is_string($id) || is_int($id) ? $this->mediaUrlResolver->resolve($id) : null;
     }
 
     public function isSecret(string $key): bool
