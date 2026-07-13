@@ -11,6 +11,7 @@ use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
+use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Console\InstallCommand;
@@ -70,6 +71,7 @@ class CmsServiceProvider extends PackageServiceProvider
     public function packageBooted(): void
     {
         $this->wireAdminLoginRedirect();
+        $this->wireAdminLogout();
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
     }
@@ -116,6 +118,28 @@ class CmsServiceProvider extends PackageServiceProvider
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
 
         Route::redirect('login', $prefix . '/login')->name('login');
+    }
+
+    /**
+     * Server half of the admin client's logout contract: ProfileDropdown
+     * (admin >=0.2.24) posts to `{prefix}/logout`. Registered by cms because
+     * auth is cms-owned — the admin package ships no auth controllers.
+     * Prefixed on purpose: a root `/logout` would occupy the host app's own
+     * route namespace. Guarded by `auth:{guard}` only: logging out must not
+     * require the CmsUserProfile row EnsureCmsAdmin checks for page access.
+     */
+    private function wireAdminLogout(): void
+    {
+        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
+            return;
+        }
+
+        $guard = (string) config('tbtop-cms.admin.guard', 'web');
+        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+
+        Route::middleware(['web', 'auth:' . $guard])
+            ->post($prefix . '/logout', LogoutController::class)
+            ->name('tbtop.cms.logout');
     }
 
     private function wireLocaleSlugBackfill(): void
