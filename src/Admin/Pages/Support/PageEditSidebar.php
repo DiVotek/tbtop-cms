@@ -20,8 +20,8 @@ final class PageEditSidebar
             $s->section(['title' => __('tbtop-cms::pages.sections.publication'), 'variant' => 'card'], [
                 $s->select('status')->label(__('tbtop-cms::pages.fields.status'))
                     ->required()->options(PageFormOptions::statuses()),
-                // TODO: variant switch when admin checkbox supports it
-                $s->checkbox('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
+                // boolean, not checkbox: renders as a switch on the client
+                $s->boolean('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.structure'), 'variant' => 'card'], [
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
