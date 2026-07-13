@@ -15,12 +15,13 @@ class RedirectForm
     public static function fields(S $s): array
     {
         return [
-            $s->text('from_path')->label('From path')->required()
-                ->helperText('Path without locale prefix, e.g. old-page.'),
-            $s->text('to_path')->label('To URL or path')->required()
-                ->helperText('Local path or full external URL.'),
-            $s->select('locale')->label('Locale')->options(RedirectFormOptions::locales()),
-            $s->select('status_code')->label('Status')->required()->options(RedirectFormOptions::statuses()),
+            $s->text('from_path')->label(__('tbtop-cms::redirects.fields.from_path'))->required()
+                ->helperText(__('tbtop-cms::redirects.helpers.from_path')),
+            $s->text('to_path')->label(__('tbtop-cms::redirects.fields.to_path'))->required()
+                ->helperText(__('tbtop-cms::redirects.helpers.to_path')),
+            $s->select('locale')->label(__('tbtop-cms::redirects.fields.locale'))->options(RedirectFormOptions::locales()),
+            $s->select('status_code')->label(__('tbtop-cms::redirects.fields.status_code'))->required()
+                ->options(RedirectFormOptions::statuses()),
         ];
     }
 
@@ -55,7 +56,7 @@ class RedirectForm
         return [
             'from_path' => $redirect->from_path,
             'to_path' => $redirect->to_path,
-            'locale' => $redirect->locale ?? '',
+            'locale' => $redirect->locale ?? RedirectFormOptions::ALL_LOCALES,
             'status_code' => (string) $redirect->status_code,
         ];
     }
@@ -69,6 +70,6 @@ class RedirectForm
     {
         $value = is_string($value) ? trim($value) : '';
 
-        return $value === '' ? null : $value;
+        return $value === '' || $value === RedirectFormOptions::ALL_LOCALES ? null : $value;
     }
 }

@@ -8,10 +8,16 @@ use Tbtop\Cms\Language\Languages;
 
 class RedirectFormOptions
 {
+    /**
+     * Sentinel for "applies to every locale" — the client Select forbids
+     * empty option values, so null is encoded as this constant in forms.
+     */
+    public const ALL_LOCALES = 'all';
+
     /** @return list<array{value: string, label: string}> */
     public static function locales(): array
     {
-        $options = [['value' => '', 'label' => 'All locales']];
+        $options = [['value' => self::ALL_LOCALES, 'label' => __('tbtop-cms::redirects.locale_all')]];
 
         foreach (app(Languages::class)->frontendActive() as $row) {
             $options[] = ['value' => $row['locale'], 'label' => $row['name']];
@@ -24,8 +30,8 @@ class RedirectFormOptions
     public static function statuses(): array
     {
         return [
-            ['value' => '301', 'label' => '301 Permanent'],
-            ['value' => '302', 'label' => '302 Temporary'],
+            ['value' => '301', 'label' => __('tbtop-cms::redirects.statuses.301')],
+            ['value' => '302', 'label' => __('tbtop-cms::redirects.statuses.302')],
         ];
     }
 }

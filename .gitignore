@@ -11,4 +11,4 @@ node_modules
 phpunit.xml
 phpstan.neon
 vendor
-/workbench/public/hot
+/workbench/public/

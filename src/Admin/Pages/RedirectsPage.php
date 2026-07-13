@@ -9,7 +9,6 @@ use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Actions\DeleteAction;
-use Tbtop\Admin\Dsl\Actions\EditAction;
 use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -37,7 +36,30 @@ class RedirectsPage extends AdminPage
     #[\Override]
     public function title(): string
     {
-        return 'Redirects';
+        return __('tbtop-cms::redirects.title');
+    }
+
+    #[\Override]
+    public function subtitle(): ?string
+    {
+        return __('tbtop-cms::redirects.subtitle');
+    }
+
+    /** @return list<array{label: string, url?: string}> */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::nav.groups.content')],
+            ['label' => __('tbtop-cms::nav.items.redirects')],
+        ];
+    }
+
+    /** @return list<ActionBuilder|Node> */
+    #[\Override]
+    public function headerActions(S $s): array
+    {
+        return [$this->createAction($s)];
     }
 
     public function view(S $s): Node
@@ -45,16 +67,21 @@ class RedirectsPage extends AdminPage
         $table = $s->table('redirects')
             ->query($this->query(...))
             ->columns([
-                Column::make('from_path')->label('From')->searchable(),
-                Column::make('to_path')->label('To')->searchable(),
-                Column::make('locale')->label('Locale'),
-                Column::make('status_code')->label('Status'),
-                Column::make('is_auto')->label('Auto')->boolean(),
+                Column::make('from_path')->label(__('tbtop-cms::redirects.columns.from'))->searchable(),
+                Column::make('to_path')->label(__('tbtop-cms::redirects.columns.to'))->searchable(),
+                Column::make('locale')->label(__('tbtop-cms::redirects.columns.locale'))
+                    ->formatUsing($this->localeLabel(...)),
+                Column::make('status_code')->label(__('tbtop-cms::redirects.columns.status'))
+                    ->formatUsing($this->statusLabel(...)),
+                Column::make('is_auto')->label(__('tbtop-cms::redirects.columns.auto'))->boolean(),
             ])
             ->searchable(['from_path', 'to_path'])
             ->defaultSort('from_path', 'asc')
-            ->emptyState('No redirects yet', 'Create your first redirect.', 'arrow-right')
-            ->headerActions([$this->createAction($s)])
+            ->emptyState(
+                __('tbtop-cms::redirects.empty.title'),
+                __('tbtop-cms::redirects.empty.description'),
+                'arrow-right',
+            )
             ->rowActions([$this->editAction($s), $this->deleteAction($s)]);
 
         return $s->stack([$table]);
@@ -68,44 +95,81 @@ class RedirectsPage extends AdminPage
 
     private function createAction(S $s): ActionBuilder
     {
+        $cancel = $s->action('redirectCreateCancel')->label(__('tbtop-cms::redirects.actions.cancel'))
+            ->handle(static fn (): Effects => Effects::make()->closeModal());
+        $create = $s->action('redirectCreateSave')->label(__('tbtop-cms::redirects.actions.create'))->color('primary')
+            ->handle($this->create(...), needs: ['form']);
+
         $form = $s->form('redirectCreate', [
             ...RedirectForm::fields($s),
-            $s->actionsRow([
-                $s->action('redirectCreateSave')->label('Create')->color('primary')
-                    ->handle($this->create(...), needs: ['form']),
-                $s->action('redirectCreateCancel')->label('Cancel')
-                    ->handle(static fn (): Effects => Effects::make()->closeModal()),
-            ]),
+            $s->flex([$s->spacer(), $cancel, $create], justify: 'end'),
         ]);
 
-        return $s->action('redirectCreate')->label('New redirect')->modal('New redirect', $form);
+        return $s->action('redirectCreate')->label(__('tbtop-cms::redirects.actions.new'))
+            ->icon('plus')->color('primary')
+            ->modal(__('tbtop-cms::redirects.actions.create_title'), $form);
     }
 
+    /**
+     * Hand-built instead of EditAction::make: the prebuilt helper hardcodes
+     * English Save/Cancel and a left-aligned actionsRow — this mirrors the
+     * create modal (localized labels, footer flex justify:end) instead.
+     */
     private function editAction(S $s): ActionBuilder
     {
-        return EditAction::make(
-            $s,
-            $s->form('redirectEdit', RedirectForm::fields($s)),
-            static fn (ActionCtx $ctx): array => RedirectForm::loadRow((int) ($ctx->row['id'] ?? 0)),
-            static fn (ActionCtx $ctx): Redirect => RedirectForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
-            name: 'redirectEdit',
-            title: 'Edit redirect',
-        );
+        $cancel = $s->action('redirectEditCancel')->label(__('tbtop-cms::redirects.actions.cancel'))
+            ->handle(static fn (): Effects => Effects::make()->closeModal());
+        $save = $s->action('redirectEditSave')->label(__('tbtop-cms::redirects.actions.save'))->color('primary')
+            ->handle($this->update(...), needs: ['row', 'form']);
+
+        $form = $s->form('redirectEdit', [
+            ...RedirectForm::fields($s),
+            $s->flex([$s->spacer(), $cancel, $save], justify: 'end'),
+        ]);
+
+        return $s->action('redirectEdit')->label(__('tbtop-cms::redirects.actions.edit'))
+            ->modal(__('tbtop-cms::redirects.actions.edit_title'), $form)
+            ->query(static fn (ActionCtx $ctx): array => RedirectForm::loadRow((int) ($ctx->row['id'] ?? 0)), needs: ['row']);
+    }
+
+    private function update(ActionCtx $ctx): Effects
+    {
+        RedirectForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0));
+
+        return Effects::make()->notify(__('tbtop-cms::redirects.actions.saved'))->closeModal()->refreshTable();
     }
 
     private function deleteAction(S $s): ActionBuilder
     {
         return DeleteAction::make(
             $s,
-            static fn (ActionCtx $ctx) => Redirect::query()->find($ctx->row['id'] ?? null)?->delete(),
+            static function (ActionCtx $ctx): Effects {
+                Redirect::query()->find($ctx->row['id'] ?? null)?->delete();
+
+                return Effects::make()->notify(__('tbtop-cms::redirects.actions.deleted'))->refreshTable();
+            },
             'redirectDelete',
-        );
+        )->label(__('tbtop-cms::redirects.actions.delete'))
+            ->confirm(__('tbtop-cms::redirects.actions.delete_title'), __('tbtop-cms::redirects.actions.delete_confirm'));
+    }
+
+    private function localeLabel(mixed $value): string
+    {
+        return $value === null || $value === '' ? __('tbtop-cms::redirects.locale_all') : (string) $value;
+    }
+
+    private function statusLabel(mixed $value): string
+    {
+        $key = 'tbtop-cms::redirects.statuses.' . $value;
+        $label = __($key);
+
+        return $label === $key ? (string) $value : $label;
     }
 
     private function create(ActionCtx $ctx): Effects
     {
         RedirectForm::save($ctx->form);
 
-        return Effects::make()->notify('Redirect created')->closeModal()->refreshTable();
+        return Effects::make()->notify(__('tbtop-cms::redirects.actions.created'))->closeModal()->refreshTable();
     }
 }
