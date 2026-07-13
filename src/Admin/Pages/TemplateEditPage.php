@@ -14,7 +14,7 @@ class TemplateEditPage extends TemplateFormPage
     #[\Override]
     public function title(): string
     {
-        return 'Edit template';
+        return __('tbtop-cms::templates.edit_title');
     }
 
     protected function templateId(): ?int

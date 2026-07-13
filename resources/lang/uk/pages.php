@@ -79,6 +79,8 @@ return [
         'deleted' => 'Сторінку видалено',
     ],
     'blocks' => [
+        'section_title' => 'Блоки',
+        'type' => 'Тип блоку',
         'active' => 'Активний',
         'sort' => 'Порядок',
         'add' => 'Додати :kind',

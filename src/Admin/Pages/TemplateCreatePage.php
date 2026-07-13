@@ -14,7 +14,7 @@ class TemplateCreatePage extends TemplateFormPage
     #[\Override]
     public function title(): string
     {
-        return 'New template';
+        return __('tbtop-cms::templates.create_title');
     }
 
     protected function templateId(): ?int

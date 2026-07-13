@@ -91,7 +91,7 @@ final class PageEditBlockTabs
         $body = $s->stack([
             ...$fields,
             $s->flex([
-                $s->checkbox("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
+                $s->boolean("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
                 $s->number("block_{$id}_sort")->label(__('tbtop-cms::pages.blocks.sort')),
             ], gap: 4, align: 'end'),
             $s->flex([self::removeAction($s, $page, $id), $s->spacer()]),
