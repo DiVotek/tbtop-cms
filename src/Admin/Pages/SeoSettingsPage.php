@@ -27,7 +27,23 @@ class SeoSettingsPage extends SettingsPageBase
     #[\Override]
     public function title(): string
     {
-        return 'SEO settings';
+        return __('tbtop-cms::settings.seo.title');
+    }
+
+    #[\Override]
+    public function subtitle(): ?string
+    {
+        return __('tbtop-cms::settings.seo.subtitle');
+    }
+
+    /** @return list<array{label: string, url?: string}> */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::nav.groups.settings')],
+            ['label' => $this->title()],
+        ];
     }
 
     /** @return array<string, string> */
@@ -45,10 +61,12 @@ class SeoSettingsPage extends SettingsPageBase
     protected function fields(S $s): array
     {
         return [
-            $s->text('seo_title_suffix')->label('Title suffix')->rules('nullable|max:255'),
-            $s->textarea('seo_default_description')->label('Default description')->rules('nullable|max:500'),
-            $s->media('seo_default_og_image')->label('Default OG image'),
-            $s->boolean('seo_indexing_enabled')->label('Allow search engines to index this site'),
+            $s->text('seo_title_suffix')->label(__('tbtop-cms::settings.seo.fields.title_suffix'))
+                ->placeholder(__('tbtop-cms::settings.seo.placeholders.title_suffix'))->rules('nullable|max:255'),
+            $s->textarea('seo_default_description')->label(__('tbtop-cms::settings.seo.fields.default_description'))
+                ->rules('nullable|max:500'),
+            $s->media('seo_default_og_image')->label(__('tbtop-cms::settings.seo.fields.default_og_image')),
+            $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled')),
         ];
     }
 }
