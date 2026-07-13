@@ -20,6 +20,7 @@ return [
     'fields' => [
         'name' => 'Назва',
         'locale' => 'Локаль',
+        'language' => 'Мова',
         'is_default' => 'Мова за замовчуванням',
         'is_admin_active' => 'Активна в адмінці',
         'is_frontend_active' => 'Активна на сайті',
@@ -27,9 +28,6 @@ return [
     ],
     'helpers' => [
         'locale' => 'Локаль не можна змінити після створення.',
-    ],
-    'placeholders' => [
-        'locale' => 'en',
     ],
     'create_title' => 'Нова мова',
     'edit_title' => 'Редагувати мову',
@@ -46,7 +44,7 @@ return [
         'delete_confirm' => 'Цю дію не можна скасувати.',
     ],
     'validation' => [
-        'locale_required' => 'Локаль обов\'язкова.',
         'locale_taken' => 'Мова з такою локаллю вже існує.',
+        'locale_unknown' => 'Невідома локаль — оберіть мову зі списку.',
     ],
 ];

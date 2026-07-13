@@ -7,23 +7,31 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Language\LocaleCatalog;
 use Tbtop\Cms\Language\Models\Language;
 
 class LanguageForm
 {
     /** @return list<Field> */
-    public static function fields(S $s, bool $isEdit = false): array
+    public static function createFields(S $s): array
     {
-        $locale = $s->text('locale')->label(__('tbtop-cms::languages.fields.locale'))->required()->rules('max:5')
-            ->placeholder(__('tbtop-cms::languages.placeholders.locale'));
+        return [
+            $s->select('locale')->label(__('tbtop-cms::languages.fields.language'))->required()->searchable()
+                ->options(self::availableLocaleOptions()),
+            $s->boolean('is_default')->label(__('tbtop-cms::languages.fields.is_default')),
+            $s->boolean('is_admin_active')->label(__('tbtop-cms::languages.fields.is_admin_active')),
+            $s->boolean('is_frontend_active')->label(__('tbtop-cms::languages.fields.is_frontend_active')),
+            $s->number('sort_order')->label(__('tbtop-cms::languages.fields.sort_order')),
+        ];
+    }
 
-        if ($isEdit) {
-            $locale->meta('disabled', true)->helperText(__('tbtop-cms::languages.helpers.locale'));
-        }
-
+    /** @return list<Field> */
+    public static function editFields(S $s): array
+    {
         return [
             $s->text('name')->label(__('tbtop-cms::languages.fields.name'))->required(),
-            $locale,
+            $s->text('locale')->label(__('tbtop-cms::languages.fields.locale'))->required()->rules('max:5')
+                ->meta('disabled', true)->helperText(__('tbtop-cms::languages.helpers.locale')),
             $s->boolean('is_default')->label(__('tbtop-cms::languages.fields.is_default')),
             $s->boolean('is_admin_active')->label(__('tbtop-cms::languages.fields.is_admin_active')),
             $s->boolean('is_frontend_active')->label(__('tbtop-cms::languages.fields.is_frontend_active')),
@@ -36,17 +44,19 @@ class LanguageForm
     {
         $language = $id !== null ? Language::query()->findOrFail($id) : new Language;
         $language->fill([
-            'name' => (string) ($form['name'] ?? ''),
             'is_default' => (bool) ($form['is_default'] ?? false),
             'is_admin_active' => (bool) ($form['is_admin_active'] ?? false),
             'is_frontend_active' => (bool) ($form['is_frontend_active'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
         ]);
 
-        if (! $language->exists) {
+        if ($language->exists) {
+            $language->name = (string) ($form['name'] ?? $language->name);
+        } else {
             $locale = (string) ($form['locale'] ?? '');
-            self::guardLocale($locale);
+            $name = self::guardLocale($locale);
             $language->locale = $locale;
+            $language->name = $name;
         }
 
         $language->save();
@@ -54,15 +64,31 @@ class LanguageForm
         return $language;
     }
 
-    private static function guardLocale(string $locale): void
+    /** @return list<array{value: string, label: string}> */
+    private static function availableLocaleOptions(): array
     {
-        if ($locale === '') {
-            throw ValidationException::withMessages(['locale' => __('tbtop-cms::languages.validation.locale_required')]);
+        $taken = Language::query()->pluck('locale')->all();
+
+        return array_values(array_filter(
+            LocaleCatalog::options(),
+            static fn (array $option): bool => ! in_array($option['value'], $taken, true),
+        ));
+    }
+
+    /** Validates the locale against the catalog and uniqueness, returning its native name. */
+    private static function guardLocale(string $locale): string
+    {
+        $name = LocaleCatalog::name($locale);
+
+        if ($name === null) {
+            throw ValidationException::withMessages(['locale' => __('tbtop-cms::languages.validation.locale_unknown')]);
         }
 
         if (Language::query()->where('locale', $locale)->exists()) {
             throw ValidationException::withMessages(['locale' => __('tbtop-cms::languages.validation.locale_taken')]);
         }
+
+        return $name;
     }
 
     /** @return array<string, mixed> */

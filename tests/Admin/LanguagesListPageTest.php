@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Language\LocaleCatalog;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
@@ -96,4 +97,19 @@ it('serializes the boolean flag fields with kind boolean in the create form', fu
     expect($byName['is_default']['kind'])->toBe('boolean')
         ->and($byName['is_admin_active']['kind'])->toBe('boolean')
         ->and($byName['is_frontend_active']['kind'])->toBe('boolean');
+});
+
+it('offers a searchable locale select in the create form, populated from the catalog minus taken locales', function (): void {
+    $byName = array_column(languageCreateFormChildren(), null, 'name');
+    $localeField = $byName['locale'];
+
+    expect($localeField['kind'])->toBe('select')
+        ->and($localeField['options']['searchable'])->toBeTrue();
+
+    $options = $localeField['options']['options'];
+    $values = array_column($options, 'value');
+
+    expect($values)->not->toContain('en')
+        ->and($values)->toContain('uk')
+        ->and(collect($options)->firstWhere('value', 'uk')['label'])->toBe(LocaleCatalog::name('uk') . ' (uk)');
 });

@@ -20,6 +20,7 @@ return [
     'fields' => [
         'name' => 'Name',
         'locale' => 'Locale',
+        'language' => 'Language',
         'is_default' => 'Default language',
         'is_admin_active' => 'Active in admin',
         'is_frontend_active' => 'Active on site',
@@ -27,9 +28,6 @@ return [
     ],
     'helpers' => [
         'locale' => 'Locale cannot be changed after creation.',
-    ],
-    'placeholders' => [
-        'locale' => 'en',
     ],
     'create_title' => 'New language',
     'edit_title' => 'Edit language',
@@ -46,7 +44,7 @@ return [
         'delete_confirm' => 'This cannot be undone.',
     ],
     'validation' => [
-        'locale_required' => 'Locale is required.',
         'locale_taken' => 'A language with this locale already exists.',
+        'locale_unknown' => 'Unknown locale — pick a language from the list.',
     ],
 ];
