@@ -81,3 +81,116 @@ it('clears the failure count on a successful login', function (): void {
 
     expect(RateLimiter::attempts('a@example.com|127.0.0.1'))->toBe(0);
 });
+
+it('carries the page title and a single breadcrumb from translations', function (): void {
+    $response = test()->get('/admin/login', ['X-Inertia' => 'true'])->assertOk();
+
+    expect($response->json('props.title'))->toBe(__('tbtop-cms::login.title'))
+        ->and($response->json('props.breadcrumbs'))->toBe([
+            ['label' => __('tbtop-cms::login.title')],
+        ]);
+});
+
+it('labels fields from translations and does not duplicate the sign-in heading', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $texts = loginCollectByKind($structure, 'displayText');
+    $headings = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['content'] ?? null) === __('tbtop-cms::login.title')));
+    expect($headings)->toHaveCount(1);
+
+    $labels = loginFieldLabels($structure);
+    expect($labels['email'])->toBe(__('tbtop-cms::login.fields.email'))
+        ->and($labels['password'])->toBe(__('tbtop-cms::login.fields.password'))
+        ->and($labels['remember'])->toBe(__('tbtop-cms::login.fields.remember'));
+});
+
+it('renders the sign-in button labeled from translations', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $actions = loginCollectByKind($structure, 'action');
+    $signIn = collect($actions)->firstWhere('name', 'signin');
+
+    expect($signIn)->not->toBeNull()
+        ->and($signIn['options']['label'] ?? null)->toBe(__('tbtop-cms::login.actions.sign_in'));
+});
+
+// Regression: "remember me" must stay a checkbox, matching login-form
+// convention — not a boolean field (which renders as a switch).
+it('keeps remember-me a checkbox, not a boolean switch', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $remember = loginFindFieldByName($structure, 'remember');
+    expect($remember)->not->toBeNull()
+        ->and($remember['kind'])->toBe('checkbox');
+});
+
+it('renders the panel brand in the card, falling back to "Admin" when unset', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $texts = loginCollectByKind($structure, 'displayText');
+    $brand = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['variant'] ?? null) === 'heading'));
+
+    expect($brand)->toHaveCount(1)
+        ->and($brand[0]['options']['content'] ?? null)->toBe('Admin');
+});
+
+/** @param  array<string, mixed>  $node @return array<string, mixed>|null */
+function loginFindFieldByName(array $node, string $name): ?array
+{
+    if (($node['name'] ?? null) === $name) {
+        return $node;
+    }
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (is_array($child)) {
+            $found = loginFindFieldByName($child, $name);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @param  array<string, mixed>  $node
+ * @return array<string, string>
+ */
+function loginFieldLabels(array $node): array
+{
+    $labels = [];
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (! is_array($child)) {
+            continue;
+        }
+        if (isset($child['name'], $child['options']['label'])) {
+            $labels[$child['name']] = $child['options']['label'];
+        }
+        $labels = [...$labels, ...loginFieldLabels($child)];
+    }
+
+    return $labels;
+}
+
+/**
+ * @param  array<string, mixed>  $node
+ * @return list<array<string, mixed>>
+ */
+function loginCollectByKind(array $node, string $kind): array
+{
+    $out = [];
+    if (($node['kind'] ?? null) === $kind) {
+        $out[] = $node;
+    }
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (is_array($child)) {
+            $out = [...$out, ...loginCollectByKind($child, $kind)];
+        }
+    }
+
+    return $out;
+}
