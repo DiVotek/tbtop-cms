@@ -16,8 +16,8 @@ class TemplateForm
     public static function fields(S $s): array
     {
         return [
-            $s->section(['title' => 'Template'], [
-                $s->text('name')->label('Name')->required(),
+            $s->section(['title' => __('tbtop-cms::templates.sections.template')], [
+                $s->text('name')->label(__('tbtop-cms::templates.fields.name'))->required(),
             ]),
             BlockContentField::make($s),
         ];

@@ -6,10 +6,12 @@ namespace Tbtop\Cms\Admin\Pages;
 
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
+use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Cms\Admin\Pages\Support\TemplateForm;
+use Tbtop\Cms\Admin\Support\EditFooter;
 
 /**
  * Shared block-repeater editor for templates. Create and edit are dedicated
@@ -20,16 +22,25 @@ abstract class TemplateFormPage extends Page
 {
     abstract protected function templateId(): ?int;
 
+    /** @return list<array{label: string, url?: string}> */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::nav.groups.design')],
+            ['label' => __('tbtop-cms::nav.items.templates'), 'url' => route('tbtop.cms.templates-page')],
+            ['label' => $this->title()],
+        ];
+    }
+
     public function view(S $s): Node
     {
         $id = $this->templateId();
+        $footer = EditFooter::build($s, $this->listUrl(), $this->saveAction($s));
 
         $form = $s->form('templateEditor', [
             ...TemplateForm::fields($s),
-            $s->actionsRow([
-                $s->action('save')->label('Save')->color('primary')->keybinding('mod+s')->submit(),
-                $s->action('cancel')->label('Cancel')->visit($this->listUrl()),
-            ]),
+            $footer,
         ])
             ->record($id !== null ? TemplateForm::loadRow($id) : [])
             ->onSubmit($this->save(...));
@@ -37,11 +48,17 @@ abstract class TemplateFormPage extends Page
         return $s->stack([$form]);
     }
 
+    private function saveAction(S $s): ActionBuilder
+    {
+        return $s->action('save')->label(__('tbtop-cms::templates.actions.save'))
+            ->color('primary')->keybinding('mod+s')->submit('templateEditor');
+    }
+
     private function save(ActionCtx $ctx): Effects
     {
         TemplateForm::save($ctx->form, $this->templateId());
 
-        return Effects::make()->notify('Template saved')->redirect($this->listUrl());
+        return Effects::make()->notify(__('tbtop-cms::templates.actions.saved'))->redirect($this->listUrl());
     }
 
     private function listUrl(): string
