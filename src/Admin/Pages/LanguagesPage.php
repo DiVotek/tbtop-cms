@@ -37,7 +37,30 @@ class LanguagesPage extends AdminPage
     #[\Override]
     public function title(): string
     {
-        return 'Languages';
+        return __('tbtop-cms::languages.title');
+    }
+
+    #[\Override]
+    public function subtitle(): ?string
+    {
+        return __('tbtop-cms::languages.subtitle');
+    }
+
+    /** @return list<array{label: string, url?: string}> */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::nav.groups.settings')],
+            ['label' => __('tbtop-cms::nav.items.languages')],
+        ];
+    }
+
+    /** @return list<ActionBuilder|Node> */
+    #[\Override]
+    public function headerActions(S $s): array
+    {
+        return [$this->createAction($s)];
     }
 
     public function view(S $s): Node
@@ -45,17 +68,20 @@ class LanguagesPage extends AdminPage
         $table = $s->table('languages')
             ->query(static fn (): Builder => Language::query())
             ->columns([
-                Column::make('name')->label('Name')->searchable(),
-                Column::make('locale')->label('Locale')->searchable(),
-                Column::make('is_default')->label('Default')->boolean(),
-                Column::make('is_admin_active')->label('Admin')->boolean(),
-                Column::make('is_frontend_active')->label('Frontend')->boolean(),
-                Column::make('sort_order')->label('Order'),
+                Column::make('name')->label(__('tbtop-cms::languages.columns.name'))->searchable(),
+                Column::make('locale')->label(__('tbtop-cms::languages.columns.locale'))->searchable(),
+                Column::make('is_default')->label(__('tbtop-cms::languages.columns.default'))->boolean(),
+                Column::make('is_admin_active')->label(__('tbtop-cms::languages.columns.admin'))->boolean(),
+                Column::make('is_frontend_active')->label(__('tbtop-cms::languages.columns.frontend'))->boolean(),
+                Column::make('sort_order')->label(__('tbtop-cms::languages.columns.order')),
             ])
             ->searchable(['name', 'locale'])
             ->defaultSort('sort_order', 'asc')
-            ->emptyState('No languages yet', 'Add your first language.', 'languages')
-            ->headerActions([$this->createAction($s)])
+            ->emptyState(
+                __('tbtop-cms::languages.empty.title'),
+                __('tbtop-cms::languages.empty.description'),
+                'languages',
+            )
             ->rowActions([$this->editAction($s), $this->deleteAction($s)]);
 
         return $s->stack([$table]);
@@ -63,28 +89,30 @@ class LanguagesPage extends AdminPage
 
     private function createAction(S $s): ActionBuilder
     {
+        $cancel = $s->action('languageCreateCancel')->label(__('tbtop-cms::languages.actions.cancel'))
+            ->handle(static fn (): Effects => Effects::make()->closeModal());
+        $create = $s->action('languageCreateSave')->label(__('tbtop-cms::languages.actions.create'))->color('primary')
+            ->handle($this->create(...), needs: ['form']);
+
         $form = $s->form('languageCreate', [
-            ...LanguageForm::fields($s),
-            $s->actionsRow([
-                $s->action('languageCreateSave')->label('Create')->color('primary')
-                    ->handle($this->create(...), needs: ['form']),
-                $s->action('languageCreateCancel')->label('Cancel')
-                    ->handle(static fn (): Effects => Effects::make()->closeModal()),
-            ]),
+            ...LanguageForm::createFields($s),
+            $s->flex([$s->spacer(), $cancel, $create], justify: 'end'),
         ]);
 
-        return $s->action('languageCreate')->label('New language')->modal('New language', $form);
+        return $s->action('languageCreate')->label(__('tbtop-cms::languages.actions.new'))
+            ->icon('plus')->color('primary')
+            ->modal(__('tbtop-cms::languages.create_title'), $form);
     }
 
     private function editAction(S $s): ActionBuilder
     {
         return EditAction::make(
             $s,
-            $s->form('languageEdit', LanguageForm::fields($s, isEdit: true)),
+            $s->form('languageEdit', LanguageForm::editFields($s)),
             static fn (ActionCtx $ctx): array => LanguageForm::load((int) ($ctx->row['id'] ?? 0)),
             static fn (ActionCtx $ctx): Language => LanguageForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
             name: 'languageEdit',
-            title: 'Edit language',
+            title: __('tbtop-cms::languages.edit_title'),
         );
     }
 
@@ -92,15 +120,21 @@ class LanguagesPage extends AdminPage
     {
         return DeleteAction::make(
             $s,
-            static fn (ActionCtx $ctx) => Language::query()->find($ctx->row['id'] ?? null)?->delete(),
+            static function (ActionCtx $ctx): Effects {
+                Language::query()->find($ctx->row['id'] ?? null)?->delete();
+
+                return Effects::make()->notify(__('tbtop-cms::languages.actions.deleted'))->refreshTable();
+            },
             'languageDelete',
-        )->hiddenIf('is_default', '=', true);
+        )->label(__('tbtop-cms::languages.actions.delete'))
+            ->confirm(__('tbtop-cms::languages.actions.delete_title'), __('tbtop-cms::languages.actions.delete_confirm'))
+            ->hiddenIf('is_default', '=', true);
     }
 
     private function create(ActionCtx $ctx): Effects
     {
         LanguageForm::save($ctx->form);
 
-        return Effects::make()->notify('Language created')->closeModal()->refreshTable();
+        return Effects::make()->notify(__('tbtop-cms::languages.actions.created'))->closeModal()->refreshTable();
     }
 }
