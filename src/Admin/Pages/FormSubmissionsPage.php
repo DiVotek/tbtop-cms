@@ -38,7 +38,27 @@ class FormSubmissionsPage extends AdminPage
     #[\Override]
     public function title(): string
     {
-        return 'Form submissions';
+        return __('tbtop-cms::form-submissions.title');
+    }
+
+    #[\Override]
+    public function subtitle(): ?string
+    {
+        return __('tbtop-cms::form-submissions.subtitle');
+    }
+
+    /**
+     * Reuses the top-bar Inbox label — this page has no nav entry of its
+     * own, it's only ever reached via that button.
+     *
+     * @return list<array{label: string, url?: string}>
+     */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::chrome.inbox.label')],
+        ];
     }
 
     public function view(S $s): Node
@@ -46,24 +66,34 @@ class FormSubmissionsPage extends AdminPage
         $table = $s->table('formSubmissions')
             ->query($this->query(...))
             ->columns([
-                Column::make('lead_status')->label('Status')->badge([
-                    LeadStatus::New->value => Color::Danger,
-                    LeadStatus::Read->value => Color::Info,
-                    LeadStatus::Processed->value => Color::Success,
-                    LeadStatus::Discarded->value => Color::Gray,
-                ]),
-                Column::make('status')->label('Delivery')->badge([
-                    SubmissionStatus::Pending->value => Color::Warning,
-                    SubmissionStatus::Handled->value => Color::Success,
-                    SubmissionStatus::Failed->value => Color::Danger,
-                ]),
-                Column::make('kind')->label('Form'),
-                Column::make('page')->label('Page')->formatUsing($this->formatPage(...)),
-                Column::make('locale')->label('Locale'),
-                Column::make('created_at')->label('Submitted')->datetime(),
+                Column::make('lead_status')->label(__('tbtop-cms::form-submissions.columns.status'))
+                    ->formatUsing($this->leadStatusLabel(...))
+                    ->badge([
+                        __('tbtop-cms::form-submissions.statuses.new') => Color::Danger,
+                        __('tbtop-cms::form-submissions.statuses.read') => Color::Info,
+                        __('tbtop-cms::form-submissions.statuses.processed') => Color::Success,
+                        __('tbtop-cms::form-submissions.statuses.discarded') => Color::Gray,
+                    ]),
+                Column::make('status')->label(__('tbtop-cms::form-submissions.columns.delivery'))
+                    ->formatUsing($this->deliveryLabel(...))
+                    ->badge([
+                        __('tbtop-cms::form-submissions.delivery.pending') => Color::Warning,
+                        __('tbtop-cms::form-submissions.delivery.handled') => Color::Success,
+                        __('tbtop-cms::form-submissions.delivery.failed') => Color::Danger,
+                    ]),
+                Column::make('kind')->label(__('tbtop-cms::form-submissions.columns.form')),
+                Column::make('page')->label(__('tbtop-cms::form-submissions.columns.page'))
+                    ->formatUsing($this->formatPage(...)),
+                Column::make('locale')->label(__('tbtop-cms::form-submissions.columns.locale')),
+                Column::make('created_at')->label(__('tbtop-cms::form-submissions.columns.submitted'))
+                    ->datetime(__('tbtop-cms::form-submissions.date_format'))->muted(),
             ])
             ->defaultSort('created_at', 'desc')
-            ->emptyState('No submissions yet', 'Form submissions will appear here.', 'inbox')
+            ->emptyState(
+                __('tbtop-cms::form-submissions.empty.title'),
+                __('tbtop-cms::form-submissions.empty.description'),
+                'inbox',
+            )
             ->rowActions([$this->viewAction($s), $this->retryAction($s)]);
 
         return $s->stack([$table]);
@@ -75,11 +105,27 @@ class FormSubmissionsPage extends AdminPage
         return FormSubmission::query()->with('page.slugs');
     }
 
+    private function leadStatusLabel(mixed $value): string
+    {
+        $key = 'tbtop-cms::form-submissions.statuses.' . $value;
+        $label = __($key);
+
+        return $label === $key ? (string) $value : $label;
+    }
+
+    private function deliveryLabel(mixed $value): string
+    {
+        $key = 'tbtop-cms::form-submissions.delivery.' . $value;
+        $label = __($key);
+
+        return $label === $key ? (string) $value : $label;
+    }
+
     /** @param  array<string, mixed>|null  $page */
     private function formatPage(?array $page): string
     {
         if ($page === null) {
-            return '(page deleted)';
+            return __('tbtop-cms::form-submissions.values.page_deleted');
         }
 
         $name = $this->firstLocaleValue($page['name'] ?? null)
@@ -90,7 +136,9 @@ class FormSubmissionsPage extends AdminPage
 
         $path = $page['slugs'][0]['path'] ?? null;
 
-        return $path !== null ? (string) $path : "Page #{$page['id']}";
+        return $path !== null
+            ? (string) $path
+            : __('tbtop-cms::form-submissions.values.page_number', ['id' => $page['id']]);
     }
 
     private function firstLocaleValue(mixed $raw): ?string
@@ -114,16 +162,17 @@ class FormSubmissionsPage extends AdminPage
 
     private function viewAction(S $s): ActionBuilder
     {
+        $close = $s->action('viewPayloadClose')->label(__('tbtop-cms::form-submissions.actions.close'))
+            ->handle(static fn (): Effects => Effects::make()->closeModal());
+
         $form = $s->form('submissionPayload', [
-            $s->keyvalue('payload')->label('Payload')->disabledIf('payload', 'not empty'),
-            $s->actionsRow([
-                $s->action('viewPayloadClose')->label('Close')
-                    ->handle(static fn (): Effects => Effects::make()->closeModal()),
-            ]),
+            $s->keyvalue('payload')->label(__('tbtop-cms::form-submissions.fields.payload'))
+                ->disabledIf('payload', 'not empty'),
+            $s->flex([$s->spacer(), $close], justify: 'end'),
         ]);
 
-        return $s->action('viewPayload')->label('View payload')
-            ->modal('Submission payload', $form)
+        return $s->action('viewPayload')->label(__('tbtop-cms::form-submissions.actions.view'))
+            ->modal(__('tbtop-cms::form-submissions.actions.view_title'), $form)
             ->query($this->loadPayload(...), needs: ['row']);
     }
 
@@ -151,9 +200,12 @@ class FormSubmissionsPage extends AdminPage
 
     private function retryAction(S $s): ActionBuilder
     {
-        return $s->action('retry')->label('Retry')
+        // hiddenIf evaluates client-side against the projected row, where
+        // status is already the translated delivery label — compare to it,
+        // not to the raw enum value.
+        return $s->action('retry')->label(__('tbtop-cms::form-submissions.actions.retry'))
             ->handle($this->retry(...), needs: ['row'])
-            ->hiddenIf('status', '!=', SubmissionStatus::Failed->value);
+            ->hiddenIf('status', '!=', $this->deliveryLabel(SubmissionStatus::Failed->value));
     }
 
     private function retry(ActionCtx $ctx): Effects
@@ -164,7 +216,7 @@ class FormSubmissionsPage extends AdminPage
         $submission->refresh();
 
         return $submission->status === SubmissionStatus::Handled
-            ? Effects::make()->notify('Submission retried successfully')->refreshTable()
+            ? Effects::make()->notify(__('tbtop-cms::form-submissions.actions.retried'))->refreshTable()
             : Effects::make()->notify((string) $submission->error, 'error')->refreshTable();
     }
 }
