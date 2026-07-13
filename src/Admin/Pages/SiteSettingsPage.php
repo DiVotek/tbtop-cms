@@ -61,8 +61,8 @@ class SiteSettingsPage extends SettingsPageBase
     {
         return [
             $s->text('site_name')->label(__('tbtop-cms::settings.site.fields.site_name'))->required()->rules('max:255'),
-            $s->media('site_logo')->label(__('tbtop-cms::settings.site.fields.logo')),
-            $s->media('site_favicon')->label(__('tbtop-cms::settings.site.fields.favicon')),
+            $s->media('site_logo')->label(__('tbtop-cms::settings.site.fields.logo'))->variant('preview'),
+            $s->media('site_favicon')->label(__('tbtop-cms::settings.site.fields.favicon'))->variant('preview'),
         ];
     }
 }
