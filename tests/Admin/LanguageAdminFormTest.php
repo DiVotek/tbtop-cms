@@ -70,3 +70,21 @@ it('rejects creating a language with a blank locale', function (): void {
         'is_frontend_active' => false,
     ]);
 })->throws(ValidationException::class);
+
+it('restores a soft-deleted language when its locale is picked again', function (): void {
+    $original = LanguageForm::save(['locale' => 'de', 'sort_order' => 3]);
+    $original->delete();
+
+    $restored = LanguageForm::save([
+        'locale' => 'de',
+        'is_admin_active' => true,
+        'is_frontend_active' => true,
+        'sort_order' => 7,
+    ]);
+
+    expect($restored->id)->toBe($original->id)
+        ->and($restored->trashed())->toBeFalse()
+        ->and($restored->is_frontend_active)->toBeTrue()
+        ->and($restored->sort_order)->toBe(7)
+        ->and(Language::query()->where('locale', 'de')->count())->toBe(1);
+});

@@ -42,22 +42,28 @@ class LanguageForm
     /** @param array<string, mixed> $form */
     public static function save(array $form, ?int $id = null): Language
     {
-        $language = $id !== null ? Language::query()->findOrFail($id) : new Language;
+        if ($id !== null) {
+            $language = Language::query()->findOrFail($id);
+            $language->name = (string) ($form['name'] ?? $language->name);
+        } else {
+            $locale = (string) ($form['locale'] ?? '');
+            $name = self::guardLocale($locale);
+            // Soft-deleted rows still hold the unique locale index: re-picking
+            // a deleted locale revives that row instead of inserting a duplicate.
+            $language = Language::onlyTrashed()->where('locale', $locale)->first() ?? new Language;
+            if ($language->trashed()) {
+                $language->restore();
+            }
+            $language->locale = $locale;
+            $language->name = $name;
+        }
+
         $language->fill([
             'is_default' => (bool) ($form['is_default'] ?? false),
             'is_admin_active' => (bool) ($form['is_admin_active'] ?? false),
             'is_frontend_active' => (bool) ($form['is_frontend_active'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
         ]);
-
-        if ($language->exists) {
-            $language->name = (string) ($form['name'] ?? $language->name);
-        } else {
-            $locale = (string) ($form['locale'] ?? '');
-            $name = self::guardLocale($locale);
-            $language->locale = $locale;
-            $language->name = $name;
-        }
 
         $language->save();
 
