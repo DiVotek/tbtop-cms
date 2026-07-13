@@ -127,7 +127,7 @@ it('keeps remember-me a checkbox, not a boolean switch', function (): void {
         ->and($remember['kind'])->toBe('checkbox');
 });
 
-it('renders the panel brand in the card, falling back to "Admin" when unset', function (): void {
+it('renders the panel brand in the card, falling back to the shared nav.title', function (): void {
     $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
 
@@ -135,7 +135,7 @@ it('renders the panel brand in the card, falling back to "Admin" when unset', fu
     $brand = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['variant'] ?? null) === 'heading'));
 
     expect($brand)->toHaveCount(1)
-        ->and($brand[0]['options']['content'] ?? null)->toBe('Admin');
+        ->and($brand[0]['options']['content'] ?? null)->toBe(__('tbtop-admin::admin.nav.title'));
 });
 
 /** @param  array<string, mixed>  $node @return array<string, mixed>|null */

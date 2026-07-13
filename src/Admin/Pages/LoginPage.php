@@ -78,7 +78,9 @@ class LoginPage extends Page
 
     private function brand(): string
     {
-        return CurrentPanel::current()?->brand() ?? 'Admin';
+        // Same fallback chain as the topbar logo (chromeBlocks: brand ?? nav.title),
+        // so the login card and the shell never show different product names.
+        return CurrentPanel::current()?->brand() ?? __('tbtop-admin::admin.nav.title');
     }
 
     private function authenticate(ActionCtx $ctx): Effects
