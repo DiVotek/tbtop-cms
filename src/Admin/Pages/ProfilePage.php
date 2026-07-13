@@ -66,18 +66,22 @@ class ProfilePage extends Page
         $footer = EditFooter::build($s, $this->selfUrl(), $this->saveAction($s));
 
         $form = $s->form('profile', [
-            $s->section(['title' => __('tbtop-cms::profile.title'), 'variant' => 'card'], [
+            $s->section(['title' => __('tbtop-cms::profile.sections.personal'), 'variant' => 'card'], [
                 $s->text('display_name')->label(__('tbtop-cms::profile.fields.display_name'))->rules('nullable|max:255'),
+                // The email belongs to the host app's user model — shown for
+                // context, never editable from the cms profile.
+                $s->text('email')->label(__('tbtop-cms::profile.fields.email'))->meta('disabled', true),
+            ]),
+            $s->section(['title' => __('tbtop-cms::profile.sections.preferences'), 'variant' => 'card'], [
                 $s->select('locale')->label(__('tbtop-cms::profile.fields.locale'))
                     ->options($options)->rules('nullable|in:' . implode(',', $locales)),
-                $s->media('avatar_media_id')->label(__('tbtop-cms::profile.fields.avatar')),
             ]),
             $footer,
         ])
             ->record([
                 'display_name' => $profile->display_name,
+                'email' => $this->userEmail(),
                 'locale' => $profile->locale,
-                'avatar_media_id' => $profile->avatar_media_id,
             ])
             ->onSubmit($this->save(...));
 
@@ -96,7 +100,6 @@ class ProfilePage extends Page
         $profile->forceFill([
             'display_name' => $ctx->form['display_name'] ?? null,
             'locale' => $ctx->form['locale'] ?? null,
-            'avatar_media_id' => $ctx->form['avatar_media_id'] ?? null,
         ])->save();
 
         if (is_string($profile->locale) && $profile->locale !== '') {
@@ -117,5 +120,13 @@ class ProfilePage extends Page
         $userId = auth()->guard($guard)->user()?->getAuthIdentifier();
 
         return CmsUserProfile::query()->firstOrNew(['user_id' => $userId]);
+    }
+
+    private function userEmail(): string
+    {
+        $guard = (string) config('tbtop-cms.admin.guard', 'web');
+        $user = auth()->guard($guard)->user();
+
+        return is_object($user) && isset($user->email) ? (string) $user->email : '';
     }
 }

@@ -30,7 +30,7 @@ class SeoResolver
             'title' => $this->title($metaTitle),
             'description' => $metaDescription,
             'canonical' => $this->canonical($page, $seo, $locale),
-            'ogImage' => $this->ogImage($seo),
+            'ogImage' => $this->ogImage($page, $seo),
             'ogTitle' => $this->str($seo, 'og_title') ?: $metaTitle,
             'ogDescription' => $this->str($seo, 'og_description') ?: $metaDescription,
             'noindex' => ! $page->is_indexable,
@@ -72,18 +72,23 @@ class SeoResolver
     }
 
     /**
-     * og_image and seo.default_og_image are $s->media() fields — both store
-     * a media id, not a URL, so both go through the same id-to-url resolver
-     * as the page override and the global fallback.
+     * og_image, page.image, and seo.default_og_image are all $s->media()
+     * fields — each stores a media id, not a URL, so all three go through
+     * the same id-to-url resolver. Fallback order: the page's explicit
+     * og_image override, then the page's own image, then the global default.
      *
      * @param  array<string, mixed>  $seo
      */
-    private function ogImage(array $seo): ?string
+    private function ogImage(Page $page, array $seo): ?string
     {
         $override = $this->str($seo, 'og_image');
 
         if ($override !== '') {
             return $this->mediaUrlResolver->resolve($override);
+        }
+
+        if ($page->image !== null && $page->image !== '') {
+            return $this->mediaUrlResolver->resolve($page->image);
         }
 
         $global = $this->settings->get('seo.default_og_image');

@@ -73,6 +73,21 @@ it('falls back to global SEO defaults when page fields are empty', function (): 
         ->assertJsonPath('props.seo.noindex', true);
 });
 
+it('falls back og:image to the page image when no og_image override is set', function (): void {
+    $pageImage = media('page-body.jpg');
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'image' => (string) $pageImage->getKey(),
+        'seo' => [],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page-body.jpg'));
+});
+
 it('resolves og_image to null when the stored media id no longer exists', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,

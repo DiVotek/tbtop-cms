@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages;
 
 use Tbtop\Admin\Dsl\Fields\Field;
+use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 
 class SiteSettingsPage extends SettingsPageBase
@@ -56,13 +57,15 @@ class SiteSettingsPage extends SettingsPageBase
         ];
     }
 
-    /** @return list<Field> */
+    /** @return list<Field|Node> */
     protected function fields(S $s): array
     {
         return [
             $s->text('site_name')->label(__('tbtop-cms::settings.site.fields.site_name'))->required()->rules('max:255'),
-            $s->media('site_logo')->label(__('tbtop-cms::settings.site.fields.logo')),
-            $s->media('site_favicon')->label(__('tbtop-cms::settings.site.fields.favicon')),
+            $s->grid(['cols' => 2], [
+                $s->media('site_logo')->label(__('tbtop-cms::settings.site.fields.logo'))->variant('preview'),
+                $s->media('site_favicon')->label(__('tbtop-cms::settings.site.fields.favicon'))->variant('preview'),
+            ]),
         ];
     }
 }

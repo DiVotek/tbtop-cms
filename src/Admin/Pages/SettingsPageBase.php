@@ -20,7 +20,7 @@ abstract class SettingsPageBase extends Page
     /** @return array<string, string> */
     abstract protected function map(): array;
 
-    /** @return list<Field> */
+    /** @return list<Field|Node> */
     abstract protected function fields(S $s): array;
 
     public function view(S $s): Node

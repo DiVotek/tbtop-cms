@@ -65,7 +65,7 @@ class SeoSettingsPage extends SettingsPageBase
                 ->placeholder(__('tbtop-cms::settings.seo.placeholders.title_suffix'))->rules('nullable|max:255'),
             $s->textarea('seo_default_description')->label(__('tbtop-cms::settings.seo.fields.default_description'))
                 ->rules('nullable|max:500'),
-            $s->media('seo_default_og_image')->label(__('tbtop-cms::settings.seo.fields.default_og_image')),
+            $s->media('seo_default_og_image')->label(__('tbtop-cms::settings.seo.fields.default_og_image'))->variant('preview'),
             $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled')),
         ];
     }

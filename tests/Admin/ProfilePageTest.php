@@ -37,8 +37,18 @@ it('labels fields from translations', function (): void {
     $labels = profileFieldLabels($structure);
 
     expect($labels['display_name'])->toBe(__('tbtop-cms::profile.fields.display_name'))
+        ->and($labels['email'])->toBe(__('tbtop-cms::profile.fields.email'))
         ->and($labels['locale'])->toBe(__('tbtop-cms::profile.fields.locale'))
-        ->and($labels['avatar_media_id'])->toBe(__('tbtop-cms::profile.fields.avatar'));
+        ->and($labels)->not->toHaveKey('avatar_media_id');
+});
+
+it('shows the signed-in email as a disabled field', function (): void {
+    $structure = test()->get('/admin/profile', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $email = profileFindField($structure, 'email');
+    expect($email)->not->toBeNull()
+        ->and($email['meta']['disabled'] ?? null)->toBeTrue();
 });
 
 it('renders the standard EditFooter with cancel visiting this same page', function (): void {
@@ -114,6 +124,25 @@ function profileFooterActionNames(array $node): array
     }
 
     return $names;
+}
+
+/** @param  array<string, mixed>  $node @return array<string, mixed>|null */
+function profileFindField(array $node, string $name): ?array
+{
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (! is_array($child)) {
+            continue;
+        }
+        if (($child['name'] ?? null) === $name && isset($child['options']['label'])) {
+            return $child;
+        }
+        $found = profileFindField($child, $name);
+        if ($found !== null) {
+            return $found;
+        }
+    }
+
+    return null;
 }
 
 /** @param  array<string, mixed>  $node @return array<string, mixed>|null */
