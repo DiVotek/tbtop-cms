@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Settings\Models\Setting;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Settings\Support\SettingCodec;
@@ -63,4 +65,27 @@ it('stores secret values encrypted at rest', function (): void {
 
     expect($raw)->not->toContain('hunter2')
         ->and($settings->get('notifications.mail.smtp_password'))->toBe('hunter2');
+});
+
+it('resolves site.logo and site.favicon media ids to public urls in the frontend payload', function (): void {
+    Storage::fake('public');
+    $logo = Media::create(['name' => 'logo.png', 'disk' => 'public', 'path' => 'media/logo.png', 'mime' => 'image/png', 'size' => 10]);
+    $favicon = Media::create(['name' => 'favicon.png', 'disk' => 'public', 'path' => 'media/favicon.png', 'mime' => 'image/png', 'size' => 10]);
+
+    $settings = app(Settings::class);
+    $settings->set('site.logo', (string) $logo->getKey());
+    $settings->set('site.favicon', (string) $favicon->getKey());
+
+    $public = $settings->forFrontend();
+
+    expect($public['site.logo'])->toBe(Storage::disk('public')->url('media/logo.png'))
+        ->and($public['site.favicon'])->toBe(Storage::disk('public')->url('media/favicon.png'));
+});
+
+it('resolves site.logo to null when unset or the stored media id no longer exists', function (): void {
+    Storage::fake('public');
+    $settings = app(Settings::class);
+    $settings->set('site.logo', '999999');
+
+    expect($settings->forFrontend()['site.logo'])->toBeNull();
 });
