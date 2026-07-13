@@ -79,6 +79,8 @@ return [
         'deleted' => 'Page deleted',
     ],
     'blocks' => [
+        'section_title' => 'Blocks',
+        'type' => 'Block type',
         'active' => 'Active',
         'sort' => 'Order',
         'add' => 'Add :kind',

@@ -32,13 +32,13 @@ class BlockContentField
     {
         $fields = [
             $s->text('id')->meta('hidden', true),
-            $s->select('kind')->label('Block type')->required()->options(self::kindOptions()),
-            $s->checkbox('active')->label('Active'),
+            $s->select('kind')->label(__('tbtop-cms::pages.blocks.type'))->required()->options(self::kindOptions()),
+            $s->boolean('active')->label(__('tbtop-cms::pages.blocks.active')),
             ...self::blockFields($s),
         ];
 
-        return $s->section(['title' => 'Blocks'], [
-            $s->repeater('content')->label('Blocks')->fields($fields),
+        return $s->section(['title' => __('tbtop-cms::pages.blocks.section_title')], [
+            $s->repeater('content')->label(__('tbtop-cms::pages.blocks.section_title'))->fields($fields),
         ]);
     }
 
