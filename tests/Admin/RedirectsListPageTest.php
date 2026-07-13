@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
+use Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
@@ -66,21 +68,21 @@ it('no longer carries a create action on the table itself', function (): void {
 // admin page when the create-redirect modal opened. "All locales" must be
 // a non-empty sentinel, mapped to null on save.
 it('emits no empty option values in the locale select', function (): void {
-    $values = array_column(\Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions::locales(), 'value');
+    $values = array_column(RedirectFormOptions::locales(), 'value');
 
     expect($values)->not->toContain('')
-        ->and($values)->toContain(\Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions::ALL_LOCALES);
+        ->and($values)->toContain(RedirectFormOptions::ALL_LOCALES);
 });
 
 it('round-trips the all-locales sentinel as a null locale', function (): void {
-    $redirect = \Tbtop\Cms\Admin\Pages\Support\RedirectForm::save([
+    $redirect = RedirectForm::save([
         'from_path' => 'old-path',
         'to_path' => 'new-path',
-        'locale' => \Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions::ALL_LOCALES,
+        'locale' => RedirectFormOptions::ALL_LOCALES,
         'status_code' => '301',
     ]);
 
     expect($redirect->locale)->toBeNull()
-        ->and(\Tbtop\Cms\Admin\Pages\Support\RedirectForm::loadRow($redirect->id)['locale'])
-        ->toBe(\Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions::ALL_LOCALES);
+        ->and(RedirectForm::loadRow($redirect->id)['locale'])
+        ->toBe(RedirectFormOptions::ALL_LOCALES);
 });
