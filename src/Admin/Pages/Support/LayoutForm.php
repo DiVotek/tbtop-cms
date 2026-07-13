@@ -36,6 +36,9 @@ class LayoutForm
 
     public static function label(string $slot): string
     {
-        return Str::ucfirst($slot);
+        $key = 'tbtop-cms::layout.slots.' . $slot;
+        $label = __($key);
+
+        return $label === $key ? Str::ucfirst($slot) : $label;
     }
 }
