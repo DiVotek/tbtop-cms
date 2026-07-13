@@ -10,6 +10,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Block\BlockContentResolver;
+use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
@@ -28,6 +29,7 @@ class PageController
         private readonly PageSpecAssembler $assembler,
         private readonly SeoResolver $seo,
         private readonly FormActionBinder $forms,
+        private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
     public function __invoke(Request $request): Response | RedirectResponse
@@ -64,11 +66,19 @@ class PageController
                 'title' => $page->getTranslation('title', $locale),
                 'heading' => $page->getTranslation('heading', $locale),
                 'summary' => $page->getTranslation('summary', $locale),
+                'image' => $this->resolveImage($page->image),
             ],
             'render' => $this->assembler->assemble($resolved),
             'seo' => $this->seo->resolve($page, $locale),
             'breadcrumbs' => $this->breadcrumbs->forPage($page, $locale),
             'path' => $path,
         ];
+    }
+
+    // image stores a media id, not a URL; resolve() already returns null for
+    // an empty/missing/deleted id, so no extra guard is needed here.
+    private function resolveImage(?string $image): ?string
+    {
+        return $image !== null && $image !== '' ? $this->mediaUrlResolver->resolve($image) : null;
     }
 }

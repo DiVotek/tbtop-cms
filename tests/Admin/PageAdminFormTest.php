@@ -107,3 +107,29 @@ it('rejects a status value outside the PageStatus enum', function (): void {
         'parent_id' => '',
     ]);
 })->throws(ValidationException::class);
+
+it('saves and reloads the page image media id', function (): void {
+    $page = PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Draft->value,
+        'name' => ['en' => 'With Image'],
+        'parent_id' => '',
+        'image' => '42',
+    ]);
+
+    expect($page->image)->toBe('42')
+        ->and(PageForm::loadRow($page->id)['image'])->toBe('42');
+});
+
+it('stores a null image when the form field is empty', function (): void {
+    $page = PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Draft->value,
+        'name' => ['en' => 'Without Image'],
+        'parent_id' => '',
+        'image' => '',
+    ]);
+
+    expect($page->image)->toBeNull()
+        ->and(PageForm::loadRow($page->id)['image'])->toBe('');
+});

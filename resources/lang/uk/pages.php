@@ -41,6 +41,7 @@ return [
         'structure' => 'Структура',
         'ordering' => 'Сортування',
         'social' => 'Соцмережі',
+        'image' => 'Зображення',
     ],
     'fields' => [
         'name' => 'Назва',
@@ -63,6 +64,7 @@ return [
         'og_description_placeholder' => 'За замовчуванням — мета-опис',
         'og_image' => 'OG зображення',
         'no_parent' => '— Немає —',
+        'image' => 'Зображення',
     ],
     'actions' => [
         'new' => 'Нова',

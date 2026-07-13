@@ -80,7 +80,7 @@ class PageForm
                     ->helperText(__('tbtop-cms::pages.fields.og_title_placeholder')),
                 $s->textarea('og_description')->label(__('tbtop-cms::pages.fields.og_description'))
                     ->set('placeholder', __('tbtop-cms::pages.fields.og_description_placeholder')),
-                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image')),
+                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))->variant('preview'),
             ]),
         ];
     }
@@ -117,6 +117,10 @@ class PageForm
             'heading' => $form['heading'] ?? [],
             'summary' => $form['summary'] ?? [],
             'body' => $form['body'] ?? [],
+            // Media id string, not a URL — resolved to a URL on the frontend
+            // via MediaUrlResolver. Applies to system pages too, so it stays
+            // in the unconditional part below rather than the is_system gate.
+            'image' => self::nullableMediaId($form['image'] ?? null),
             // The create form has no is_indexable field — new pages are always
             // indexable by default; edits keep the form-submitted value.
             'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
@@ -216,6 +220,7 @@ class PageForm
             'sort_order' => $page->sort_order,
             'paths' => $page->slugs->pluck('path', 'locale')->all(),
             'content' => BlockContentField::toRows($page->content),
+            'image' => (string) ($page->image ?? ''),
             'seo_title' => (string) ($seo['title'] ?? ''),
             'seo_description' => (string) ($seo['description'] ?? ''),
             'seo_focus_keyword' => (string) ($seo['focus_keyword'] ?? ''),
@@ -287,5 +292,14 @@ class PageForm
         }
 
         return (int) $value;
+    }
+
+    private static function nullableMediaId(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (string) $value;
     }
 }

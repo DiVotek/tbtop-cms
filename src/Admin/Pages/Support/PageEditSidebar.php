@@ -32,6 +32,9 @@ final class PageEditSidebar
             $s->section(['title' => __('tbtop-cms::pages.sections.ordering'), 'variant' => 'card'], [
                 $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
             ]),
+            $s->section(['title' => __('tbtop-cms::pages.sections.image'), 'variant' => 'card'], [
+                $s->media('image')->label(__('tbtop-cms::pages.fields.image'))->variant('preview'),
+            ]),
         ]);
     }
 }

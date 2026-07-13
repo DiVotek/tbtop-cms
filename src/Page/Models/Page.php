@@ -26,6 +26,7 @@ use Tbtop\Cms\Page\Observers\PageObserver;
  * @property string|null $heading
  * @property string|null $summary
  * @property array<int, array<string, mixed>>|null $content
+ * @property string|null $image
  * @property array<string, mixed>|null $seo
  * @property bool $is_indexable
  * @property bool $is_system

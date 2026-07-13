@@ -41,6 +41,7 @@ return [
         'structure' => 'Structure',
         'ordering' => 'Ordering',
         'social' => 'Social networks',
+        'image' => 'Image',
     ],
     'fields' => [
         'name' => 'Name',
@@ -63,6 +64,7 @@ return [
         'og_description_placeholder' => 'Defaults to the meta description',
         'og_image' => 'OG image',
         'no_parent' => '— None —',
+        'image' => 'Image',
     ],
     'actions' => [
         'new' => 'New',
