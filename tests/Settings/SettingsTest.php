@@ -89,3 +89,14 @@ it('resolves site.logo to null when unset or the stored media id no longer exist
 
     expect($settings->forFrontend()['site.logo'])->toBeNull();
 });
+
+it('resolves seo.default_og_image to a public url in the frontend payload', function (): void {
+    Storage::fake('public');
+    $image = Media::create(['name' => 'og.png', 'disk' => 'public', 'path' => 'media/og.png', 'mime' => 'image/png', 'size' => 10]);
+
+    $settings = app(Settings::class);
+    $settings->set('seo.default_og_image', (string) $image->getKey());
+
+    expect($settings->forFrontend()['seo.default_og_image'])
+        ->toBe(Storage::disk('public')->url('media/og.png'));
+});
