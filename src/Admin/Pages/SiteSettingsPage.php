@@ -27,7 +27,23 @@ class SiteSettingsPage extends SettingsPageBase
     #[\Override]
     public function title(): string
     {
-        return 'Site settings';
+        return __('tbtop-cms::settings.site.title');
+    }
+
+    #[\Override]
+    public function subtitle(): ?string
+    {
+        return __('tbtop-cms::settings.site.subtitle');
+    }
+
+    /** @return list<array{label: string, url?: string}> */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::nav.groups.settings')],
+            ['label' => $this->title()],
+        ];
     }
 
     /** @return array<string, string> */
@@ -44,9 +60,9 @@ class SiteSettingsPage extends SettingsPageBase
     protected function fields(S $s): array
     {
         return [
-            $s->text('site_name')->label('Site name')->required()->rules('max:255'),
-            $s->media('site_logo')->label('Logo'),
-            $s->media('site_favicon')->label('Favicon'),
+            $s->text('site_name')->label(__('tbtop-cms::settings.site.fields.site_name'))->required()->rules('max:255'),
+            $s->media('site_logo')->label(__('tbtop-cms::settings.site.fields.logo')),
+            $s->media('site_favicon')->label(__('tbtop-cms::settings.site.fields.favicon')),
         ];
     }
 }

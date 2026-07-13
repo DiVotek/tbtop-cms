@@ -27,7 +27,23 @@ class NotificationSettingsPage extends SettingsPageBase
     #[\Override]
     public function title(): string
     {
-        return 'Notification settings';
+        return __('tbtop-cms::settings.notifications.title');
+    }
+
+    #[\Override]
+    public function subtitle(): ?string
+    {
+        return __('tbtop-cms::settings.notifications.subtitle');
+    }
+
+    /** @return list<array{label: string, url?: string}> */
+    #[\Override]
+    public function breadcrumbs(): array
+    {
+        return [
+            ['label' => __('tbtop-cms::nav.groups.settings')],
+            ['label' => $this->title()],
+        ];
     }
 
     /** @return array<string, string> */
@@ -44,11 +60,11 @@ class NotificationSettingsPage extends SettingsPageBase
     protected function fields(S $s): array
     {
         return [
-            $s->boolean('notification_mail_enabled')->label('Mail enabled'),
-            $s->textarea('notification_mail_recipients')->label('Recipients')
-                ->rules('nullable')->helperText('One email address per line.'),
-            $s->password('notification_mail_smtp_password')->label('SMTP password')
-                ->rules('nullable|max:255')->helperText('Leave blank to keep the current value.'),
+            $s->boolean('notification_mail_enabled')->label(__('tbtop-cms::settings.notifications.fields.mail_enabled')),
+            $s->textarea('notification_mail_recipients')->label(__('tbtop-cms::settings.notifications.fields.recipients'))
+                ->rules('nullable')->helperText(__('tbtop-cms::settings.notifications.helpers.recipients')),
+            $s->password('notification_mail_smtp_password')->label(__('tbtop-cms::settings.notifications.fields.smtp_password'))
+                ->rules('nullable|max:255')->helperText(__('tbtop-cms::settings.notifications.helpers.smtp_password')),
         ];
     }
 }
