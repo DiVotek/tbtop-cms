@@ -76,7 +76,8 @@ class TemplatesPage extends AdminPage
             ->query($this->query(...))
             ->columns([
                 Column::make('name')->label(__('tbtop-cms::templates.columns.name'))->searchable(),
-                Column::make('updated_at')->label(__('tbtop-cms::templates.columns.updated')),
+                Column::make('updated_at')->label(__('tbtop-cms::templates.columns.updated'))
+                    ->date(__('tbtop-cms::templates.date_format'))->muted(),
             ])
             ->searchable(['name'])
             ->defaultSort('name', 'asc')

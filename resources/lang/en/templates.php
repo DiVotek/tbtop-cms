@@ -9,6 +9,7 @@ return [
         'name' => 'Name',
         'updated' => 'Updated',
     ],
+    'date_format' => 'n/j/Y',
     'empty' => [
         'title' => 'No templates yet',
         'description' => 'Create your first template.',

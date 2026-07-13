@@ -9,6 +9,7 @@ return [
         'name' => 'Назва',
         'updated' => 'Оновлено',
     ],
+    'date_format' => 'd.m.Y',
     'empty' => [
         'title' => 'Поки немає шаблонів',
         'description' => 'Створіть перший шаблон.',
