@@ -3,18 +3,25 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
 
+const PROFILE_PASSWORD = 'secret-pass-1';
+
 beforeEach(function (): void {
     config(['tbtop-cms.admin.model' => AdminUser::class]);
     config(['auth.providers.users.model' => AdminUser::class]);
     Language::factory()->default()->create(['locale' => 'en']);
 
-    $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
+    $user = AdminUser::create([
+        'name' => 'Admin',
+        'email' => 'admin@example.com',
+        'password' => PROFILE_PASSWORD,
+    ]);
     CmsUserProfile::create(['user_id' => $user->id]);
     test()->actingAs($user, 'web');
 });
@@ -30,57 +37,151 @@ it('carries title, subtitle, and breadcrumbs from translations', function (): vo
     ]);
 });
 
-it('labels fields from translations', function (): void {
-    $structure = test()->get('/admin/profile', ['X-Inertia' => 'true'])
-        ->assertOk()->json('props.structure');
+it('renders three tabs labelled from translations', function (): void {
+    expect(profileTabLabels(profileStructure()))->toBe([
+        __('tbtop-cms::profile.sections.personal'),
+        __('tbtop-cms::profile.sections.password'),
+        __('tbtop-cms::profile.sections.preferences'),
+    ]);
+});
 
-    $labels = profileFieldLabels($structure);
+it('labels fields from translations', function (): void {
+    $labels = profileFieldLabels(profileStructure());
 
     expect($labels['display_name'])->toBe(__('tbtop-cms::profile.fields.display_name'))
         ->and($labels['email'])->toBe(__('tbtop-cms::profile.fields.email'))
         ->and($labels['locale'])->toBe(__('tbtop-cms::profile.fields.locale'))
+        ->and($labels['current_password'])->toBe(__('tbtop-cms::profile.fields.current_password'))
+        ->and($labels['password'])->toBe(__('tbtop-cms::profile.fields.new_password'))
+        ->and($labels['password_confirmation'])->toBe(__('tbtop-cms::profile.fields.confirm_password'))
         ->and($labels)->not->toHaveKey('avatar_media_id');
 });
 
 it('shows the signed-in email as a disabled field', function (): void {
-    $structure = test()->get('/admin/profile', ['X-Inertia' => 'true'])
-        ->assertOk()->json('props.structure');
-
-    $email = profileFindField($structure, 'email');
+    $email = profileFindField(profileStructure(), 'email');
     expect($email)->not->toBeNull()
         ->and($email['meta']['disabled'] ?? null)->toBeTrue();
 });
 
-it('renders the standard EditFooter with cancel visiting this same page', function (): void {
-    $structure = test()->get('/admin/profile', ['X-Inertia' => 'true'])
-        ->assertOk()->json('props.structure');
+it('gives every tab form its own submit action and no cancel', function (): void {
+    $actions = [];
+    profileCollectByKind(profileStructure(), 'action', $actions);
+    $names = array_column($actions, 'name');
 
-    $names = profileFooterActionNames($structure);
-    expect($names)->toBe(['cancel', 'save']);
-
-    $save = profileFindAction($structure, 'save');
-    expect($save)->not->toBeNull()
-        ->and($save['options']['label'] ?? null)->toBe(__('tbtop-cms::profile.actions.save'));
-
-    $cancel = profileFindAction($structure, 'cancel');
-    expect($cancel['options']['spec']['href'] ?? null)->toEndWith('/admin/profile');
+    expect($names)->toBe(['save_profile', 'update_password', 'save_preferences']);
 });
 
-it('saves and notifies from translations', function (): void {
-    test()->post('/admin/profile/forms/profile', ['display_name' => 'New Name', 'locale' => 'en'])
+it('saves personal info and notifies from translations', function (): void {
+    test()->post('/admin/profile/forms/profile', ['display_name' => 'New Name'])
         ->assertRedirect();
 
-    // "tbtop.effects" is a single flash key (literal dot in the name), not a
-    // nested path — session()'s dot notation would misparse it as 4 segments.
-    $effects = session('inertia.flash_data')['tbtop.effects'] ?? null;
-    expect($effects)->not->toBeNull();
-
-    $notify = collect($effects)->firstWhere('kind', 'notify');
-    expect($notify)->not->toBeNull()
-        ->and($notify['message'])->toBe(__('tbtop-cms::profile.actions.saved'));
-
+    expect(profileNotifyMessage())->toBe(__('tbtop-cms::profile.actions.saved'));
     expect(CmsUserProfile::first()?->display_name)->toBe('New Name');
 });
+
+it('saves the locale preference into the profile and session', function (): void {
+    test()->post('/admin/profile/forms/preferences', ['locale' => 'en'])
+        ->assertRedirect()
+        ->assertSessionHas('tbtop.locale', 'en');
+
+    expect(CmsUserProfile::first()?->locale)->toBe('en');
+});
+
+it('changes the password when the current password is correct', function (): void {
+    test()->post('/admin/profile/forms/password', [
+        'current_password' => PROFILE_PASSWORD,
+        'password' => 'brand-new-pass-1',
+        'password_confirmation' => 'brand-new-pass-1',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(profileNotifyMessage())->toBe(__('tbtop-cms::profile.actions.password_updated'));
+    expect(Hash::check('brand-new-pass-1', AdminUser::first()?->password))->toBeTrue();
+});
+
+it('rejects a wrong current password and keeps the old one', function (): void {
+    test()->post('/admin/profile/forms/password', [
+        'current_password' => 'not-the-password',
+        'password' => 'brand-new-pass-1',
+        'password_confirmation' => 'brand-new-pass-1',
+    ])->assertSessionHasErrors('current_password');
+
+    expect(Hash::check(PROFILE_PASSWORD, AdminUser::first()?->password))->toBeTrue();
+});
+
+it('rejects a short new password', function (): void {
+    test()->post('/admin/profile/forms/password', [
+        'current_password' => PROFILE_PASSWORD,
+        'password' => 'short',
+        'password_confirmation' => 'short',
+    ])->assertSessionHasErrors('password');
+});
+
+it('rejects a mismatched confirmation', function (): void {
+    test()->post('/admin/profile/forms/password', [
+        'current_password' => PROFILE_PASSWORD,
+        'password' => 'brand-new-pass-1',
+        'password_confirmation' => 'something-else-1',
+    ])->assertSessionHasErrors('password');
+});
+
+it('rejects a new password equal to the current one', function (): void {
+    test()->post('/admin/profile/forms/password', [
+        'current_password' => PROFILE_PASSWORD,
+        'password' => PROFILE_PASSWORD,
+        'password_confirmation' => PROFILE_PASSWORD,
+    ])->assertSessionHasErrors('password');
+});
+
+it('hides the password tab and form when disabled in config', function (): void {
+    config(['tbtop-cms.profile.password_change' => false]);
+
+    expect(profileTabLabels(profileStructure()))->toBe([
+        __('tbtop-cms::profile.sections.personal'),
+        __('tbtop-cms::profile.sections.preferences'),
+    ]);
+
+    test()->post('/admin/profile/forms/password', [
+        'current_password' => PROFILE_PASSWORD,
+        'password' => 'brand-new-pass-1',
+        'password_confirmation' => 'brand-new-pass-1',
+    ])->assertNotFound();
+});
+
+/** @return array<string, mixed> */
+function profileStructure(): array
+{
+    return test()->get('/admin/profile', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+}
+
+/**
+ * Child nodes of a structure node: options.children plus tab bodies,
+ * so traversal helpers see fields inside the profile tabs.
+ *
+ * @param  array<string, mixed>  $node
+ * @return list<array<string, mixed>>
+ */
+function profileChildNodes(array $node): array
+{
+    $children = array_values(array_filter((array) ($node['options']['children'] ?? []), 'is_array'));
+    foreach ((array) ($node['options']['tabs'] ?? []) as $tab) {
+        if (is_array($tab) && is_array($tab['body'] ?? null)) {
+            $children[] = $tab['body'];
+        }
+    }
+
+    return $children;
+}
+
+/** @param  array<string, mixed>  $node @return list<string> */
+function profileTabLabels(array $node): array
+{
+    $tabsNodes = [];
+    profileCollectByKind($node, 'tabs', $tabsNodes);
+    expect($tabsNodes)->toHaveCount(1);
+
+    return array_column((array) ($tabsNodes[0]['options']['tabs'] ?? []), 'label');
+}
 
 /**
  * @param  array<string, mixed>  $node
@@ -89,10 +190,7 @@ it('saves and notifies from translations', function (): void {
 function profileFieldLabels(array $node): array
 {
     $labels = [];
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (! is_array($child)) {
-            continue;
-        }
+    foreach (profileChildNodes($node) as $child) {
         if (isset($child['name'], $child['options']['label'])) {
             $labels[$child['name']] = $child['options']['label'];
         }
@@ -102,58 +200,16 @@ function profileFieldLabels(array $node): array
     return $labels;
 }
 
-/**
- * Action names inside the form's footer flex node (cancel/save) — the only
- * flex node in the profile form tree, mirroring SettingsPagesTest's footer.
- *
- * @param  array<string, mixed>  $node
- * @return list<string>
- */
-function profileFooterActionNames(array $node): array
-{
-    $flexes = [];
-    profileCollectByKind($node, 'flex', $flexes);
-    expect($flexes)->not->toBeEmpty();
-
-    $footer = $flexes[array_key_last($flexes)];
-    $names = [];
-    foreach ((array) ($footer['options']['children'] ?? []) as $child) {
-        if (is_array($child) && ($child['kind'] ?? null) === 'action') {
-            $names[] = $child['name'];
-        }
-    }
-
-    return $names;
-}
-
 /** @param  array<string, mixed>  $node @return array<string, mixed>|null */
 function profileFindField(array $node, string $name): ?array
 {
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (! is_array($child)) {
-            continue;
-        }
+    foreach (profileChildNodes($node) as $child) {
         if (($child['name'] ?? null) === $name && isset($child['options']['label'])) {
             return $child;
         }
         $found = profileFindField($child, $name);
         if ($found !== null) {
             return $found;
-        }
-    }
-
-    return null;
-}
-
-/** @param  array<string, mixed>  $node @return array<string, mixed>|null */
-function profileFindAction(array $node, string $name): ?array
-{
-    $actions = [];
-    profileCollectByKind($node, 'action', $actions);
-
-    foreach ($actions as $action) {
-        if (($action['name'] ?? null) === $name) {
-            return $action;
         }
     }
 
@@ -169,9 +225,19 @@ function profileCollectByKind(array $node, string $kind, array &$out): void
     if (($node['kind'] ?? null) === $kind) {
         $out[] = $node;
     }
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (is_array($child)) {
-            profileCollectByKind($child, $kind, $out);
-        }
+    foreach (profileChildNodes($node) as $child) {
+        profileCollectByKind($child, $kind, $out);
     }
+}
+
+function profileNotifyMessage(): ?string
+{
+    // "tbtop.effects" is a single flash key (literal dot in the name), not a
+    // nested path — session()'s dot notation would misparse it as 4 segments.
+    $effects = session('inertia.flash_data')['tbtop.effects'] ?? null;
+    expect($effects)->not->toBeNull();
+
+    $notify = collect($effects)->firstWhere('kind', 'notify');
+
+    return is_array($notify) ? (string) $notify['message'] : null;
 }
