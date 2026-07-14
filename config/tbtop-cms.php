@@ -7,6 +7,7 @@ use Tbtop\Cms\Admin\Pages\LanguagesPage;
 use Tbtop\Cms\Admin\Pages\LayoutEditPage;
 use Tbtop\Cms\Admin\Pages\LayoutPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
+use Tbtop\Cms\Admin\Pages\MediaLibraryPage;
 use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
 use Tbtop\Cms\Admin\Pages\PageEditPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
@@ -84,6 +85,7 @@ return [
             'pages' => PagesPage::class,
             'page_edit' => PageEditPage::class,
             'redirects' => RedirectsPage::class,
+            'media_library' => MediaLibraryPage::class,
             'site_settings' => SiteSettingsPage::class,
             'seo_settings' => SeoSettingsPage::class,
             'notification_settings' => NotificationSettingsPage::class,
