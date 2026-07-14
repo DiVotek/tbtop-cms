@@ -14,6 +14,7 @@ return [
         'media_library' => 'Media library',
         'templates' => 'Templates',
         'layout' => 'Layout',
+        'menus' => 'Menus',
         'languages' => 'Languages',
         'site_settings' => 'Site settings',
         'seo_settings' => 'SEO settings',

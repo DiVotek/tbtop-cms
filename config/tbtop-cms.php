@@ -8,6 +8,9 @@ use Tbtop\Cms\Admin\Pages\LayoutEditPage;
 use Tbtop\Cms\Admin\Pages\LayoutPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\MediaLibraryPage;
+use Tbtop\Cms\Admin\Pages\MenuCreatePage;
+use Tbtop\Cms\Admin\Pages\MenuEditPage;
+use Tbtop\Cms\Admin\Pages\MenusPage;
 use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
 use Tbtop\Cms\Admin\Pages\PageEditPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
@@ -94,6 +97,9 @@ return [
             'template_edit' => TemplateEditPage::class,
             'layout' => LayoutPage::class,
             'layout_edit' => LayoutEditPage::class,
+            'menus' => MenusPage::class,
+            'menu_create' => MenuCreatePage::class,
+            'menu_edit' => MenuEditPage::class,
             'form_submissions' => FormSubmissionsPage::class,
         ],
     ],
