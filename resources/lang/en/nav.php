@@ -11,6 +11,7 @@ return [
     'items' => [
         'pages' => 'Pages',
         'redirects' => 'Redirects',
+        'media_library' => 'Media library',
         'templates' => 'Templates',
         'layout' => 'Layout',
         'languages' => 'Languages',
