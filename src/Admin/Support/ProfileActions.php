@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Support;
 
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
@@ -16,6 +17,11 @@ use Tbtop\Admin\Actions\Effects;
  */
 final class ProfileActions
 {
+    /** Theme modes the admin client understands (tbtop_theme cookie). */
+    public const THEMES = ['system', 'light', 'dark'];
+
+    private const THEME_COOKIE_MINUTES = 60 * 24 * 365;
+
     public function personal(ActionCtx $ctx): Effects
     {
         CurrentAdmin::profile()->forceFill([
@@ -46,6 +52,21 @@ final class ProfileActions
 
         if (is_string($profile->locale) && $profile->locale !== '') {
             session(['tbtop.locale' => $profile->locale]);
+        }
+
+        $theme = $ctx->form['theme'] ?? null;
+        if (is_string($theme) && $theme !== '') {
+            // Plain + JS-readable: the admin client applies this cookie
+            // itself (excluded from encryption in CmsServiceProvider).
+            Cookie::queue(Cookie::make(
+                'tbtop_theme',
+                $theme,
+                self::THEME_COOKIE_MINUTES,
+                '/',
+                null,
+                null,
+                false,
+            ));
         }
 
         return Effects::make()->notify(__('tbtop-cms::profile.actions.saved'));

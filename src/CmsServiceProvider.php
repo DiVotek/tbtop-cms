@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms;
 
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Support\Facades\Route;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -75,6 +76,9 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireAdminLogout();
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
+        // The admin client reads/writes this cookie from JS; the profile
+        // preferences form sets it server-side. Both must see plain text.
+        EncryptCookies::except('tbtop_theme');
     }
 
     /**

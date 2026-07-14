@@ -49,20 +49,29 @@ final class ProfileForms
     }
 
     /**
-     * @param  array{locale: string|null}  $record
+     * @param  array{locale: string|null, theme: string}  $record
      * @param  list<string>  $locales
      */
     public function preferences(array $record, array $locales, Closure $onSubmit): FormBuilder
     {
         $s = $this->s;
-        $options = array_map(
+        $localeOptions = array_map(
             static fn (string $locale): array => ['value' => $locale, 'label' => $locale],
             $locales,
+        );
+        $themeOptions = array_map(
+            static fn (string $theme): array => [
+                'value' => $theme,
+                'label' => __('tbtop-cms::profile.theme.' . $theme),
+            ],
+            ProfileActions::THEMES,
         );
 
         return $s->form('preferences', [
             $s->select('locale')->label(__('tbtop-cms::profile.fields.locale'))
-                ->options($options)->rules('nullable|in:' . implode(',', $locales)),
+                ->options($localeOptions)->rules('nullable|in:' . implode(',', $locales)),
+            $s->select('theme')->label(__('tbtop-cms::profile.fields.theme'))
+                ->options($themeOptions)->rules('nullable|in:' . implode(',', ProfileActions::THEMES)),
             $this->footer('save_preferences', __('tbtop-cms::profile.actions.save')),
         ])->record($record)->onSubmit($onSubmit);
     }

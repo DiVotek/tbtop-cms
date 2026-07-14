@@ -17,6 +17,12 @@ return [
         'current_password' => 'Current password',
         'new_password' => 'New password',
         'confirm_password' => 'Confirm new password',
+        'theme' => 'Theme',
+    ],
+    'theme' => [
+        'system' => 'System',
+        'light' => 'Light',
+        'dark' => 'Dark',
     ],
     'actions' => [
         'save' => 'Save',

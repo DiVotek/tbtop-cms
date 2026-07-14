@@ -17,6 +17,12 @@ return [
         'current_password' => 'Поточний пароль',
         'new_password' => 'Новий пароль',
         'confirm_password' => 'Підтвердьте новий пароль',
+        'theme' => 'Тема',
+    ],
+    'theme' => [
+        'system' => 'Системна',
+        'light' => 'Світла',
+        'dark' => 'Темна',
     ],
     'actions' => [
         'save' => 'Зберегти',
