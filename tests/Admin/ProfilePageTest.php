@@ -54,6 +54,7 @@ it('labels fields from translations', function (): void {
         ->and($labels['current_password'])->toBe(__('tbtop-cms::profile.fields.current_password'))
         ->and($labels['password'])->toBe(__('tbtop-cms::profile.fields.new_password'))
         ->and($labels['password_confirmation'])->toBe(__('tbtop-cms::profile.fields.confirm_password'))
+        ->and($labels['theme'])->toBe(__('tbtop-cms::profile.fields.theme'))
         ->and($labels)->not->toHaveKey('avatar_media_id');
 });
 
@@ -85,6 +86,33 @@ it('saves the locale preference into the profile and session', function (): void
         ->assertSessionHas('tbtop.locale', 'en');
 
     expect(CmsUserProfile::first()?->locale)->toBe('en');
+});
+
+it('saves the theme preference as a plain client-readable cookie', function (): void {
+    test()->post('/admin/profile/forms/preferences', ['locale' => 'en', 'theme' => 'dark'])
+        ->assertRedirect()
+        ->assertPlainCookie('tbtop_theme', 'dark');
+});
+
+it('rejects an unknown theme value', function (): void {
+    test()->post('/admin/profile/forms/preferences', ['theme' => 'sepia'])
+        ->assertSessionHasErrors('theme');
+});
+
+it('hydrates the theme select from the cookie', function (): void {
+    $theme = test()->withUnencryptedCookie('tbtop_theme', 'dark')
+        ->get('/admin/profile', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.preferences.theme');
+
+    expect($theme)->toBe('dark');
+});
+
+it('falls back to the system theme on a tampered cookie', function (): void {
+    $theme = test()->withUnencryptedCookie('tbtop_theme', 'purple')
+        ->get('/admin/profile', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.preferences.theme');
+
+    expect($theme)->toBe('system');
 });
 
 it('changes the password when the current password is correct', function (): void {

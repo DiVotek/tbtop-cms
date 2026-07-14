@@ -31,7 +31,9 @@ class CmsChrome extends Chrome
 
     /**
      * Header, left to right (the shell right-aligns the row):
-     * theme · locale · notifications · inbox · view-site · profile.
+     * notifications · inbox · view-site · profile.
+     * No theme toggle or locale switcher: both are profile
+     * preferences; standalone copies only ate top-bar space.
      *
      * @return list<mixed>
      */
@@ -39,8 +41,6 @@ class CmsChrome extends Chrome
     protected function headerItems(S $s): array
     {
         return [
-            $s->themeToggle(),
-            $s->localeSwitcher('dropdown'),
             $s->notifications(),
             $this->inbox($s),
             $s->action('view-site')
@@ -49,7 +49,7 @@ class CmsChrome extends Chrome
                 ->tooltip(__('tbtop-cms::chrome.view_site.tooltip'))
                 ->size('sm')
                 ->visit('/', newTab: true),
-            $s->userMenu(),
+            $s->userMenu(['locales' => false]),
         ];
     }
 

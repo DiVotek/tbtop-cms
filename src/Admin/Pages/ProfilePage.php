@@ -81,12 +81,22 @@ class ProfilePage extends Page
         $tabs[] = [
             'label' => __('tbtop-cms::profile.sections.preferences'),
             'body' => $forms->preferences(
-                ['locale' => $profile->locale],
+                ['locale' => $profile->locale, 'theme' => $this->currentTheme()],
                 LocaleService::availableLocales(),
                 $actions->preferences(...),
             ),
         ];
 
-        return $s->stack([$s->tabs($tabs)]);
+        // Compact column like the divotek profile — the panel itself
+        // runs full-width, so the page narrows its own content.
+        return $s->stack([$s->tabs($tabs)], ['class' => 'mx-auto w-full max-w-2xl']);
+    }
+
+    /** The theme cookie is the source of truth — the client applies it. */
+    private function currentTheme(): string
+    {
+        $theme = (string) request()->cookie('tbtop_theme', 'system');
+
+        return in_array($theme, ProfileActions::THEMES, true) ? $theme : 'system';
     }
 }
