@@ -87,6 +87,8 @@ class ProfilePage extends Page
             ),
         ];
 
-        return $s->stack([$s->tabs($tabs)]);
+        // Compact column like the divotek profile — the panel itself
+        // runs full-width, so the page narrows its own content.
+        return $s->stack([$s->tabs($tabs)], ['class' => 'mx-auto w-full max-w-2xl']);
     }
 }

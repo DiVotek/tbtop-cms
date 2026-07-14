@@ -31,7 +31,9 @@ class CmsChrome extends Chrome
 
     /**
      * Header, left to right (the shell right-aligns the row):
-     * theme · locale · notifications · inbox · view-site · profile.
+     * theme · notifications · inbox · view-site · profile.
+     * No standalone locale switcher — the language already lives
+     * in the user menu and the profile preferences.
      *
      * @return list<mixed>
      */
@@ -40,7 +42,6 @@ class CmsChrome extends Chrome
     {
         return [
             $s->themeToggle(),
-            $s->localeSwitcher('dropdown'),
             $s->notifications(),
             $this->inbox($s),
             $s->action('view-site')
