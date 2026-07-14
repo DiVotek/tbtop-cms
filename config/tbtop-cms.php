@@ -62,6 +62,10 @@ return [
         'throttle' => '10,1',
         'store' => true,
     ],
+    'profile' => [
+        // Disable on hosts where passwords are managed elsewhere (SSO).
+        'password_change' => true,
+    ],
     'render' => [
         'component' => 'Cms/Page',
         'root_kind' => 'Fragment',

@@ -52,8 +52,11 @@ class CmsPanel extends Panel
     /** @return list<NavItem> */
     private function userMenuItems(string $prefix): array
     {
+        // Closure label: panel config is built once at boot, an eager
+        // __() here would freeze on the boot locale.
         return [
-            NavItem::make('Profile')->url('/' . trim($prefix, '/') . '/profile')->icon('user'),
+            NavItem::make(static fn (): string => __('tbtop-cms::profile.title'))
+                ->url('/' . trim($prefix, '/') . '/profile')->icon('user'),
         ];
     }
 
