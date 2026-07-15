@@ -20,7 +20,8 @@ return [
     'fields' => [
         'name' => 'Name',
         'key' => 'Key',
-        'key_hint' => 'Stable identifier used to reference this menu, e.g. main or footer.',
+        'key_hint' => 'Auto-generated from the name. Stable identifier used to reference this menu, e.g. main or footer.',
+        'key_locked_hint' => 'Fixed once the menu is created — other things reference the menu by this key.',
         'items' => 'Items',
         'children' => 'Sub-items',
         'label' => 'Label',

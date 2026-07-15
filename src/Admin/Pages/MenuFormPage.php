@@ -39,7 +39,7 @@ abstract class MenuFormPage extends Page
         $footer = EditFooter::build($s, $this->listUrl(), $this->saveAction($s));
 
         $form = $s->form('menuEditor', [
-            ...MenuForm::fields($s),
+            ...MenuForm::fields($s, isEdit: $id !== null),
             $footer,
         ])
             ->record($id !== null ? MenuForm::loadRow($id) : [])

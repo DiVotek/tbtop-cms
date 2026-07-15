@@ -104,6 +104,16 @@ it('drops rows with an empty label and caps nesting at two levels', function ():
         ->and($menu->items[0]['children'][0])->not->toHaveKey('children');
 });
 
+it('keeps the key fixed on edit even if a different key is submitted', function (): void {
+    $menu = Menu::create(['name' => 'Header', 'key' => 'header', 'items' => []]);
+
+    // A renamed menu (and a tampered key field) must not move the stored key.
+    MenuForm::save(['name' => 'Header renamed', 'key' => 'header-renamed', 'items' => []], $menu->id);
+
+    expect($menu->fresh()->key)->toBe('header')
+        ->and($menu->fresh()->name)->toBe('Header renamed');
+});
+
 it('loads a stored menu back into repeater rows', function (): void {
     $menu = Menu::create([
         'name' => 'Footer',

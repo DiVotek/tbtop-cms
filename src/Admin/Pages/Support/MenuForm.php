@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Fields\Repeater;
 use Tbtop\Admin\Dsl\Node;
@@ -22,18 +23,35 @@ use Tbtop\Cms\Page\Models\Page;
 class MenuForm
 {
     /** @return list<Node> */
-    public static function fields(S $s): array
+    public static function fields(S $s, bool $isEdit = false): array
     {
         return [
             $s->section(['title' => __('tbtop-cms::menus.sections.menu')], [
                 $s->text('name')->label(__('tbtop-cms::menus.fields.name'))->required(),
-                $s->text('key')->label(__('tbtop-cms::menus.fields.key'))->required()
-                    ->helperText(__('tbtop-cms::menus.fields.key_hint')),
+                self::keyField($s, $isEdit),
             ]),
             $s->section(['title' => __('tbtop-cms::menus.sections.items')], [
                 self::itemsRepeater($s),
             ]),
         ];
+    }
+
+    /**
+     * On create the key is a slug that auto-derives from the name (still
+     * editable). Once saved the key is the stable reference other things use,
+     * so on edit it is shown read-only — renaming the menu never moves it.
+     */
+    private static function keyField(S $s, bool $isEdit): Field
+    {
+        if ($isEdit) {
+            return $s->text('key')->label(__('tbtop-cms::menus.fields.key'))->required()
+                ->disabledIf(Cond::notEmpty('key'))
+                ->helperText(__('tbtop-cms::menus.fields.key_locked_hint'));
+        }
+
+        return $s->slug('key')->label(__('tbtop-cms::menus.fields.key'))->required()
+            ->fromField('name')
+            ->helperText(__('tbtop-cms::menus.fields.key_hint'));
     }
 
     /**
@@ -89,11 +107,19 @@ class MenuForm
     public static function save(array $form, ?int $id = null): Menu
     {
         $menu = $id !== null ? Menu::query()->findOrFail($id) : new Menu;
-        $menu->fill([
+        $data = [
             'name' => (string) ($form['name'] ?? ''),
-            'key' => (string) ($form['key'] ?? ''),
             'items' => self::normalizeItems($form['items'] ?? null, depth: 0),
-        ]);
+        ];
+
+        // The key is set once, at creation, and is immutable afterwards — it is
+        // the stable reference other things resolve the menu by. On edit it is
+        // shown read-only, so never trust an incoming value.
+        if ($id === null) {
+            $data['key'] = (string) ($form['key'] ?? '');
+        }
+
+        $menu->fill($data);
         $menu->save();
 
         return $menu;
