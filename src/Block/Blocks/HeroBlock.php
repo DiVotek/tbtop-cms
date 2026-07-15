@@ -16,6 +16,24 @@ class HeroBlock extends Block
         return 'Hero';
     }
 
+    #[\Override]
+    public function label(): string
+    {
+        return 'Hero';
+    }
+
+    #[\Override]
+    public function description(): ?string
+    {
+        return 'Full-width intro section: a headline, optional subtitle, image, and a call-to-action button.';
+    }
+
+    #[\Override]
+    public function category(): ?string
+    {
+        return 'content';
+    }
+
     /** @return list<Field> */
     public function form(S $s): array
     {
