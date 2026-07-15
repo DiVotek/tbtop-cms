@@ -94,6 +94,29 @@ it('escapes block-derived values in the showcase html', function (): void {
         ->and($preview)->not->toContain('Ev<il<');
 });
 
+it('keeps per-block dark colors in inline vars so cards do not collide', function (): void {
+    // Two previews with different hues rendered on the same page. The dark-mode
+    // background must come from a per-element inline var (--pb-dark), not from a
+    // hue-baked global rule — otherwise the last <style> wins and paints every
+    // card the same shade in dark mode. Regression for Devin BUG on PR #60.
+    $one = BlockShowcaseHtml::placeholder('Hero', 'Hero');
+    $two = BlockShowcaseHtml::placeholder('ContactForm', 'Contact form');
+
+    // Each card carries its own dark color in an inline custom property...
+    expect($one)->toMatch('/--pb-dark:hsl\(\d+ 30% 22%\)/')
+        ->and($two)->toMatch('/--pb-dark:hsl\(\d+ 30% 22%\)/');
+
+    // ...and the shared <style> rule references the var, never a literal hue,
+    // so duplicating it across cards cannot override another card's color.
+    expect($one)->toContain('[data-block-preview]{background:var(--pb-dark) !important;}')
+        ->and($one)->not->toMatch('/\[data-block-preview\]\{background:hsl/');
+
+    // The two blocks actually differ in hue — proves the collision was real.
+    preg_match('/--pb-dark:hsl\((\d+) /', $one, $h1);
+    preg_match('/--pb-dark:hsl\((\d+) /', $two, $h2);
+    expect($h1[1])->not->toBe($h2[1]);
+});
+
 it('indexes which pages use each block kind, once, in a single pass', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,

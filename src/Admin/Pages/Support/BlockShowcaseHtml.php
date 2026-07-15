@@ -19,6 +19,13 @@ class BlockShowcaseHtml
     public static function placeholder(string $kind, string $label, string $aspect = '16 / 9', string $markSize = '2rem'): string
     {
         $hue = self::hue($kind);
+        // Per-block colors live in inline CSS custom properties (--pb, --pb-dark)
+        // on the element itself, so each card keeps its own hue. The dark-mode
+        // <style> below is a single hue-independent rule (background:var(--pb-dark)
+        // !important — needed to beat the inline background); duplicating it across
+        // cards is harmless because every copy is byte-identical. The previous code
+        // baked the hue into the global rule, so the last card's rule won and painted
+        // every preview the same shade in dark mode.
         $bg = "hsl({$hue} 45% 92%)";
         $bgDark = "hsl({$hue} 30% 22%)";
         $fg = "hsl({$hue} 45% 40%)";
@@ -26,8 +33,9 @@ class BlockShowcaseHtml
         $tag = self::e($kind);
 
         return <<<HTML
-            <div style="position:relative;aspect-ratio:{$aspect};display:grid;place-items:center;
-                        background:{$bg};color:{$fg};border-radius:inherit;"
+            <div style="--pb:{$bg};--pb-dark:{$bgDark};position:relative;aspect-ratio:{$aspect};
+                        display:grid;place-items:center;background:var(--pb);color:{$fg};
+                        border-radius:inherit;"
                  data-block-preview>
                 <span style="position:absolute;top:8px;left:8px;font-family:ui-monospace,monospace;
                              font-size:11px;padding:2px 7px;border-radius:5px;
@@ -35,8 +43,8 @@ class BlockShowcaseHtml
                 <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:{$markSize};
                              letter-spacing:-.02em;opacity:.85;">{$initials}</span>
             </div>
-            <style>[data-theme="dark"] [data-block-preview]{background:{$bgDark} !important;}
-            @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) [data-block-preview]{background:{$bgDark} !important;}}</style>
+            <style>[data-theme="dark"] [data-block-preview]{background:var(--pb-dark) !important;}
+            @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) [data-block-preview]{background:var(--pb-dark) !important;}}</style>
             HTML;
     }
 
