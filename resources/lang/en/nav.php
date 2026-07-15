@@ -15,6 +15,7 @@ return [
         'templates' => 'Templates',
         'layout' => 'Layout',
         'menus' => 'Menus',
+        'blocks' => 'Blocks',
         'languages' => 'Languages',
         'site_settings' => 'Site settings',
         'seo_settings' => 'SEO settings',

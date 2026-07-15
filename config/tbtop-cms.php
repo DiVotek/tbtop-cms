@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Tbtop\Cms\Admin\Pages\BlocksPage;
 use Tbtop\Cms\Admin\Pages\DashboardPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionsPage;
 use Tbtop\Cms\Admin\Pages\LanguagesPage;
@@ -100,6 +101,7 @@ return [
             'menus' => MenusPage::class,
             'menu_create' => MenuCreatePage::class,
             'menu_edit' => MenuEditPage::class,
+            'blocks' => BlocksPage::class,
             'form_submissions' => FormSubmissionsPage::class,
         ],
     ],

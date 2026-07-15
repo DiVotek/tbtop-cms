@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Block;
 
+use Illuminate\Support\Str;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 
@@ -13,6 +14,33 @@ abstract class Block
 
     /** @return list<Field> */
     abstract public function form(S $s): array;
+
+    /**
+     * Human name for the blocks showcase. Defaults to a title-cased kind
+     * ("ContactForm" -> "Contact Form"); override for a nicer label.
+     */
+    public function label(): string
+    {
+        return Str::headline($this->kind());
+    }
+
+    /**
+     * One-line explanation shown in the showcase. Null hides the line —
+     * override to document what the block is for.
+     */
+    public function description(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Optional grouping bucket for the showcase (e.g. "content", "layout").
+     * Null leaves the block ungrouped.
+     */
+    public function category(): ?string
+    {
+        return null;
+    }
 
     /**
      * @param  array<string, mixed>  $input

@@ -34,6 +34,24 @@ class ContactForm extends Block implements HandlesFormSubmission
         return 'ContactForm';
     }
 
+    #[\Override]
+    public function label(): string
+    {
+        return 'Contact form';
+    }
+
+    #[\Override]
+    public function description(): ?string
+    {
+        return 'Anonymous contact form. You edit the copy and recipient; the name, email, and message fields are built in.';
+    }
+
+    #[\Override]
+    public function category(): ?string
+    {
+        return 'forms';
+    }
+
     /** @return list<Field> */
     public function form(S $s): array
     {

@@ -15,6 +15,7 @@ return [
         'templates' => 'Шаблони',
         'layout' => 'Макет',
         'menus' => 'Меню',
+        'blocks' => 'Блоки',
         'languages' => 'Мови',
         'site_settings' => 'Налаштування сайту',
         'seo_settings' => 'SEO-налаштування',
