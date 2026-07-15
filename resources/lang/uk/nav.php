@@ -14,6 +14,7 @@ return [
         'media_library' => 'Медіатека',
         'templates' => 'Шаблони',
         'layout' => 'Макет',
+        'menus' => 'Меню',
         'languages' => 'Мови',
         'site_settings' => 'Налаштування сайту',
         'seo_settings' => 'SEO-налаштування',
