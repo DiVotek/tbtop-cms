@@ -64,20 +64,23 @@ class MenuForm
     {
         $childItems = $s->repeater('children')->label(__('tbtop-cms::menus.fields.children'))
             ->collapsible()->summary('label')
-            ->fields(self::itemFields($s));
+            ->fields(self::itemFields($s, 'items.*.children.*.type'));
 
         return $s->repeater('items')->label(__('tbtop-cms::menus.fields.items'))
             ->collapsible()->summary('label')
-            ->fields([...self::itemFields($s), $childItems]);
+            ->fields([...self::itemFields($s, 'items.*.type'), $childItems]);
     }
 
     /**
-     * Fields shared by every menu item (both levels). Type-specific fields
-     * are hidden unless the matching type is selected.
+     * Fields shared by every menu item (both levels). Type-specific fields are
+     * hidden and required only when the matching type is selected. `$typePath`
+     * is the full wildcard path to this level's `type` field — Laravel's
+     * required_if needs the absolute sibling path to scope per row, so it
+     * differs between the top level and the nested children.
      *
      * @return list<Field>
      */
-    private static function itemFields(S $s): array
+    private static function itemFields(S $s, string $typePath): array
     {
         return [
             $s->text('label')->label(__('tbtop-cms::menus.fields.label'))->required(),
@@ -90,14 +93,18 @@ class MenuForm
                 ]),
             $s->select('page_id')->label(__('tbtop-cms::menus.fields.page'))
                 ->options(self::pageOptions())
+                ->rules("required_if:{$typePath},page")
                 ->hiddenIf('type', '!=', 'page'),
             $s->select('category_id')->label(__('tbtop-cms::menus.fields.category'))
                 ->options(self::categoryOptions())
+                ->rules("required_if:{$typePath},category")
                 ->hiddenIf('type', '!=', 'category'),
             $s->text('url')->label(__('tbtop-cms::menus.fields.url'))
+                ->rules("required_if:{$typePath},url")
                 ->hiddenIf('type', '!=', 'url'),
             $s->text('anchor')->label(__('tbtop-cms::menus.fields.anchor'))
                 ->helperText(__('tbtop-cms::menus.fields.anchor_hint'))
+                ->rules("required_if:{$typePath},anchor")
                 ->hiddenIf('type', '!=', 'anchor'),
             $s->boolean('target_blank')->label(__('tbtop-cms::menus.fields.target_blank')),
         ];
@@ -137,10 +144,20 @@ class MenuForm
         ];
     }
 
+    /** The sub-field that carries each item type's link target. */
+    private const TARGET_FIELDS = [
+        'page' => 'page_id',
+        'category' => 'category_id',
+        'url' => 'url',
+        'anchor' => 'anchor',
+    ];
+
     /**
-     * Drop empty rows and strip fields that do not belong to the chosen type,
-     * recursing one level into children. Depth is hard-capped at 1 so a
-     * malformed payload can never persist a third level.
+     * Drop empty rows and rows whose type has no target, keeping only the one
+     * target field for the chosen type, recursing one level into children.
+     * Depth is hard-capped at 1 so a malformed payload can never persist a
+     * third level. An item without a resolvable target is dropped entirely —
+     * "no target" is one consistent shape, never a null/empty placeholder.
      *
      * @return list<array<string, mixed>>
      */
@@ -165,24 +182,25 @@ class MenuForm
                 ? $row['type']
                 : 'page';
 
-            $item = ['type' => $type, 'label' => $label];
-
-            if ($type === 'page' && isset($row['page_id']) && $row['page_id'] !== '') {
-                $item['page_id'] = (int) $row['page_id'];
-            } elseif ($type === 'category' && isset($row['category_id']) && $row['category_id'] !== '') {
-                $item['category_id'] = (int) $row['category_id'];
-            } elseif ($type === 'url') {
-                $item['url'] = (string) ($row['url'] ?? '');
-            } elseif ($type === 'anchor') {
-                $item['anchor'] = (string) ($row['anchor'] ?? '');
+            $targetField = self::TARGET_FIELDS[$type];
+            $rawTarget = $row[$targetField] ?? null;
+            $target = is_string($rawTarget) ? trim($rawTarget) : $rawTarget;
+            if ($target === null || $target === '') {
+                continue;
             }
+
+            $item = [
+                'type' => $type,
+                'label' => $label,
+                $targetField => in_array($type, ['page', 'category'], true) ? (int) $target : (string) $target,
+            ];
 
             if (! empty($row['target_blank'])) {
                 $item['target_blank'] = true;
             }
 
             if ($depth < 1) {
-                $children = self::normalizeItems($row['children'] ?? null, $depth + 1);
+                $children = self::normalizeItems($row['children'] ?? null, depth: $depth + 1);
                 if ($children !== []) {
                     $item['children'] = $children;
                 }

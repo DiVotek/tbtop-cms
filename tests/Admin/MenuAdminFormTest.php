@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Admin\Dsl\RuleWalker;
+use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\MenuForm;
 use Tbtop\Cms\Language\Models\Language;
@@ -77,6 +79,41 @@ it('omits target_blank when the checkbox is off', function (): void {
     ]);
 
     expect($menu->items[0])->not->toHaveKey('target_blank');
+});
+
+it('requires each type target only for its type, scoped per row at both levels', function (): void {
+    $rules = RuleWalker::collect(MenuForm::fields(new S, false));
+
+    // The reference must be the full wildcard path to the sibling type, or
+    // Laravel resolves it against a non-existent top-level `type` and never fires.
+    expect($rules['items.*.url'])->toBe(['required_if:items.*.type,url'])
+        ->and($rules['items.*.page_id'])->toBe(['required_if:items.*.type,page'])
+        ->and($rules['items.*.children.*.url'])->toBe(['required_if:items.*.children.*.type,url']);
+
+    // And the rule actually fires: an empty url on a url item is rejected.
+    $data = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'url', 'label' => 'a', 'url' => '']]];
+    expect(validator($data, $rules)->fails())->toBeTrue();
+
+    $valid = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'url', 'label' => 'a', 'url' => '/ok']]];
+    expect(validator($valid, $rules)->fails())->toBeFalse();
+});
+
+it('drops items whose type has no target, for every type', function (): void {
+    $menu = MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [
+            ['label' => 'No page', 'type' => 'page', 'page_id' => ''],
+            ['label' => 'No category', 'type' => 'category', 'category_id' => null],
+            ['label' => 'Blank url', 'type' => 'url', 'url' => '   '],
+            ['label' => 'Empty anchor', 'type' => 'anchor', 'anchor' => ''],
+            ['label' => 'Real', 'type' => 'url', 'url' => 'https://ok'],
+        ],
+    ]);
+
+    expect($menu->items)->toBe([
+        ['type' => 'url', 'label' => 'Real', 'url' => 'https://ok'],
+    ]);
 });
 
 it('drops rows with an empty label and caps nesting at two levels', function (): void {
