@@ -66,17 +66,22 @@ class MenuForm
             $s->select('type')->label(__('tbtop-cms::menus.fields.type'))->required()
                 ->options([
                     ['value' => 'page', 'label' => __('tbtop-cms::menus.types.page')],
+                    ['value' => 'category', 'label' => __('tbtop-cms::menus.types.category')],
                     ['value' => 'url', 'label' => __('tbtop-cms::menus.types.url')],
                     ['value' => 'anchor', 'label' => __('tbtop-cms::menus.types.anchor')],
                 ]),
             $s->select('page_id')->label(__('tbtop-cms::menus.fields.page'))
                 ->options(self::pageOptions())
                 ->hiddenIf('type', '!=', 'page'),
+            $s->select('category_id')->label(__('tbtop-cms::menus.fields.category'))
+                ->options(self::categoryOptions())
+                ->hiddenIf('type', '!=', 'category'),
             $s->text('url')->label(__('tbtop-cms::menus.fields.url'))
                 ->hiddenIf('type', '!=', 'url'),
             $s->text('anchor')->label(__('tbtop-cms::menus.fields.anchor'))
                 ->helperText(__('tbtop-cms::menus.fields.anchor_hint'))
                 ->hiddenIf('type', '!=', 'anchor'),
+            $s->boolean('target_blank')->label(__('tbtop-cms::menus.fields.target_blank')),
         ];
     }
 
@@ -130,7 +135,7 @@ class MenuForm
                 continue;
             }
 
-            $type = in_array($row['type'] ?? null, ['page', 'url', 'anchor'], true)
+            $type = in_array($row['type'] ?? null, ['page', 'category', 'url', 'anchor'], true)
                 ? $row['type']
                 : 'page';
 
@@ -138,10 +143,16 @@ class MenuForm
 
             if ($type === 'page' && isset($row['page_id']) && $row['page_id'] !== '') {
                 $item['page_id'] = (int) $row['page_id'];
+            } elseif ($type === 'category' && isset($row['category_id']) && $row['category_id'] !== '') {
+                $item['category_id'] = (int) $row['category_id'];
             } elseif ($type === 'url') {
                 $item['url'] = (string) ($row['url'] ?? '');
             } elseif ($type === 'anchor') {
                 $item['anchor'] = (string) ($row['anchor'] ?? '');
+            }
+
+            if (! empty($row['target_blank'])) {
+                $item['target_blank'] = true;
             }
 
             if ($depth < 1) {
@@ -160,10 +171,28 @@ class MenuForm
     /** @return list<array{value: string, label: string}> */
     public static function pageOptions(): array
     {
+        return self::optionsForType('page');
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    public static function categoryOptions(): array
+    {
+        return self::optionsForType('category');
+    }
+
+    /**
+     * Published records of one page type (page or category), as picker
+     * options. Articles are intentionally excluded from menu targets.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private static function optionsForType(string $type): array
+    {
         $default = app(Languages::class)->defaultLocale();
         $options = [];
 
         $pages = Page::query()
+            ->where('type', $type)
             ->where('status', PageStatus::Published->value)
             ->orderBy('sort_order')
             ->orderBy('id')

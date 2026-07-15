@@ -36,9 +36,12 @@ it('persists a nested item tree, keeping only fields for each chosen type', func
                 'label' => 'Products',
                 'type' => 'page',
                 'page_id' => '7',
-                // url/anchor for other types must be dropped on a page item
+                'target_blank' => true,
+                // url/category/anchor for other types must be dropped on a page item
                 'url' => 'https://leak.example',
+                'category_id' => '99',
                 'children' => [
+                    ['label' => 'Blog', 'type' => 'category', 'category_id' => '3'],
                     ['label' => 'Laptops', 'type' => 'url', 'url' => 'https://shop/laptops'],
                     ['label' => 'Jump', 'type' => 'anchor', 'anchor' => '#deals'],
                 ],
@@ -54,12 +57,26 @@ it('persists a nested item tree, keeping only fields for each chosen type', func
                 'type' => 'page',
                 'label' => 'Products',
                 'page_id' => 7,
+                'target_blank' => true,
                 'children' => [
+                    ['type' => 'category', 'label' => 'Blog', 'category_id' => 3],
                     ['type' => 'url', 'label' => 'Laptops', 'url' => 'https://shop/laptops'],
                     ['type' => 'anchor', 'label' => 'Jump', 'anchor' => '#deals'],
                 ],
             ],
         ]);
+});
+
+it('omits target_blank when the checkbox is off', function (): void {
+    $menu = MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [
+            ['label' => 'Home', 'type' => 'url', 'url' => '/', 'target_blank' => false],
+        ],
+    ]);
+
+    expect($menu->items[0])->not->toHaveKey('target_blank');
 });
 
 it('drops rows with an empty label and caps nesting at two levels', function (): void {
@@ -102,14 +119,32 @@ it('loads a stored menu back into repeater rows', function (): void {
         ->and($row['items'][0]['url'])->toBe('/');
 });
 
-it('offers only published pages in the picker options', function (): void {
-    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Live']]);
-    Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Hidden']]);
+it('offers only published pages in the page picker, excluding categories and articles', function (): void {
+    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
+    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
+    $cat = Page::factory()->create(['type' => 'category', 'status' => PageStatus::Published, 'name' => ['en' => 'A category']]);
+    Page::factory()->create(['type' => 'article', 'status' => PageStatus::Published, 'parent_id' => $cat->id, 'name' => ['en' => 'An article']]);
 
     $labels = array_column(MenuForm::pageOptions(), 'label');
 
-    expect($labels)->toContain('Live')
-        ->and($labels)->not->toContain('Hidden');
+    expect($labels)->toContain('Live page')
+        ->and($labels)->not->toContain('Draft page')
+        ->and($labels)->not->toContain('A category')
+        ->and($labels)->not->toContain('An article');
+});
+
+it('offers only published categories in the category picker, excluding pages and articles', function (): void {
+    $cat = Page::factory()->create(['type' => 'category', 'status' => PageStatus::Published, 'name' => ['en' => 'Live category']]);
+    Page::factory()->create(['type' => 'category', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft category']]);
+    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'A page']]);
+    Page::factory()->create(['type' => 'article', 'status' => PageStatus::Published, 'parent_id' => $cat->id, 'name' => ['en' => 'An article']]);
+
+    $labels = array_column(MenuForm::categoryOptions(), 'label');
+
+    expect($labels)->toContain('Live category')
+        ->and($labels)->not->toContain('Draft category')
+        ->and($labels)->not->toContain('A page')
+        ->and($labels)->not->toContain('An article');
 });
 
 it('shows the menus list to an admin user', function (): void {
