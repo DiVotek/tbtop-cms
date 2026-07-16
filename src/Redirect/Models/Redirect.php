@@ -18,7 +18,14 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Redirect extends Model
 {
-    protected $guarded = [];
+    /**
+     * created_by/updated_by exist in the schema and docblock but nothing in
+     * the codebase writes them yet — left out until something actually
+     * sets them.
+     *
+     * @var list<string>
+     */
+    protected $fillable = ['locale', 'from_path', 'to_path', 'status_code', 'is_auto'];
 
     /** @var array<string, string> */
     protected $casts = [

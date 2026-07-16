@@ -46,4 +46,13 @@ return [
         'title' => 'No redirects yet',
         'description' => 'Create your first redirect.',
     ],
+    'validation' => [
+        'paths_required' => 'From and to paths are required.',
+        'from_not_external' => 'From path must be a local path, not an external URL.',
+        'to_invalid_url' => 'External redirect target must be a valid http(s) URL with a host.',
+        'to_host_not_allowlisted' => 'External redirect host is not allowlisted. Add it to tbtop-cms.redirects.allowed_external_hosts to allow it.',
+        'status_invalid' => 'Status code must be 301 or 302.',
+        'from_taken' => 'A redirect already exists for this path and locale.',
+        'from_shadows_page' => 'A page already exists at this path.',
+    ],
 ];

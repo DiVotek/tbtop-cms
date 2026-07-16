@@ -96,4 +96,12 @@ return [
         'updated' => 'Updated',
         'created' => 'Created',
     ],
+    'validation' => [
+        'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
+        'type_unregistered' => 'Page type [:type] is not registered.',
+        'status_invalid' => 'Status [:status] is not a valid page status.',
+        'delete_has_children' => 'This page has child pages — move or delete them first.',
+        'delete_system' => 'System pages cannot be deleted.',
+        'status_change_system' => 'The status of a system page cannot be changed.',
+    ],
 ];

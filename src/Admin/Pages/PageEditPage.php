@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use DomainException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
@@ -89,7 +90,7 @@ class PageEditPage extends AdminPage
             $s,
             route('tbtop.cms.pages-page'),
             $saveFooter,
-            $page->is_system ? null : $this->deleteAction($s),
+            $this->canDelete($page) ? $this->deleteAction($s) : null,
         );
 
         $form = $s->form('pageEditor', [
@@ -155,12 +156,35 @@ class PageEditPage extends AdminPage
             ->handle(fn (ActionCtx $ctx): Effects => $this->delete());
     }
 
+    /**
+     * PageObserver::deleting() throws DomainException for a system page or
+     * a page with children — the UI already hides the delete button for
+     * both cases (see canDelete()), so this is defense-in-depth against any
+     * caller that reaches the action without going through that guard (e.g.
+     * a stale page in another open tab). Surfaced via notify(..., 'error')
+     * rather than haltModal(): this is a plain footer action, not a modal.
+     */
     private function delete(): Effects
     {
-        $this->page()->delete();
+        try {
+            $this->page()->delete();
+        } catch (DomainException $e) {
+            return Effects::make()->notify($e->getMessage(), 'error');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::pages.actions.deleted'))
             ->redirect(route('tbtop.cms.pages-page'));
+    }
+
+    /**
+     * Mirrors PageObserver::deleting()'s invariants (system page, or a page
+     * with children) so the delete button never appears for a page that
+     * would fail to delete. children() is an existing hasMany — cheap
+     * exists() check, no new query shape.
+     */
+    private function canDelete(Page $page): bool
+    {
+        return ! $page->is_system && ! $page->children()->exists();
     }
 
     private function page(): Page

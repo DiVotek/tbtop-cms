@@ -533,6 +533,31 @@ it('deletes a regular page and redirects to the list', function (): void {
     expect($effects)->toContain('redirect');
 });
 
+it('hides and unregisters the delete action for a page that has children, instead of it 500ing', function (): void {
+    $category = Page::factory()->category()->create();
+    Page::factory()->article()->create(['parent_id' => $category->id]);
+
+    // The DSL rebuilds the page fresh per request (ResolvedPage::fromRequest);
+    // once canDelete() omits deleteAction($s), pageEditDelete is never added
+    // to collectedActions(), so the route resolves to a clean 404 instead of
+    // reaching PageObserver's DomainException at all.
+    $response = test()->actingAs(makePageEditAdmin(), 'web')
+        ->postJson("/admin/pages/{$category->id}/edit/actions/pageEditDelete", ['payload' => []]);
+
+    $response->assertNotFound();
+    expect(Page::query()->find($category->id))->not->toBeNull();
+});
+
+it('hides delete from the form footer for a page that has children', function (): void {
+    $category = Page::factory()->category()->create();
+    Page::factory()->article()->create(['parent_id' => $category->id]);
+
+    $form = findNodeByKind(pageEditStructure($category->id)['props']['structure'], 'form');
+    $footerActions = footerActionNames($form);
+
+    expect($footerActions)->toBe(['cancel', 'save']);
+});
+
 /** @return array<string, mixed> Minimal valid general/SEO payload for the pageEditor form. */
 function baseEditPayload(): array
 {

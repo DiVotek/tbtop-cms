@@ -28,7 +28,25 @@ use Tbtop\Cms\Page\Models\Page;
  */
 class FormSubmission extends Model
 {
-    protected $guarded = [];
+    /**
+     * handled_at is written only via forceFill() (SubmissionRetrier,
+     * FormSubmitController) and stays out of this list on purpose; every
+     * other column here is mass-assigned somewhere (created_at is set
+     * explicitly in dashboard/list tests to control ordering).
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'page_id',
+        'block_id',
+        'kind',
+        'locale',
+        'payload',
+        'status',
+        'lead_status',
+        'error',
+        'created_at',
+    ];
 
     protected $table = 'cms_form_submissions';
 

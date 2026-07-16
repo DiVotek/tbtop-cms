@@ -16,7 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PageSlug extends Model
 {
-    protected $guarded = [];
+    /** @var list<string> */
+    protected $fillable = ['page_id', 'locale', 'slug', 'path'];
 
     /** @return BelongsTo<Page, $this> */
     public function page(): BelongsTo

@@ -17,7 +17,14 @@ class Template extends Model
 {
     protected $table = 'cms_templates';
 
-    protected $guarded = [];
+    /**
+     * created_by/updated_by exist in the schema and docblock but nothing in
+     * the codebase writes them yet — left out until something actually
+     * sets them.
+     *
+     * @var list<string>
+     */
+    protected $fillable = ['name', 'content'];
 
     /** @var array<string, string> */
     protected $casts = [

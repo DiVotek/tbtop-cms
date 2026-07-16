@@ -46,7 +46,31 @@ class Page extends Model
     use HasTranslations;
     use SoftDeletes;
 
-    protected $guarded = [];
+    /**
+     * created_by/updated_by/lock_version exist in the schema and docblock
+     * but nothing in the codebase writes them yet (no observer/trait wires
+     * them) — left out until something actually sets them. created_at is
+     * mass-assigned explicitly in list-ordering tests.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'type',
+        'parent_id',
+        'status',
+        'name',
+        'title',
+        'heading',
+        'summary',
+        'body',
+        'image',
+        'content',
+        'seo',
+        'is_indexable',
+        'is_system',
+        'sort_order',
+        'created_at',
+    ];
 
     /** @var list<string> */
     public array $translatable = ['name', 'title', 'heading', 'summary', 'body'];

@@ -74,8 +74,35 @@ it('rejects an external URL as the from path', function (): void {
 it('rejects an external to path whose host is not allowlisted', function (): void {
     config()->set('tbtop-cms.redirects.allowed_external_hosts', []);
 
-    RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://evil.test/landing', 'locale' => '', 'status_code' => '301']);
-})->throws(ValidationException::class);
+    $caught = null;
+
+    try {
+        RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://evil.test/landing', 'locale' => '', 'status_code' => '301']);
+    } catch (ValidationException $e) {
+        $caught = $e;
+    }
+
+    expect($caught)->toBeInstanceOf(ValidationException::class)
+        ->and($caught?->errors()['to_path'][0])->toContain('not allowlisted')
+        ->toContain('tbtop-cms.redirects.allowed_external_hosts');
+});
+
+it('rejects an external to path whose host is not allowlisted, localized to uk', function (): void {
+    app()->setLocale('uk');
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', []);
+
+    $caught = null;
+
+    try {
+        RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://evil.test/landing', 'locale' => '', 'status_code' => '301']);
+    } catch (ValidationException $e) {
+        $caught = $e;
+    }
+
+    expect($caught)->toBeInstanceOf(ValidationException::class)
+        ->and($caught?->errors()['to_path'][0])->toBe(__('tbtop-cms::redirects.validation.to_host_not_allowlisted'))
+        ->toContain('tbtop-cms.redirects.allowed_external_hosts');
+});
 
 it('accepts an external to path whose host is allowlisted', function (): void {
     config()->set('tbtop-cms.redirects.allowed_external_hosts', ['example.com']);
