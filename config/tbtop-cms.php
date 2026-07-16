@@ -53,6 +53,12 @@ return [
             'enabled' => true,
         ],
     ],
+    'preview' => [
+        // Hours a signed draft-preview link stays valid for. Read with an
+        // inline default (config('tbtop-cms.preview.link_ttl_hours', 72)) —
+        // published host configs override whole sections and won't have this key.
+        'link_ttl_hours' => 72,
+    ],
     'settings' => [
         'secret' => [
             'notifications.mail.smtp_password',

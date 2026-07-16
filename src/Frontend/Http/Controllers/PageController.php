@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
@@ -16,6 +17,7 @@ use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
+use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\RedirectResolver;
 
@@ -36,8 +38,9 @@ class PageController
     {
         $locale = (string) app()->getLocale();
         $path = (string) $request->attributes->get('cms_path', '');
+        $previewAccess = $this->hasPreviewAccess($request);
 
-        $page = $this->resolver->resolve($path, $locale);
+        $page = $this->resolver->resolve($path, $locale, $previewAccess);
 
         if (! $page instanceof Page) {
             return $this->redirects->resolve($path, $locale, $request)
@@ -47,15 +50,30 @@ class PageController
         return Inertia::render($this->component(), $this->props($page, $locale, $path));
     }
 
-    private function component(): string
+    /**
+     * Preview access is granted to a user allowed into the cms admin
+     * (CurrentAdmin::canAccess — the same rule EnsureCmsAdmin enforces on
+     * panel routes, NOT mere guard authentication: the guard is often the
+     * host app's regular end-user guard) or to a request carrying a valid
+     * signed preview URL (see PreviewLink). Anyone else falls through to
+     * the normal published-only lookup, so an unpublished path still 404s
+     * (or falls back to a redirect) for them.
+     */
+    private function hasPreviewAccess(Request $request): bool
     {
-        return (string) config('tbtop-cms.render.component', 'Cms/Page');
+        return CurrentAdmin::canAccess() || $request->hasValidSignature();
     }
 
     /** @return array<string, mixed> */
     private function props(Page $page, string $locale, string $path): array
     {
         $resolved = $this->forms->bind($this->blocks->resolve($page->content ?? [], $page), $page);
+        $isPreview = $page->status === PageStatus::Draft;
+        $seo = $this->seo->resolve($page, $locale);
+
+        if ($isPreview) {
+            $seo['noindex'] = true;
+        }
 
         return [
             'page' => [
@@ -69,10 +87,16 @@ class PageController
                 'image' => $this->resolveImage($page->image),
             ],
             'render' => $this->assembler->assemble($resolved),
-            'seo' => $this->seo->resolve($page, $locale),
+            'seo' => $seo,
             'breadcrumbs' => $this->breadcrumbs->forPage($page, $locale),
             'path' => $path,
+            'isPreview' => $isPreview,
         ];
+    }
+
+    private function component(): string
+    {
+        return (string) config('tbtop-cms.render.component', 'Cms/Page');
     }
 
     // image stores a media id, not a URL; resolve() already returns null for

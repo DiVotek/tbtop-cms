@@ -591,6 +591,26 @@ it('ignores a slug override submitted for the system page and keeps its slug/pat
         ->and(Redirect::query()->where('locale', 'en')->exists())->toBeFalse();
 });
 
+it('shows the preview-link action in the status bar for a draft page', function (): void {
+    $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
+
+    $form = findNodeByKind(pageEditStructure($draft->id)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][0];
+    $names = array_column($statusBar['options']['children'], 'name');
+
+    expect($names)->toContain('pagePreviewLink');
+});
+
+it('omits the preview-link action from the status bar for a published page', function (): void {
+    $published = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
+
+    $form = findNodeByKind(pageEditStructure($published->id)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][0];
+    $names = array_column($statusBar['options']['children'], 'name');
+
+    expect($names)->not->toContain('pagePreviewLink');
+});
+
 it('keeps delete in the form footer for regular pages', function (): void {
     $regular = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 

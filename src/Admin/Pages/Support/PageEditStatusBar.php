@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Admin\Actions\ActionCtx;
+use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\DisplayValueBlock;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\PreviewLink;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -36,8 +40,52 @@ final class PageEditStatusBar
             $s->spacer(),
             ...self::timestamps($s, $page),
             $viewOnSite,
+            ...self::previewLinkAction($s, $page),
             $saveTop,
         ], align: 'center', gap: 3, wrap: true, variant: 'card', class: 'text-xs');
+    }
+
+    /**
+     * Draft-only: a published page has nothing to preview ahead of the live
+     * site, so the action (and the modal it opens) simply doesn't exist for
+     * it — mirrors canDelete()'s server-side conditional-build pattern in
+     * PageEditPage rather than hiding a built action client-side.
+     *
+     * @return list<ActionBuilder>
+     */
+    private static function previewLinkAction(S $s, Page $page): array
+    {
+        if ($page->status !== PageStatus::Draft) {
+            return [];
+        }
+
+        $close = $s->action('pagePreviewLinkClose')->label(__('tbtop-cms::pages.preview.close'))
+            ->handle(static fn (ActionCtx $ctx): Effects => Effects::make()->closeModal());
+
+        $field = $s->text('previewUrl')->label(__('tbtop-cms::pages.preview.field_label'))->meta('disabled', true);
+
+        // The signed URL is only fetched via the action's query() below (which
+        // runs when the modal opens) — this form carries no onSubmit because
+        // there's nothing to save, only a value to display and copy.
+        $form = $s->form('pagePreviewLinkForm', [
+            $field,
+            $s->displayText(__('tbtop-cms::pages.preview.helper', ['hours' => self::ttlHours()]))->variant('muted'),
+            $s->flex([$s->spacer(), $close], justify: 'end'),
+        ])->guardUnsaved(false);
+
+        return [
+            $s->action('pagePreviewLink')->label(__('tbtop-cms::pages.actions.preview_link'))
+                ->icon('eye')
+                ->modal(__('tbtop-cms::pages.actions.preview_link_title'), $form)
+                ->query(static fn (ActionCtx $ctx): array => [
+                    'previewUrl' => app(PreviewLink::class)->for($page, app(Languages::class)->defaultLocale()),
+                ], needs: []),
+        ];
+    }
+
+    private static function ttlHours(): int
+    {
+        return (int) config('tbtop-cms.preview.link_ttl_hours', 72);
     }
 
     private static function statusBadge(S $s, Page $page): DisplayValueBlock

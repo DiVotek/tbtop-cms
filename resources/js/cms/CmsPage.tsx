@@ -1,5 +1,6 @@
 import { Head, usePage } from "@inertiajs/react";
 import { JSONUIProvider, Renderer, type Spec } from "@json-render/react";
+import type { CSSProperties } from "react";
 import { registry } from "./registry";
 
 interface Seo {
@@ -15,11 +16,23 @@ interface Seo {
 interface CmsPageProps {
     render: Spec;
     seo: Seo;
+    isPreview?: boolean;
     [key: string]: unknown;
 }
 
+const bannerStyle: CSSProperties = {
+    position: "sticky",
+    top: 0,
+    zIndex: 9999,
+    padding: "6px 12px",
+    background: "#1f2937",
+    color: "#ffffff",
+    fontSize: "12px",
+    textAlign: "center",
+};
+
 export default function CmsPage() {
-    const { render, seo } = usePage<CmsPageProps>().props;
+    const { render, seo, isPreview } = usePage<CmsPageProps>().props;
 
     return (
         <>
@@ -32,6 +45,7 @@ export default function CmsPage() {
                 {seo.ogDescription ? <meta property="og:description" content={seo.ogDescription} /> : null}
                 {seo.ogImage ? <meta property="og:image" content={seo.ogImage} /> : null}
             </Head>
+            {isPreview ? <div style={bannerStyle}>Draft preview — this page is not published.</div> : null}
             <JSONUIProvider registry={registry}>
                 <Renderer spec={render} registry={registry} />
             </JSONUIProvider>
