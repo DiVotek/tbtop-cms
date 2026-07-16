@@ -16,7 +16,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CmsUserProfile extends Model
 {
-    protected $guarded = [];
+    /**
+     * locale/display_name/avatar_media_id are written only via forceFill()
+     * (ProfileActions::personal()/preferences()), which bypasses this list
+     * entirely — user_id is the only column ever set through mass assignment.
+     *
+     * @var list<string>
+     */
+    protected $fillable = ['user_id'];
 
     /** @return BelongsTo<Model, $this> */
     public function user(): BelongsTo

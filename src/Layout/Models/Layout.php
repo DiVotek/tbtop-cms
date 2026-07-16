@@ -15,7 +15,8 @@ class Layout extends Model
 {
     protected $table = 'cms_layouts';
 
-    protected $guarded = [];
+    /** @var list<string> */
+    protected $fillable = ['slot', 'content'];
 
     /** @var array<string, string> */
     protected $casts = [

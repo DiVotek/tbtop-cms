@@ -20,7 +20,8 @@ class Menu extends Model
 {
     protected $table = 'cms_menus';
 
-    protected $guarded = [];
+    /** @var list<string> */
+    protected $fillable = ['key', 'name', 'items'];
 
     /** @var array<string, string> */
     protected $casts = [

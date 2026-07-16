@@ -28,7 +28,15 @@ class Language extends Model
 
     use SoftDeletes;
 
-    protected $guarded = [];
+    /** @var list<string> */
+    protected $fillable = [
+        'name',
+        'locale',
+        'is_default',
+        'is_admin_active',
+        'is_frontend_active',
+        'sort_order',
+    ];
 
     /** @var array<string, string> */
     protected $casts = [
