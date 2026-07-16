@@ -16,7 +16,7 @@ class RedirectValidator
     public static function assert(array $data, ?int $id): void
     {
         if ($data['from'] === '' || $data['to'] === '') {
-            throw ValidationException::withMessages(['from_path' => 'From and to paths are required.']);
+            throw ValidationException::withMessages(['from_path' => __('tbtop-cms::redirects.validation.paths_required')]);
         }
 
         self::assertFromNotExternal($data['from']);
@@ -31,7 +31,7 @@ class RedirectValidator
     {
         if (RedirectPath::isExternal($from)) {
             throw ValidationException::withMessages([
-                'from_path' => 'From path must be a local path, not an external URL.',
+                'from_path' => __('tbtop-cms::redirects.validation.from_not_external'),
             ]);
         }
     }
@@ -48,7 +48,7 @@ class RedirectValidator
 
         if (! in_array($scheme, ['http', 'https'], true) || ! is_string($host) || $host === '') {
             throw ValidationException::withMessages([
-                'to_path' => 'External redirect target must be a valid http(s) URL with a host.',
+                'to_path' => __('tbtop-cms::redirects.validation.to_invalid_url'),
             ]);
         }
 
@@ -56,7 +56,7 @@ class RedirectValidator
 
         if (! in_array(strtolower($host), $allowed, true)) {
             throw ValidationException::withMessages([
-                'to_path' => 'External redirect host is not allowlisted. Add it to tbtop-cms.redirects.allowed_external_hosts to allow it.',
+                'to_path' => __('tbtop-cms::redirects.validation.to_host_not_allowlisted'),
             ]);
         }
     }
@@ -64,7 +64,7 @@ class RedirectValidator
     private static function assertStatus(int $status): void
     {
         if (! in_array($status, [301, 302], true)) {
-            throw ValidationException::withMessages(['status_code' => 'Status code must be 301 or 302.']);
+            throw ValidationException::withMessages(['status_code' => __('tbtop-cms::redirects.validation.status_invalid')]);
         }
     }
 
@@ -77,7 +77,7 @@ class RedirectValidator
         }
 
         if ($query->exists()) {
-            throw ValidationException::withMessages(['from_path' => 'A redirect already exists for this path and locale.']);
+            throw ValidationException::withMessages(['from_path' => __('tbtop-cms::redirects.validation.from_taken')]);
         }
     }
 
@@ -90,7 +90,7 @@ class RedirectValidator
         }
 
         if ($query->exists()) {
-            throw ValidationException::withMessages(['from_path' => 'A page already exists at this path.']);
+            throw ValidationException::withMessages(['from_path' => __('tbtop-cms::redirects.validation.from_shadows_page')]);
         }
     }
 }

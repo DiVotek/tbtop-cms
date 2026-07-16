@@ -42,7 +42,7 @@ class PageObserver
     public function deleting(Page $page): void
     {
         if ($page->is_system) {
-            throw new DomainException("Cannot delete system page [{$page->id}].");
+            throw new DomainException(__('tbtop-cms::pages.validation.delete_system'));
         }
 
         $children = Page::query()->where('parent_id', $page->id);
@@ -52,7 +52,7 @@ class PageObserver
         }
 
         if ($children->exists()) {
-            throw new DomainException("Cannot delete page [{$page->id}]: it has children.");
+            throw new DomainException(__('tbtop-cms::pages.validation.delete_has_children'));
         }
 
         $this->slugs->remove($page);
@@ -61,7 +61,7 @@ class PageObserver
     private function guardSystemStatus(Page $page): void
     {
         if ($page->is_system && $page->isDirty('status')) {
-            throw new DomainException("Cannot change status of system page [{$page->id}].");
+            throw new DomainException(__('tbtop-cms::pages.validation.status_change_system'));
         }
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use DomainException;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
@@ -100,7 +101,26 @@ class PageForm
             $page->pendingSlugOverrides = self::stringMap($form['slug'] ?? null);
         }
 
-        $page->save();
+        // PageObserver enforces invariants (system-page status lock, type/
+        // parent hierarchy rules) as DomainException during save(). The UI
+        // already avoids submitting a changed status/type/parent for system
+        // pages (see fillAttributes()/guardTypeAndStatus() above), so this is
+        // defense-in-depth for any caller that reaches save() without going
+        // through those guards — without it, the exception would bubble out
+        // of the form's onSubmit handler as an unhandled 500 instead of a
+        // field error. The field picked mirrors exactly what the observer
+        // itself inspects (dirty status vs. dirty type/parent), not the
+        // exception's message text.
+        $statusDirty = $page->isDirty('status');
+        $hierarchyDirty = $page->isDirty(['type', 'parent_id']);
+
+        try {
+            $page->save();
+        } catch (DomainException $e) {
+            $field = $statusDirty ? 'status' : ($hierarchyDirty ? 'type' : 'status');
+
+            throw ValidationException::withMessages([$field => $e->getMessage()]);
+        }
 
         return $page;
     }
@@ -238,7 +258,7 @@ class PageForm
 
         if ($parentId === $page->getKey() || in_array($parentId, self::descendantIds($page), true)) {
             throw ValidationException::withMessages([
-                'parent_id' => 'A page cannot be placed under itself or one of its descendants.',
+                'parent_id' => __('tbtop-cms::pages.validation.parent_cycle'),
             ]);
         }
     }
@@ -253,7 +273,7 @@ class PageForm
         $type = (string) ($form['type'] ?? '');
         if (! app(PageTypeRegistry::class)->has($type)) {
             throw ValidationException::withMessages([
-                'type' => "Page type [{$type}] is not registered.",
+                'type' => __('tbtop-cms::pages.validation.type_unregistered', ['type' => $type]),
             ]);
         }
 
@@ -264,7 +284,7 @@ class PageForm
     {
         if (PageStatus::tryFrom($status) === null) {
             throw ValidationException::withMessages([
-                'status' => "Status [{$status}] is not a valid page status.",
+                'status' => __('tbtop-cms::pages.validation.status_invalid', ['status' => $status]),
             ]);
         }
     }
