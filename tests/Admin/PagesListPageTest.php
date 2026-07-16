@@ -69,9 +69,9 @@ it('renders the divotek-style pages list wire shape', function (): void {
         ->and($cols['status']['badge']['colors'])->toBe(['Published' => 'success', 'Draft' => 'warning'])
         ->and($cols['updated_at']['kind'] ?? null)->toBe('date');
 
-    // Toolbar (search + column toggle) hidden; the whole row links to the edit page.
-    expect($opts['searchInput'] ?? null)->toBeFalse()
-        ->and($opts['columnToggle'] ?? null)->toBeFalse()
+    // Toolbar (search + column toggle) visible (not explicitly disabled); the whole row links to the edit page.
+    expect($opts['searchInput'] ?? null)->not->toBeFalse()
+        ->and($opts['columnToggle'] ?? null)->not->toBeFalse()
         ->and($opts['recordUrl'] ?? null)->toBeTrue();
 
     // Row actions: only the external view-on-site link (quick-edit removed; the row itself links to the edit page).
@@ -102,6 +102,27 @@ it('scopes the tab queries by page type and parent', function (): void {
         ->and(array_column($rows('categories'), 'type'))->toBe(['Category'])
         ->and(array_column($rows('pages'), 'type'))->toBe(['Page'])
         ->and(array_column($rows('articles'), 'type'))->toBe(['Article']);
+});
+
+it('renders the toolbar with a search input', function (): void {
+    $node = pagesTableNode();
+    $opts = $node['options'];
+
+    // No explicit toolbar()/searchInput() call → back-compat default: renders
+    // as long as searchable fields are declared (see TableToolbar client logic).
+    expect($opts['searchInput'] ?? null)->not->toBeFalse()
+        ->and($opts['searchable'] ?? [])->not->toBeEmpty();
+});
+
+it('searches the list by page title, matching only rows whose title contains the term', function (): void {
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About Us']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'Contact']]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all&search=About')
+        ->assertOk()
+        ->json('data.data');
+
+    expect(array_column($rows, 'name'))->toBe(['About Us']);
 });
 
 it('projects parent name, formatted status, and slug path into list rows', function (): void {

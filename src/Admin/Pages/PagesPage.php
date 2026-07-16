@@ -88,7 +88,7 @@ class PagesPage extends AdminPage
                 $this->tab('articles')
                     ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNotNull('pages.parent_id')),
             ])
-            ->toolbar(false)
+            ->searchable(['pages.name'])
             ->defaultSort('sort_key', 'asc')
             ->emptyState(__('tbtop-cms::pages.empty'))
             ->recordUrl(static fn (Page $row): string => route('tbtop.cms.page-edit-page', ['page' => $row->id]))

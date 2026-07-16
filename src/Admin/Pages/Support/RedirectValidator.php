@@ -20,6 +20,7 @@ class RedirectValidator
         }
 
         self::assertFromNotExternal($data['from']);
+        self::assertToAllowed($data['to']);
         self::assertStatus($data['status']);
         self::assertUnique($data['locale'], $data['from'], $id);
         self::assertNotShadowing($data['locale'], $data['from']);
@@ -31,6 +32,31 @@ class RedirectValidator
         if (RedirectPath::isExternal($from)) {
             throw ValidationException::withMessages([
                 'from_path' => 'From path must be a local path, not an external URL.',
+            ]);
+        }
+    }
+
+    private static function assertToAllowed(string $to): void
+    {
+        if (! RedirectPath::isExternal($to)) {
+            return;
+        }
+
+        $parts = parse_url($to);
+        $scheme = is_array($parts) ? ($parts['scheme'] ?? null) : null;
+        $host = is_array($parts) ? ($parts['host'] ?? null) : null;
+
+        if (! in_array($scheme, ['http', 'https'], true) || ! is_string($host) || $host === '') {
+            throw ValidationException::withMessages([
+                'to_path' => 'External redirect target must be a valid http(s) URL with a host.',
+            ]);
+        }
+
+        $allowed = array_map('strtolower', config('tbtop-cms.redirects.allowed_external_hosts', []));
+
+        if (! in_array(strtolower($host), $allowed, true)) {
+            throw ValidationException::withMessages([
+                'to_path' => 'External redirect host is not allowlisted. Add it to tbtop-cms.redirects.allowed_external_hosts to allow it.',
             ]);
         }
     }

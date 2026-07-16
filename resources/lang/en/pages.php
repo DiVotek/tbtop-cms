@@ -86,7 +86,7 @@ return [
         'active' => 'Active',
         'sort' => 'Order',
         'add' => 'Add :kind',
-        'added' => 'Block added',
+        'added' => 'Block added (inactive) and saved. Configure and activate it when ready.',
         'remove' => 'Remove block',
         'remove_title' => 'Remove block?',
         'remove_confirm' => 'This cannot be undone.',

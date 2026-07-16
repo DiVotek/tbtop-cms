@@ -70,3 +70,59 @@ it('loads a redirect row for editing', function (): void {
 it('rejects an external URL as the from path', function (): void {
     RedirectForm::save(['from_path' => 'https://evil.test/x', 'to_path' => 'safe', 'locale' => '', 'status_code' => '301']);
 })->throws(ValidationException::class);
+
+it('rejects an external to path whose host is not allowlisted', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', []);
+
+    RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://evil.test/landing', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);
+
+it('accepts an external to path whose host is allowlisted', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['example.com']);
+
+    $redirect = RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://example.com/landing', 'locale' => '', 'status_code' => '301']);
+
+    expect($redirect->to_path)->toBe('https://example.com/landing');
+});
+
+it('matches the allowlisted host case-insensitively', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['Example.COM']);
+
+    $redirect = RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://EXAMPLE.com/landing', 'locale' => '', 'status_code' => '301']);
+
+    expect($redirect->to_path)->toBe('https://EXAMPLE.com/landing');
+});
+
+it('rejects a subdomain of an allowlisted host', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['example.com']);
+
+    RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://sub.example.com/landing', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);
+
+it('rejects a protocol-relative to path even when the host is allowlisted', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['evil.com']);
+
+    RedirectForm::save(['from_path' => 'gone', 'to_path' => '//evil.com', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);
+
+it('resolves the userinfo-tricked host to the real host, not the disguised one', function (): void {
+    // "https://evil.com\@good.com" looks like it points at evil.com, but parse_url
+    // reads "evil.com\" as userinfo and "good.com" as the actual host.
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['good.com']);
+
+    $redirect = RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://evil.com\@good.com', 'locale' => '', 'status_code' => '301']);
+
+    expect($redirect->to_path)->toBe('https://evil.com\@good.com');
+});
+
+it('rejects the userinfo-tricked host when the real host is not allowlisted', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['evil.com']);
+
+    RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https://evil.com\@good.com', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);
+
+it('rejects an external to path that parse_url cannot parse', function (): void {
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['example.com']);
+
+    RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https:///example.com', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);
