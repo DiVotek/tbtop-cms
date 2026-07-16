@@ -407,7 +407,7 @@ it('reads a legacy envelope without sort in its stored order, then assigns sort 
         ->and($content[1]['sort'])->toBe(1);
 });
 
-it('adds a new block via pageBlockAdd_{kind} and persists general fields from the payload', function (): void {
+it('adds a new block via pageBlockAdd_{kind} as inactive so it does not leak into public render', function (): void {
     $page = pageWithBlocks();
 
     $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
@@ -420,7 +420,7 @@ it('adds a new block via pageBlockAdd_{kind} and persists general fields from th
 
     expect($page->content)->toHaveCount(1)
         ->and($page->content[0]['kind'])->toBe('Simple')
-        ->and($page->content[0]['active'])->toBeTrue()
+        ->and($page->content[0]['active'])->toBeFalse()
         ->and($page->content[0]['sort'])->toBe(0)
         ->and($page->getTranslation('name', 'en'))->toBe('Renamed');
 
@@ -452,7 +452,7 @@ it('appends a new block after the highest existing sort', function (): void {
 
     expect($content)->toHaveCount(3)
         ->and($content[2]['sort'])->toBe(8)
-        ->and($content[2]['active'])->toBeTrue();
+        ->and($content[2]['active'])->toBeFalse();
 });
 
 it('removes a block via pageBlockRemove_{id} and keeps the other blocks intact', function (): void {

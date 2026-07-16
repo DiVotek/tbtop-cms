@@ -156,7 +156,11 @@ final class PageEditBlockTabs
     private static function handleAdd(ActionCtx $ctx, Page $page, string $kind): Effects
     {
         $existingRows = PageEditBlocks::toRows($ctx->form, $page);
-        $newRow = ['id' => (string) Str::ulid(), 'kind' => $kind, 'active' => true, 'sort' => self::nextSort($existingRows)];
+        // Persisted inactive: handleAdd saves outside the normal page Save
+        // cycle (see class docblock), so an empty, unconfigured block must
+        // not go live on a published page the moment it's added. The editor
+        // activates it explicitly once it's configured.
+        $newRow = ['id' => (string) Str::ulid(), 'kind' => $kind, 'active' => false, 'sort' => self::nextSort($existingRows)];
         $rows = [...$existingRows, $newRow];
 
         PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
