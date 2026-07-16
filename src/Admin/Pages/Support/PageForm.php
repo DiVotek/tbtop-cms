@@ -48,13 +48,26 @@ class PageForm
      * block content lives in its own per-block tabs (PageEditBlockTabs) —
      * neither belongs to this tab anymore.
      *
+     * $withSlug is false for the site-root system page (Home: is_system with
+     * no parent): its slug/path must stay '' (see PageSlugWriter::slugBase()/
+     * baseFor()), but RuleWalker collects `required` statically from the
+     * field tree, so a required slug field would make it unsaveable — and
+     * separately, the client slug field auto-derives from the name when it
+     * mounts over an empty value, which would propose "home" and move the
+     * site root off '/' on save. Omitting the field entirely avoids both.
+     *
      * @return list<Node|Field>
      */
-    public static function generalFields(S $s): array
+    public static function generalFields(S $s, bool $withSlug = true): array
     {
         return [
             $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
             $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
+            ...($withSlug ? [
+                $s->slug('slug')->label(__('tbtop-cms::pages.fields.slug'))->required()
+                    ->translatable()->fromField('name')
+                    ->helperText(__('tbtop-cms::pages.fields.slug_edit_hint')),
+            ] : []),
             $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable(),
             $s->textarea('summary')->label(__('tbtop-cms::pages.fields.summary'))->translatable(),
             $s->richtext('body')->label(__('tbtop-cms::pages.fields.body'))->translatable(),
@@ -97,9 +110,13 @@ class PageForm
 
         $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
 
-        if ($isCreate) {
-            $page->pendingSlugOverrides = self::stringMap($form['slug'] ?? null);
-        }
+        // Left unconditional rather than gated on ! $page->is_system: the
+        // edit form never submits a 'slug' key for the root system page
+        // (generalFields() omits the field — see its docblock), and even if
+        // a stray override reached here, PageSlugWriter::baseFor() ignores
+        // overrides for any is_system page outright. Gating here too would
+        // be redundant defense against the same already-guarded case.
+        $page->pendingSlugOverrides = self::stringMap($form['slug'] ?? null);
 
         // PageObserver enforces invariants (system-page status lock, type/
         // parent hierarchy rules) as DomainException during save(). The UI
@@ -239,6 +256,7 @@ class PageForm
             'is_indexable' => $page->is_indexable,
             'sort_order' => $page->sort_order,
             'paths' => $page->slugs->pluck('path', 'locale')->all(),
+            'slug' => $page->slugs->pluck('slug', 'locale')->all(),
             'content' => BlockContentField::toRows($page->content),
             'image' => (string) ($page->image ?? ''),
             'seo_title' => (string) ($seo['title'] ?? ''),

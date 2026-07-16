@@ -133,3 +133,26 @@ it('stores a null image when the form field is empty', function (): void {
     expect($page->image)->toBeNull()
         ->and(PageForm::loadRow($page->id)['image'])->toBe('');
 });
+
+it('updates the localized slug when the edit form submits a changed slug map', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Old Name']]);
+    expect($page->pathFor('en'))->toBe('old-name');
+
+    PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Published->value,
+        'name' => ['en' => 'Old Name'],
+        'parent_id' => '',
+        'slug' => ['en' => 'brand-new-slug'],
+    ], $page->id);
+
+    expect($page->fresh()->pathFor('en'))->toBe('brand-new-slug');
+});
+
+it('loads the localized slug map for editing', function (): void {
+    $page = Page::factory()->create(['name' => ['en' => 'Contact']]);
+
+    $row = PageForm::loadRow($page->id);
+
+    expect($row['slug'])->toBe(['en' => 'contact']);
+});
