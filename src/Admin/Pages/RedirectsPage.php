@@ -35,6 +35,12 @@ class RedirectsPage extends AdminPage
     }
 
     #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.redirects';
+    }
+
+    #[\Override]
     public function title(): string
     {
         return __('tbtop-cms::redirects.title');

@@ -20,5 +20,6 @@ return [
         'site_settings' => 'Налаштування сайту',
         'seo_settings' => 'SEO-налаштування',
         'notification_settings' => 'Сповіщення',
+        'users' => 'Користувачі',
     ],
 ];

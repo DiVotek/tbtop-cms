@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Tbtop\Admin\Media\Models\Media;
+use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
@@ -29,7 +30,7 @@ beforeEach(function (): void {
 function actingAsDashboardAdmin(): AdminUser
 {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
     test()->actingAs($user, 'web');
 
     return $user;

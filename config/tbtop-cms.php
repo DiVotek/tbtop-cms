@@ -22,6 +22,7 @@ use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
 use Tbtop\Cms\Admin\Pages\TemplateCreatePage;
 use Tbtop\Cms\Admin\Pages\TemplateEditPage;
 use Tbtop\Cms\Admin\Pages\TemplatesPage;
+use Tbtop\Cms\Admin\Pages\UsersPage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 
 return [
@@ -120,6 +121,7 @@ return [
             'menu_edit' => MenuEditPage::class,
             'blocks' => BlocksPage::class,
             'form_submissions' => FormSubmissionsPage::class,
+            'users' => UsersPage::class,
         ],
     ],
 ];

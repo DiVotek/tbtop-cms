@@ -23,6 +23,12 @@ abstract class SettingsPageBase extends Page
     /** @return list<Field|Node> */
     abstract protected function fields(S $s): array;
 
+    #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.settings';
+    }
+
     public function view(S $s): Node
     {
         // No settings list to cancel back to, unlike other EditFooter

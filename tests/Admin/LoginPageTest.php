@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Testing\TestResponse;
+use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
@@ -25,7 +26,7 @@ function submitLoginForm(array $payload): TestResponse
 function makeLoginableAdmin(): AdminUser
 {
     $user = AdminUser::create(['name' => 'A', 'email' => 'a@example.com', 'password' => 'correct-password']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
 
     return $user;
 }

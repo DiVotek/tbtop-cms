@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
@@ -16,7 +17,7 @@ beforeEach(function (): void {
 function actingAsSharedAdmin(): AdminUser
 {
     $user = AdminUser::create(['name' => 'Dana', 'email' => 'dana@example.com', 'password' => 'secret']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
 
     test()->actingAs($user, 'web');
 
