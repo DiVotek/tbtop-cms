@@ -6,10 +6,10 @@ namespace Tbtop\Cms\Frontend\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
@@ -51,18 +51,17 @@ class PageController
     }
 
     /**
-     * Preview access is granted to an authenticated admin (same guard the
-     * cms admin panel registers) or a request carrying a valid signed
-     * preview URL (see PreviewLink) — either lets lookup() drop the
-     * published-only filter. Anonymous requests without a valid signature
-     * fall through to the normal published-only lookup, so an unpublished
-     * path still 404s (or falls back to a redirect) for them.
+     * Preview access is granted to a user allowed into the cms admin
+     * (CurrentAdmin::canAccess — the same rule EnsureCmsAdmin enforces on
+     * panel routes, NOT mere guard authentication: the guard is often the
+     * host app's regular end-user guard) or to a request carrying a valid
+     * signed preview URL (see PreviewLink). Anyone else falls through to
+     * the normal published-only lookup, so an unpublished path still 404s
+     * (or falls back to a redirect) for them.
      */
     private function hasPreviewAccess(Request $request): bool
     {
-        $guard = (string) config('tbtop-cms.admin.guard', 'web');
-
-        return Auth::guard($guard)->check() || $request->hasValidSignature();
+        return CurrentAdmin::canAccess() || $request->hasValidSignature();
     }
 
     /** @return array<string, mixed> */

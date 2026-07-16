@@ -32,6 +32,17 @@ it('404s a draft page for an anonymous visitor', function (): void {
     test()->getJson('/secret')->assertNotFound();
 });
 
+it('404s a draft for an authenticated user without cms admin access', function (): void {
+    // Authenticated on the panel's guard but with no CmsUserProfile row —
+    // e.g. a regular end user of a host app whose `web` guard doubles as
+    // the cms admin guard. Guard authentication alone must NOT grant
+    // draft visibility.
+    $user = AdminUser::create(['name' => 'Visitor', 'email' => 'visitor@example.com', 'password' => 'secret']);
+    Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Secret']]);
+
+    test()->actingAs($user, 'web')->getJson('/secret')->assertNotFound();
+});
+
 it('shows a draft page to an authenticated admin with preview props set', function (): void {
     $page = Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Secret']]);
 
