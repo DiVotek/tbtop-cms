@@ -41,7 +41,7 @@ class Cms
 
             $this->seoRoutes();
 
-            Route::get('{path?}', PageController::class)->where('path', '.*');
+            Route::get('{path?}', PageController::class)->where('path', '.*')->name('tbtop-cms.page');
         });
     }
 

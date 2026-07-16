@@ -73,6 +73,8 @@ return [
     'actions' => [
         'new' => 'New',
         'view_on_site' => 'View on site',
+        'preview_link' => 'Preview link',
+        'preview_link_title' => 'Draft preview link',
         'create' => 'Create',
         'cancel' => 'Cancel',
         'create_title' => 'New page',
@@ -105,6 +107,11 @@ return [
     'status_bar' => [
         'updated' => 'Updated',
         'created' => 'Created',
+    ],
+    'preview' => [
+        'field_label' => 'Link',
+        'helper' => 'Link is valid for :hours hours.',
+        'close' => 'Close',
     ],
     'validation' => [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
