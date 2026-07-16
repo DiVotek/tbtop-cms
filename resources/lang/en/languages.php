@@ -5,6 +5,11 @@ declare(strict_types=1);
 return [
     'title' => 'Languages',
     'subtitle' => 'Languages available in the admin panel and on the site.',
+    'tabs' => [
+        'all' => 'All',
+        'deleted' => 'Deleted',
+    ],
+    'tabs_deleted_description' => 'Languages moved to the trash — restore them or delete permanently.',
     'columns' => [
         'name' => 'Name',
         'locale' => 'Locale',
@@ -12,6 +17,7 @@ return [
         'admin' => 'Admin',
         'frontend' => 'Frontend',
         'order' => 'Order',
+        'deleted_at' => 'Deleted',
     ],
     'empty' => [
         'title' => 'No languages yet',
@@ -41,7 +47,13 @@ return [
         'delete' => 'Delete',
         'deleted' => 'Language deleted',
         'delete_title' => 'Delete language?',
-        'delete_confirm' => 'This cannot be undone.',
+        'delete_confirm' => 'The language will be moved to Deleted, where you can restore it later.',
+        'restore' => 'Restore',
+        'restored' => 'Language restored',
+        'force_delete' => 'Delete permanently',
+        'force_delete_title' => 'Delete permanently?',
+        'force_delete_confirm' => 'This cannot be undone.',
+        'force_deleted' => 'Language deleted permanently',
     ],
     'validation' => [
         'locale_taken' => 'A language with this locale already exists.',

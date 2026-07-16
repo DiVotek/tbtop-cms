@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Tbtop\Admin\Actions\ActionCtx;
@@ -78,6 +79,10 @@ class PagesPage extends AdminPage
                     ]),
                 Column::make('updated_at')->label(__('tbtop-cms::pages.columns.updated'))
                     ->date(__('tbtop-cms::pages.date_format'))->muted(),
+                // Not shown by default — projected purely so hiddenIf() can
+                // distinguish trashed rows client-side (empty vs non-empty).
+                Column::make('deleted_at')->label(__('tbtop-cms::pages.columns.deleted_at'))
+                    ->date(__('tbtop-cms::pages.date_format'))->toggleable(true, hiddenByDefault: true),
             ])
             ->tabs([
                 $this->tab('all'),
@@ -87,13 +92,23 @@ class PagesPage extends AdminPage
                     ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNull('pages.parent_id')),
                 $this->tab('articles')
                     ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNotNull('pages.parent_id')),
+                Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))
+                    ->description(__('tbtop-cms::pages.tabs_deleted_description'))
+                    ->query($this->onlyTrashedScope(...)),
             ])
             ->searchable(['pages.name'])
             ->defaultSort('sort_key', 'asc')
             ->emptyState(__('tbtop-cms::pages.empty'))
-            ->recordUrl(static fn (Page $row): string => route('tbtop.cms.page-edit-page', ['page' => $row->id]))
+            // null for a trashed row: no edit page for a soft-deleted record,
+            // so the row falls back to non-clickable (see tableRow.tsx —
+            // recordUrl is only honored when _recordUrl is a string).
+            ->recordUrl(static fn (Page $row): ?string => $row->trashed()
+                ? null
+                : route('tbtop.cms.page-edit-page', ['page' => $row->id]))
             ->rowActions([
                 $this->viewOnSiteAction($s),
+                $this->restoreAction($s),
+                $this->forceDeleteAction($s),
             ]);
 
         return $s->stack([$table]);
@@ -123,6 +138,15 @@ class PagesPage extends AdminPage
         return PageSortKey::apply($query);
     }
 
+    /**
+     * @param  Builder<Page>  $q
+     * @return Builder<Page>
+     */
+    private function onlyTrashedScope(Builder $q): Builder
+    {
+        return $q->onlyTrashed();
+    }
+
     private function createAction(S $s): ActionBuilder
     {
         $cancel = $s->action('pageCreateCancel')->label(__('tbtop-cms::pages.actions.cancel'))
@@ -144,7 +168,51 @@ class PagesPage extends AdminPage
         // label('') → icon-only; the tooltip carries the accessible name.
         return $s->action('pageView')->label('')->link()->icon('external-link')
             ->tooltip(__('tbtop-cms::pages.actions.view_on_site'))
-            ->visit('/{path}', newTab: true);
+            ->visit('/{path}', newTab: true)
+            // A trashed page has no live path (its slugs were removed by
+            // PageObserver::deleting()) — the link would 404.
+            ->hiddenIf('deleted_at', 'not empty');
+    }
+
+    private function restoreAction(S $s): ActionBuilder
+    {
+        return $s->action('pageRestore')->label(__('tbtop-cms::pages.actions.restore'))->color('gray')
+            ->handle($this->restore(...), needs: ['row'])
+            ->hiddenIf('deleted_at', 'empty');
+    }
+
+    private function restore(ActionCtx $ctx): Effects
+    {
+        $page = Page::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+
+        try {
+            $page->restore();
+        } catch (DomainException $e) {
+            return Effects::make()->notify($e->getMessage(), 'error');
+        }
+
+        return Effects::make()->notify(__('tbtop-cms::pages.actions.restored'))->refreshTable();
+    }
+
+    private function forceDeleteAction(S $s): ActionBuilder
+    {
+        return $s->action('pageForceDelete')->label(__('tbtop-cms::pages.actions.force_delete'))->color('danger')
+            ->confirm(__('tbtop-cms::pages.actions.force_delete_title'), __('tbtop-cms::pages.actions.force_delete_confirm'))
+            ->handle($this->forceDelete(...), needs: ['row'])
+            ->hiddenIf('deleted_at', 'empty');
+    }
+
+    private function forceDelete(ActionCtx $ctx): Effects
+    {
+        $page = Page::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+
+        try {
+            $page->forceDelete();
+        } catch (DomainException $e) {
+            return Effects::make()->notify($e->getMessage(), 'error');
+        }
+
+        return Effects::make()->notify(__('tbtop-cms::pages.actions.force_deleted'))->refreshTable();
     }
 
     private function tab(string $name): Tab
