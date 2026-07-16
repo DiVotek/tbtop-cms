@@ -41,6 +41,15 @@ class FormSubmitController
             throw new NotFoundHttpException;
         }
 
+        if ($this->trippedHoneypot($request)) {
+            // Classic honeypot semantics: look exactly like success (same
+            // response, no validation errors) so the bot's script has
+            // nothing to learn from. Nothing is persisted or delivered.
+            Log::debug('form.submit.honeypot_tripped', ['page' => $model->getKey(), 'block' => $block]);
+
+            return back();
+        }
+
         $payload = $request->validate($located->block->submitRules($located->data, $located->context));
 
         $submission = $this->store($model, $block, $located, $payload);
@@ -86,5 +95,21 @@ class FormSubmitController
         if (in_array($locale, $active, true)) {
             $this->languages->setCurrent($locale);
         }
+    }
+
+    /**
+     * True when the configured honeypot field (exposed to the frontend via
+     * FormActionBinder as `props.honeypotField`) was submitted non-empty.
+     * `null`/`false` in config disables the check.
+     */
+    private function trippedHoneypot(Request $request): bool
+    {
+        $field = config('tbtop-cms.forms.honeypot_field');
+
+        if (! is_string($field) || $field === '') {
+            return false;
+        }
+
+        return trim((string) $request->input($field, '')) !== '';
     }
 }

@@ -288,3 +288,64 @@ it('returns 404 when submitting to an inactive block', function (): void {
     $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
     Mail::assertNothingSent();
 });
+
+it('exposes the configured honeypot field name in the rendered form block props', function (): void {
+    $page = contactFormPage();
+
+    $this->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.render.elements.form-1.props.honeypotField', 'website');
+});
+
+it('omits the honeypot prop from the payload when disabled via config', function (): void {
+    config()->set('tbtop-cms.forms.honeypot_field', false);
+    $page = contactFormPage();
+
+    $response = $this->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])->assertOk();
+
+    expect($response->json('props.render.elements.form-1.props'))->not->toHaveKey('honeypotField');
+});
+
+it('silently drops a submission when the honeypot field is filled', function (): void {
+    $page = contactFormPage();
+
+    $response = $this->post(submitUrl($page, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+        'website' => 'https://spam.example.test',
+    ])->assertRedirect();
+
+    expect($response->getSession()->get('errors'))->toBeNull();
+    Mail::assertNothingSent();
+    expect(FormSubmission::query()->count())->toBe(0);
+});
+
+it('still persists and delivers a submission when the honeypot field is left empty', function (): void {
+    $page = contactFormPage();
+
+    $this->post(submitUrl($page, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+        'website' => '',
+    ])->assertRedirect();
+
+    Mail::assertSent(ContactFormMail::class, fn (ContactFormMail $mail): bool => $mail->hasTo('ops@example.test'));
+    expect(FormSubmission::query()->count())->toBe(1);
+});
+
+it('bypasses the honeypot check entirely when disabled via config', function (): void {
+    config()->set('tbtop-cms.forms.honeypot_field', false);
+    $page = contactFormPage();
+
+    $this->post(submitUrl($page, 'form-1'), [
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'message' => 'Hello there',
+        'website' => 'https://spam.example.test',
+    ])->assertRedirect();
+
+    Mail::assertSent(ContactFormMail::class);
+    expect(FormSubmission::query()->count())->toBe(1);
+});

@@ -66,6 +66,12 @@ return [
     'forms' => [
         'throttle' => '10,1',
         'store' => true,
+        // Honeypot field name exposed to public form blocks via
+        // FormActionBinder (props.honeypotField) and enforced by
+        // FormSubmitController. Bots that autofill every field trip it;
+        // real visitors never see or fill it. Set to null or false to
+        // disable the check (and stop exposing the prop) entirely.
+        'honeypot_field' => 'website',
     ],
     'redirects' => [
         // External redirect targets are rejected unless their host is listed here.
