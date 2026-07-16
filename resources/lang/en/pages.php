@@ -50,6 +50,7 @@ return [
         'name' => 'Name',
         'title' => 'Title',
         'slug' => 'Slug',
+        'slug_edit_hint' => 'Changing the slug changes the page URL; an automatic redirect is created from the old address.',
         'heading' => 'Heading',
         'summary' => 'Summary',
         'body' => 'Content',

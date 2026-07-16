@@ -7,6 +7,8 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Redirect\Models\Redirect;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
@@ -253,6 +255,7 @@ it('saves general and SEO fields including the seo json column', function (): vo
         [
             'name' => ['en' => 'About Updated'],
             'title' => ['en' => ''],
+            'slug' => ['en' => 'about-updated'],
             'heading' => ['en' => ''],
             'summary' => ['en' => ''],
             'type' => 'page',
@@ -511,6 +514,83 @@ it('hides delete from the form footer for system pages', function (): void {
     expect($footerActions)->toBe(['cancel', 'save']);
 });
 
+it('omits the slug field from the General tab for the root system page', function (): void {
+    $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
+
+    $tabs = editFormTabs($system->id);
+    $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
+
+    expect($generalFieldNames)->not->toContain('slug');
+});
+
+it('saves the system page with no slug key in the payload and keeps its slug/path empty', function (): void {
+    $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$system->id}/edit/forms/pageEditor",
+        [
+            'name' => ['en' => 'Home Updated'],
+            'title' => ['en' => ''],
+            'heading' => ['en' => ''],
+            'summary' => ['en' => ''],
+            'type' => 'page',
+            'parent_id' => 'none',
+            'status' => PageStatus::Published->value,
+            'sort_order' => 0,
+            'seo_title' => '',
+            'seo_description' => '',
+            'seo_focus_keyword' => '',
+            'og_title' => '',
+            'og_description' => '',
+            'og_image' => '',
+            'is_indexable' => true,
+        ],
+    )->assertRedirect()->assertSessionHasNoErrors();
+
+    $system->refresh();
+    $slug = PageSlug::query()->where('page_id', $system->id)->where('locale', 'en')->first();
+
+    expect($system->getTranslation('name', 'en'))->toBe('Home Updated')
+        ->and($slug)->not->toBeNull()
+        ->and($slug->slug)->toBe('')
+        ->and($slug->path)->toBe('')
+        ->and(Redirect::query()->where('locale', 'en')->exists())->toBeFalse();
+});
+
+it('ignores a slug override submitted for the system page and keeps its slug/path empty', function (): void {
+    $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$system->id}/edit/forms/pageEditor",
+        [
+            'name' => ['en' => 'Home Updated'],
+            'title' => ['en' => ''],
+            'slug' => ['en' => 'home'],
+            'heading' => ['en' => ''],
+            'summary' => ['en' => ''],
+            'type' => 'page',
+            'parent_id' => 'none',
+            'status' => PageStatus::Published->value,
+            'sort_order' => 0,
+            'seo_title' => '',
+            'seo_description' => '',
+            'seo_focus_keyword' => '',
+            'og_title' => '',
+            'og_description' => '',
+            'og_image' => '',
+            'is_indexable' => true,
+        ],
+    )->assertRedirect()->assertSessionHasNoErrors();
+
+    $system->refresh();
+    $slug = PageSlug::query()->where('page_id', $system->id)->where('locale', 'en')->first();
+
+    expect($slug)->not->toBeNull()
+        ->and($slug->slug)->toBe('')
+        ->and($slug->path)->toBe('')
+        ->and(Redirect::query()->where('locale', 'en')->exists())->toBeFalse();
+});
+
 it('keeps delete in the form footer for regular pages', function (): void {
     $regular = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
@@ -564,6 +644,7 @@ function baseEditPayload(): array
     return [
         'name' => ['en' => 'About Us'],
         'title' => ['en' => ''],
+        'slug' => ['en' => 'about-us'],
         'heading' => ['en' => ''],
         'summary' => ['en' => ''],
         'type' => 'page',
