@@ -7,6 +7,7 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
 use Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Redirect\Models\Redirect;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -85,4 +86,54 @@ it('round-trips the all-locales sentinel as a null locale', function (): void {
     expect($redirect->locale)->toBeNull()
         ->and(RedirectForm::loadRow($redirect->id)['locale'])
         ->toBe(RedirectFormOptions::ALL_LOCALES);
+});
+
+// Action endpoints have no field-error channel: a thrown ValidationException
+// becomes a redirect the client silently ignores (form reset, no message).
+// Validation failures must come back as a haltModal effect instead.
+it('returns a haltModal effect when create validation fails', function (): void {
+    $response = $this->postJson('/admin/redirects/actions/redirectCreateSave', [
+        'payload' => ['form' => [
+            'from_path' => 'old-external',
+            'to_path' => 'https://evil.example/page',
+            'locale' => RedirectFormOptions::ALL_LOCALES,
+            'status_code' => '301',
+        ]],
+    ]);
+
+    $response->assertOk();
+    $effects = $response->json('effects');
+
+    expect($effects)->toHaveCount(1)
+        ->and($effects[0]['kind'])->toBe('haltModal')
+        ->and($effects[0]['message'])->toContain('not allowlisted')
+        ->and(Redirect::count())->toBe(0);
+});
+
+it('returns a haltModal effect when edit validation fails', function (): void {
+    $redirect = RedirectForm::save([
+        'from_path' => 'old-a',
+        'to_path' => 'new-a',
+        'locale' => RedirectFormOptions::ALL_LOCALES,
+        'status_code' => '301',
+    ]);
+
+    $response = $this->postJson('/admin/redirects/actions/redirectEditSave', [
+        'payload' => [
+            'row' => ['id' => $redirect->id],
+            'form' => [
+                'from_path' => 'old-a',
+                'to_path' => 'https://evil.example/page',
+                'locale' => RedirectFormOptions::ALL_LOCALES,
+                'status_code' => '301',
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+    $effects = $response->json('effects');
+
+    expect($effects)->toHaveCount(1)
+        ->and($effects[0]['kind'])->toBe('haltModal')
+        ->and(Redirect::find($redirect->id)->to_path)->toBe('new-a');
 });

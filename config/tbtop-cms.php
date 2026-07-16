@@ -67,6 +67,11 @@ return [
         'throttle' => '10,1',
         'store' => true,
     ],
+    'redirects' => [
+        // External redirect targets are rejected unless their host is listed here.
+        // Exact, case-insensitive match only — listing "example.com" does NOT allow "sub.example.com".
+        'allowed_external_hosts' => [],
+    ],
     'profile' => [
         // Disable on hosts where passwords are managed elsewhere (SSO).
         'password_change' => true,

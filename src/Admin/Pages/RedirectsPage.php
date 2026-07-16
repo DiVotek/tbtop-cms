@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
@@ -134,7 +135,11 @@ class RedirectsPage extends AdminPage
 
     private function update(ActionCtx $ctx): Effects
     {
-        RedirectForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0));
+        try {
+            RedirectForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0));
+        } catch (ValidationException $e) {
+            return self::haltWithErrors($e);
+        }
 
         return Effects::make()->notify(__('tbtop-cms::redirects.actions.saved'))->closeModal()->refreshTable();
     }
@@ -168,8 +173,24 @@ class RedirectsPage extends AdminPage
 
     private function create(ActionCtx $ctx): Effects
     {
-        RedirectForm::save($ctx->form);
+        try {
+            RedirectForm::save($ctx->form);
+        } catch (ValidationException $e) {
+            return self::haltWithErrors($e);
+        }
 
         return Effects::make()->notify(__('tbtop-cms::redirects.actions.created'))->closeModal()->refreshTable();
+    }
+
+    /**
+     * Action endpoints have no field-error channel (a thrown
+     * ValidationException turns into a redirect the client silently
+     * ignores) — surface the message inside the still-open modal instead.
+     */
+    private static function haltWithErrors(ValidationException $e): Effects
+    {
+        $first = collect($e->errors())->flatten()->first();
+
+        return Effects::make()->haltModal(is_string($first) ? $first : $e->getMessage());
     }
 }
