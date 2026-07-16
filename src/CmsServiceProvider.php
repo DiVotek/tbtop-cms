@@ -47,6 +47,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_cms_layouts_table')
             ->hasMigration('update_pages_add_image_table')
             ->hasMigration('create_cms_menus_table')
+            ->hasMigration('update_cms_user_profiles_add_user_id_foreign_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
