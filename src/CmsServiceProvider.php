@@ -23,7 +23,9 @@ use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\LayoutResolver;
+use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\Observers\PageRevisions;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
 use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
@@ -52,6 +54,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('create_cms_menus_table')
             ->hasMigration('update_cms_user_profiles_add_user_id_foreign_table')
             ->hasMigration('update_cms_user_profiles_add_role_table')
+            ->hasMigration('create_page_revisions_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -82,6 +85,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireAdminLogout();
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
+        $this->wirePageRevisions();
         $this->wireRoleGates();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
@@ -173,6 +177,15 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireRedirectMaintenance(): void
     {
         PageSlug::observe(PageSlugRedirects::class);
+    }
+
+    /**
+     * A second Page observer, registered independently of PageObserver's
+     * #[ObservedBy] attribute — see PageRevisions' class docblock for why.
+     */
+    private function wirePageRevisions(): void
+    {
+        Page::observe(PageRevisions::class);
     }
 
     /**

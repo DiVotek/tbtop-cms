@@ -84,6 +84,21 @@ class Page extends Model
      */
     public array $pendingSlugOverrides = [];
 
+    /**
+     * Transient marker set by PageRevisionWriter::restore() immediately
+     * before save() (and cleared by it in a finally), read by the
+     * PageRevisions observer's saved() hook to label the resulting snapshot
+     * kind='restore' instead of 'save'. Lives on the model instance rather
+     * than on the writer service:
+     * the writer has no container binding forcing it to be shared, so the
+     * instance resolved for the observer's saved() dispatch (a fresh
+     * "Class@method" string-listener resolution) is not guaranteed to be the
+     * same writer instance restore() called — the Page instance flowing
+     * through the event IS guaranteed to be the same object, exactly like
+     * $pendingSlugOverrides above.
+     */
+    public bool $pendingRestore = false;
+
     /** @var array<string, string> */
     protected $casts = [
         'status' => PageStatus::class,

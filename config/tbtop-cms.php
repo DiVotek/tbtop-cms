@@ -85,6 +85,15 @@ return [
         // Exact, case-insensitive match only — listing "example.com" does NOT allow "sub.example.com".
         'allowed_external_hosts' => [],
     ],
+    'revisions' => [
+        // Number of content-revision snapshots kept per page (oldest pruned
+        // past this). Read with an inline default
+        // (config('tbtop-cms.revisions.keep', 25)) — published host configs
+        // override whole sections and won't have this key. Set to 0 or null
+        // to disable the revisions feature entirely: no snapshots are taken,
+        // not even on page creation.
+        'keep' => 25,
+    ],
     'profile' => [
         // Disable on hosts where passwords are managed elsewhere (SSO).
         'password_change' => true,

@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageEditBlocks;
 use Tbtop\Cms\Admin\Pages\Support\PageEditBlockTabs;
+use Tbtop\Cms\Admin\Pages\Support\PageEditRevisionsTab;
 use Tbtop\Cms\Admin\Pages\Support\PageEditSidebar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
@@ -120,6 +121,11 @@ class PageEditPage extends AdminPage
             ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s, ! $page->is_system))],
             ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s))],
             ...PageEditBlockTabs::build($s, $page),
+            // Spread, not a plain entry: when revisions are disabled
+            // (revisions.keep = 0/null) the tab must disappear entirely, not
+            // render an empty shell over rows that survived from before the
+            // feature was switched off.
+            ...(PageEditRevisionsTab::enabled() ? [PageEditRevisionsTab::build($s, $page)] : []),
         ];
     }
 

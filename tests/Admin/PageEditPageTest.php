@@ -72,18 +72,19 @@ it('redirects a guest away from the edit page', function (): void {
     test()->get("/admin/pages/{$page->id}/edit")->assertRedirect(route('login'));
 });
 
-it('wires General/SEO tabs, one tab per saved block, and a trailing add-block tab', function (): void {
+it('wires General/SEO tabs, one tab per saved block, a trailing add-block tab, and a final Revisions tab', function (): void {
     $page = pageWithBlocks([
         ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Hi']],
     ]);
 
     $tabs = editFormTabs($page->id);
 
-    expect($tabs)->toHaveCount(4)
+    expect($tabs)->toHaveCount(5)
         ->and($tabs[0]['label'])->toBe('General')
         ->and($tabs[1]['label'])->toBe('SEO')
         ->and($tabs[2]['label'])->toBe('Simple')
-        ->and($tabs[3]['label'])->toBe('+ Add block');
+        ->and($tabs[3]['label'])->toBe('+ Add block')
+        ->and($tabs[4]['label'])->toBe('Revisions');
 
     $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
     expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary', 'body')
