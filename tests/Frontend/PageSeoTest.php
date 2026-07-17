@@ -173,6 +173,21 @@ it('ships ogTitle/ogDescription/ogImage props for the CmsPage <Head> to render a
         ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page.jpg'));
 });
 
+it('falls back the meta title to the page name when title and seo.title are empty', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => ''],
+        'seo' => [],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'About — Acme')
+        // og:title inherits the same cascade via metaTitle().
+        ->assertJsonPath('props.seo.ogTitle', 'About');
+});
+
 it('uses the default-locale title fallback for a non-default-locale page', function (): void {
     Language::factory()->create(['locale' => 'uk']);
 
