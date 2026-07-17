@@ -37,9 +37,20 @@ final class CurrentAdmin
 
     public static function profile(): CmsUserProfile
     {
-        $userId = auth()->guard(self::guard())->user()?->getAuthIdentifier();
+        $user = auth()->guard(self::guard())->user();
+        $profile = CmsUserProfile::query()->firstOrNew(['user_id' => $user?->getAuthIdentifier()]);
 
-        return CmsUserProfile::query()->firstOrNew(['user_id' => $userId]);
+        // Seed the role on a brand-new row from the user's currently
+        // resolved role. Without this, saving an unrelated profile field
+        // (display name, locale, theme) INSERTs the row with the DB
+        // default 'editor' — silently demoting a CmsAdmin-contract user
+        // whose implicit superadministrator role exists only while they
+        // have NO row (see roleOf()).
+        if (! $profile->exists && $user !== null) {
+            $profile->role = self::roleOf($user) ?? CmsRole::Editor;
+        }
+
+        return $profile;
     }
 
     /**

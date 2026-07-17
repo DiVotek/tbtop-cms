@@ -104,6 +104,26 @@ it('treats a CmsAdmin-contract user without a profile row as an implicit superad
     test()->actingAs($user, 'web')->get($url, ['X-Inertia' => 'true'])->assertOk();
 })->with('administrator_pages');
 
+it('does not demote an implicit superadministrator when saving their profile creates the row', function (): void {
+    // Regression (Devin, PR #67): profile saves go through
+    // CurrentAdmin::profile() (firstOrNew) — for a contract user with no
+    // row, the INSERT used to land with the DB default role 'editor',
+    // silently stripping their implicit superadministrator access the
+    // first time they changed a display name or theme.
+    config(['tbtop-cms.admin.model' => ContractAdminUser::class]);
+    config(['auth.providers.users.model' => ContractAdminUser::class]);
+    $user = ContractAdminUser::create(['name' => 'Contract', 'email' => 'contract3@example.com', 'password' => 'secret']);
+
+    test()->actingAs($user, 'web')
+        ->post('/admin/profile/forms/profile', ['display_name' => 'Renamed'])
+        ->assertRedirect();
+
+    expect(CmsUserProfile::query()->where('user_id', $user->id)->value('role'))
+        ->toBe(CmsRole::SuperAdministrator);
+
+    test()->actingAs($user, 'web')->get('/admin/users', ['X-Inertia' => 'true'])->assertOk();
+});
+
 it('lets a profile row downgrade a CmsAdmin-contract user to editor', function (): void {
     config(['tbtop-cms.admin.model' => ContractAdminUser::class]);
     config(['auth.providers.users.model' => ContractAdminUser::class]);
