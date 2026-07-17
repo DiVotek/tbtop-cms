@@ -12,6 +12,7 @@ use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageRevision;
 use Tbtop\Cms\Page\Support\PageRevisionWriter;
@@ -99,7 +100,11 @@ final class PageEditRevisionsAction
     private static function row(S $s, Page $page, PageRevision $revision, Collection $authors, bool $isNewest): Node
     {
         $meta = $s->flex([
-            $s->displayValue($revision->created_at)->datetime(),
+            // 'd.m.Y H:i': matches the status bar's compact "Updated"/
+            // "Created" timestamps (PageEditStatusBar::timestamps()) — a
+            // revision row and the status bar showing the same moment in two
+            // different formats read as inconsistent.
+            $s->displayValue($revision->created_at)->datetime('d.m.Y H:i'),
             $s->displayText(self::authorLabel($revision, $authors))->variant('muted'),
             $s->displayText(self::kindLabel($revision))->variant('muted'),
         ], gap: 4, wrap: true);
@@ -146,47 +151,17 @@ final class PageEditRevisionsAction
     }
 
     /**
-     * One whereIn() query for every author across all rows, rather than one
-     * query per row — the panel renders at most config('tbtop-cms.revisions.keep')
-     * rows, but there's no reason to pay N queries for something a single
-     * query answers.
-     *
      * @param  Collection<int, PageRevision>  $revisions
      * @return Collection<int|string, Model> keyed by user id
      */
     private static function authorNames(Collection $revisions): Collection
     {
-        $userIds = $revisions->pluck('user_id')->filter()->unique()->values();
-
-        if ($userIds->isEmpty()) {
-            /** @var Collection<int|string, Model> */
-            return new Collection;
-        }
-
-        /** @var class-string<Model> $userModel */
-        $userModel = config('tbtop-cms.admin.model', 'App\\Models\\User');
-
-        return $userModel::query()->whereIn('id', $userIds)->get()->keyBy(
-            static fn (Model $user): int | string => $user->getKey(),
-        );
+        return AuthorNames::lookup($revisions->pluck('user_id'));
     }
 
     /** @param  Collection<int|string, Model>  $authors */
     private static function authorLabel(PageRevision $revision, Collection $authors): string
     {
-        $user = $revision->user_id !== null ? $authors->get($revision->user_id) : null;
-
-        if ($user === null) {
-            return __('tbtop-cms::pages.revisions.author_unknown');
-        }
-
-        $name = isset($user->name) ? (string) $user->name : '';
-        if ($name !== '') {
-            return $name;
-        }
-
-        $email = isset($user->email) ? (string) $user->email : '';
-
-        return $email !== '' ? $email : __('tbtop-cms::pages.revisions.author_unknown');
+        return AuthorNames::label($revision->user_id, $authors) ?? __('tbtop-cms::pages.revisions.author_unknown');
     }
 }

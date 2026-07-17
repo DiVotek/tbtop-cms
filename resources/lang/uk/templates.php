@@ -8,6 +8,7 @@ return [
     'columns' => [
         'name' => 'Назва',
         'updated' => 'Оновлено',
+        'updated_by' => 'Оновив(-ла)',
     ],
     'date_format' => 'd.m.Y',
     'empty' => [

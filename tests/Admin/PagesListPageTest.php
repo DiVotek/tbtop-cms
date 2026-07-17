@@ -61,15 +61,16 @@ it('renders the divotek-style pages list wire shape', function (): void {
         'deleted' => 'Deleted',
     ])->and(array_column($opts['tabs'], 'description'))->toHaveCount(5);
 
-    // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge / Updated date / deleted_at (hidden helper).
+    // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge / Updated date / Updated by (hidden) / deleted_at (hidden helper).
     $cols = array_column($opts['columns'], null, 'name');
-    expect(array_keys($cols))->toBe(['name', 'type', 'parent_name', 'status', 'updated_at', 'deleted_at'])
+    expect(array_keys($cols))->toBe(['name', 'type', 'parent_name', 'status', 'updated_at', 'updated_by_name', 'deleted_at'])
         ->and($cols['name']['emphasized'] ?? null)->toBeTrue()
         ->and($cols['type']['muted'] ?? null)->toBeTrue()
         ->and($cols['type']['uppercase'] ?? null)->toBeTrue()
         ->and($cols['status']['kind'] ?? null)->toBe('badge')
         ->and($cols['status']['badge']['colors'])->toBe(['Published' => 'success', 'Draft' => 'warning'])
         ->and($cols['updated_at']['kind'] ?? null)->toBe('date')
+        ->and($cols['updated_by_name']['hiddenByDefault'] ?? null)->toBeTrue()
         ->and($cols['deleted_at']['hiddenByDefault'] ?? null)->toBeTrue();
 
     // Toolbar (search + column toggle) visible (not explicitly disabled); the whole row links to the edit page.

@@ -17,6 +17,7 @@ use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
+use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
@@ -85,6 +86,11 @@ class PagesPage extends AdminPage
                     ]),
                 Column::make('updated_at')->label(__('tbtop-cms::pages.columns.updated'))
                     ->date(__('tbtop-cms::pages.date_format'))->muted(),
+                // Off by default — the compact status bar / revisions panel
+                // already surface authorship on the edit page; this column
+                // is here for the rare "who touched this" table-level sweep.
+                Column::make('updated_by_name')->label(__('tbtop-cms::pages.columns.updated_by'))
+                    ->toggleable(true, hiddenByDefault: true)->muted(),
                 // Not shown by default — projected purely so hiddenIf() can
                 // distinguish trashed rows client-side (empty vs non-empty).
                 Column::make('deleted_at')->label(__('tbtop-cms::pages.columns.deleted_at'))
@@ -139,7 +145,8 @@ class PagesPage extends AdminPage
                     ->whereNull('parents.deleted_at')
                     ->limit(1),
                 'parent_name',
-            );
+            )
+            ->selectSub(AuthorNames::subselect('pages', 'updated_by'), 'updated_by_name');
 
         return PageSortKey::apply($query);
     }

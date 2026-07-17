@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Redirect\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Tbtop\Cms\Support\Concerns\TracksAuthors;
 
 /**
  * @property int $id
@@ -18,10 +19,11 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Redirect extends Model
 {
+    use TracksAuthors;
+
     /**
-     * created_by/updated_by exist in the schema and docblock but nothing in
-     * the codebase writes them yet — left out until something actually
-     * sets them.
+     * created_by/updated_by are stamped by TracksAuthors, not mass-assigned —
+     * see the trait's docblock for why they stay out of this list.
      *
      * @var list<string>
      */

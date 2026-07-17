@@ -8,6 +8,7 @@ return [
     'columns' => [
         'name' => 'Name',
         'updated' => 'Updated',
+        'updated_by' => 'Updated by',
     ],
     'date_format' => 'n/j/Y',
     'empty' => [

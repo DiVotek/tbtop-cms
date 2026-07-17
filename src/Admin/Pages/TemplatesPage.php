@@ -14,6 +14,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\TemplateForm;
+use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Template\Models\Template;
 use Tbtop\Cms\Template\TemplateApplier;
@@ -84,6 +85,8 @@ class TemplatesPage extends AdminPage
                 Column::make('name')->label(__('tbtop-cms::templates.columns.name'))->searchable(),
                 Column::make('updated_at')->label(__('tbtop-cms::templates.columns.updated'))
                     ->date(__('tbtop-cms::templates.date_format'))->muted(),
+                Column::make('updated_by_name')->label(__('tbtop-cms::templates.columns.updated_by'))
+                    ->toggleable(true, hiddenByDefault: true)->muted(),
             ])
             ->searchable(['name'])
             ->defaultSort('name', 'asc')
@@ -112,7 +115,8 @@ class TemplatesPage extends AdminPage
     /** @return Builder<Template> */
     private function query(): Builder
     {
-        return Template::query();
+        return Template::query()->select('cms_templates.*')
+            ->selectSub(AuthorNames::subselect('cms_templates', 'updated_by'), 'updated_by_name');
     }
 
     private function deleteAction(S $s): ActionBuilder

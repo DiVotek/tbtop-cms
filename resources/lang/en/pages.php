@@ -19,6 +19,7 @@ return [
         'parent' => 'Parent',
         'status' => 'Status',
         'updated' => 'Updated',
+        'updated_by' => 'Updated by',
         'deleted_at' => 'Deleted',
     ],
     'status' => [
