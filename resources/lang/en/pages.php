@@ -36,7 +36,6 @@ return [
         'general' => 'General',
         'seo' => 'SEO',
         'add_block' => '+ Add block',
-        'revisions' => 'Revisions',
     ],
     'sections' => [
         'content' => 'Content',
@@ -115,6 +114,7 @@ return [
         'close' => 'Close',
     ],
     'revisions' => [
+        'title' => 'Revisions',
         'empty' => 'No revisions yet.',
         'current' => 'Current',
         'author_unknown' => '—',

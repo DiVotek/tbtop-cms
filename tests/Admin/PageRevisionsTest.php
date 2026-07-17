@@ -148,12 +148,12 @@ it('writes no revisions at all when revisions.keep is 0', function (): void {
     expect(PageRevision::query()->where('page_id', $page->id)->count())->toBe(0);
 });
 
-it('hides the revisions tab entirely when revisions.keep is 0, even over leftover rows', function (): void {
+it('hides the revisions action entirely when revisions.keep is 0, even over leftover rows', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
     $admin = makeRevisionsAdmin();
 
     // A row written while the feature was on must not resurface as an
-    // empty-shell tab after the host disables the feature.
+    // empty-shell action after the host disables the feature.
     expect(PageRevision::query()->where('page_id', $page->id)->count())->toBe(1);
     config(['tbtop-cms.revisions.keep' => 0]);
 
@@ -163,8 +163,29 @@ it('hides the revisions tab entirely when revisions.keep is 0, even over leftove
 
     $structure = json_encode($json['props']['structure']);
 
-    expect($structure)->not->toContain(__('tbtop-cms::pages.tabs_edit.revisions'))
+    expect($structure)->not->toContain(__('tbtop-cms::pages.revisions.title'))
         ->and($structure)->not->toContain('pageRevisionRestore_');
+});
+
+it('renders the revisions action with the restore action for an older revision when revisions are present', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'v0']]);
+    $admin = makeRevisionsAdmin();
+
+    test()->actingAs($admin, 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...revisionsBaseEditPayload(), 'name' => ['en' => 'v1']],
+    )->assertRedirect();
+
+    $oldest = PageRevision::query()->where('page_id', $page->id)->orderBy('id')->firstOrFail();
+
+    $json = test()->actingAs($admin, 'web')
+        ->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
+        ->assertOk()->json();
+
+    $structure = json_encode($json['props']['structure']);
+
+    expect($structure)->toContain(__('tbtop-cms::pages.revisions.title'))
+        ->and($structure)->toContain("pageRevisionRestore_{$oldest->id}");
 });
 
 it('restores a page from a revision via the action endpoint, leaves status untouched, and writes a kind=restore revision', function (): void {

@@ -36,7 +36,6 @@ return [
         'general' => 'Основне',
         'seo' => 'SEO',
         'add_block' => '+ Додати блок',
-        'revisions' => 'Версії',
     ],
     'sections' => [
         'content' => 'Контент',
@@ -115,6 +114,7 @@ return [
         'close' => 'Закрити',
     ],
     'revisions' => [
+        'title' => 'Версії',
         'empty' => 'Поки що немає версій.',
         'current' => 'Поточна',
         'author_unknown' => '—',
