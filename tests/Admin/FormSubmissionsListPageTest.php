@@ -61,6 +61,7 @@ it('labels every column from translations', function (): void {
 
     expect($labels)->toBe([
         __('tbtop-cms::form-submissions.columns.status'),
+        __('tbtop-cms::form-submissions.columns.lead'),
         __('tbtop-cms::form-submissions.columns.delivery'),
         __('tbtop-cms::form-submissions.columns.form'),
         __('tbtop-cms::form-submissions.columns.page'),

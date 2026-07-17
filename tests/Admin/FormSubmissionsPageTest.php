@@ -167,11 +167,16 @@ it('loads the payload for the view action', function (): void {
         'status' => SubmissionStatus::Pending,
     ]);
 
-    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
+    // 5.3: the modal's query() data is no longer a raw 'payload' map fed into
+    // an editable keyvalue field — it's a flattened, read-only 'payloadText'
+    // string (one "key: value" line per pair) plus separate meta keys, bound
+    // via field()-bound DisplayValueBlocks (see FormSubmissionsPage::viewAction()).
+    $data = $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
         'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk()
-        ->assertJsonPath('data.payload.name', 'Ada')
-        ->assertJsonPath('data.payload.email', 'ada@example.test');
+    ])->assertOk()->json('data');
+
+    expect($data['payloadText'])->toContain('name: Ada')
+        ->and($data['payloadText'])->toContain('email: ada@example.test');
 });
 
 function submissionWithLead(LeadStatus $lead): FormSubmission

@@ -9,6 +9,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Form\Support\LeadIdentity;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -60,15 +61,22 @@ class DashboardRecent
             ->all();
     }
 
-    /** @return list<array{title: string, meta: string, color: string, url?: string}> */
+    /**
+     * Title is now the lead's identity (5.4 — "who" outranks "which form"
+     * here too, same reasoning as FormSubmissionsPage's Lead column), with
+     * the form kind folded into meta alongside the relative time rather than
+     * dropped — it's still useful context, just secondary.
+     *
+     * @return list<array{title: string, meta: string, color: string, url?: string}>
+     */
     private static function latestSubmissionsItems(): array
     {
         $url = self::submissionsUrl();
 
         return FormSubmission::query()->orderByDesc('created_at')->limit(self::LIMIT)->get()
             ->map(static fn (FormSubmission $submission): array => [
-                'title' => $submission->kind,
-                'meta' => optional($submission->created_at)->diffForHumans() ?? '',
+                'title' => LeadIdentity::label($submission->payload) ?? $submission->kind,
+                'meta' => $submission->kind . ' · ' . (optional($submission->created_at)->diffForHumans() ?? ''),
                 'color' => self::leadStatusColor($submission->lead_status),
                 ...($url !== null ? ['url' => $url] : []),
             ])

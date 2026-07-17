@@ -7,11 +7,15 @@ return [
     'subtitle' => 'Submissions from the site\'s forms.',
     'columns' => [
         'status' => 'Status',
+        'lead' => 'Lead',
         'delivery' => 'Delivery',
         'form' => 'Form',
         'page' => 'Page',
         'locale' => 'Locale',
         'submitted' => 'Submitted',
+    ],
+    'tabs' => [
+        'all' => 'All',
     ],
     'date_format' => 'n/j/Y H:i',
     'statuses' => [
@@ -27,10 +31,14 @@ return [
     ],
     'fields' => [
         'payload' => 'Payload',
+        'error' => 'Delivery error',
     ],
     'values' => [
         'page_deleted' => '(page deleted)',
         'page_number' => 'Page #:id',
+        'lead_unknown' => '—',
+        'no_error' => '—',
+        'empty_payload' => '(empty payload)',
     ],
     'actions' => [
         'view' => 'View payload',
@@ -38,6 +46,22 @@ return [
         'close' => 'Close',
         'retry' => 'Retry',
         'retried' => 'Submission retried successfully',
+        'mark_processed' => 'Mark processed',
+        'marked_processed' => 'Marked as processed',
+        'mark_processed_bulk_title' => 'Mark selected as processed?',
+        'mark_processed_bulk_confirm' => 'The selected submissions will be marked as processed.',
+        'discard' => 'Discard',
+        'discarded' => 'Submission discarded',
+        'discard_title' => 'Discard this submission?',
+        'discard_confirm' => 'It will be marked as discarded. This does not delete it.',
+        'discard_bulk_title' => 'Discard selected submissions?',
+        'discard_bulk_confirm' => 'The selected submissions will be marked as discarded. This does not delete them.',
+        'delete' => 'Delete',
+        'deleted' => 'Submission deleted',
+        'delete_title' => 'Delete this submission permanently?',
+        'delete_confirm' => 'This cannot be undone.',
+        'delete_bulk_title' => 'Delete selected submissions permanently?',
+        'delete_bulk_confirm' => 'This cannot be undone.',
     ],
     'empty' => [
         'title' => 'No submissions yet',

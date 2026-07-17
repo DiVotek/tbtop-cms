@@ -342,11 +342,15 @@ it('colors the latest-submissions list by lead status', function (): void {
             'url' => route('tbtop.cms.form-submissions-page'),
         ]);
 
+    // 5.4: title is now the lead's identity (LeadIdentity::label()), not the
+    // bare form kind — every fixture here submits the same payload
+    // (['name' => 'Ada']), so title is 'Ada' for all of them; the kind moved
+    // into meta instead (see DashboardRecent::latestSubmissionsItems()).
     $lists = [];
     collectDashboardNodesByKind($structure, 'list', $lists);
     $submissionsList = collect($lists)->first(
         fn (array $list): bool => $list['items'] !== []
-            && collect($list['items'])->pluck('title')->every(fn ($t) => $t === 'ContactForm'),
+            && collect($list['items'])->pluck('meta')->every(fn ($m) => str_starts_with((string) $m, 'ContactForm')),
     );
     $colors = collect($submissionsList['items'])->pluck('color')->all();
 
