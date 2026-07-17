@@ -32,13 +32,14 @@ final class PageEditStatusBar
         'published' => 'success',
     ];
 
-    public static function build(S $s, Page $page, ActionBuilder $viewOnSite, ActionBuilder $saveTop): Node
+    public static function build(S $s, Page $page, ?ActionBuilder $revisions, ActionBuilder $viewOnSite, ActionBuilder $saveTop): Node
     {
         return $s->flex([
             self::statusBadge($s, $page),
             $s->unsavedIndicator(),
             $s->spacer(),
             ...self::timestamps($s, $page),
+            ...($revisions !== null ? [$revisions] : []),
             $viewOnSite,
             ...self::previewLinkAction($s, $page),
             $saveTop,

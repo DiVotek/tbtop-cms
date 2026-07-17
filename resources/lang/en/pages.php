@@ -113,6 +113,21 @@ return [
         'helper' => 'Link is valid for :hours hours.',
         'close' => 'Close',
     ],
+    'revisions' => [
+        'title' => 'Revisions',
+        'empty' => 'No revisions yet.',
+        'current' => 'Current',
+        'author_unknown' => '—',
+        'kinds' => [
+            'create' => 'Created',
+            'save' => 'Saved',
+            'restore' => 'Restored',
+        ],
+        'restore' => 'Restore',
+        'restore_title' => 'Restore this revision?',
+        'restore_confirm' => 'Any unsaved changes in this form will be lost. The page will be reverted to this revision\'s content.',
+        'restored' => 'Page restored to the selected revision',
+    ],
     'validation' => [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
