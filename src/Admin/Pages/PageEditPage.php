@@ -19,6 +19,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -103,6 +104,20 @@ class PageEditPage extends AdminPage
         $revisions = PageEditRevisionsAction::enabled() ? PageEditRevisionsAction::build($s, $page) : null;
 
         $form = $s->form('pageEditor', [
+            // A real (client-invisible) field, not just a record() key: the
+            // client's own form-state round-trip would carry lock_version
+            // back untouched with no field at all (serializeFormData starts
+            // from the full record bag and only transforms values for nodes
+            // it can find by name — see PageForm::loadRow()'s docblock), but
+            // FormSubmitController runs $request->validate($form->collectRules())
+            // server-side, and RuleWalker only emits a rule for fields that
+            // are actually present in the tree — an undeclared key is
+            // silently dropped from the validated payload before it ever
+            // reaches PageForm::save(). meta('hidden', true) keeps it out of
+            // the rendered UI (see structure/meta.ts's isNodeHidden) while
+            // still giving RuleWalker something to collect a ('nullable')
+            // rule for.
+            $s->number('lock_version')->meta('hidden', true),
             PageEditStatusBar::build($s, $page, $revisions, $this->viewOnSiteAction($s), $saveTop),
             $s->grid(['cols' => ['sm' => 1, 'lg' => 3], 'gap' => 6], [
                 $s->stack([$s->tabs($this->tabs($s, $page))], ['colSpan' => ['sm' => 1, 'lg' => 2]]),
@@ -133,11 +148,24 @@ class PageEditPage extends AdminPage
         return $name === 'save' ? $action->keybinding('mod+s') : $action;
     }
 
+    /**
+     * A stale lock_version (someone else saved or restored this page while
+     * this form was open) surfaces as an error notify with NO redirect —
+     * unlike every other outcome here, the submitter's in-progress edits stay
+     * on screen so they can copy anything unsaved and check the Revisions
+     * panel, instead of being redirected into a fresh reload that would
+     * silently discard what they were typing.
+     */
     private function save(ActionCtx $ctx): Effects
     {
         $page = $this->page();
         $rows = PageEditBlocks::toRows($ctx->form, $page);
-        PageForm::save([...$ctx->form, 'content' => $rows], $this->pageId());
+
+        try {
+            PageForm::save([...$ctx->form, 'content' => $rows], $this->pageId());
+        } catch (PageConflictException) {
+            return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::pages.actions.saved'))->redirect(
             route('tbtop.cms.page-edit-page', ['page' => $this->pageId()]),

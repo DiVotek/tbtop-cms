@@ -10,6 +10,7 @@ use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -123,7 +124,16 @@ final class PageEditBlockTabs
             static fn (array $row): bool => (string) $row['id'] !== $id,
         ));
 
-        PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
+        // Same stale-form guard as PageEditPage::save() — this action saves
+        // outside the normal form submit cycle, but it carries the same
+        // $ctx->form (including lock_version) and reaches the same
+        // PageForm::save(), so it needs the same non-destructive handling of
+        // a conflict: error notify, no redirect, block NOT removed.
+        try {
+            PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
+        } catch (PageConflictException) {
+            return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::pages.blocks.removed'))
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
@@ -163,7 +173,12 @@ final class PageEditBlockTabs
         $newRow = ['id' => (string) Str::ulid(), 'kind' => $kind, 'active' => false, 'sort' => self::nextSort($existingRows)];
         $rows = [...$existingRows, $newRow];
 
-        PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
+        // See handleRemove()'s matching comment: same conflict handling.
+        try {
+            PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
+        } catch (PageConflictException) {
+            return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::pages.blocks.added'))
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));

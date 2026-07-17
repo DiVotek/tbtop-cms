@@ -128,6 +128,12 @@ return [
         'restore_confirm' => 'Any unsaved changes in this form will be lost. The page will be reverted to this revision\'s content.',
         'restored' => 'Page restored to the selected revision',
     ],
+    'conflict' => [
+        // Matches what actually happens on a conflict: the error response
+        // re-renders the page props, so the form resyncs to the latest saved
+        // version and the submitter's unapplied edits leave the screen.
+        'message' => 'This page was changed by someone else while you were editing. Your edits were not applied and the form now shows the latest version — reapply them if needed; every saved version is in Revisions.',
+    ],
     'validation' => [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
