@@ -41,11 +41,18 @@ class SeoResolver
      * The meta title before the global suffix is appended — also the base
      * that og:title falls back to when no og_title override is set.
      *
+     * Cascade: seo.title → page.title → page.name. The last link matters:
+     * name is the only required editorial field, so a page with empty
+     * Title/Meta title still gets a non-empty <title> instead of a bare
+     * suffix (or nothing at all when no suffix is configured).
+     *
      * @param  array<string, mixed>  $seo
      */
     private function metaTitle(Page $page, array $seo, string $locale): string
     {
-        return $this->str($seo, 'title') ?: (string) $page->getTranslation('title', $locale);
+        return $this->str($seo, 'title')
+            ?: (string) $page->getTranslation('title', $locale)
+            ?: (string) $page->getTranslation('name', $locale);
     }
 
     private function title(string $base): string
