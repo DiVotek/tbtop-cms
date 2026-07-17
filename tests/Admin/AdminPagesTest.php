@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -17,7 +18,7 @@ beforeEach(function (): void {
 
 it('shows the pages admin to an admin user', function (): void {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
 
     $this->actingAs($user, 'web')
         ->get('/admin/pages', ['X-Inertia' => 'true'])
@@ -26,7 +27,7 @@ it('shows the pages admin to an admin user', function (): void {
 
 it('shows the languages admin to an admin user', function (): void {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
 
     $this->actingAs($user, 'web')
         ->get('/admin/languages', ['X-Inertia' => 'true'])
@@ -43,7 +44,7 @@ it('redirects a guest away from the languages admin', function (): void {
 
 it('shows the redirects admin to an admin user', function (): void {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
 
     $this->actingAs($user, 'web')
         ->get('/admin/redirects', ['X-Inertia' => 'true'])

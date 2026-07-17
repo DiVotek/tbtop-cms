@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\PreviewLink;
@@ -21,7 +22,7 @@ beforeEach(function (): void {
 function makePreviewAdmin(): AdminUser
 {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
 
     return $user;
 }
@@ -51,6 +52,17 @@ it('shows a draft page to an authenticated admin with preview props set', functi
         ->assertOk()
         ->assertJsonPath('props.isPreview', true)
         ->assertJsonPath('props.seo.noindex', true);
+});
+
+it('shows a draft page to an editor — CurrentAdmin::canAccess only requires a profile row, not a role', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Secret']]);
+    $editor = AdminUser::create(['name' => 'Editor', 'email' => 'editor@example.com', 'password' => 'secret']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $editor->id, 'role' => CmsRole::Editor]);
+
+    test()->actingAs($editor, 'web')
+        ->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.isPreview', true);
 });
 
 it('does not force noindex or preview on a published page for an anonymous visitor', function (): void {

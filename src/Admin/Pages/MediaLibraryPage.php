@@ -31,4 +31,10 @@ class MediaLibraryPage extends AdminMediaLibraryPage
     {
         return __('tbtop-cms::nav.items.media_library');
     }
+
+    #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.media';
+    }
 }

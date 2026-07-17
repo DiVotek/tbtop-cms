@@ -22,6 +22,12 @@ abstract class MenuFormPage extends Page
 {
     abstract protected function menuId(): ?int;
 
+    #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.menus';
+    }
+
     /** @return list<array{label: string, url?: string}> */
     #[\Override]
     public function breadcrumbs(): array

@@ -46,6 +46,12 @@ class PageEditPage extends AdminPage
     }
 
     #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.pages';
+    }
+
+    #[\Override]
     public function title(): string
     {
         return $this->page()->getTranslation('name', $this->defaultLocale(), false) ?: ('#' . $this->page()->getKey());

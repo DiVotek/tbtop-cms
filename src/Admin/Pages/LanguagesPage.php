@@ -38,6 +38,12 @@ class LanguagesPage extends AdminPage
     }
 
     #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.languages';
+    }
+
+    #[\Override]
     public function title(): string
     {
         return __('tbtop-cms::languages.title');

@@ -39,6 +39,12 @@ class PagesPage extends AdminPage
     }
 
     #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.pages';
+    }
+
+    #[\Override]
     public function title(): string
     {
         return __('tbtop-cms::pages.title');

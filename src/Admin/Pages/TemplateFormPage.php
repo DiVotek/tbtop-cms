@@ -22,6 +22,12 @@ abstract class TemplateFormPage extends Page
 {
     abstract protected function templateId(): ?int;
 
+    #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.design';
+    }
+
     /** @return list<array{label: string, url?: string}> */
     #[\Override]
     public function breadcrumbs(): array

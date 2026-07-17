@@ -20,5 +20,6 @@ return [
         'site_settings' => 'Site settings',
         'seo_settings' => 'SEO settings',
         'notification_settings' => 'Notification settings',
+        'users' => 'Users',
     ],
 ];

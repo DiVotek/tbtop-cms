@@ -28,6 +28,12 @@ class LayoutPage extends AdminPage
     }
 
     #[\Override]
+    public static function can(): ?string
+    {
+        return 'tbtop-cms.design';
+    }
+
+    #[\Override]
     public function title(): string
     {
         return __('tbtop-cms::layout.title');
