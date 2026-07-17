@@ -19,6 +19,7 @@ return [
         'parent' => 'Батьківська',
         'status' => 'Статус',
         'updated' => 'Оновлено',
+        'updated_by' => 'Оновив(-ла)',
         'deleted_at' => 'Видалено',
     ],
     'status' => [

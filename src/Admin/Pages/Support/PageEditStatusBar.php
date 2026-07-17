@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\DisplayValueBlock;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Frontend\PreviewLink;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -106,19 +107,71 @@ final class PageEditStatusBar
         return self::STATUS_COLORS[$status->value];
     }
 
-    /** @return list<mixed> */
+    /**
+     * Compact icon'd pair instead of the old "Updated <datetime> Created
+     * <datetime>" text: an icon communicates which timestamp this is without
+     * spending horizontal space on the word — this row already competes with
+     * the status badge, view-on-site, preview-link, revisions, and save
+     * actions for the same line. Updated carries the full datetime plus its
+     * author (who most recently touched the content); Created is date-only
+     * with no author — the creator is one click away in the Revisions panel
+     * (its oldest, kind=create row), so repeating it here would be the same
+     * fact twice for less room to show it clearly.
+     *
+     * @return list<mixed>
+     */
     private static function timestamps(S $s, Page $page): array
     {
-        $nodes = [
-            $s->displayText(__('tbtop-cms::pages.status_bar.updated'))->variant('muted'),
-            $s->displayValue($page->updated_at)->datetime(),
-        ];
+        $nodes = [self::updatedGroup($s, $page)];
 
         if ($page->created_at !== null && ! $page->created_at->equalTo($page->updated_at)) {
-            $nodes[] = $s->displayText(__('tbtop-cms::pages.status_bar.created'))->variant('muted');
-            $nodes[] = $s->displayValue($page->created_at)->datetime();
+            $nodes[] = self::createdGroup($s, $page);
         }
 
         return $nodes;
+    }
+
+    private static function updatedGroup(S $s, Page $page): Node
+    {
+        $children = [
+            self::icon($s, 'pencil'),
+            $s->displayValue($page->updated_at)->datetime('d.m.Y H:i'),
+        ];
+
+        $author = AuthorNames::label($page->updated_by, AuthorNames::lookup([$page->updated_by]));
+        if ($author !== null) {
+            // " · <author>" stays on the same line, muted, rather than a
+            // second row — the goal is compactness, not a second fact
+            // fighting the datetime for visual weight.
+            $children[] = $s->displayText('· ' . $author)->variant('muted');
+        }
+
+        return $s->flex($children, align: 'center', gap: 1);
+    }
+
+    private static function createdGroup(S $s, Page $page): Node
+    {
+        return $s->flex([
+            self::icon($s, 'calendar-plus'),
+            $s->displayValue($page->created_at)->date('d.m.Y'),
+        ], align: 'center', gap: 1);
+    }
+
+    /**
+     * A bare icon, no visible text: DisplayValueBlock's icon() kind maps a
+     * value to an {icon,color} entry and renders only the icon client-side
+     * (IconMapCell) — the value itself ($name) never reaches the page, it's
+     * just the lookup key matching its own single map entry.
+     *
+     * The entry MUST be the object form ['icon' => $name]: the PHP docblock
+     * also allows a bare icon string, but the client's IconMapCell only reads
+     * entry.icon — a string entry leaves it undefined and the cell falls back
+     * to rendering the raw value as text (verified live: the status bar
+     * showed the words "pencil"/"calendar-plus"). Admin-package doc/client
+     * mismatch, noted in the audit backlog.
+     */
+    private static function icon(S $s, string $name): DisplayValueBlock
+    {
+        return $s->displayValue($name)->icon([$name => ['icon' => $name]]);
     }
 }

@@ -11,6 +11,7 @@ return [
         'locale' => 'Мова',
         'status' => 'Статус',
         'auto' => 'Авто',
+        'updated_by' => 'Оновив(-ла)',
     ],
     'locale_all' => 'Всі мови',
     'statuses' => [

@@ -15,6 +15,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
+use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Redirect\Models\Redirect;
 
 class RedirectsPage extends AdminPage
@@ -81,6 +82,8 @@ class RedirectsPage extends AdminPage
                 Column::make('status_code')->label(__('tbtop-cms::redirects.columns.status'))
                     ->formatUsing($this->statusLabel(...)),
                 Column::make('is_auto')->label(__('tbtop-cms::redirects.columns.auto'))->boolean(),
+                Column::make('updated_by_name')->label(__('tbtop-cms::redirects.columns.updated_by'))
+                    ->toggleable(true, hiddenByDefault: true)->muted(),
             ])
             ->searchable(['from_path', 'to_path'])
             ->defaultSort('from_path', 'asc')
@@ -97,7 +100,8 @@ class RedirectsPage extends AdminPage
     /** @return Builder<Redirect> */
     private function query(): Builder
     {
-        return Redirect::query();
+        return Redirect::query()->select('redirects.*')
+            ->selectSub(AuthorNames::subselect('redirects', 'updated_by'), 'updated_by_name');
     }
 
     private function createAction(S $s): ActionBuilder

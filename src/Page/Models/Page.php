@@ -15,6 +15,7 @@ use Spatie\Translatable\HasTranslations;
 use Tbtop\Cms\Database\Factories\PageFactory;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Observers\PageObserver;
+use Tbtop\Cms\Support\Concerns\TracksAuthors;
 
 /**
  * @property int $id
@@ -45,12 +46,14 @@ class Page extends Model
 
     use HasTranslations;
     use SoftDeletes;
+    use TracksAuthors;
 
     /**
-     * created_by/updated_by/lock_version exist in the schema and docblock
-     * but nothing in the codebase writes them yet (no observer/trait wires
-     * them) — left out until something actually sets them. created_at is
-     * mass-assigned explicitly in list-ordering tests.
+     * created_by/updated_by are stamped by TracksAuthors, not mass-assigned —
+     * they stay out of $fillable on purpose (see the trait's docblock).
+     * lock_version is bumped by PageObserver::saving(), also never mass-
+     * assigned. created_at is mass-assigned explicitly in list-ordering
+     * tests.
      *
      * @var list<string>
      */

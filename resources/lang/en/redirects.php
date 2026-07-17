@@ -11,6 +11,7 @@ return [
         'locale' => 'Locale',
         'status' => 'Status',
         'auto' => 'Auto',
+        'updated_by' => 'Updated by',
     ],
     'locale_all' => 'All locales',
     'statuses' => [
