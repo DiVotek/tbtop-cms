@@ -11,6 +11,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
@@ -99,11 +100,32 @@ class PageForm
         ];
     }
 
-    /** @param array<string, mixed> $form */
+    /**
+     * @param  array<string, mixed>  $form
+     *
+     * @throws PageConflictException When $form carries a lock_version that no
+     *                               longer matches the row (someone else saved or restored this
+     *                               page since the form was loaded). Checked first, before any
+     *                               fill/guard side effect, so a stale submit never partially
+     *                               applies — see PageEditPage::save()/PageEditBlockTabs for how
+     *                               callers turn this into a non-destructive error notify that
+     *                               keeps the submitter's unsaved edits in the form.
+     */
     public static function save(array $form, ?int $id = null): Page
     {
         $page = $id !== null ? Page::query()->findOrFail($id) : new Page;
         $isCreate = ! $page->exists;
+
+        // Creates and any legacy/internal caller that never learned about
+        // lock_version (the form simply omits the key — see loadRow()'s
+        // counterpart and PagesPage::createAction()'s form, which has none)
+        // skip the check outright: there is no prior version to conflict
+        // with, and requiring the key would break every caller that predates
+        // this feature.
+        if (! $isCreate && array_key_exists('lock_version', $form)) {
+            self::guardLockVersion($page, $form);
+        }
+
         $parentId = self::nullableInt($form['parent_id'] ?? null);
         self::guardParent($page, $parentId);
         self::guardTypeAndStatus($page, $form);
@@ -265,7 +287,26 @@ class PageForm
             'og_title' => (string) ($seo['og_title'] ?? ''),
             'og_description' => (string) ($seo['og_description'] ?? ''),
             'og_image' => (string) ($seo['og_image'] ?? ''),
+            // Seeds the pageEditor form's hidden lock_version field (see
+            // PageEditPage::view()). The client would round-trip an
+            // undeclared record key on its own, but FormSubmitController's
+            // $request->validate() strips keys RuleWalker collected no rule
+            // for — the value only survives the forms endpoint because a
+            // real (hidden) field exists for it in the tree.
+            'lock_version' => $page->lock_version,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     *
+     * @throws PageConflictException
+     */
+    private static function guardLockVersion(Page $page, array $form): void
+    {
+        if ((int) $form['lock_version'] !== $page->lock_version) {
+            throw new PageConflictException("Page #{$page->getKey()} was changed since this form was loaded.");
+        }
     }
 
     private static function guardParent(Page $page, ?int $parentId): void

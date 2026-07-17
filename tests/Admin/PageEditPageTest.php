@@ -223,16 +223,21 @@ it('puts status and is_indexable together in the sidebar Publication card', func
     expect($names)->toBe(['status', 'is_indexable']);
 });
 
-it('renders the status bar as the first child of the form with a status badge', function (): void {
+it('renders a hidden lock_version field before the status bar, then the status bar with a status badge', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
-    $firstChild = $form['options']['children'][0];
+    $lockVersionField = $form['options']['children'][0];
+    $statusBar = $form['options']['children'][1];
 
-    expect($firstChild['kind'])->toBe('flex')
-        ->and($firstChild['options']['variant'])->toBe('card');
+    expect($lockVersionField['kind'])->toBe('number')
+        ->and($lockVersionField['name'])->toBe('lock_version')
+        ->and($lockVersionField['meta']['hidden'] ?? null)->toBeTrue();
 
-    $badge = findNodeByKind($firstChild, 'displayValue');
+    expect($statusBar['kind'])->toBe('flex')
+        ->and($statusBar['options']['variant'])->toBe('card');
+
+    $badge = findNodeByKind($statusBar, 'displayValue');
     expect($badge)->not->toBeNull()
         ->and($badge['options']['kind'])->toBe('badge');
 });
@@ -500,7 +505,9 @@ it('places view-on-site and a top save action in the status bar', function (): v
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
-    $statusBar = $form['options']['children'][0];
+    // children[0] is the hidden lock_version field (see the "renders a
+    // hidden lock_version field..." test) — the status bar is the next one.
+    $statusBar = $form['options']['children'][1];
     $names = array_column($statusBar['options']['children'], 'name');
 
     expect($names)->toContain('pageEditView', 'saveTop');
@@ -596,7 +603,9 @@ it('shows the preview-link action in the status bar for a draft page', function 
     $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
 
     $form = findNodeByKind(pageEditStructure($draft->id)['props']['structure'], 'form');
-    $statusBar = $form['options']['children'][0];
+    // children[0] is the hidden lock_version field — see the "renders a
+    // hidden lock_version field..." test.
+    $statusBar = $form['options']['children'][1];
     $names = array_column($statusBar['options']['children'], 'name');
 
     expect($names)->toContain('pagePreviewLink');
@@ -606,7 +615,7 @@ it('omits the preview-link action from the status bar for a published page', fun
     $published = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
 
     $form = findNodeByKind(pageEditStructure($published->id)['props']['structure'], 'form');
-    $statusBar = $form['options']['children'][0];
+    $statusBar = $form['options']['children'][1];
     $names = array_column($statusBar['options']['children'], 'name');
 
     expect($names)->not->toContain('pagePreviewLink');
