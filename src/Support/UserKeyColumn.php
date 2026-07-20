@@ -30,12 +30,12 @@ final class UserKeyColumn
         $model = self::resolveUserModel();
         $traits = class_uses_recursive($model);
 
-        if (isset($traits[HasUuids::class])) {
-            return $table->uuid($column);
-        }
-
         if (isset($traits[HasUlids::class])) {
             return $table->ulid($column);
+        }
+
+        if (isset($traits[HasUuids::class])) {
+            return $table->uuid($column);
         }
 
         if ($model->getKeyType() === 'int' && $model->getIncrementing()) {
