@@ -224,3 +224,32 @@ it('prefills the edit page with the menu record', function (): void {
 it('redirects a guest away from the menus admin', function (): void {
     $this->get('/admin/menus')->assertRedirect(route('login'));
 });
+
+it('saves the menu without leaving the edit form', function (): void {
+    $menu = Menu::create(['name' => 'Main', 'key' => 'main', 'items' => []]);
+
+    test()->actingAs(makeMenuAdmin(), 'web')->post(
+        "/admin/menus/{$menu->id}/edit/forms/menuEditor",
+        ['name' => 'Main renamed', 'key' => 'main', 'items' => []],
+    )->assertRedirect();
+
+    $effects = session('inertia.flash_data')['tbtop.effects'] ?? [];
+    $kinds = collect($effects)->pluck('kind');
+
+    expect($kinds)->toContain('notify')
+        ->and($kinds)->not->toContain('redirect');
+});
+
+it('redirects to the new menu edit page after creating a menu', function (): void {
+    test()->actingAs(makeMenuAdmin(), 'web')->post(
+        '/admin/menus/create/forms/menuEditor',
+        ['name' => 'Header', 'key' => 'header', 'items' => []],
+    )->assertRedirect();
+
+    $menu = Menu::query()->where('key', 'header')->firstOrFail();
+
+    $effects = session('inertia.flash_data')['tbtop.effects'] ?? [];
+    $redirect = collect($effects)->firstWhere('kind', 'redirect');
+    expect($redirect)->not->toBeNull()
+        ->and($redirect['href'])->toBe(route('tbtop.cms.menu-edit-page', ['menu' => $menu->id]));
+});

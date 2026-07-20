@@ -100,3 +100,32 @@ it('prefills the edit page with the template record', function (): void {
 it('redirects a guest away from the templates admin', function (): void {
     $this->get('/admin/templates')->assertRedirect(route('login'));
 });
+
+it('saves the template without leaving the edit form', function (): void {
+    $template = Template::create(['name' => 'Landing', 'content' => []]);
+
+    test()->actingAs(makeTemplateAdmin(), 'web')->post(
+        "/admin/templates/{$template->id}/edit/forms/templateEditor",
+        ['name' => 'Landing renamed', 'content' => []],
+    )->assertRedirect();
+
+    $effects = session('inertia.flash_data')['tbtop.effects'] ?? [];
+    $kinds = collect($effects)->pluck('kind');
+
+    expect($kinds)->toContain('notify')
+        ->and($kinds)->not->toContain('redirect');
+});
+
+it('redirects to the new template edit page after creating a template', function (): void {
+    test()->actingAs(makeTemplateAdmin(), 'web')->post(
+        '/admin/templates/create/forms/templateEditor',
+        ['name' => 'Landing', 'content' => []],
+    )->assertRedirect();
+
+    $template = Template::query()->where('name', 'Landing')->firstOrFail();
+
+    $effects = session('inertia.flash_data')['tbtop.effects'] ?? [];
+    $redirect = collect($effects)->firstWhere('kind', 'redirect');
+    expect($redirect)->not->toBeNull()
+        ->and($redirect['href'])->toBe(route('tbtop.cms.template-edit-page', ['template' => $template->id]));
+});
