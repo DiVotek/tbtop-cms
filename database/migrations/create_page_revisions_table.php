@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Tbtop\Cms\Support\UserKeyColumn;
 
 return new class extends Migration
 {
@@ -18,7 +19,7 @@ return new class extends Migration
             // used before its own user_id FK migration. A revision survives its
             // author's account being deleted; the author column just reads as
             // unknown (see PageRevisionWriter/the revisions tab author lookup).
-            $table->unsignedBigInteger('user_id')->nullable();
+            UserKeyColumn::define($table, 'user_id')->nullable();
             $table->string('kind');
             $table->json('payload');
             $table->timestamp('created_at')->nullable();

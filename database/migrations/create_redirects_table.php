@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Tbtop\Cms\Support\UserKeyColumn;
 
 return new class extends Migration
 {
@@ -17,8 +18,8 @@ return new class extends Migration
             $table->string('to_path', 2048);
             $table->unsignedSmallInteger('status_code')->default(301);
             $table->boolean('is_auto')->default(false);
-            $table->unsignedBigInteger('created_by')->nullable();
-            $table->unsignedBigInteger('updated_by')->nullable();
+            UserKeyColumn::define($table, 'created_by')->nullable();
+            UserKeyColumn::define($table, 'updated_by')->nullable();
 
             $table->unique(['locale', 'from_path']);
 
