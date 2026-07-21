@@ -62,9 +62,14 @@ abstract class TemplateFormPage extends Page
 
     private function save(ActionCtx $ctx): Effects
     {
-        TemplateForm::save($ctx->form, $this->templateId());
+        $template = TemplateForm::save($ctx->form, $this->templateId());
+        $effects = Effects::make()->notify(__('tbtop-cms::templates.actions.saved'));
 
-        return Effects::make()->notify(__('tbtop-cms::templates.actions.saved'))->redirect($this->listUrl());
+        if ($this->templateId() === null) {
+            return $effects->redirect(route('tbtop.cms.template-edit-page', ['template' => $template->id]));
+        }
+
+        return $effects;
     }
 
     private function listUrl(): string

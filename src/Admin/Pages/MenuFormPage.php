@@ -62,9 +62,14 @@ abstract class MenuFormPage extends Page
 
     private function save(ActionCtx $ctx): Effects
     {
-        MenuForm::save($ctx->form, $this->menuId());
+        $menu = MenuForm::save($ctx->form, $this->menuId());
+        $effects = Effects::make()->notify(__('tbtop-cms::menus.actions.saved'));
 
-        return Effects::make()->notify(__('tbtop-cms::menus.actions.saved'))->redirect($this->listUrl());
+        if ($this->menuId() === null) {
+            return $effects->redirect(route('tbtop.cms.menu-edit-page', ['menu' => $menu->id]));
+        }
+
+        return $effects;
     }
 
     private function listUrl(): string

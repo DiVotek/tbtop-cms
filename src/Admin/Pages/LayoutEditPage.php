@@ -69,7 +69,7 @@ class LayoutEditPage extends Page
     {
         LayoutForm::save($ctx->form, $this->slot());
 
-        return Effects::make()->notify(__('tbtop-cms::layout.actions.saved'))->redirect($this->listUrl());
+        return Effects::make()->notify(__('tbtop-cms::layout.actions.saved'));
     }
 
     private function slot(): string

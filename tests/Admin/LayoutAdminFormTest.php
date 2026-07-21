@@ -107,3 +107,16 @@ it('returns 404 for an unknown slot in the edit url', function (): void {
 it('redirects a guest away from the layout admin', function (): void {
     $this->get('/admin/layout')->assertRedirect(route('login'));
 });
+
+it('saves the layout without leaving the edit form', function (): void {
+    test()->actingAs(makeLayoutAdmin(), 'web')->post(
+        '/admin/layout/' . Slots::HEADER . '/edit/forms/layoutEditor',
+        ['content' => []],
+    )->assertRedirect();
+
+    $effects = session('inertia.flash_data')['tbtop.effects'] ?? [];
+    $kinds = collect($effects)->pluck('kind');
+
+    expect($kinds)->toContain('notify')
+        ->and($kinds)->not->toContain('redirect');
+});
