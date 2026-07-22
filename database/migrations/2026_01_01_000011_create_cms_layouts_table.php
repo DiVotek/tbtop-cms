@@ -10,6 +10,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('cms_layouts')) {
+            return;
+        }
+
         Schema::create('cms_layouts', function (Blueprint $table): void {
             $table->id();
             $table->string('slot')->unique();

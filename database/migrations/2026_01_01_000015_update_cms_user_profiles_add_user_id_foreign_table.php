@@ -11,11 +11,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // EnsureCmsAdmin grants access purely by the existence of a
-        // cms_user_profiles row for the user id. Without a FK, deleting a
-        // user orphans the profile and a later reused user id would
-        // silently inherit admin access. Delete orphans first so the FK
-        // below can be added without failing on pre-existing bad data.
+        $hasUserIdForeignKey = collect(Schema::getForeignKeys('cms_user_profiles'))
+            ->contains(fn (array $foreignKey): bool => in_array('user_id', $foreignKey['columns'], true));
+
+        if ($hasUserIdForeignKey) {
+            return;
+        }
+
+        // Deletes orphaned profiles first: without this FK a deleted user's
+        // reused id would otherwise inherit admin access via the old row.
         DB::table('cms_user_profiles')
             ->whereNotIn('user_id', DB::table('users')->select('id'))
             ->delete();

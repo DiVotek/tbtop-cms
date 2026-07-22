@@ -11,6 +11,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('cms_user_profiles')) {
+            return;
+        }
+
         Schema::create('cms_user_profiles', function (Blueprint $table): void {
             $table->id();
             UserKeyColumn::define($table, 'user_id')->unique();

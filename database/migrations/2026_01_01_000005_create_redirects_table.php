@@ -11,6 +11,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('redirects')) {
+            return;
+        }
+
         Schema::create('redirects', function (Blueprint $table): void {
             $table->id();
             $table->string('locale', 5)->nullable();

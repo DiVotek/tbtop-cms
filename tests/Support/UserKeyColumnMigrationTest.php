@@ -12,14 +12,14 @@ use Tbtop\Cms\Tests\Fixtures\UuidAdminUser;
 // Provider order for the affected migrations — proves the corrective
 // migration is registered before the FK migration that depends on it.
 const USER_KEY_COLUMN_MIGRATIONS = [
-    'create_pages_table',
-    'create_cms_user_profiles_table',
-    'create_redirects_table',
-    'create_cms_templates_table',
-    'update_user_id_columns_match_host_key_type',
-    'update_cms_user_profiles_add_user_id_foreign_table',
-    'update_cms_user_profiles_add_role_table',
-    'create_page_revisions_table',
+    '2026_01_01_000002_create_pages_table',
+    '2026_01_01_000004_create_cms_user_profiles_table',
+    '2026_01_01_000005_create_redirects_table',
+    '2026_01_01_000007_create_cms_templates_table',
+    '2026_01_01_000014_update_user_id_columns_match_host_key_type',
+    '2026_01_01_000015_update_cms_user_profiles_add_user_id_foreign_table',
+    '2026_01_01_000016_update_cms_user_profiles_add_role_table',
+    '2026_01_01_000017_create_page_revisions_table',
 ];
 
 function runUserKeyColumnMigrationsOn(string $connection): void

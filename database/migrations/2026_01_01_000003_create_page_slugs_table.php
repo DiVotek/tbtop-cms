@@ -10,6 +10,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('page_slugs')) {
+            return;
+        }
+
         Schema::create('page_slugs', function (Blueprint $table): void {
             $table->id();
             // No FK: package migrations load alphabetically, so page_slugs precedes pages.

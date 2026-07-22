@@ -11,6 +11,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('cms_form_submissions', 'lead_status')) {
+            return;
+        }
+
         Schema::table('cms_form_submissions', function (Blueprint $table): void {
             $table->string('lead_status')->default(LeadStatus::New->value)->index()->after('status');
         });

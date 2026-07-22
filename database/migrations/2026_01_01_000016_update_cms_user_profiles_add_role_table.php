@@ -12,6 +12,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('cms_user_profiles', 'role')) {
+            return;
+        }
+
         Schema::table('cms_user_profiles', function (Blueprint $table): void {
             $table->string('role')->nullable()->after('user_id');
         });
