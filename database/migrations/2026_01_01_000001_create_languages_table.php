@@ -10,6 +10,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('languages')) {
+            return;
+        }
+
         Schema::create('languages', function (Blueprint $table): void {
             $table->id();
             $table->string('name');

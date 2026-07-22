@@ -62,7 +62,7 @@ function runRoleMigrationOn(string $connection): void
     config(['database.default' => $connection]);
 
     try {
-        (require __DIR__ . '/../../database/migrations/update_cms_user_profiles_add_role_table.php')->up();
+        (require __DIR__ . '/../../database/migrations/2026_01_01_000016_update_cms_user_profiles_add_role_table.php')->up();
     } finally {
         config(['database.default' => $previousDefault]);
     }

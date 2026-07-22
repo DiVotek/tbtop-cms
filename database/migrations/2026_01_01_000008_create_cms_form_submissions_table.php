@@ -10,6 +10,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('cms_form_submissions')) {
+            return;
+        }
+
         Schema::create('cms_form_submissions', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('page_id')->nullable()->constrained('pages')->nullOnDelete();

@@ -30,7 +30,7 @@ it('throws a clear exception when the host user model uses a key type the helper
     config(['database.default' => 'exotic_key_host_test']);
 
     try {
-        (require __DIR__ . '/../../database/migrations/create_cms_user_profiles_table.php')->up();
+        (require __DIR__ . '/../../database/migrations/2026_01_01_000004_create_cms_user_profiles_table.php')->up();
     } finally {
         config(['database.default' => $previousDefault]);
     }

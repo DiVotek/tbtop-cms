@@ -10,15 +10,19 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('pages', 'body')) {
+            return;
+        }
+
         Schema::table('pages', function (Blueprint $table): void {
-            $table->string('image')->nullable()->after('body');
+            $table->json('body')->nullable()->after('summary');
         });
     }
 
     public function down(): void
     {
         Schema::table('pages', function (Blueprint $table): void {
-            $table->dropColumn('image');
+            $table->dropColumn('body');
         });
     }
 };
