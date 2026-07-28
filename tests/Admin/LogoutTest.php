@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
@@ -20,7 +19,7 @@ beforeEach(function (): void {
 // (>=0.2.24) panel-prefixed ProfileDropdown default.
 it('logs the admin out and redirects to the login page', function (): void {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
     test()->actingAs($user, 'web');
 
     test()->post('/admin/logout')->assertRedirect('/admin/login');
@@ -30,7 +29,7 @@ it('logs the admin out and redirects to the login page', function (): void {
 
 it('invalidates the session on logout', function (): void {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
     test()->actingAs($user, 'web');
 
     $originalSessionId = session()->getId();

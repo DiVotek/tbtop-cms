@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Menu\Models\Menu;
 
 class MenusPage extends AdminPage
@@ -35,7 +36,7 @@ class MenusPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.menus';
+        return CmsAbilities::for('tbtop-cms.menus');
     }
 
     #[\Override]

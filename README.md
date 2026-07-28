@@ -61,6 +61,46 @@ frontend (non-admin) Inertia response:
 - `cms.layout` — resolved block lists (`header`/`footer`) the host renders in
   its persistent layout.
 
+## Admin access and roles
+
+Access to the admin panel is binary and owned by this package: a user has it if
+a `cms_user_profiles` row exists for them, or if the host's user model
+implements `Tbtop\Cms\Admin\Contracts\CmsAdmin` and returns `true`. Grant and
+revoke it from the Users page, or from the CLI:
+
+```bash
+php artisan cms:admin:create admin@example.com   # create a user and grant access
+php artisan cms:admin:grant admin@example.com    # grant to an existing user
+php artisan cms:admin:revoke admin@example.com   # revoke
+```
+
+**What an admin may then do is the host's decision.** The package ships no
+roles. Each admin page declares a `tbtop-cms.*` ability, and the `tbtop-cms.roles`
+config flag decides who answers it:
+
+- `false` (default) — no ability is declared, so **every section is open to
+  every user with admin access**, including form submissions (lead PII),
+  template editing, and global settings. Appropriate when everyone with admin
+  access is equally trusted.
+- `true` — pages require their ability and your app must answer it. The package
+  never defines these gates, so an ability you have not answered denies access.
+  Define all nine before flipping the flag.
+
+```php
+// A host using spatie/laravel-permission: permission names match the abilities.
+// Or answer them directly:
+foreach ([
+    'tbtop-cms.pages', 'tbtop-cms.media', 'tbtop-cms.submissions',
+    'tbtop-cms.redirects', 'tbtop-cms.settings', 'tbtop-cms.design',
+    'tbtop-cms.menus', 'tbtop-cms.languages', 'tbtop-cms.users',
+] as $ability) {
+    Gate::define($ability, fn (User $user): bool => $user->isEditor());
+}
+```
+
+The dashboard and profile pages declare no ability and stay open to anyone with
+admin access under either setting.
+
 ## Development
 
 ```bash

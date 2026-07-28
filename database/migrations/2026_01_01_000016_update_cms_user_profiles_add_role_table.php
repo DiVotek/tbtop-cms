@@ -6,7 +6,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 
 return new class extends Migration
 {
@@ -20,14 +19,13 @@ return new class extends Migration
             $table->string('role')->nullable()->after('user_id');
         });
 
-        // Upgrade path: before this column existed, every profile row had
-        // full admin access. Backfill to superadministrator so nobody loses
-        // access they already had; new rows default to editor (least
-        // privilege) at the DB level below.
-        DB::table('cms_user_profiles')->update(['role' => CmsRole::SuperAdministrator->value]);
+        // Role slugs are literals, not enum refs: the CmsRole enum was
+        // removed in a later version and an applied migration must keep
+        // replaying on a fresh database.
+        DB::table('cms_user_profiles')->update(['role' => 'superadministrator']);
 
         Schema::table('cms_user_profiles', function (Blueprint $table): void {
-            $table->string('role')->default(CmsRole::Editor->value)->nullable(false)->change();
+            $table->string('role')->default('editor')->nullable(false)->change();
         });
     }
 

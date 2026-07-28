@@ -15,6 +15,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\TemplateForm;
 use Tbtop\Cms\Admin\Support\AuthorNames;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Template\Models\Template;
 use Tbtop\Cms\Template\TemplateApplier;
@@ -39,7 +40,7 @@ class TemplatesPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.design';
+        return CmsAbilities::for('tbtop-cms.design');
     }
 
     #[\Override]

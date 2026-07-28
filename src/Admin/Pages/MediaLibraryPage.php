@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages;
 
 use Tbtop\Admin\Pages\MediaLibraryPage as AdminMediaLibraryPage;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 
 /**
  * Surfaces the admin package's media library in the CMS sidebar.
@@ -35,6 +36,6 @@ class MediaLibraryPage extends AdminMediaLibraryPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.media';
+        return CmsAbilities::for('tbtop-cms.media');
     }
 }

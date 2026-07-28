@@ -11,6 +11,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Cms\Admin\Pages\Support\MenuForm;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
 
 /**
@@ -25,7 +26,7 @@ abstract class MenuFormPage extends Page
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.menus';
+        return CmsAbilities::for('tbtop-cms.menus');
     }
 
     /** @return list<array{label: string, url?: string}> */

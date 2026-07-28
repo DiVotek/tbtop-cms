@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -15,7 +13,6 @@ use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
-use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Console\InstallCommand;
@@ -56,6 +53,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000015_update_cms_user_profiles_add_user_id_foreign_table')
             ->hasMigration('2026_01_01_000016_update_cms_user_profiles_add_role_table')
             ->hasMigration('2026_01_01_000017_create_page_revisions_table')
+            ->hasMigration('2026_01_01_000018_update_cms_user_profiles_drop_role_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -87,7 +85,6 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
         $this->wirePageRevisions();
-        $this->wireRoleGates();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -187,32 +184,5 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wirePageRevisions(): void
     {
         Page::observe(PageRevisions::class);
-    }
-
-    /**
-     * One ability per section, matching CmsRole::sections(). AuthorizesPage
-     * (admin package) calls Gate::authorize($ability) for whatever a page's
-     * can() returns; NavBuilder calls Gate::allows() the same way to hide
-     * nav items. Role resolution lives in CurrentAdmin::roleOf(): profile
-     * row → its role; CmsAdmin-contract access without a row → implicit
-     * superadministrator (pre-roles behavior); no access → null, so a user
-     * with neither fails every ability — EnsureCmsAdmin already 403s them
-     * before they reach a gated route, this is defense in depth.
-     */
-    private function wireRoleGates(): void
-    {
-        foreach ([
-            'tbtop-cms.pages',
-            'tbtop-cms.media',
-            'tbtop-cms.submissions',
-            'tbtop-cms.redirects',
-            'tbtop-cms.settings',
-            'tbtop-cms.design',
-            'tbtop-cms.menus',
-            'tbtop-cms.languages',
-            'tbtop-cms.users',
-        ] as $ability) {
-            Gate::define($ability, static fn (Authenticatable $user): bool => CurrentAdmin::roleOf($user)?->can($ability) ?? false);
-        }
     }
 }

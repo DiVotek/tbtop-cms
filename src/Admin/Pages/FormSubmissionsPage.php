@@ -16,6 +16,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
@@ -43,7 +44,7 @@ class FormSubmissionsPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.submissions';
+        return CmsAbilities::for('tbtop-cms.submissions');
     }
 
     #[\Override]

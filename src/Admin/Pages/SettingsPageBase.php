@@ -12,6 +12,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Cms\Admin\Pages\Support\SettingsForm;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Settings\Settings;
 
@@ -26,7 +27,7 @@ abstract class SettingsPageBase extends Page
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.settings';
+        return CmsAbilities::for('tbtop-cms.settings');
     }
 
     public function view(S $s): Node

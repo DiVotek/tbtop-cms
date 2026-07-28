@@ -12,6 +12,7 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\BlockShowcase;
 use Tbtop\Cms\Admin\Pages\Support\BlockShowcaseHtml;
 use Tbtop\Cms\Admin\Pages\Support\BlockUsage;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 
@@ -41,7 +42,7 @@ class BlocksPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.design';
+        return CmsAbilities::for('tbtop-cms.design');
     }
 
     #[\Override]

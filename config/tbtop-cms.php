@@ -103,6 +103,10 @@ return [
         'root_kind' => 'Fragment',
         'root_view' => null,
     ],
+    // Who answers the tbtop-cms.* section abilities: false leaves every
+    // section open to anyone with admin access; true hands them to the host,
+    // which must define the gates first — an unanswered ability denies.
+    'roles' => false,
     'admin' => [
         'autoregister' => true,
         'prefix' => 'admin',
