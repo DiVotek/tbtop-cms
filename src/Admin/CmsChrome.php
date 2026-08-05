@@ -62,7 +62,8 @@ class CmsChrome extends Chrome
             ->icon('inbox')
             ->tooltip(__('tbtop-cms::chrome.inbox.tooltip'))
             ->size('sm')
-            ->visit('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions');
+            ->visit('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions')
+            ->authorize('tbtop-cms.submissions');
 
         if ($unread > 0) {
             $action->badge($unread, Color::Danger);

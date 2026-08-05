@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -609,6 +610,51 @@ it('shows the preview-link action in the status bar for a draft page', function 
     $names = array_column($statusBar['options']['children'], 'name');
 
     expect($names)->toContain('pagePreviewLink');
+});
+
+/** @return array<string, mixed> */
+function previewLinkNode(int $pageId): array
+{
+    $form = findNodeByKind(pageEditStructure($pageId)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][1];
+    foreach ($statusBar['options']['children'] as $child) {
+        if (($child['name'] ?? null) === 'pagePreviewLink') {
+            return $child;
+        }
+    }
+
+    throw new RuntimeException('pagePreviewLink action not found in status bar.');
+}
+
+it('offers Copy before Close in the preview-link modal footer', function (): void {
+    $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
+
+    $footer = previewLinkNode($draft->id)['options']['spec']['body']['options']['children'][2];
+    // The spacer serializes without a name, so array_column skips it.
+    $names = array_column($footer['options']['children'], 'name');
+    $labelByName = array_column($footer['options']['children'], 'options', 'name');
+
+    expect($names)->toBe(['pagePreviewLinkCopy', 'pagePreviewLinkClose'])
+        ->and($labelByName['pagePreviewLinkCopy']['label'])->toBe('Copy')
+        ->and($labelByName['pagePreviewLinkClose']['label'])->toBe('Close');
+});
+
+it('returns a copyToClipboard effect with the signed preview URL from the Copy action', function (): void {
+    // PreviewLink::for() builds a signed URL to the frontend page route,
+    // which the admin test bootstrap does not register.
+    app(Cms::class)->frontendRoutes();
+    $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
+
+    $response = test()->actingAs(makePageEditAdmin(), 'web')
+        ->postJson("/admin/pages/{$draft->id}/edit/actions/pagePreviewLinkCopy", ['payload' => []])
+        ->assertOk();
+
+    $effects = $response->json('effects');
+    // The default locale is unprefixed, so the path is /draft-page.
+    expect($effects)->toHaveCount(1)
+        ->and($effects[0]['kind'])->toBe('copyToClipboard')
+        ->and($effects[0]['text'])->toContain('/draft-page')
+        ->and($effects[0]['text'])->toContain('signature=');
 });
 
 it('omits the preview-link action from the status bar for a published page', function (): void {
