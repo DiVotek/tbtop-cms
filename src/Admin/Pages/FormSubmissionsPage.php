@@ -324,7 +324,7 @@ class FormSubmissionsPage extends AdminPage
             $s->displayValue('error')->field('error'),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::form-submissions.fields.payload'))->variant('muted'),
-            $s->displayValue('payloadText')->field('payloadText'),
+            $s->displayValue('payloadText')->field('payloadText')->multiline(),
         ]);
 
         return $s->action('viewPayload')->label(__('tbtop-cms::form-submissions.actions.view'))

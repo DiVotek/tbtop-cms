@@ -149,12 +149,10 @@ class PageEditPage extends AdminPage
     }
 
     /**
-     * A stale lock_version (someone else saved or restored this page while
-     * this form was open) surfaces as an error notify with NO redirect —
-     * unlike every other outcome here, the submitter's in-progress edits stay
-     * on screen so they can copy anything unsaved and check the Revisions
-     * panel, instead of being redirected into a fresh reload that would
-     * silently discard what they were typing.
+     * A stale lock_version returns a notify only — no redirect effect. The
+     * submit's own back() already delivers the winning record, so the form
+     * resyncs (fresh lock_version, edits dropped as the message explains);
+     * a redirect effect would revisit the page and unmount the toast.
      */
     private function save(ActionCtx $ctx): Effects
     {

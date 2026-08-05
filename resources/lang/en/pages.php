@@ -112,6 +112,7 @@ return [
     'preview' => [
         'field_label' => 'Link',
         'helper' => 'Link is valid for :hours hours.',
+        'copy' => 'Copy',
         'close' => 'Close',
     ],
     'revisions' => [
@@ -130,10 +131,9 @@ return [
         'restored' => 'Page restored to the selected revision',
     ],
     'conflict' => [
-        // Matches what actually happens on a conflict: the error response
-        // re-renders the page props, so the form resyncs to the latest saved
-        // version and the submitter's unapplied edits leave the screen.
-        'message' => 'This page was changed by someone else while you were editing. Your edits were not applied and the form now shows the latest version — reapply them if needed; every saved version is in Revisions.',
+        // On conflict the form resyncs to the winning record (fresh
+        // lock_version); the message must say the edits were dropped.
+        'message' => 'This page was changed by someone else while you were editing, so your unsaved edits were not applied — the form now shows the latest version. You can restore any earlier version from Revisions.',
     ],
     'validation' => [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',

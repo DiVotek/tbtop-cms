@@ -116,6 +116,8 @@ it('rejects a save with a stale lock_version, leaving the database and revisions
     expect($notify)->not->toBeNull()
         ->and($notify['level'])->toBe('error')
         ->and($notify['message'])->toBe(__('tbtop-cms::pages.conflict.message'))
+        // Notify only — back() already reloads the winning record (fresh
+        // lock_version); a redirect effect would revisit and drop the toast.
         ->and(collect($effects)->pluck('kind'))->not->toContain('redirect');
 });
 

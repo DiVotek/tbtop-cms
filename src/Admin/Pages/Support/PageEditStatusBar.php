@@ -64,6 +64,13 @@ final class PageEditStatusBar
         $close = $s->action('pagePreviewLinkClose')->label(__('tbtop-cms::pages.preview.close'))
             ->handle(static fn (ActionCtx $ctx): Effects => Effects::make()->closeModal());
 
+        // Regenerates the signed URL (same deterministic call as query() below)
+        // instead of reading the disabled field's displayed value.
+        $copy = $s->action('pagePreviewLinkCopy')->label(__('tbtop-cms::pages.preview.copy'))
+            ->handle(static fn (ActionCtx $ctx): Effects => Effects::make()->copyToClipboard(
+                app(PreviewLink::class)->for($page, app(Languages::class)->defaultLocale()),
+            ));
+
         $field = $s->text('previewUrl')->label(__('tbtop-cms::pages.preview.field_label'))->meta('disabled', true);
 
         // The signed URL is only fetched via the action's query() below (which
@@ -72,7 +79,7 @@ final class PageEditStatusBar
         $form = $s->form('pagePreviewLinkForm', [
             $field,
             $s->displayText(__('tbtop-cms::pages.preview.helper', ['hours' => self::ttlHours()]))->variant('muted'),
-            $s->flex([$s->spacer(), $close], justify: 'end'),
+            $s->flex([$s->spacer(), $copy, $close], justify: 'end'),
         ])->guardUnsaved(false);
 
         return [

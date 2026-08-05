@@ -33,6 +33,15 @@ function actingAsCmsAdmin(): AdminUser
     return $user;
 }
 
+function actingAsCmsEditor(): AdminUser
+{
+    $user = AdminUser::create(['name' => 'Editor', 'email' => 'editor@example.com', 'password' => 'secret']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::Editor]);
+    test()->actingAs($user, 'web');
+
+    return $user;
+}
+
 function contactPageForListing(): Page
 {
     return Page::factory()->create([
@@ -234,6 +243,28 @@ it('shows the unread lead count on the inbox badge', function (): void {
     submissionWithLead(LeadStatus::Processed);
 
     expect(inboxActionOptions()['badge'])->toBe('2');
+});
+
+// Editors lack tbtop-cms.submissions (CmsRole::sections()) and can't reach
+// /admin/form-submissions itself, so the header is read off /admin/pages.
+it('hides the Inbox header item from an editor, who lacks tbtop-cms.submissions', function (): void {
+    actingAsCmsEditor();
+
+    $header = test()->get('/admin/pages', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.tbtop.chrome.header');
+
+    expect(findNodeByName($header, 'inbox'))->toBeNull();
+});
+
+it('shows the Inbox header item to a superadministrator, who has tbtop-cms.submissions', function (): void {
+    actingAsCmsAdmin();
+
+    $header = test()->get('/admin/pages', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.tbtop.chrome.header');
+
+    expect(findNodeByName($header, 'inbox'))->not->toBeNull();
 });
 
 it('omits the inbox badge when nothing is unread', function (): void {
