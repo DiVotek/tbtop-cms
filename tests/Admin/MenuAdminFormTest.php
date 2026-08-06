@@ -211,6 +211,41 @@ it('stores only label overrides for page items, dropping locales that echo the p
     expect($menu->items[0])->not->toHaveKey('label');
 });
 
+it('does not freeze the old page name as an override when a row is repointed', function (): void {
+    $old = Page::factory()->create([
+        'type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Alpha'],
+    ]);
+    $new = Page::factory()->create([
+        'type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Beta'],
+    ]);
+
+    $menu = Menu::create([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [['type' => 'page', 'page_id' => $old->id]],
+    ]);
+
+    // Repoint to Beta without touching the label: the submitted label still
+    // carries Alpha's prefill and must not persist as an override.
+    $menu = MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [['type' => 'page', 'page_id' => (string) $new->id, 'label' => ['en' => 'Alpha']]],
+    ], $menu->id);
+
+    expect($menu->items[0])->not->toHaveKey('label')
+        ->and($menu->items[0]['page_id'])->toBe($new->id);
+
+    // On a menu that never referenced Alpha, the same text is a real override.
+    $other = MenuForm::save([
+        'name' => 'Other',
+        'key' => 'other',
+        'items' => [['type' => 'page', 'page_id' => (string) $new->id, 'label' => ['en' => 'Alpha']]],
+    ]);
+
+    expect($other->items[0]['label'])->toBe(['en' => 'Alpha']);
+});
+
 it('prefills page-item labels from name translations on load, keeping stored overrides', function (): void {
     Language::factory()->create(['locale' => 'uk']);
     $page = Page::factory()->create([

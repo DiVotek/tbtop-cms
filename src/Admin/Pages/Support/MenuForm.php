@@ -122,9 +122,18 @@ class MenuForm
     {
         $menu = $id !== null ? Menu::query()->findOrFail($id) : new Menu;
         $items = $form['items'] ?? null;
+        // Pages referenced before this save widen the echo diff: a row
+        // repointed to another page still carries the old page's prefilled
+        // label, which must not be frozen as an override (see
+        // withoutPageNameEchoes).
         $data = [
             'name' => (string) ($form['name'] ?? ''),
-            'items' => self::normalizeItems($items, depth: 0, pages: self::referencedPages($items)),
+            'items' => self::normalizeItems(
+                $items,
+                depth: 0,
+                pages: self::referencedPages($items),
+                previousPages: self::referencedPages($menu->items ?? []),
+            ),
         ];
 
         // The key is set once, at creation, and is immutable afterwards — it is
@@ -227,9 +236,10 @@ class MenuForm
      * stays live, so renaming the page renames untouched menu items.
      *
      * @param  array<int, Page>  $pages
+     * @param  array<int, Page>  $previousPages
      * @return list<array<string, mixed>>
      */
-    private static function normalizeItems(mixed $rows, int $depth, array $pages): array
+    private static function normalizeItems(mixed $rows, int $depth, array $pages, array $previousPages): array
     {
         if (! is_array($rows)) {
             return [];
@@ -255,7 +265,7 @@ class MenuForm
                 if ($target <= 0) {
                     continue;
                 }
-                $label = self::withoutPageNameEchoes($label, $pages[$target] ?? null);
+                $label = self::withoutPageNameEchoes($label, $pages[$target] ?? null, $previousPages);
                 if ($label !== []) {
                     $item['label'] = $label;
                 }
@@ -274,7 +284,12 @@ class MenuForm
             }
 
             if ($depth < 1) {
-                $children = self::normalizeItems($row['children'] ?? null, depth: $depth + 1, pages: $pages);
+                $children = self::normalizeItems(
+                    $row['children'] ?? null,
+                    depth: $depth + 1,
+                    pages: $pages,
+                    previousPages: $previousPages,
+                );
                 if ($children !== []) {
                     $item['children'] = $children;
                 }
@@ -289,20 +304,26 @@ class MenuForm
     /**
      * A locale whose label matches the page-name translation is an untouched
      * prefill (see itemsForForm), not an override — storing it would freeze
-     * the copy and break the live fallback.
+     * the copy and break the live fallback. Previously referenced pages are
+     * checked too: a row repointed to another page still submits the old
+     * page's prefilled label, which would otherwise persist as a stale
+     * override showing the old page's name on the site.
      *
      * @param  array<string, string>  $label
+     * @param  array<int, Page>  $previousPages
      * @return array<string, string>
      */
-    private static function withoutPageNameEchoes(array $label, ?Page $page): array
+    private static function withoutPageNameEchoes(array $label, ?Page $page, array $previousPages): array
     {
-        if (! $page instanceof Page) {
-            return $label;
-        }
+        $sources = $page instanceof Page ? [$page, ...$previousPages] : $previousPages;
 
         foreach ($label as $locale => $text) {
-            if ($text === trim((string) $page->getTranslation('name', $locale, false))) {
-                unset($label[$locale]);
+            foreach ($sources as $source) {
+                if ($text === trim((string) $source->getTranslation('name', $locale, false))) {
+                    unset($label[$locale]);
+
+                    break;
+                }
             }
         }
 
