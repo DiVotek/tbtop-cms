@@ -19,6 +19,8 @@ use Tbtop\Cms\Page\Models\Page;
  * tree — each item is one of three types (page ref / raw url / on-page
  * anchor); a `page` item stores `page_id` so links stay rename-safe. The
  * child repeater is capped at one level: sub-items cannot nest further.
+ * label/url/anchor are per-locale maps; page/category labels store only
+ * overrides and fall back to the page-name translation.
  */
 class MenuForm
 {
@@ -78,12 +80,17 @@ class MenuForm
      * required_if needs the absolute sibling path to scope per row, so it
      * differs between the top level and the nested children.
      *
+     * label/url/anchor are per-locale maps. A label is only required for
+     * url/anchor items — page/category items fall back to the page name.
+     *
      * @return list<Field>
      */
     private static function itemFields(S $s, string $typePath): array
     {
         return [
-            $s->text('label')->label(__('tbtop-cms::menus.fields.label'))->required(),
+            $s->text('label')->label(__('tbtop-cms::menus.fields.label'))->translatable()
+                ->rules("required_if:{$typePath},url,anchor")
+                ->helperText(__('tbtop-cms::menus.fields.label_hint')),
             $s->select('type')->label(__('tbtop-cms::menus.fields.type'))->required()
                 ->options([
                     ['value' => 'page', 'label' => __('tbtop-cms::menus.types.page')],
@@ -99,10 +106,10 @@ class MenuForm
                 ->options(self::categoryOptions())
                 ->rules("required_if:{$typePath},category")
                 ->hiddenIf('type', '!=', 'category'),
-            $s->text('url')->label(__('tbtop-cms::menus.fields.url'))
+            $s->text('url')->label(__('tbtop-cms::menus.fields.url'))->translatable()
                 ->rules("required_if:{$typePath},url")
                 ->hiddenIf('type', '!=', 'url'),
-            $s->text('anchor')->label(__('tbtop-cms::menus.fields.anchor'))
+            $s->text('anchor')->label(__('tbtop-cms::menus.fields.anchor'))->translatable()
                 ->helperText(__('tbtop-cms::menus.fields.anchor_hint'))
                 ->rules("required_if:{$typePath},anchor")
                 ->hiddenIf('type', '!=', 'anchor'),
@@ -114,9 +121,10 @@ class MenuForm
     public static function save(array $form, ?int $id = null): Menu
     {
         $menu = $id !== null ? Menu::query()->findOrFail($id) : new Menu;
+        $items = $form['items'] ?? null;
         $data = [
             'name' => (string) ($form['name'] ?? ''),
-            'items' => self::normalizeItems($form['items'] ?? null, depth: 0),
+            'items' => self::normalizeItems($items, depth: 0, pages: self::referencedPages($items)),
         ];
 
         // The key is set once, at creation, and is immutable afterwards — it is
@@ -136,12 +144,65 @@ class MenuForm
     public static function loadRow(int $id): array
     {
         $menu = Menu::query()->findOrFail($id);
+        $items = $menu->items ?? [];
 
         return [
             'name' => $menu->name,
             'key' => $menu->key,
-            'items' => $menu->items ?? [],
+            'items' => self::itemsForForm($items, self::referencedPages($items)),
         ];
+    }
+
+    /**
+     * Stored items -> form rows: label/url/anchor become locale maps (legacy
+     * scalars belong to the default locale), and page/category labels are
+     * prefilled per locale with the page-name translation wherever no override
+     * is stored — save() diffs the same values back out, so an untouched
+     * prefill keeps the fallback live instead of freezing a copy.
+     *
+     * @param  list<mixed>  $items
+     * @param  array<int, Page>  $pages
+     * @return list<array<string, mixed>>
+     */
+    private static function itemsForForm(array $items, array $pages): array
+    {
+        $locales = array_column(app(Languages::class)->adminActive(), 'locale');
+        $rows = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $item['label'] = self::localeMap($item['label'] ?? null);
+
+            foreach (['url', 'anchor'] as $field) {
+                if (array_key_exists($field, $item)) {
+                    $item[$field] = self::localeMap($item[$field]);
+                }
+            }
+
+            $page = $pages[(int) ($item['page_id'] ?? $item['category_id'] ?? 0)] ?? null;
+            if ($page instanceof Page) {
+                foreach ($locales as $locale) {
+                    if (($item['label'][$locale] ?? '') !== '') {
+                        continue;
+                    }
+                    $name = trim((string) $page->getTranslation('name', $locale, false));
+                    if ($name !== '') {
+                        $item['label'][$locale] = $name;
+                    }
+                }
+            }
+
+            if (isset($item['children']) && is_array($item['children'])) {
+                $item['children'] = self::itemsForForm($item['children'], $pages);
+            }
+
+            $rows[] = $item;
+        }
+
+        return $rows;
     }
 
     /** The sub-field that carries each item type's link target. */
@@ -159,22 +220,25 @@ class MenuForm
      * third level. An item without a resolvable target is dropped entirely —
      * "no target" is one consistent shape, never a null/empty placeholder.
      *
+     * label/url/anchor persist as locale maps of non-empty overrides. For
+     * url/anchor the default locale is the fallback source, so a row without
+     * a default-locale label or target is dropped. For page/category a label
+     * locale equal to the page-name translation is not stored — the fallback
+     * stays live, so renaming the page renames untouched menu items.
+     *
+     * @param  array<int, Page>  $pages
      * @return list<array<string, mixed>>
      */
-    private static function normalizeItems(mixed $rows, int $depth): array
+    private static function normalizeItems(mixed $rows, int $depth, array $pages): array
     {
         if (! is_array($rows)) {
             return [];
         }
 
+        $default = app(Languages::class)->defaultLocale();
         $items = [];
         foreach ($rows as $row) {
             if (! is_array($row)) {
-                continue;
-            }
-
-            $label = trim((string) ($row['label'] ?? ''));
-            if ($label === '') {
                 continue;
             }
 
@@ -183,24 +247,34 @@ class MenuForm
                 : 'page';
 
             $targetField = self::TARGET_FIELDS[$type];
-            $rawTarget = $row[$targetField] ?? null;
-            $target = is_string($rawTarget) ? trim($rawTarget) : $rawTarget;
-            if ($target === null || $target === '') {
-                continue;
-            }
+            $label = self::localeMap($row['label'] ?? null);
+            $item = ['type' => $type];
 
-            $item = [
-                'type' => $type,
-                'label' => $label,
-                $targetField => in_array($type, ['page', 'category'], true) ? (int) $target : (string) $target,
-            ];
+            if (in_array($type, ['page', 'category'], true)) {
+                $target = (int) ($row[$targetField] ?? 0);
+                if ($target <= 0) {
+                    continue;
+                }
+                $label = self::withoutPageNameEchoes($label, $pages[$target] ?? null);
+                if ($label !== []) {
+                    $item['label'] = $label;
+                }
+                $item[$targetField] = $target;
+            } else {
+                $target = self::localeMap($row[$targetField] ?? null);
+                if (($target[$default] ?? '') === '' || ($label[$default] ?? '') === '') {
+                    continue;
+                }
+                $item['label'] = $label;
+                $item[$targetField] = $target;
+            }
 
             if (! empty($row['target_blank'])) {
                 $item['target_blank'] = true;
             }
 
             if ($depth < 1) {
-                $children = self::normalizeItems($row['children'] ?? null, depth: $depth + 1);
+                $children = self::normalizeItems($row['children'] ?? null, depth: $depth + 1, pages: $pages);
                 if ($children !== []) {
                     $item['children'] = $children;
                 }
@@ -210,6 +284,96 @@ class MenuForm
         }
 
         return $items;
+    }
+
+    /**
+     * A locale whose label matches the page-name translation is an untouched
+     * prefill (see itemsForForm), not an override — storing it would freeze
+     * the copy and break the live fallback.
+     *
+     * @param  array<string, string>  $label
+     * @return array<string, string>
+     */
+    private static function withoutPageNameEchoes(array $label, ?Page $page): array
+    {
+        if (! $page instanceof Page) {
+            return $label;
+        }
+
+        foreach ($label as $locale => $text) {
+            if ($text === trim((string) $page->getTranslation('name', $locale, false))) {
+                unset($label[$locale]);
+            }
+        }
+
+        return $label;
+    }
+
+    /**
+     * Trimmed non-empty values per locale. A legacy scalar (stored before
+     * menus became translatable) counts as the default locale's value.
+     *
+     * @return array<string, string>
+     */
+    private static function localeMap(mixed $value): array
+    {
+        if (is_string($value)) {
+            $value = [app(Languages::class)->defaultLocale() => $value];
+        }
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($value as $locale => $text) {
+            if (! is_string($locale) || ! is_string($text)) {
+                continue;
+            }
+            $text = trim($text);
+            if ($text !== '') {
+                $map[$locale] = $text;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Pages referenced by page/category items at either level, keyed by id —
+     * one query backing both the label prefill and the override diff.
+     *
+     * @return array<int, Page>
+     */
+    private static function referencedPages(mixed $rows): array
+    {
+        $ids = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            foreach (['page_id', 'category_id'] as $field) {
+                $id = (int) ($row[$field] ?? 0);
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+            foreach (is_array($row['children'] ?? null) ? $row['children'] : [] as $child) {
+                foreach (['page_id', 'category_id'] as $field) {
+                    $id = (int) (is_array($child) ? ($child[$field] ?? 0) : 0);
+                    if ($id > 0) {
+                        $ids[] = $id;
+                    }
+                }
+            }
+        }
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return Page::query()->whereIn('id', array_unique($ids))->get()->keyBy(
+            static fn (Page $page): int => (int) $page->getKey(),
+        )->all();
     }
 
     /** @return list<array{value: string, label: string}> */

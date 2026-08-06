@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'Menus',
-    'subtitle' => 'Named navigation menus. Build the item tree here; it is wired into the site separately.',
+    'subtitle' => 'Named navigation menus shown on the site.',
     'create_title' => 'New menu',
     'edit_title' => 'Edit menu',
     'date_format' => 'M j, Y',
@@ -25,6 +25,7 @@ return [
         'items' => 'Items',
         'children' => 'Sub-items',
         'label' => 'Label',
+        'label_hint' => 'For page and category items this defaults to the page name — edit to override.',
         'type' => 'Type',
         'page' => 'Page',
         'category' => 'Category',
