@@ -13,7 +13,6 @@ use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
-use Tbtop\Cms\Admin\Pages\Support\TemplateForm;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Template\Models\Template;
@@ -143,8 +142,12 @@ class TemplatesPage extends AdminPage
             ->handle($this->apply(...), needs: ['row', 'form']);
 
         $form = $s->form('templateApply', [
-            $s->select('target_page_id')->label(__('tbtop-cms::templates.fields.target_page'))
-                ->required()->options(TemplateForm::pageOptions()),
+            // Any page, any status — assigning a template to a draft page is
+            // legitimate (the draft simply isn't live yet).
+            $s->relation('target_page_id')->label(__('tbtop-cms::templates.fields.target_page'))
+                ->required()
+                ->query(static fn (): Builder => Page::query()->orderBy('sort_order')->orderBy('id'))
+                ->labelKey('name')->searchable(),
             $s->flex([$s->spacer(), $cancel, $apply], justify: 'end'),
         ]);
 

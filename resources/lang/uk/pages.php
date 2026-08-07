@@ -74,7 +74,6 @@ return [
         'og_description' => 'OG опис',
         'og_description_placeholder' => 'За замовчуванням — мета-опис',
         'og_image' => 'OG зображення',
-        'no_parent' => '— Немає —',
         'image' => 'Зображення',
     ],
     'actions' => [

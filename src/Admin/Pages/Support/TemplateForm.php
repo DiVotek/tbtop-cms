@@ -6,8 +6,6 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
-use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Template\Models\Template;
 
 class TemplateForm
@@ -45,19 +43,5 @@ class TemplateForm
             'name' => $template->name,
             'content' => BlockContentField::toRows($template->content),
         ];
-    }
-
-    /** @return list<array{value: string, label: string}> */
-    public static function pageOptions(): array
-    {
-        $default = app(Languages::class)->defaultLocale();
-        $options = [];
-
-        foreach (Page::query()->orderBy('sort_order')->orderBy('id')->get() as $page) {
-            $name = $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey());
-            $options[] = ['value' => (string) $page->getKey(), 'label' => $name];
-        }
-
-        return $options;
     }
 }

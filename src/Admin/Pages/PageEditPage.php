@@ -122,7 +122,7 @@ class PageEditPage extends AdminPage
             PageEditStatusBar::build($s, $page, $revisions, $this->viewOnSiteAction($s), $saveTop),
             $s->grid(['cols' => ['sm' => 1, 'lg' => 3], 'gap' => 6], [
                 $s->stack([$s->tabs($this->tabs($s, $page))], ['colSpan' => ['sm' => 1, 'lg' => 2]]),
-                PageEditSidebar::build($s),
+                PageEditSidebar::build($s, $page),
             ]),
             $footer,
         ])

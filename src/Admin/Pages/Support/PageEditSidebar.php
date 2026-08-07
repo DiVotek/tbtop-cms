@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Models\Page;
 
 /**
  * The right sidebar column on PageEditPage: publication status, hierarchy
@@ -17,7 +19,7 @@ use Tbtop\Cms\Page\Enums\PageStatus;
  */
 final class PageEditSidebar
 {
-    public static function build(S $s): Node
+    public static function build(S $s, Page $page): Node
     {
         return $s->stack([
             $s->section(['title' => __('tbtop-cms::pages.sections.publication'), 'variant' => 'card'], [
@@ -30,8 +32,13 @@ final class PageEditSidebar
             $s->section(['title' => __('tbtop-cms::pages.sections.structure'), 'variant' => 'card'], [
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
                     ->required()->options(PageFormOptions::types()),
-                $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
-                    ->options(PageFormOptions::parents()),
+                // Excludes the page itself and its descendants — placing it
+                // under its own subtree is a cycle PageForm::guardParent()
+                // rejects on submit; excluding here keeps the picker from
+                // offering an option that would only bounce back as an error.
+                $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
+                    ->query(static fn (): Builder => PageForm::parentQuery($page))
+                    ->labelKey('name')->searchable(),
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.ordering'), 'variant' => 'card'], [
                 $s->number('sort_order')->label(__('tbtop-cms::pages.fields.sort_order')),
