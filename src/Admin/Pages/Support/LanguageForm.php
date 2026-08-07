@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\LocaleCatalog;
 use Tbtop\Cms\Language\Models\Language;
 
@@ -66,6 +67,8 @@ class LanguageForm
         ]);
 
         $language->save();
+
+        event(new LanguagesChanged);
 
         return $language;
     }

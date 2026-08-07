@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 
 class SettingsForm
@@ -42,6 +43,8 @@ class SettingsForm
 
             $settings->set($key, $value);
         }
+
+        event(new SettingsSaved(array_keys($map)));
     }
 
     private static function isBlank(mixed $value): bool

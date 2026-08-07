@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Block\Block;
+use Tbtop\Cms\Form\Events\SubmissionReceived;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Frontend\Form\FormBlockLocator;
@@ -53,6 +54,8 @@ class FormSubmitController
         $payload = $request->validate($located->block->submitRules($located->data, $located->context));
 
         $submission = $this->store($model, $block, $located, $payload);
+
+        event(new SubmissionReceived($submission, $payload, $model, $block, $located->context->locale));
 
         try {
             $located->block->handleSubmit($payload, $located->data, $located->context);

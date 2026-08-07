@@ -19,6 +19,8 @@ use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Events\PageDeleted;
+use Tbtop\Cms\Page\Events\PageRestored;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 
@@ -207,6 +209,8 @@ class PagesPage extends AdminPage
             return Effects::make()->notify($e->getMessage(), 'error');
         }
 
+        event(new PageRestored($page));
+
         return Effects::make()->notify(__('tbtop-cms::pages.actions.restored'))->refreshTable();
     }
 
@@ -227,6 +231,8 @@ class PagesPage extends AdminPage
         } catch (DomainException $e) {
             return Effects::make()->notify($e->getMessage(), 'error');
         }
+
+        event(new PageDeleted($page, forced: true));
 
         return Effects::make()->notify(__('tbtop-cms::pages.actions.force_deleted'))->refreshTable();
     }

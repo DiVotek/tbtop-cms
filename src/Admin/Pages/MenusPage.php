@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Menu\Events\MenuDeleted;
 use Tbtop\Cms\Menu\Models\Menu;
 
 class MenusPage extends AdminPage
@@ -110,7 +111,12 @@ class MenusPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
-                Menu::query()->find($ctx->row['id'] ?? null)?->delete();
+                $menu = Menu::query()->find($ctx->row['id'] ?? null);
+                $menu?->delete();
+
+                if ($menu instanceof Menu) {
+                    event(new MenuDeleted($menu));
+                }
 
                 return Effects::make()->notify(__('tbtop-cms::menus.actions.deleted'))->refreshTable();
             },

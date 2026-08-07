@@ -19,6 +19,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -201,11 +202,15 @@ class PageEditPage extends AdminPage
      */
     private function delete(): Effects
     {
+        $page = $this->page();
+
         try {
-            $this->page()->delete();
+            $page->delete();
         } catch (DomainException $e) {
             return Effects::make()->notify($e->getMessage(), 'error');
         }
+
+        event(new PageDeleted($page, forced: false));
 
         return Effects::make()->notify(__('tbtop-cms::pages.actions.deleted'))
             ->redirect(route('tbtop.cms.pages-page'));
