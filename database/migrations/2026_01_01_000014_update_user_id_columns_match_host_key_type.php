@@ -11,14 +11,14 @@ return new class extends Migration
 {
     /** @var list<array{table: string, column: string, nullable: bool}> */
     private const USER_ID_COLUMNS = [
-        ['table' => 'cms_user_profiles', 'column' => 'user_id', 'nullable' => false],
-        ['table' => 'page_revisions', 'column' => 'user_id', 'nullable' => true],
-        ['table' => 'pages', 'column' => 'created_by', 'nullable' => true],
-        ['table' => 'pages', 'column' => 'updated_by', 'nullable' => true],
-        ['table' => 'cms_templates', 'column' => 'created_by', 'nullable' => true],
-        ['table' => 'cms_templates', 'column' => 'updated_by', 'nullable' => true],
-        ['table' => 'redirects', 'column' => 'created_by', 'nullable' => true],
-        ['table' => 'redirects', 'column' => 'updated_by', 'nullable' => true],
+        ['table' => 'tbtop_user_profiles', 'column' => 'user_id', 'nullable' => false],
+        ['table' => 'tbtop_page_revisions', 'column' => 'user_id', 'nullable' => true],
+        ['table' => 'tbtop_pages', 'column' => 'created_by', 'nullable' => true],
+        ['table' => 'tbtop_pages', 'column' => 'updated_by', 'nullable' => true],
+        ['table' => 'tbtop_templates', 'column' => 'created_by', 'nullable' => true],
+        ['table' => 'tbtop_templates', 'column' => 'updated_by', 'nullable' => true],
+        ['table' => 'tbtop_redirects', 'column' => 'created_by', 'nullable' => true],
+        ['table' => 'tbtop_redirects', 'column' => 'updated_by', 'nullable' => true],
     ];
 
     public function up(): void

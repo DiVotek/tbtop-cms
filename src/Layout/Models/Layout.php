@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Layout extends Model
 {
-    protected $table = 'cms_layouts';
+    protected $table = 'tbtop_layouts';
 
     /** @var list<string> */
     protected $fillable = ['slot', 'content'];

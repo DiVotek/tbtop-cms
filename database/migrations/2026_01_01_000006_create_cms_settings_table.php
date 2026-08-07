@@ -10,11 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('cms_settings')) {
+        if (Schema::hasTable('tbtop_settings')) {
             return;
         }
 
-        Schema::create('cms_settings', function (Blueprint $table): void {
+        Schema::create('tbtop_settings', function (Blueprint $table): void {
             $table->id();
             $table->string('key')->unique();
             $table->text('value')->nullable();
@@ -25,6 +25,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('cms_settings');
+        Schema::dropIfExists('tbtop_settings');
     }
 };

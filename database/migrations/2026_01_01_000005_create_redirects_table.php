@@ -11,11 +11,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('redirects')) {
+        if (Schema::hasTable('tbtop_redirects')) {
             return;
         }
 
-        Schema::create('redirects', function (Blueprint $table): void {
+        Schema::create('tbtop_redirects', function (Blueprint $table): void {
             $table->id();
             $table->string('locale', 5)->nullable();
             $table->string('from_path', 600);
@@ -33,6 +33,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('redirects');
+        Schema::dropIfExists('tbtop_redirects');
     }
 };

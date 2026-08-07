@@ -18,7 +18,7 @@ class Template extends Model
 {
     use TracksAuthors;
 
-    protected $table = 'cms_templates';
+    protected $table = 'tbtop_templates';
 
     /**
      * created_by/updated_by are stamped by TracksAuthors, not mass-assigned —

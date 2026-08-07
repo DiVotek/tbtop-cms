@@ -20,16 +20,20 @@ class AncestorChain
             return [];
         }
 
+        // Table name is taken from the model, not user input, so
+        // interpolating it into the SQL string is safe.
+        $table = (new Page)->getTable();
+
         // Recursive CTE; the depth counter caps cycles, hydration dedupes.
         $rows = DB::select(
-            <<<'SQL'
+            <<<SQL
                 WITH RECURSIVE chain AS (
                     SELECT *, 1 AS depth
-                    FROM pages
+                    FROM {$table}
                     WHERE id = ? AND deleted_at IS NULL
                     UNION ALL
                     SELECT p.*, c.depth + 1
-                    FROM pages p
+                    FROM {$table} p
                     INNER JOIN chain c ON p.id = c.parent_id
                     WHERE c.depth < ? AND p.deleted_at IS NULL
                 )

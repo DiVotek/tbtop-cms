@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Menu extends Model
 {
-    protected $table = 'cms_menus';
+    protected $table = 'tbtop_menus';
 
     /** @var list<string> */
     protected $fillable = ['key', 'name', 'items'];

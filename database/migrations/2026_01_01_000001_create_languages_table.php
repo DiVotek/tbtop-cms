@@ -10,11 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('languages')) {
+        if (Schema::hasTable('tbtop_languages')) {
             return;
         }
 
-        Schema::create('languages', function (Blueprint $table): void {
+        Schema::create('tbtop_languages', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
             $table->string('locale', 5)->unique();
@@ -29,6 +29,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('languages');
+        Schema::dropIfExists('tbtop_languages');
     }
 };

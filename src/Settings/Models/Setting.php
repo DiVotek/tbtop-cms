@@ -15,5 +15,5 @@ class Setting extends Model
     /** @var list<string> */
     protected $fillable = ['key', 'value'];
 
-    protected $table = 'cms_settings';
+    protected $table = 'tbtop_settings';
 }

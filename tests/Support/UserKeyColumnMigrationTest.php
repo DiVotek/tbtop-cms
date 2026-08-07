@@ -63,14 +63,14 @@ afterEach(function (): void {
 it('declares every user-id column as string-shaped (not integer) on a HasUuids host', function (): void {
     $connection = Schema::connection('uuid_host_test');
 
-    expect($connection->getColumnType('cms_user_profiles', 'user_id'))->toBe('varchar')
-        ->and($connection->getColumnType('page_revisions', 'user_id'))->toBe('varchar')
-        ->and($connection->getColumnType('pages', 'created_by'))->toBe('varchar')
-        ->and($connection->getColumnType('pages', 'updated_by'))->toBe('varchar')
-        ->and($connection->getColumnType('cms_templates', 'created_by'))->toBe('varchar')
-        ->and($connection->getColumnType('cms_templates', 'updated_by'))->toBe('varchar')
-        ->and($connection->getColumnType('redirects', 'created_by'))->toBe('varchar')
-        ->and($connection->getColumnType('redirects', 'updated_by'))->toBe('varchar');
+    expect($connection->getColumnType('tbtop_user_profiles', 'user_id'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_page_revisions', 'user_id'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_pages', 'created_by'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_pages', 'updated_by'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_templates', 'created_by'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_templates', 'updated_by'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_redirects', 'created_by'))->toBe('varchar')
+        ->and($connection->getColumnType('tbtop_redirects', 'updated_by'))->toBe('varchar');
 });
 
 it('lets a uuid-pk host save a profile row and a page revision snapshot with the uuid stored intact', function (): void {
@@ -82,21 +82,21 @@ it('lets a uuid-pk host save a profile row and a page revision snapshot with the
         'password' => 'secret',
     ]);
 
-    DB::connection('uuid_host_test')->table('cms_user_profiles')->insert([
+    DB::connection('uuid_host_test')->table('tbtop_user_profiles')->insert([
         'user_id' => $userId,
         'role' => CmsRole::SuperAdministrator->value,
     ]);
 
-    $storedProfileUserId = DB::connection('uuid_host_test')->table('cms_user_profiles')->where('user_id', $userId)->value('user_id');
+    $storedProfileUserId = DB::connection('uuid_host_test')->table('tbtop_user_profiles')->where('user_id', $userId)->value('user_id');
     expect($storedProfileUserId)->toBe($userId);
 
-    $pageId = DB::connection('uuid_host_test')->table('pages')->insertGetId([
+    $pageId = DB::connection('uuid_host_test')->table('tbtop_pages')->insertGetId([
         'type' => 'page',
         'name' => json_encode(['en' => 'About']),
         'status' => 'published',
     ]);
 
-    DB::connection('uuid_host_test')->table('page_revisions')->insert([
+    DB::connection('uuid_host_test')->table('tbtop_page_revisions')->insert([
         'page_id' => $pageId,
         'user_id' => $userId,
         'kind' => 'create',
@@ -104,6 +104,6 @@ it('lets a uuid-pk host save a profile row and a page revision snapshot with the
         'created_at' => now(),
     ]);
 
-    $storedRevisionUserId = DB::connection('uuid_host_test')->table('page_revisions')->where('page_id', $pageId)->value('user_id');
+    $storedRevisionUserId = DB::connection('uuid_host_test')->table('tbtop_page_revisions')->where('page_id', $pageId)->value('user_id');
     expect($storedRevisionUserId)->toBe($userId);
 });

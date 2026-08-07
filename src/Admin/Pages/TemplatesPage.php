@@ -115,8 +115,10 @@ class TemplatesPage extends AdminPage
     /** @return Builder<Template> */
     private function query(): Builder
     {
-        return Template::query()->select('cms_templates.*')
-            ->selectSub(AuthorNames::subselect('cms_templates', 'updated_by'), 'updated_by_name');
+        $table = (new Template)->getTable();
+
+        return Template::query()->select("{$table}.*")
+            ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name');
     }
 
     private function deleteAction(S $s): ActionBuilder

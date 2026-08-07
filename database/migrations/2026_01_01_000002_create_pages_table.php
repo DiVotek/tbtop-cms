@@ -11,14 +11,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('pages')) {
+        if (Schema::hasTable('tbtop_pages')) {
             return;
         }
 
-        Schema::create('pages', function (Blueprint $table): void {
+        Schema::create('tbtop_pages', function (Blueprint $table): void {
             $table->id();
             $table->string('type')->index();
-            $table->foreignId('parent_id')->nullable()->constrained('pages');
+            $table->foreignId('parent_id')->nullable()->constrained('tbtop_pages');
             $table->string('status')->default('draft');
             $table->json('content')->nullable();
             $table->json('name')->nullable();
@@ -41,6 +41,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('pages');
+        Schema::dropIfExists('tbtop_pages');
     }
 };

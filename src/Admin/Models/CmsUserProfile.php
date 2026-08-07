@@ -18,6 +18,8 @@ use Tbtop\Cms\Admin\Enums\CmsRole;
  */
 class CmsUserProfile extends Model
 {
+    protected $table = 'tbtop_user_profiles';
+
     /**
      * locale/display_name/avatar_media_id are written only via forceFill()
      * (ProfileActions::personal()/preferences()), which bypasses this list

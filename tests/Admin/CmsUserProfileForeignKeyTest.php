@@ -32,7 +32,7 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    Schema::connection('fk_test')->create('cms_user_profiles', function (Blueprint $table): void {
+    Schema::connection('fk_test')->create('tbtop_user_profiles', function (Blueprint $table): void {
         $table->id();
         $table->unsignedBigInteger('user_id')->unique();
         $table->string('locale')->nullable();

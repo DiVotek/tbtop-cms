@@ -10,13 +10,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('cms_form_submissions')) {
+        if (Schema::hasTable('tbtop_form_submissions')) {
             return;
         }
 
-        Schema::create('cms_form_submissions', function (Blueprint $table): void {
+        Schema::create('tbtop_form_submissions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('page_id')->nullable()->constrained('pages')->nullOnDelete();
+            $table->foreignId('page_id')->nullable()->constrained('tbtop_pages')->nullOnDelete();
             $table->string('block_id');
             $table->string('kind');
             $table->string('locale');
@@ -30,6 +30,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('cms_form_submissions');
+        Schema::dropIfExists('tbtop_form_submissions');
     }
 };
