@@ -15,7 +15,6 @@ use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Frontend\Form\FormBlockLocator;
 use Tbtop\Cms\Frontend\Form\LocatedFormBlock;
 use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Throwable;
 
@@ -30,7 +29,7 @@ class FormSubmitController
     {
         $this->applyLocale($locale);
 
-        $model = Page::query()->where('status', PageStatus::Published)->find($page);
+        $model = Page::query()->live()->find($page);
 
         if (! $model instanceof Page) {
             throw new NotFoundHttpException;

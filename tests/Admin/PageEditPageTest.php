@@ -221,7 +221,7 @@ it('puts status and is_indexable together in the sidebar Publication card', func
     $publicationCard = $sidebar['options']['children'][0];
 
     $names = array_column($publicationCard['options']['children'], 'name');
-    expect($names)->toBe(['status', 'is_indexable']);
+    expect($names)->toBe(['status', 'is_indexable', 'published_at', 'unpublish_at']);
 });
 
 it('renders a hidden lock_version field before the status bar, then the status bar with a status badge', function (): void {
@@ -241,6 +241,48 @@ it('renders a hidden lock_version field before the status bar, then the status b
     $badge = findNodeByKind($statusBar, 'displayValue');
     expect($badge)->not->toBeNull()
         ->and($badge['options']['kind'])->toBe('badge');
+});
+
+it('badges a scheduled page as Scheduled and shows a note with the publish datetime', function (): void {
+    $publishedAt = now()->addDay();
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'published_at' => $publishedAt,
+    ]);
+
+    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][1];
+
+    $badge = findNodeByKind($statusBar, 'displayValue');
+    expect($badge['options']['value'])->toBe('Scheduled');
+
+    $texts = array_filter($statusBar['options']['children'], static fn (array $c): bool => ($c['kind'] ?? null) === 'displayText');
+    $noteContent = array_column(array_values($texts), 'options');
+    $hasScheduleNote = false;
+    foreach ($noteContent as $opts) {
+        if (str_contains((string) ($opts['content'] ?? ''), 'Scheduled for')) {
+            $hasScheduleNote = true;
+        }
+    }
+
+    expect($hasScheduleNote)->toBeTrue();
+});
+
+it('badges an expired page as Expired', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'unpublish_at' => now()->subDay(),
+    ]);
+
+    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][1];
+
+    $badge = findNodeByKind($statusBar, 'displayValue');
+    expect($badge['options']['value'])->toBe('Expired');
 });
 
 it('includes breadcrumbs linking back to the pages list', function (): void {
@@ -657,7 +699,7 @@ it('returns a copyToClipboard effect with the signed preview URL from the Copy a
         ->and($effects[0]['text'])->toContain('signature=');
 });
 
-it('omits the preview-link action from the status bar for a published page', function (): void {
+it('omits the preview-link action from the status bar for a live published page', function (): void {
     $published = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
 
     $form = findNodeByKind(pageEditStructure($published->id)['props']['structure'], 'form');
@@ -665,6 +707,36 @@ it('omits the preview-link action from the status bar for a published page', fun
     $names = array_column($statusBar['options']['children'], 'name');
 
     expect($names)->not->toContain('pagePreviewLink');
+});
+
+it('shows the preview-link action for a scheduled page (published_at in the future)', function (): void {
+    $scheduled = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Scheduled page'],
+        'published_at' => now()->addDay(),
+    ]);
+
+    $form = findNodeByKind(pageEditStructure($scheduled->id)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][1];
+    $names = array_column($statusBar['options']['children'], 'name');
+
+    expect($names)->toContain('pagePreviewLink');
+});
+
+it('shows the preview-link action for an expired page (unpublish_at in the past)', function (): void {
+    $expired = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Expired page'],
+        'unpublish_at' => now()->subDay(),
+    ]);
+
+    $form = findNodeByKind(pageEditStructure($expired->id)['props']['structure'], 'form');
+    $statusBar = $form['options']['children'][1];
+    $names = array_column($statusBar['options']['children'], 'name');
+
+    expect($names)->toContain('pagePreviewLink');
 });
 
 it('keeps delete in the form footer for regular pages', function (): void {

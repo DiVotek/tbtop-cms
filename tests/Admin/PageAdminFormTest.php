@@ -156,3 +156,97 @@ it('loads the localized slug map for editing', function (): void {
 
     expect($row['slug'])->toBe(['en' => 'contact']);
 });
+
+it('persists published_at and unpublish_at when both are set', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Scheduled Page']]);
+    $publishedAt = now()->addDay()->startOfSecond();
+    $unpublishAt = now()->addWeek()->startOfSecond();
+
+    PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Published->value,
+        'name' => ['en' => 'Scheduled Page'],
+        'parent_id' => '',
+        'published_at' => $publishedAt->toIso8601String(),
+        'unpublish_at' => $unpublishAt->toIso8601String(),
+    ], $page->id);
+
+    $page->refresh();
+
+    expect($page->published_at)->not->toBeNull()
+        ->and($page->published_at->equalTo($publishedAt))->toBeTrue()
+        ->and($page->unpublish_at)->not->toBeNull()
+        ->and($page->unpublish_at->equalTo($unpublishAt))->toBeTrue();
+
+    $row = PageForm::loadRow($page->id);
+    expect($row['published_at'])->not->toBeNull()
+        ->and($row['unpublish_at'])->not->toBeNull();
+});
+
+it('clears published_at and unpublish_at to null when the form submits them empty', function (): void {
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Scheduled Page'],
+        'published_at' => now()->addDay(),
+        'unpublish_at' => now()->addWeek(),
+    ]);
+
+    PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Published->value,
+        'name' => ['en' => 'Scheduled Page'],
+        'parent_id' => '',
+        'published_at' => '',
+        'unpublish_at' => '',
+    ], $page->id);
+
+    $page->refresh();
+
+    expect($page->published_at)->toBeNull()
+        ->and($page->unpublish_at)->toBeNull();
+});
+
+it('rejects an unpublish_at that is not strictly after published_at', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Scheduled Page']]);
+    $at = now()->addDay();
+
+    try {
+        PageForm::save([
+            'type' => 'page',
+            'status' => PageStatus::Published->value,
+            'name' => ['en' => 'Scheduled Page'],
+            'parent_id' => '',
+            'published_at' => $at->toIso8601String(),
+            'unpublish_at' => $at->toIso8601String(),
+        ], $page->id);
+
+        expect(false)->toBeTrue('Expected a ValidationException to be thrown.');
+    } catch (ValidationException $e) {
+        expect($e->errors())->toHaveKey('unpublish_at');
+    }
+});
+
+it('rejects an unpublish_at earlier than published_at', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Scheduled Page']]);
+
+    PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Published->value,
+        'name' => ['en' => 'Scheduled Page'],
+        'parent_id' => '',
+        'published_at' => now()->addWeek()->toIso8601String(),
+        'unpublish_at' => now()->addDay()->toIso8601String(),
+    ], $page->id);
+})->throws(ValidationException::class);
+
+it('creates a page unaffected by scheduling — the create form never submits schedule fields', function (): void {
+    $page = PageForm::save([
+        'type' => 'page',
+        'status' => PageStatus::Published->value,
+        'name' => ['en' => 'Fresh Page'],
+        'parent_id' => '',
+    ]);
+
+    expect($page->published_at)->toBeNull()
+        ->and($page->unpublish_at)->toBeNull();
+});

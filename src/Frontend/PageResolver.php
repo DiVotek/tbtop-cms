@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend;
 
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 
@@ -39,7 +38,7 @@ class PageResolver
         $query = Page::query()->whereKey($pageId);
 
         if (! $withDrafts) {
-            $query->where('status', PageStatus::Published->value);
+            $query->live();
         }
 
         return $query->first();

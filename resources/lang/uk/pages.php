@@ -25,6 +25,8 @@ return [
     'status' => [
         'published' => 'Опубліковано',
         'draft' => 'Чернетка',
+        'scheduled' => 'Заплановано',
+        'expired' => 'Термін минув',
     ],
     'types' => [
         'page' => 'Сторінка',
@@ -58,6 +60,10 @@ return [
         'type' => 'Тип',
         'parent' => 'Батьківська',
         'status' => 'Статус',
+        'published_at' => 'Опублікувати',
+        'published_at_hint' => 'Залиште порожнім, щоб опублікувати одразу.',
+        'unpublish_at' => 'Зняти з публікації',
+        'unpublish_at_hint' => 'Залиште порожнім, щоб сторінка залишалась опублікованою безстроково.',
         'sort_order' => 'Порядок сортування',
         'is_indexable' => 'Індексувати в пошуку',
         'seo_title' => 'SEO-заголовок',
@@ -108,6 +114,8 @@ return [
     'status_bar' => [
         'updated' => 'Оновлено',
         'created' => 'Створено',
+        'scheduled_for' => 'Заплановано на :datetime',
+        'expired_at' => 'Термін минув :datetime',
     ],
     'preview' => [
         'field_label' => 'Посилання',
@@ -141,5 +149,6 @@ return [
         'delete_system' => 'Системні сторінки не можна видаляти.',
         'status_change_system' => 'Статус системної сторінки не можна змінити.',
         'restore_parent_trashed' => 'Спершу відновіть батьківську сторінку.',
+        'unpublish_before_published' => 'Дата зняття з публікації має бути пізнішою за дату публікації.',
     ],
 ];

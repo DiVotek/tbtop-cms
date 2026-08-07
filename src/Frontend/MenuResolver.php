@@ -6,7 +6,6 @@ namespace Tbtop\Cms\Frontend;
 
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Menu\Models\Menu;
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 
@@ -14,7 +13,7 @@ use Tbtop\Cms\Page\Models\PageSlug;
  * Resolves every stored menu into frontend-ready items for one locale:
  * labels picked per locale (override -> page-name translation -> default
  * locale), hrefs built from the page slug / raw url / anchor. Items whose
- * page is unpublished or deleted are dropped.
+ * page is unpublished, not-yet-scheduled, expired, or deleted are dropped.
  */
 class MenuResolver
 {
@@ -35,7 +34,7 @@ class MenuResolver
         $ids = $this->pageIds($menus->pluck('items')->all());
         $pages = $ids === [] ? [] : Page::query()
             ->whereIn('id', $ids)
-            ->where('status', PageStatus::Published->value)
+            ->live()
             ->get()
             ->keyBy(static fn (Page $page): int => (int) $page->getKey())
             ->all();

@@ -116,6 +116,39 @@ it('drops items whose page is unpublished and resolves anchors and children', fu
         ->assertJsonPath('props.cms.menus.main.0.children.0.url', '/live');
 });
 
+it('drops a scheduled item whose published_at is in the future and an expired item whose unpublish_at is in the past', function (): void {
+    $live = menuPage(['en' => 'Live']);
+    $scheduled = Page::factory()->create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Scheduled'],
+        'published_at' => now()->addDay(),
+    ]);
+    $expired = Page::factory()->create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Expired'],
+        'unpublish_at' => now()->subDay(),
+    ]);
+
+    Menu::create([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [
+            ['type' => 'page', 'page_id' => $scheduled->id],
+            ['type' => 'page', 'page_id' => $expired->id],
+            ['type' => 'page', 'page_id' => $live->id],
+        ],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/live', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonCount(1, 'props.cms.menus.main')
+        ->assertJsonPath('props.cms.menus.main.0.label', 'Live');
+});
+
 it('serves a legacy scalar menu row to every locale', function (): void {
     menuPage(['en' => 'Home']);
 
