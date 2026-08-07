@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
-use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
+use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -296,24 +296,28 @@ it('projects parent name, formatted status, and slug path into list rows', funct
         ->and($rows[0]['path'])->toBe('blog/post');
 });
 
-it('offers no empty-string parent option (Radix SelectItem crash guard)', function (): void {
-    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
-
-    $values = array_column(PageFormOptions::parents(), 'value');
-
-    expect($values)->not->toContain('')
-        ->and($values[0])->toBe(PageFormOptions::NO_PARENT);
-});
-
-it('only offers categories as parent options', function (): void {
+it('only offers categories as parent picker candidates', function (): void {
     $category = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
     Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
     Page::create(['type' => 'article', 'parent_id' => $category->id, 'status' => 'draft', 'name' => ['en' => 'Post']]);
 
-    $options = PageFormOptions::parents();
+    $ids = PageForm::parentQuery()->pluck('id')->all();
 
-    expect(array_column($options, 'value'))->toBe([PageFormOptions::NO_PARENT, (string) $category->id])
-        ->and(array_column($options, 'label')[1])->toBe('Blog');
+    expect($ids)->toBe([$category->id]);
+});
+
+it('excludes the edited page and its descendants from the parent picker query', function (): void {
+    $grandparent = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'A']]);
+    $parent = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'B'], 'parent_id' => $grandparent->id]);
+    $child = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'C'], 'parent_id' => $parent->id]);
+    $unrelated = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'D']]);
+
+    $ids = PageForm::parentQuery($parent)->pluck('id')->all();
+
+    expect($ids)->toContain($grandparent->id)
+        ->and($ids)->toContain($unrelated->id)
+        ->and($ids)->not->toContain($parent->id)
+        ->and($ids)->not->toContain($child->id);
 });
 
 it('sorts the list as a tree: each child directly after its parent, siblings by created_at ascending', function (): void {

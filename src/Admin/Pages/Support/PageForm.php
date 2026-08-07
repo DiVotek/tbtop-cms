@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Carbon\Exceptions\InvalidFormatException;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Cond;
@@ -42,10 +43,33 @@ class PageForm
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.settings')], [
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
-                $s->select('parent_id')->label(__('tbtop-cms::pages.fields.parent'))->options(PageFormOptions::parents())
+                $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
+                    ->query(static fn (): Builder => self::parentQuery())
+                    ->labelKey('name')->searchable()
                     ->hiddenIf(Cond::notIn('type', ['category', 'article'])),
             ]),
         ];
+    }
+
+    /**
+     * Base query backing the parent_id relation picker: only categories are
+     * valid parents (the sole grouping container in the page hierarchy — see
+     * PageTypeRegistry/CategoryType). Edit forms pass the page being edited
+     * so it and its descendants are excluded — placing a page under itself or
+     * its own subtree is a cycle guardParent() would reject anyway, but
+     * hiding those options keeps the picker from even offering them.
+     *
+     * @return Builder<Page>
+     */
+    public static function parentQuery(?Page $excluding = null): Builder
+    {
+        $query = Page::query()->where('type', 'category')->orderBy('sort_order')->orderBy('id');
+
+        if ($excluding !== null && $excluding->exists) {
+            $query->whereNotIn('id', [$excluding->getKey(), ...self::descendantIds($excluding)]);
+        }
+
+        return $query;
     }
 
     /**
@@ -306,7 +330,11 @@ class PageForm
             'summary' => $page->getTranslations('summary'),
             'body' => $page->getTranslations('body'),
             'type' => $page->type,
-            'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
+            // Raw id string (or null) — the relation picker resolves its
+            // label via the relation-search endpoint's resolve mode, which
+            // looks the value up by primary key; the old NO_PARENT sentinel
+            // would 404 there instead of rendering an empty picker.
+            'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : null,
             'status' => $page->status->value,
             'published_at' => $page->published_at?->toIso8601String(),
             'unpublish_at' => $page->unpublish_at?->toIso8601String(),
@@ -423,6 +451,11 @@ class PageForm
         return array_map(static fn (mixed $id): int => (int) $id, $ids);
     }
 
+    /**
+     * The relation picker clears to null/'' natively; PageFormOptions::NO_PARENT
+     * stays tolerated here as a regression guard for the legacy select sentinel
+     * (any still-cached client bundle, or a stored draft submitted from one).
+     */
     private static function nullableInt(mixed $value): ?int
     {
         if (in_array($value, [null, '', PageFormOptions::NO_PARENT], true)) {

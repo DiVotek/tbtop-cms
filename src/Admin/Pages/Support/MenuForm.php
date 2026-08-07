@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Fields\Repeater;
@@ -99,12 +100,14 @@ class MenuForm
                     ['value' => 'url', 'label' => __('tbtop-cms::menus.types.url')],
                     ['value' => 'anchor', 'label' => __('tbtop-cms::menus.types.anchor')],
                 ]),
-            $s->select('page_id')->label(__('tbtop-cms::menus.fields.page'))
-                ->options(self::pageOptions())
+            $s->relation('page_id')->label(__('tbtop-cms::menus.fields.page'))
+                ->query(static fn (): Builder => self::queryForType('page'))
+                ->labelKey('name')->searchable()
                 ->rules("required_if:{$typePath},page")
                 ->hiddenIf('type', '!=', 'page'),
-            $s->select('category_id')->label(__('tbtop-cms::menus.fields.category'))
-                ->options(self::categoryOptions())
+            $s->relation('category_id')->label(__('tbtop-cms::menus.fields.category'))
+                ->query(static fn (): Builder => self::queryForType('category'))
+                ->labelKey('name')->searchable()
                 ->rules("required_if:{$typePath},category")
                 ->hiddenIf('type', '!=', 'category'),
             $s->text('url')->label(__('tbtop-cms::menus.fields.url'))->translatable()
@@ -401,7 +404,13 @@ class MenuForm
         )->all();
     }
 
-    /** @return list<array{value: string, label: string}> */
+    /**
+     * Retained for callers that need the whole options list at once (e.g.
+     * tests asserting the picker's candidate set) — the page_id relation
+     * field itself now resolves options one page at a time via queryForType().
+     *
+     * @return list<array{value: string, label: string}>
+     */
     public static function pageOptions(): array
     {
         return self::optionsForType('page');
@@ -413,9 +422,24 @@ class MenuForm
         return self::optionsForType('category');
     }
 
+    /** @return list<array{value: string, label: string}> */
+    private static function optionsForType(string $type): array
+    {
+        $default = app(Languages::class)->defaultLocale();
+        $options = [];
+
+        foreach (self::queryForType($type)->get() as $page) {
+            $name = $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey());
+            $options[] = ['value' => (string) $page->getKey(), 'label' => $name];
+        }
+
+        return $options;
+    }
+
     /**
-     * Published records of one page type (page or category), as picker
-     * options. Articles are intentionally excluded from menu targets.
+     * Published records of one page type (page or category); backs both the
+     * relation picker's query() and the legacy options-array helpers above.
+     * Articles are intentionally excluded from menu targets.
      *
      * Filtered by status only, not the live scope: an editor may deliberately
      * pick a page that is scheduled for the future (or past its unpublish
@@ -423,25 +447,14 @@ class MenuForm
      * render time and drops the item from the frontend menu until/while the
      * page is actually live.
      *
-     * @return list<array{value: string, label: string}>
+     * @return Builder<Page>
      */
-    private static function optionsForType(string $type): array
+    private static function queryForType(string $type): Builder
     {
-        $default = app(Languages::class)->defaultLocale();
-        $options = [];
-
-        $pages = Page::query()
+        return Page::query()
             ->where('type', $type)
             ->where('status', PageStatus::Published->value)
             ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-
-        foreach ($pages as $page) {
-            $name = $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey());
-            $options[] = ['value' => (string) $page->getKey(), 'label' => $name];
-        }
-
-        return $options;
+            ->orderBy('id');
     }
 }

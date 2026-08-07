@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
-use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
-use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 class PageFormOptions
 {
     /**
-     * Sentinel for "no parent". Radix Select forbids an empty-string item
-     * value (it crashes the whole page), so the option carries this marker
-     * and PageForm maps it back to null on save.
+     * Legacy sentinel for "no parent", from when parent_id was a Radix
+     * Select (which forbids an empty-string item value). The field is now an
+     * async relation picker that clears to a real null, but PageForm::save()
+     * still tolerates this string as a regression guard — see its
+     * nullableInt().
      */
     public const NO_PARENT = 'none';
 
@@ -40,26 +40,6 @@ class PageFormOptions
             ],
             PageStatus::cases(),
         );
-    }
-
-    /**
-     * Only categories are valid parents — categories are the sole grouping
-     * container in the page hierarchy (see PageTypeRegistry/CategoryType).
-     *
-     * @return list<array{value: string, label: string}>
-     */
-    public static function parents(): array
-    {
-        $default = app(Languages::class)->defaultLocale();
-
-        $options = [['value' => self::NO_PARENT, 'label' => __('tbtop-cms::pages.fields.no_parent')]];
-
-        foreach (Page::query()->where('type', 'category')->orderBy('sort_order')->orderBy('id')->get() as $page) {
-            $name = $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey());
-            $options[] = ['value' => (string) $page->getKey(), 'label' => $name];
-        }
-
-        return $options;
     }
 
     /**
