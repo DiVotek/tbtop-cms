@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Page\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Translatable\HasTranslations;
 use Tbtop\Cms\Database\Factories\PageFactory;
+use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Observers\PageObserver;
 use Tbtop\Cms\Support\Concerns\TracksAuthors;
@@ -22,6 +24,8 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
  * @property string $type
  * @property int|null $parent_id
  * @property PageStatus $status
+ * @property Carbon|null $published_at
+ * @property Carbon|null $unpublish_at
  * @property string|null $name
  * @property string|null $title
  * @property string|null $heading
@@ -63,6 +67,8 @@ class Page extends Model
         'type',
         'parent_id',
         'status',
+        'published_at',
+        'unpublish_at',
         'name',
         'title',
         'heading',
@@ -107,6 +113,8 @@ class Page extends Model
     /** @var array<string, string> */
     protected $casts = [
         'status' => PageStatus::class,
+        'published_at' => 'datetime',
+        'unpublish_at' => 'datetime',
         'content' => 'array',
         'seo' => 'array',
         'is_indexable' => 'boolean',
@@ -136,6 +144,50 @@ class Page extends Model
     public function pathFor(string $locale): ?string
     {
         return $this->slugs->firstWhere('locale', $locale)?->path;
+    }
+
+    /**
+     * Single source of truth for frontend visibility: published, and (if
+     * scheduled) currently within its go-live/go-dark window. Every
+     * frontend-facing query that used to filter on status alone should use
+     * this instead — see PageResolver/MenuResolver/SitemapEntryBuilder/
+     * FormSubmitController.
+     *
+     * @param  Builder<Page>  $query
+     * @return Builder<Page>
+     */
+    public function scopeLive(Builder $query): Builder
+    {
+        $now = Carbon::now();
+
+        return $query->where('status', PageStatus::Published->value)
+            ->where(static fn (Builder $q): Builder => $q->whereNull('published_at')->orWhere('published_at', '<=', $now))
+            ->where(static fn (Builder $q): Builder => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', $now));
+    }
+
+    public function isLive(): bool
+    {
+        return $this->displayState() === PageDisplayState::Published;
+    }
+
+    /** The computed state PageEditStatusBar/PagesPage/DashboardRecent display, folding the schedule into PageStatus's plain draft/published. */
+    public function displayState(): PageDisplayState
+    {
+        if ($this->status !== PageStatus::Published) {
+            return PageDisplayState::Draft;
+        }
+
+        $now = Carbon::now();
+
+        if ($this->published_at !== null && $this->published_at->greaterThan($now)) {
+            return PageDisplayState::Scheduled;
+        }
+
+        if ($this->unpublish_at !== null && ! $this->unpublish_at->greaterThan($now)) {
+            return PageDisplayState::Expired;
+        }
+
+        return PageDisplayState::Published;
     }
 
     protected static function newFactory(): PageFactory

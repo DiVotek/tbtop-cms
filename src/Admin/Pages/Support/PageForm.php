@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Carbon\Exceptions\InvalidFormatException;
 use DomainException;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
@@ -133,6 +135,7 @@ class PageForm
         $parentId = self::nullableInt($form['parent_id'] ?? null);
         self::guardParent($page, $parentId);
         self::guardTypeAndStatus($page, $form);
+        self::guardScheduling($form);
 
         $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
 
@@ -222,6 +225,11 @@ class PageForm
             'type' => (string) ($form['type'] ?? ''),
             'parent_id' => $parentId,
             'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
+            // Create form never sends these (PageEditSidebar is edit-only),
+            // so they stay null until the page is first edited — matching
+            // status's own create-time default.
+            'published_at' => self::nullableDateTime($form['published_at'] ?? null),
+            'unpublish_at' => self::nullableDateTime($form['unpublish_at'] ?? null),
         ];
     }
 
@@ -300,6 +308,8 @@ class PageForm
             'type' => $page->type,
             'parent_id' => $page->parent_id !== null ? (string) $page->parent_id : PageFormOptions::NO_PARENT,
             'status' => $page->status->value,
+            'published_at' => $page->published_at?->toIso8601String(),
+            'unpublish_at' => $page->unpublish_at?->toIso8601String(),
             'is_indexable' => $page->is_indexable,
             'sort_order' => $page->sort_order,
             'paths' => $page->slugs->pluck('path', 'locale')->all(),
@@ -373,6 +383,30 @@ class PageForm
         }
     }
 
+    /**
+     * A schedule where the page would go dark before (or the instant) it
+     * goes live is never satisfiable, so it's rejected outright rather than
+     * silently producing a page that's never actually visible. Only runs
+     * when both dates are present — either one alone is always valid.
+     *
+     * @param  array<string, mixed>  $form
+     */
+    private static function guardScheduling(array $form): void
+    {
+        $publishedAt = self::nullableDateTime($form['published_at'] ?? null);
+        $unpublishAt = self::nullableDateTime($form['unpublish_at'] ?? null);
+
+        if ($publishedAt === null || $unpublishAt === null) {
+            return;
+        }
+
+        if ($unpublishAt->lessThanOrEqualTo($publishedAt)) {
+            throw ValidationException::withMessages([
+                'unpublish_at' => __('tbtop-cms::pages.validation.unpublish_before_published'),
+            ]);
+        }
+    }
+
     /** @return list<int> */
     private static function descendantIds(Page $page): array
     {
@@ -405,5 +439,23 @@ class PageForm
         }
 
         return (string) $value;
+    }
+
+    /**
+     * The datetime field posts an ISO string or null (cleared) — see
+     * dateField.tsx's DateTimeForm. An unparsable string is treated as
+     * empty rather than throwing, matching the field's own clear semantics.
+     */
+    private static function nullableDateTime(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $value);
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 }

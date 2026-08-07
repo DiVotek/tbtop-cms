@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Support\Carbon;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\DisplayValueBlock;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Frontend\PreviewLink;
 use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -21,22 +23,33 @@ use Tbtop\Cms\Page\Models\Page;
  * created timestamps, view-on-site, and a top-of-form save button mirroring
  * the footer save.
  *
- * PageStatus currently has two cases (draft/published) — there is no
- * "archived" case in the enum, so the badge color map only covers what
- * exists. Adding a third status is a data/enum change out of scope here.
+ * The badge shows the computed PageDisplayState (draft/scheduled/published/
+ * expired), not the raw PageStatus (draft/published) — see
+ * Page::displayState(). Every case must have a color entry here; adding a
+ * case without one is a compile-time array-key error, which is the point.
  */
 final class PageEditStatusBar
 {
-    /** @var array<string, string> */
+    /**
+     * The admin DSL's badge Color enum has no "info" or "muted" token
+     * (Gray/Success/Warning/Danger/Primary only — see Tbtop\Admin\Dsl\Color),
+     * so scheduled/expired fall back to the closest supported tone: gray
+     * reads as neutral/inactive for both "not yet" and "no longer".
+     *
+     * @var array<string, string>
+     */
     private const STATUS_COLORS = [
         'draft' => 'warning',
+        'scheduled' => 'gray',
         'published' => 'success',
+        'expired' => 'gray',
     ];
 
     public static function build(S $s, Page $page, ?ActionBuilder $revisions, ActionBuilder $viewOnSite, ActionBuilder $saveTop): Node
     {
         return $s->flex([
             self::statusBadge($s, $page),
+            ...self::scheduleNote($s, $page),
             $s->unsavedIndicator(),
             $s->spacer(),
             ...self::timestamps($s, $page),
@@ -48,16 +61,19 @@ final class PageEditStatusBar
     }
 
     /**
-     * Draft-only: a published page has nothing to preview ahead of the live
-     * site, so the action (and the modal it opens) simply doesn't exist for
-     * it — mirrors canDelete()'s server-side conditional-build pattern in
-     * PageEditPage rather than hiding a built action client-side.
+     * Shown whenever the page is not currently live: draft, scheduled
+     * (published_at in the future), or expired (unpublish_at in the past) —
+     * all three have something worth previewing ahead of/after the live
+     * site. A live page has nothing to preview, so the action (and the
+     * modal it opens) simply doesn't exist for it — mirrors canDelete()'s
+     * server-side conditional-build pattern in PageEditPage rather than
+     * hiding a built action client-side.
      *
      * @return list<ActionBuilder>
      */
     private static function previewLinkAction(S $s, Page $page): array
     {
-        if ($page->status !== PageStatus::Draft) {
+        if ($page->isLive()) {
             return [];
         }
 
@@ -99,19 +115,45 @@ final class PageEditStatusBar
 
     private static function statusBadge(S $s, Page $page): DisplayValueBlock
     {
-        $label = __('tbtop-cms::pages.status.' . $page->status->value);
+        $state = $page->displayState();
+        $label = __('tbtop-cms::pages.status.' . $state->value);
 
-        return $s->displayValue($label)->badge([$label => self::colorFor($page->status)]);
+        return $s->displayValue($label)->badge([$label => self::colorFor($state)]);
+    }
+
+    private static function colorFor(PageDisplayState $state): string
+    {
+        return self::STATUS_COLORS[$state->value];
     }
 
     /**
-     * Every PageStatus case must have an entry here — adding a case without
-     * one is a compile-time array-key error, which is the point: a missing
-     * badge color should fail loudly, not silently fall back to gray.
+     * The badge alone doesn't say *when* a scheduled/expired page changes
+     * state — this compact muted text supplies the datetime next to it, same
+     * style as the updated/created timestamp groups below.
+     *
+     * @return list<TextBlock>
      */
-    private static function colorFor(PageStatus $status): string
+    private static function scheduleNote(S $s, Page $page): array
     {
-        return self::STATUS_COLORS[$status->value];
+        return match ($page->displayState()) {
+            PageDisplayState::Scheduled => [self::note($s, __('tbtop-cms::pages.status_bar.scheduled_for', [
+                'datetime' => self::format($page->published_at),
+            ]))],
+            PageDisplayState::Expired => [self::note($s, __('tbtop-cms::pages.status_bar.expired_at', [
+                'datetime' => self::format($page->unpublish_at),
+            ]))],
+            default => [],
+        };
+    }
+
+    private static function note(S $s, string $text): TextBlock
+    {
+        return $s->displayText($text)->variant('muted');
+    }
+
+    private static function format(?Carbon $datetime): string
+    {
+        return $datetime?->format('d.m.Y H:i') ?? '';
     }
 
     /**

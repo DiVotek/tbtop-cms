@@ -10,7 +10,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Support\LeadIdentity;
-use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Models\Page;
 
 /** Row 2 — recently updated pages and the latest form submissions, each a card-list. */
@@ -55,10 +55,21 @@ class DashboardRecent
             ->map(static fn (Page $page): array => [
                 'title' => (string) $page->getTranslation('name', app()->getLocale()),
                 'meta' => optional($page->updated_at)->diffForHumans() ?? '',
-                'color' => $page->status === PageStatus::Published ? 'success' : 'muted',
+                'color' => self::displayStateColor($page->displayState()),
                 ...($url !== null ? ['url' => $url] : []),
             ])
             ->all();
+    }
+
+    /**
+     * Only currently-live pages read as success; draft, scheduled, and
+     * expired all fall back to muted — a scheduled/expired page is not
+     * currently visible on the frontend any more than a draft is, so it
+     * should not read as the same "live" green.
+     */
+    private static function displayStateColor(PageDisplayState $state): string
+    {
+        return $state === PageDisplayState::Published ? 'success' : 'muted';
     }
 
     /**

@@ -8,7 +8,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Tbtop\Cms\Frontend\PageUrl;
 use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -31,7 +30,7 @@ class SitemapEntryBuilder
         }
 
         $pages = Page::query()
-            ->where('status', PageStatus::Published->value)
+            ->live()
             ->where('is_indexable', true)
             ->with('slugs')
             ->get();

@@ -63,6 +63,36 @@ it('excludes draft and non-indexable pages', function (): void {
     expect($response->getContent())->not->toContain('draft')->not->toContain('hidden');
 });
 
+it('excludes a scheduled page whose published_at is in the future', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Scheduled'],
+        'is_indexable' => true,
+        'published_at' => now()->addDay(),
+    ]);
+
+    $response = $this->get('/sitemap.xml')->assertOk();
+
+    expect($response->getContent())->not->toContain('scheduled');
+});
+
+it('excludes an expired page whose unpublish_at is in the past', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Expired'],
+        'is_indexable' => true,
+        'unpublish_at' => now()->subDay(),
+    ]);
+
+    $response = $this->get('/sitemap.xml')->assertOk();
+
+    expect($response->getContent())->not->toContain('expired');
+});
+
 it('returns 404 for sitemap but keeps robots reachable when the sitemap config disables it', function (): void {
     config(['tbtop-cms.seo.sitemap.enabled' => false]);
     app(Cms::class)->frontendRoutes();

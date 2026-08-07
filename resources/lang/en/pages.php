@@ -25,6 +25,8 @@ return [
     'status' => [
         'published' => 'Published',
         'draft' => 'Draft',
+        'scheduled' => 'Scheduled',
+        'expired' => 'Expired',
     ],
     'types' => [
         'page' => 'Page',
@@ -58,6 +60,10 @@ return [
         'type' => 'Type',
         'parent' => 'Parent',
         'status' => 'Status',
+        'published_at' => 'Publish at',
+        'published_at_hint' => 'Leave empty to publish immediately.',
+        'unpublish_at' => 'Unpublish at',
+        'unpublish_at_hint' => 'Leave empty to keep published indefinitely.',
         'sort_order' => 'Sort order',
         'is_indexable' => 'Indexable in search',
         'seo_title' => 'Meta title',
@@ -108,6 +114,8 @@ return [
     'status_bar' => [
         'updated' => 'Updated',
         'created' => 'Created',
+        'scheduled_for' => 'Scheduled for :datetime',
+        'expired_at' => 'Expired :datetime',
     ],
     'preview' => [
         'field_label' => 'Link',
@@ -143,5 +151,6 @@ return [
         'delete_system' => 'System pages cannot be deleted.',
         'status_change_system' => 'The status of a system page cannot be changed.',
         'restore_parent_trashed' => 'Restore the parent page first.',
+        'unpublish_before_published' => 'Unpublish date must be after the publish date.',
     ],
 ];

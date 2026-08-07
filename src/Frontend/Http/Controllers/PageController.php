@@ -17,7 +17,6 @@ use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\RedirectResolver;
 
@@ -68,7 +67,12 @@ class PageController
     private function props(Page $page, string $locale, string $path): array
     {
         $resolved = $this->forms->bind($this->blocks->resolve($page->content ?? [], $page), $page);
-        $isPreview = $page->status === PageStatus::Draft;
+        // Not live covers draft, scheduled (published_at in the future), and
+        // expired (unpublish_at in the past): reaching this page at all with
+        // any of those means the caller has preview access (PageResolver's
+        // withDrafts=true branch — see hasPreviewAccess()) and should see the
+        // preview affordances, same as a plain draft did before scheduling.
+        $isPreview = ! $page->isLive();
         $seo = $this->seo->resolve($page, $locale);
 
         if ($isPreview) {

@@ -417,6 +417,12 @@ class MenuForm
      * Published records of one page type (page or category), as picker
      * options. Articles are intentionally excluded from menu targets.
      *
+     * Filtered by status only, not the live scope: an editor may deliberately
+     * pick a page that is scheduled for the future (or past its unpublish
+     * date) to link it in advance — MenuResolver applies the live scope at
+     * render time and drops the item from the frontend menu until/while the
+     * page is actually live.
+     *
      * @return list<array{value: string, label: string}>
      */
     private static function optionsForType(string $type): array

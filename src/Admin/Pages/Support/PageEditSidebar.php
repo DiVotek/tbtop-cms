@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Admin\Dsl\Cond;
+use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Page\Enums\PageStatus;
 
 /**
  * The right sidebar column on PageEditPage: publication status, hierarchy
@@ -22,6 +25,7 @@ final class PageEditSidebar
                     ->required()->options(PageFormOptions::statuses()),
                 // boolean, not checkbox: renders as a switch on the client
                 $s->boolean('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
+                ...self::schedulingFields($s),
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.structure'), 'variant' => 'card'], [
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
@@ -36,5 +40,27 @@ final class PageEditSidebar
                 $s->media('image')->label(__('tbtop-cms::pages.fields.image'))->variant('preview'),
             ]),
         ]);
+    }
+
+    /**
+     * Only meaningful once status is published — a draft has no schedule to
+     * set. hiddenIf keeps them in the tree (so PageForm::save() still
+     * receives and can clear them) but out of the rendered form while
+     * status !== published.
+     *
+     * @return list<Field>
+     */
+    private static function schedulingFields(S $s): array
+    {
+        $hiddenUnlessPublished = Cond::neq('status', PageStatus::Published->value);
+
+        return [
+            $s->datetime('published_at')->label(__('tbtop-cms::pages.fields.published_at'))
+                ->helperText(__('tbtop-cms::pages.fields.published_at_hint'))
+                ->hiddenIf($hiddenUnlessPublished),
+            $s->datetime('unpublish_at')->label(__('tbtop-cms::pages.fields.unpublish_at'))
+                ->helperText(__('tbtop-cms::pages.fields.unpublish_at_hint'))
+                ->hiddenIf($hiddenUnlessPublished),
+        ];
     }
 }

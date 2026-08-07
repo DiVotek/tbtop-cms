@@ -19,6 +19,8 @@ use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Enums\PageDisplayState;
+use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PageRestored;
 use Tbtop\Cms\Page\Models\Page;
@@ -82,11 +84,18 @@ class PagesPage extends AdminPage
                     ->formatUsing($this->typeLabel(...))
                     ->muted()->uppercase(),
                 Column::make('parent_name')->label(__('tbtop-cms::pages.columns.parent'))->translatable()->muted(),
-                Column::make('status')->label(__('tbtop-cms::pages.columns.status'))
+                // Bound to the display_state computed column (see query()),
+                // not the raw status column — mirrors PageEditStatusBar's
+                // badge, which shows the same computed scheduled/expired
+                // states. Colors follow the same "no info/muted token"
+                // fallback documented on PageEditStatusBar::STATUS_COLORS.
+                Column::make('display_state')->label(__('tbtop-cms::pages.columns.status'))
                     ->formatUsing($this->statusLabel(...))
                     ->badge([
                         __('tbtop-cms::pages.status.published') => 'success',
                         __('tbtop-cms::pages.status.draft') => 'warning',
+                        __('tbtop-cms::pages.status.scheduled') => 'gray',
+                        __('tbtop-cms::pages.status.expired') => 'gray',
                     ]),
                 Column::make('updated_at')->label(__('tbtop-cms::pages.columns.updated'))
                     ->date(__('tbtop-cms::pages.date_format'))->muted(),
@@ -151,9 +160,48 @@ class PagesPage extends AdminPage
                     ->limit(1),
                 'parent_name',
             )
-            ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name');
+            ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name')
+            ->selectRaw($this->displayStateSql($table), $this->displayStateBindings());
 
         return PageSortKey::apply($query);
+    }
+
+    /**
+     * SQL mirror of Page::displayState() (that method stays the source of
+     * truth for the model-level API — see its docblock) so the status column
+     * can badge scheduled/expired without an N+1 model hydration per row.
+     * Plain ANSI CASE/COALESCE, no driver-specific function, same portability
+     * approach as AuthorNames::subselect() — reads identically on sqlite
+     * (tests), mysql, and postgres (hosts).
+     *
+     * Columns are table-qualified: PageSortKey::apply() below self-joins
+     * tbtop_pages up to 4 levels deep as sort_key_p1..p4, so an unqualified
+     * `status`/`published_at`/`unpublish_at` is ambiguous once those joins
+     * are in the same query.
+     */
+    private function displayStateSql(string $table): string
+    {
+        return <<<SQL
+            CASE
+                WHEN {$table}.status != ? THEN ?
+                WHEN {$table}.published_at IS NOT NULL AND {$table}.published_at > ? THEN ?
+                WHEN {$table}.unpublish_at IS NOT NULL AND {$table}.unpublish_at <= ? THEN ?
+                ELSE ?
+            END as display_state
+            SQL;
+    }
+
+    /** @return list<string> */
+    private function displayStateBindings(): array
+    {
+        $now = now()->toDateTimeString();
+
+        return [
+            PageStatus::Published->value, PageDisplayState::Draft->value,
+            $now, PageDisplayState::Scheduled->value,
+            $now, PageDisplayState::Expired->value,
+            PageDisplayState::Published->value,
+        ];
     }
 
     /**

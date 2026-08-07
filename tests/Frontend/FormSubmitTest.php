@@ -180,6 +180,40 @@ it('returns 404 when submitting to a draft page', function (): void {
     Mail::assertNothingSent();
 });
 
+it('returns 404 when submitting to a page scheduled for the future', function (): void {
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Scheduled'],
+        'published_at' => now()->addDay(),
+        'content' => [[
+            'id' => 'form-1',
+            'kind' => 'ContactForm',
+            'active' => true,
+            'data' => ['recipient' => 'ops@example.test'],
+        ]],
+    ]);
+
+    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    Mail::assertNothingSent();
+});
+
+it('returns 404 when submitting to an expired page', function (): void {
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Expired'],
+        'unpublish_at' => now()->subDay(),
+        'content' => [[
+            'id' => 'form-1',
+            'kind' => 'ContactForm',
+            'active' => true,
+            'data' => ['recipient' => 'ops@example.test'],
+        ]],
+    ]);
+
+    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    Mail::assertNothingSent();
+});
+
 it('throttles repeated submissions from the same client', function (): void {
     $page = contactFormPage();
     $url = submitUrl($page, 'form-1');
