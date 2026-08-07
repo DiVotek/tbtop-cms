@@ -28,9 +28,16 @@ return new class extends Migration
 
     /**
      * Renames existing installs' tables to the tbtop_ prefix. On a fresh
-     * install the create-* migrations above already create the new names
-     * directly, so hasTable($old) is false and this is a no-op — the guards
-     * exist to keep fresh and pre-existing databases both correct.
+     * install the create-* migrations create the new names directly, so
+     * hasTable($old) is false and this is a no-op — the guards exist to keep
+     * fresh and pre-existing databases both correct.
+     *
+     * This file sorts FIRST (000000): a legacy database upgrading across
+     * several pending migrations must be renamed before the guarded
+     * create/update migrations run, since those reference the new names
+     * only. The ordering also makes rollback safe — on migrate:rollback this
+     * down() runs last, after the create migrations have dropped the tbtop_*
+     * tables, so a fresh install is not left with stray legacy-named tables.
      *
      * Auto-generated index/constraint names (e.g. `pages_type_index`) are NOT
      * renamed by Schema::rename() and are left as-is on upgraded databases;

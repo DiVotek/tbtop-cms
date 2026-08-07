@@ -39,6 +39,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $package
             ->name('tbtop-cms')
             ->hasConfigFile()
+            ->hasMigration('2026_01_01_000000_update_tables_add_tbtop_prefix_table')
             ->hasMigration('2026_01_01_000001_create_languages_table')
             ->hasMigration('2026_01_01_000002_create_pages_table')
             ->hasMigration('2026_01_01_000003_create_page_slugs_table')
@@ -56,7 +57,6 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000015_update_cms_user_profiles_add_user_id_foreign_table')
             ->hasMigration('2026_01_01_000016_update_cms_user_profiles_add_role_table')
             ->hasMigration('2026_01_01_000017_create_page_revisions_table')
-            ->hasMigration('2026_01_01_000018_update_tables_add_tbtop_prefix_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
