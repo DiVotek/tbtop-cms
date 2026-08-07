@@ -12,11 +12,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasColumn('cms_user_profiles', 'role')) {
+        if (Schema::hasColumn('tbtop_user_profiles', 'role')) {
             return;
         }
 
-        Schema::table('cms_user_profiles', function (Blueprint $table): void {
+        Schema::table('tbtop_user_profiles', function (Blueprint $table): void {
             $table->string('role')->nullable()->after('user_id');
         });
 
@@ -24,16 +24,16 @@ return new class extends Migration
         // full admin access. Backfill to superadministrator so nobody loses
         // access they already had; new rows default to editor (least
         // privilege) at the DB level below.
-        DB::table('cms_user_profiles')->update(['role' => CmsRole::SuperAdministrator->value]);
+        DB::table('tbtop_user_profiles')->update(['role' => CmsRole::SuperAdministrator->value]);
 
-        Schema::table('cms_user_profiles', function (Blueprint $table): void {
+        Schema::table('tbtop_user_profiles', function (Blueprint $table): void {
             $table->string('role')->default(CmsRole::Editor->value)->nullable(false)->change();
         });
     }
 
     public function down(): void
     {
-        Schema::table('cms_user_profiles', function (Blueprint $table): void {
+        Schema::table('tbtop_user_profiles', function (Blueprint $table): void {
             $table->dropColumn('role');
         });
     }

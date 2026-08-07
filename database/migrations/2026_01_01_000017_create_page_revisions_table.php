@@ -11,15 +11,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('page_revisions')) {
+        if (Schema::hasTable('tbtop_page_revisions')) {
             return;
         }
 
-        Schema::create('page_revisions', function (Blueprint $table): void {
+        Schema::create('tbtop_page_revisions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('page_id')->constrained('pages')->cascadeOnDelete();
+            $table->foreignId('page_id')->constrained('tbtop_pages')->cascadeOnDelete();
             // No FK: the host user table is configurable (tbtop-cms.admin.model)
-            // and may not even be named `users` — same reasoning cms_user_profiles
+            // and may not even be named `users` — same reasoning tbtop_user_profiles
             // used before its own user_id FK migration. A revision survives its
             // author's account being deleted; the author column just reads as
             // unknown (see PageRevisionWriter/the revisions tab author lookup).
@@ -34,6 +34,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('page_revisions');
+        Schema::dropIfExists('tbtop_page_revisions');
     }
 };

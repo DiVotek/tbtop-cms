@@ -48,6 +48,8 @@ class Page extends Model
     use SoftDeletes;
     use TracksAuthors;
 
+    protected $table = 'tbtop_pages';
+
     /**
      * created_by/updated_by are stamped by TracksAuthors, not mass-assigned —
      * they stay out of $fillable on purpose (see the trait's docblock).

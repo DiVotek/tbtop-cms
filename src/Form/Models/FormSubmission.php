@@ -48,7 +48,7 @@ class FormSubmission extends Model
         'created_at',
     ];
 
-    protected $table = 'cms_form_submissions';
+    protected $table = 'tbtop_form_submissions';
 
     /** @var array<string, string> */
     protected $casts = [

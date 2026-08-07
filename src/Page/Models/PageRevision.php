@@ -27,6 +27,8 @@ class PageRevision extends Model
 {
     public $timestamps = false;
 
+    protected $table = 'tbtop_page_revisions';
+
     /** @var list<string> */
     protected $fillable = ['page_id', 'user_id', 'kind', 'payload', 'created_at'];
 

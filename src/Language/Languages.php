@@ -140,7 +140,7 @@ class Languages
     /** @return list<LanguageRow> */
     private function buildFromDatabase(): array
     {
-        if (! Schema::hasTable('languages')) {
+        if (! Schema::hasTable((new Language)->getTable())) {
             return [];
         }
 

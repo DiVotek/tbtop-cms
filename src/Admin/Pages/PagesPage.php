@@ -70,6 +70,8 @@ class PagesPage extends AdminPage
 
     public function view(S $s): Node
     {
+        $pages = (new Page)->getTable();
+
         $table = $s->table('pages')
             ->query($this->query(...))
             ->columns([
@@ -99,16 +101,16 @@ class PagesPage extends AdminPage
             ->tabs([
                 $this->tab('all'),
                 $this->tab('categories')
-                    ->query(static fn (Builder $q): Builder => $q->where('pages.type', 'category')),
+                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", 'category')),
                 $this->tab('pages')
-                    ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNull('pages.parent_id')),
+                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", '!=', 'category')->whereNull("{$pages}.parent_id")),
                 $this->tab('articles')
-                    ->query(static fn (Builder $q): Builder => $q->where('pages.type', '!=', 'category')->whereNotNull('pages.parent_id')),
+                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", '!=', 'category')->whereNotNull("{$pages}.parent_id")),
                 Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))
                     ->description(__('tbtop-cms::pages.tabs_deleted_description'))
                     ->query($this->onlyTrashedScope(...)),
             ])
-            ->searchable(['pages.name'])
+            ->searchable(["{$pages}.name"])
             ->defaultSort('sort_key', 'asc')
             ->emptyState(__('tbtop-cms::pages.empty'))
             // null for a trashed row: no edit page for a soft-deleted record,
@@ -130,23 +132,24 @@ class PagesPage extends AdminPage
     private function query(): Builder
     {
         $default = app(Languages::class)->defaultLocale();
+        $table = (new Page)->getTable();
 
-        $query = Page::query()->select('pages.*')
+        $query = Page::query()->select("{$table}.*")
             ->selectSub(
                 PageSlug::query()->select('path')
-                    ->whereColumn('page_id', 'pages.id')
+                    ->whereColumn('page_id', "{$table}.id")
                     ->where('locale', $default)
                     ->limit(1),
                 'path',
             )
             ->selectSub(
-                DB::table('pages', 'parents')->select('parents.name')
-                    ->whereColumn('parents.id', 'pages.parent_id')
+                DB::table($table, 'parents')->select('parents.name')
+                    ->whereColumn('parents.id', "{$table}.parent_id")
                     ->whereNull('parents.deleted_at')
                     ->limit(1),
                 'parent_name',
             )
-            ->selectSub(AuthorNames::subselect('pages', 'updated_by'), 'updated_by_name');
+            ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name');
 
         return PageSortKey::apply($query);
     }

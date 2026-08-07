@@ -11,11 +11,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('cms_templates')) {
+        if (Schema::hasTable('tbtop_templates')) {
             return;
         }
 
-        Schema::create('cms_templates', function (Blueprint $table): void {
+        Schema::create('tbtop_templates', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
             $table->json('content')->nullable();
@@ -27,6 +27,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('cms_templates');
+        Schema::dropIfExists('tbtop_templates');
     }
 };

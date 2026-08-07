@@ -100,8 +100,10 @@ class RedirectsPage extends AdminPage
     /** @return Builder<Redirect> */
     private function query(): Builder
     {
-        return Redirect::query()->select('redirects.*')
-            ->selectSub(AuthorNames::subselect('redirects', 'updated_by'), 'updated_by_name');
+        $table = (new Redirect)->getTable();
+
+        return Redirect::query()->select("{$table}.*")
+            ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name');
     }
 
     private function createAction(S $s): ActionBuilder

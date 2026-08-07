@@ -11,11 +11,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('cms_user_profiles')) {
+        if (Schema::hasTable('tbtop_user_profiles')) {
             return;
         }
 
-        Schema::create('cms_user_profiles', function (Blueprint $table): void {
+        Schema::create('tbtop_user_profiles', function (Blueprint $table): void {
             $table->id();
             UserKeyColumn::define($table, 'user_id')->unique();
             $table->string('locale')->nullable();
@@ -27,6 +27,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('cms_user_profiles');
+        Schema::dropIfExists('tbtop_user_profiles');
     }
 };

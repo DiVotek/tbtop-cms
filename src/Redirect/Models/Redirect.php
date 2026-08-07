@@ -21,6 +21,8 @@ class Redirect extends Model
 {
     use TracksAuthors;
 
+    protected $table = 'tbtop_redirects';
+
     /**
      * created_by/updated_by are stamped by TracksAuthors, not mass-assigned —
      * see the trait's docblock for why they stay out of this list.

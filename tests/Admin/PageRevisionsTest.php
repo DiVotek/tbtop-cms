@@ -266,22 +266,22 @@ it('cascades its revisions when a page is force-deleted (DB-level FK)', function
         'foreign_key_constraints' => true,
     ]]);
 
-    Schema::connection('fk_test')->create('pages', function (Blueprint $table): void {
+    Schema::connection('fk_test')->create('tbtop_pages', function (Blueprint $table): void {
         $table->id();
         $table->string('type');
     });
 
-    Schema::connection('fk_test')->create('page_revisions', function (Blueprint $table): void {
+    Schema::connection('fk_test')->create('tbtop_page_revisions', function (Blueprint $table): void {
         $table->id();
-        $table->foreignId('page_id')->constrained('pages')->cascadeOnDelete();
+        $table->foreignId('page_id')->constrained('tbtop_pages')->cascadeOnDelete();
         $table->unsignedBigInteger('user_id')->nullable();
         $table->string('kind');
         $table->json('payload');
         $table->timestamp('created_at')->nullable();
     });
 
-    $pageId = DB::connection('fk_test')->table('pages')->insertGetId(['type' => 'page']);
-    DB::connection('fk_test')->table('page_revisions')->insert([
+    $pageId = DB::connection('fk_test')->table('tbtop_pages')->insertGetId(['type' => 'page']);
+    DB::connection('fk_test')->table('tbtop_page_revisions')->insert([
         'page_id' => $pageId,
         'user_id' => null,
         'kind' => 'create',
@@ -289,9 +289,9 @@ it('cascades its revisions when a page is force-deleted (DB-level FK)', function
         'created_at' => now(),
     ]);
 
-    DB::connection('fk_test')->table('pages')->where('id', $pageId)->delete();
+    DB::connection('fk_test')->table('tbtop_pages')->where('id', $pageId)->delete();
 
-    expect(DB::connection('fk_test')->table('page_revisions')->where('page_id', $pageId)->count())->toBe(0);
+    expect(DB::connection('fk_test')->table('tbtop_page_revisions')->where('page_id', $pageId)->count())->toBe(0);
 
     DB::purge('fk_test');
 });

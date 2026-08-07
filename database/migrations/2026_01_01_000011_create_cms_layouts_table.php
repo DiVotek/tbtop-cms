@@ -10,11 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('cms_layouts')) {
+        if (Schema::hasTable('tbtop_layouts')) {
             return;
         }
 
-        Schema::create('cms_layouts', function (Blueprint $table): void {
+        Schema::create('tbtop_layouts', function (Blueprint $table): void {
             $table->id();
             $table->string('slot')->unique();
             $table->json('content')->nullable();
@@ -24,6 +24,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('cms_layouts');
+        Schema::dropIfExists('tbtop_layouts');
     }
 };

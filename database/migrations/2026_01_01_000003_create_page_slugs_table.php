@@ -10,11 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('page_slugs')) {
+        if (Schema::hasTable('tbtop_page_slugs')) {
             return;
         }
 
-        Schema::create('page_slugs', function (Blueprint $table): void {
+        Schema::create('tbtop_page_slugs', function (Blueprint $table): void {
             $table->id();
             // No FK: package migrations load alphabetically, so page_slugs precedes pages.
             $table->unsignedBigInteger('page_id');
@@ -31,6 +31,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('page_slugs');
+        Schema::dropIfExists('tbtop_page_slugs');
     }
 };

@@ -10,18 +10,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasColumn('pages', 'image')) {
+        if (Schema::hasColumn('tbtop_pages', 'image')) {
             return;
         }
 
-        Schema::table('pages', function (Blueprint $table): void {
+        Schema::table('tbtop_pages', function (Blueprint $table): void {
             $table->string('image')->nullable()->after('body');
         });
     }
 
     public function down(): void
     {
-        Schema::table('pages', function (Blueprint $table): void {
+        Schema::table('tbtop_pages', function (Blueprint $table): void {
             $table->dropColumn('image');
         });
     }

@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PageSlug extends Model
 {
+    protected $table = 'tbtop_page_slugs';
+
     /** @var list<string> */
     protected $fillable = ['page_id', 'locale', 'slug', 'path'];
 

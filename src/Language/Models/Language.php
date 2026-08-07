@@ -28,6 +28,8 @@ class Language extends Model
 
     use SoftDeletes;
 
+    protected $table = 'tbtop_languages';
+
     /** @var list<string> */
     protected $fillable = [
         'name',

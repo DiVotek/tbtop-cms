@@ -44,14 +44,16 @@ class PageSortKey
      */
     public static function apply(Builder $query): Builder
     {
+        $table = (new Page)->getTable();
+
         $aliases = [];
-        $parentColumn = 'pages.parent_id';
+        $parentColumn = "{$table}.parent_id";
 
         for ($level = 1; $level <= self::DEPTH; $level++) {
             $alias = "sort_key_p{$level}";
             $aliases[] = $alias;
 
-            $query->leftJoin("pages as {$alias}", "{$alias}.id", '=', $parentColumn);
+            $query->leftJoin("{$table} as {$alias}", "{$alias}.id", '=', $parentColumn);
             $parentColumn = "{$alias}.parent_id";
         }
 
@@ -59,7 +61,7 @@ class PageSortKey
         // contribution last.
         $levelExprs = [
             ...array_map(static fn (string $alias): string => self::levelExpr($alias), array_reverse($aliases)),
-            self::levelExpr('pages'),
+            self::levelExpr($table),
         ];
 
         // addSelect(['alias' => Expression]) drops the alias for a raw
