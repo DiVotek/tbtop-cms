@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -108,13 +109,27 @@ it('labels notification settings fields and helper text from translations', func
 
     expect($labels['notification_mail_enabled'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_enabled'))
         ->and($labels['notification_mail_recipients'])->toBe(__('tbtop-cms::settings.notifications.fields.recipients'))
-        ->and($labels['notification_mail_smtp_password'])->toBe(__('tbtop-cms::settings.notifications.fields.smtp_password'));
+        ->and($labels['mail_host'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_host'))
+        ->and($labels['mail_port'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_port'))
+        ->and($labels['mail_username'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_username'))
+        ->and($labels['mail_password'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_password'))
+        ->and($labels['mail_encryption'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_encryption'))
+        ->and($labels['mail_from_address'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_from_address'))
+        ->and($labels['mail_from_name'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_from_name'));
 
     $recipients = settingsFindFieldByName($structure, 'notification_mail_recipients');
     expect($recipients['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.notifications.helpers.recipients'));
 
-    $smtpPassword = settingsFindFieldByName($structure, 'notification_mail_smtp_password');
-    expect($smtpPassword['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.notifications.helpers.smtp_password'));
+    $mailPassword = settingsFindFieldByName($structure, 'mail_password');
+    expect($mailPassword['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.notifications.helpers.mail_password'));
+});
+
+it('does not return mail.password on the notification settings record', function (): void {
+    app(Settings::class)->set('mail.password', 'hunter2');
+
+    $response = test()->get('/admin/notification-settings', ['X-Inertia' => 'true'])->assertOk();
+
+    expect($response->json('props.data.notification-settings.mail_password'))->toBeNull();
 });
 
 /**

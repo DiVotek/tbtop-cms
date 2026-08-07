@@ -22,10 +22,10 @@ beforeEach(function (): void {
 it('loads non-secret values and hides secrets on record', function (): void {
     $settings = app(Settings::class);
     $settings->set('site.name', 'Acme');
-    $settings->set('notifications.mail.smtp_password', 'hunter2');
+    $settings->set('mail.password', 'hunter2');
 
     $record = SettingsForm::record(
-        ['site_name' => 'site.name', 'pwd' => 'notifications.mail.smtp_password'],
+        ['site_name' => 'site.name', 'pwd' => 'mail.password'],
         $settings,
     );
 
@@ -43,20 +43,20 @@ it('persists submitted values through the service', function (): void {
 
 it('keeps the existing secret when the field is left blank', function (): void {
     $settings = app(Settings::class);
-    $settings->set('notifications.mail.smtp_password', 'original');
+    $settings->set('mail.password', 'original');
 
-    SettingsForm::apply(['pwd' => ''], ['pwd' => 'notifications.mail.smtp_password'], $settings);
+    SettingsForm::apply(['pwd' => ''], ['pwd' => 'mail.password'], $settings);
 
-    expect($settings->get('notifications.mail.smtp_password'))->toBe('original');
+    expect($settings->get('mail.password'))->toBe('original');
 });
 
 it('overwrites the secret when a value is submitted', function (): void {
     $settings = app(Settings::class);
-    $settings->set('notifications.mail.smtp_password', 'original');
+    $settings->set('mail.password', 'original');
 
-    SettingsForm::apply(['pwd' => 'changed'], ['pwd' => 'notifications.mail.smtp_password'], $settings);
+    SettingsForm::apply(['pwd' => 'changed'], ['pwd' => 'mail.password'], $settings);
 
-    expect($settings->get('notifications.mail.smtp_password'))->toBe('changed');
+    expect($settings->get('mail.password'))->toBe('changed');
 });
 
 it('shows the settings pages to an admin user', function (): void {

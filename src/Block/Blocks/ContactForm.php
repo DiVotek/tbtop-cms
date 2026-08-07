@@ -5,20 +5,24 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Block\Blocks;
 
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
+use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\Mail\ContactFormMail;
+use Tbtop\Cms\Mail\Recipients;
+use Tbtop\Cms\Settings\Settings;
 
 /**
  * Reference form block: an anonymous contact form that mails its submission to
- * a recipient the admin configures. The visitor-facing fields are authored in
- * code (SPEC_V2 §3); the admin only edits copy and the recipient. Real projects
- * swap {@see handleSubmit()} to forward to a CRM, queue a job, store a lead, etc.
+ * the global notification recipients configured on NotificationSettingsPage
+ * (notifications.mail.enabled + notifications.mail.recipients), not a
+ * per-block address. The visitor-facing fields are authored in code
+ * (SPEC_V2 §3); the admin only edits copy. Real projects swap
+ * {@see handleSubmit()} to forward to a CRM, queue a job, store a lead, etc.
  */
 class ContactForm extends Block implements HandlesFormSubmission
 {
@@ -43,7 +47,7 @@ class ContactForm extends Block implements HandlesFormSubmission
     #[\Override]
     public function description(): ?string
     {
-        return 'Anonymous contact form. You edit the copy and recipient; the name, email, and message fields are built in.';
+        return 'Anonymous contact form. You edit the copy; the name, email, and message fields are built in. Submissions mail the global notification recipients.';
     }
 
     #[\Override]
@@ -59,7 +63,6 @@ class ContactForm extends Block implements HandlesFormSubmission
             $s->text('heading')->label('Heading')->translatable(),
             $s->text('submitLabel')->label('Submit button label')->translatable(),
             $s->textarea('successMessage')->label('Success message')->translatable(),
-            $s->text('recipient')->label('Recipient email')->required()->rules('email'),
         ];
     }
 
@@ -97,14 +100,22 @@ class ContactForm extends Block implements HandlesFormSubmission
      */
     public function handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void
     {
-        $recipient = trim((string) ($blockData['recipient'] ?? ''));
+        $settings = app(Settings::class);
 
-        if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
-            Log::warning('form.contact.invalid_recipient', ['page' => $ctx->page?->getKey()]);
+        if (! $settings->get('notifications.mail.enabled')) {
+            Log::debug('form.contact.notifications_disabled', ['page' => $ctx->page?->getKey()]);
 
             return;
         }
 
-        Mail::to($recipient)->send(new ContactFormMail($payload));
+        $recipients = Recipients::parse($settings->get('notifications.mail.recipients'));
+
+        if ($recipients === []) {
+            Log::debug('form.contact.no_recipients', ['page' => $ctx->page?->getKey()]);
+
+            return;
+        }
+
+        app(CmsMailer::class)->send(new ContactFormMail($payload), $recipients);
     }
 }

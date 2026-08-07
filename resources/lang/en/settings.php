@@ -31,15 +31,36 @@ return [
     ],
     'notifications' => [
         'title' => 'Notification settings',
-        'subtitle' => 'Outgoing mail notifications and SMTP credentials.',
+        'subtitle' => 'Mail transport for the site and the recipients notified about new form submissions.',
+        'sections' => [
+            'notifications' => 'Notifications',
+            'mail_transport' => 'Mail transport',
+        ],
         'fields' => [
             'mail_enabled' => 'Mail enabled',
             'recipients' => 'Recipients',
-            'smtp_password' => 'SMTP password',
+            'mail_host' => 'SMTP host',
+            'mail_port' => 'SMTP port',
+            'mail_username' => 'SMTP username',
+            'mail_password' => 'SMTP password',
+            'mail_encryption' => 'Encryption',
+            'mail_from_address' => 'From address',
+            'mail_from_name' => 'From name',
         ],
         'helpers' => [
-            'recipients' => 'One email address per line.',
-            'smtp_password' => 'Leave blank to keep the current value.',
+            'recipients' => 'One email address per line, or separated by commas.',
+            'mail_password' => 'Leave blank to keep the current value.',
+        ],
+        'encryption' => [
+            'none' => 'None',
+            'tls' => 'TLS',
+            'ssl' => 'SSL',
+        ],
+        'actions' => [
+            'send_test_email' => 'Send test email',
+            'test_email_sent' => 'Test email sent.',
+            'test_email_no_recipients' => 'Add at least one recipient before sending a test email.',
+            'test_email_failed' => 'Could not send the test email: :error',
         ],
     ],
 ];

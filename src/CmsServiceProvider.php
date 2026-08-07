@@ -23,6 +23,7 @@ use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\LayoutResolver;
+use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\Observers\PageRevisions;
@@ -77,6 +78,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(PageResolver::class);
         $this->app->scoped(RedirectResolver::class);
         $this->app->scoped(Settings::class);
+        $this->app->scoped(CmsMailer::class);
         $this->app->scoped(Cms::class);
         $this->registerAdminPanel();
     }

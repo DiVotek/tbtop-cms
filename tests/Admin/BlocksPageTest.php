@@ -164,7 +164,7 @@ it('lists every registered block with its fields', function (): void {
     expect($json)->toContain('Hero')
         ->and($json)->toContain('Contact form')
         ->and($json)->toContain('title')
-        ->and($json)->toContain('recipient');
+        ->and($json)->toContain('successMessage');
 });
 
 it('renders an empty state when no blocks are registered', function (): void {

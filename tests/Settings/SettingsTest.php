@@ -48,23 +48,23 @@ it('invalidates the cache on save', function (): void {
 it('excludes secret keys from the frontend payload', function (): void {
     $settings = new Settings;
     $settings->set('site.name', 'My Site');
-    $settings->set('notifications.mail.smtp_password', 'hunter2');
+    $settings->set('mail.password', 'hunter2');
 
     $public = $settings->forFrontend();
 
     expect($public)->toHaveKey('site.name')
         ->and($public['site.name'])->toBe('My Site')
-        ->and($public)->not->toHaveKey('notifications.mail.smtp_password');
+        ->and($public)->not->toHaveKey('mail.password');
 });
 
 it('stores secret values encrypted at rest', function (): void {
     $settings = new Settings;
-    $settings->set('notifications.mail.smtp_password', 'hunter2');
+    $settings->set('mail.password', 'hunter2');
 
-    $raw = Setting::query()->where('key', 'notifications.mail.smtp_password')->value('value');
+    $raw = Setting::query()->where('key', 'mail.password')->value('value');
 
     expect($raw)->not->toContain('hunter2')
-        ->and($settings->get('notifications.mail.smtp_password'))->toBe('hunter2');
+        ->and($settings->get('mail.password'))->toBe('hunter2');
 });
 
 it('resolves site.logo and site.favicon media ids to public urls in the frontend payload', function (): void {
