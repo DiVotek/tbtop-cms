@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\Fields\Repeater;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Menu\Events\MenuSaved;
 use Tbtop\Cms\Menu\Models\Menu;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -121,6 +122,7 @@ class MenuForm
     public static function save(array $form, ?int $id = null): Menu
     {
         $menu = $id !== null ? Menu::query()->findOrFail($id) : new Menu;
+        $wasCreated = $id === null;
         $items = $form['items'] ?? null;
         // Pages referenced before this save widen the echo diff: a row
         // repointed to another page still carries the old page's prefilled
@@ -145,6 +147,8 @@ class MenuForm
 
         $menu->fill($data);
         $menu->save();
+
+        event(new MenuSaved($menu, $wasCreated));
 
         return $menu;
     }

@@ -11,6 +11,9 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Events\PagePublished;
+use Tbtop\Cms\Page\Events\PageSaved;
+use Tbtop\Cms\Page\Events\PageUnpublished;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
@@ -115,6 +118,7 @@ class PageForm
     {
         $page = $id !== null ? Page::query()->findOrFail($id) : new Page;
         $isCreate = ! $page->exists;
+        $statusBefore = $page->exists ? $page->status : null;
 
         // Creates and any legacy/internal caller that never learned about
         // lock_version (the form simply omits the key — see loadRow()'s
@@ -161,7 +165,28 @@ class PageForm
             throw ValidationException::withMessages([$field => $e->getMessage()]);
         }
 
+        event(new PageSaved($page, $isCreate));
+        self::eventPublishTransition($page, $statusBefore);
+
         return $page;
+    }
+
+    /**
+     * Compares the status this save started from against what actually
+     * persisted, so a create-published page and a draft->published update
+     * both raise PagePublished, and only an update leaving Published raises
+     * PageUnpublished.
+     */
+    private static function eventPublishTransition(Page $page, ?PageStatus $statusBefore): void
+    {
+        $wasPublished = $statusBefore === PageStatus::Published;
+        $isPublished = $page->status === PageStatus::Published;
+
+        if ($isPublished && ! $wasPublished) {
+            event(new PagePublished($page));
+        } elseif ($wasPublished && ! $isPublished) {
+            event(new PageUnpublished($page));
+        }
     }
 
     /**

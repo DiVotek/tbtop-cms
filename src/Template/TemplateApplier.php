@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Template;
 
 use Illuminate\Support\Str;
+use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Template\Models\Template;
 
@@ -14,6 +15,8 @@ class TemplateApplier
     {
         $page->content = [...$this->blocks($page), ...$this->copyBlocks($template)];
         $page->save();
+
+        event(new PageSaved($page, false));
 
         return $page;
     }

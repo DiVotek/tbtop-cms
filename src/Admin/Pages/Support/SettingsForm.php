@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 
 class SettingsForm
@@ -29,6 +30,8 @@ class SettingsForm
      */
     public static function apply(array $form, array $map, Settings $settings): void
     {
+        $applied = [];
+
         foreach ($map as $field => $key) {
             if (! array_key_exists($field, $form)) {
                 continue;
@@ -41,6 +44,11 @@ class SettingsForm
             }
 
             $settings->set($key, $value);
+            $applied[] = $key;
+        }
+
+        if ($applied !== []) {
+            event(new SettingsSaved($applied));
         }
     }
 
