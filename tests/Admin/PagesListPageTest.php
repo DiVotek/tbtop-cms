@@ -83,20 +83,21 @@ it('renders the divotek-style pages list wire shape', function (): void {
         ->and($opts['columnToggle'] ?? null)->not->toBeFalse()
         ->and($opts['recordUrl'] ?? null)->toBeTrue();
 
-    // Row actions: view-on-site link, restore, delete permanently.
+    // Row actions: view-on-site link, duplicate, restore, delete permanently.
     $actions = array_column($opts['rowActions'], null, 'name');
-    expect(array_keys($actions))->toBe(['pageView', 'pageRestore', 'pageForceDelete'])
+    expect(array_keys($actions))->toBe(['pageView', 'pageDuplicate', 'pageRestore', 'pageForceDelete'])
         ->and($actions['pageView']['options']['spec']['type'] ?? $actions['pageView']['spec']['type'] ?? null)->not->toBeNull();
 });
 
-it('hides restore/delete-permanently on active rows and view-on-site on trashed rows via hiddenIf', function (): void {
+it('hides restore/delete-permanently/duplicate on active rows and view-on-site on trashed rows via hiddenIf', function (): void {
     $node = pagesTableNode();
     $actions = array_column($node['options']['rowActions'], null, 'name');
 
     // Active rows: deleted_at is empty → restore/forceDelete hidden, view-on-site shown.
     expect($actions['pageRestore']['meta']['hiddenIf'])->toBe(['op' => 'empty', 'field' => 'deleted_at'])
         ->and($actions['pageForceDelete']['meta']['hiddenIf'])->toBe(['op' => 'empty', 'field' => 'deleted_at'])
-        ->and($actions['pageView']['meta']['hiddenIf'])->toBe(['op' => 'notEmpty', 'field' => 'deleted_at']);
+        ->and($actions['pageView']['meta']['hiddenIf'])->toBe(['op' => 'notEmpty', 'field' => 'deleted_at'])
+        ->and($actions['pageDuplicate']['meta']['hiddenIf'])->toBe(['op' => 'notEmpty', 'field' => 'deleted_at']);
 });
 
 it('links each row to its dedicated edit page', function (): void {
@@ -192,6 +193,27 @@ it('blocks the restore row action with a notify effect when the parent is still 
 
     $notify = collect($response->json('effects'))->firstWhere('kind', 'notify');
     expect($notify['level'] ?? null)->toBe('error');
+});
+
+it('duplicates a page via the row action, creating a draft copy next to the original', function (): void {
+    $category = Page::factory()->category()->create(['name' => ['en' => 'Blog']]);
+    $page = Page::factory()->article()->create([
+        'parent_id' => $category->id,
+        'status' => 'published',
+        'name' => ['en' => 'About'],
+    ]);
+
+    $response = $this->postJson('/admin/pages/actions/pageDuplicate', ['payload' => ['row' => ['id' => $page->id]]]);
+
+    $response->assertOk();
+
+    $copy = Page::query()->where('id', '!=', $page->id)->where('parent_id', $category->id)->first();
+    expect($copy)->not->toBeNull()
+        ->and($copy->getTranslation('name', 'en', false))->toBe('About (copy)')
+        ->and($copy->status->value)->toBe('draft');
+
+    $effects = collect($response->json('effects'))->pluck('kind');
+    expect($effects)->toContain('notify', 'refreshTable');
 });
 
 it('force-deletes a trashed page permanently via the row action', function (): void {

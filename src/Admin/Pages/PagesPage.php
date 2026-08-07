@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
+use Tbtop\Admin\Dsl\Actions\ReplicateAction;
 use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -25,6 +26,7 @@ use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PageRestored;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\Support\PageDuplicator;
 
 class PagesPage extends AdminPage
 {
@@ -132,6 +134,7 @@ class PagesPage extends AdminPage
                 : route('tbtop.cms.page-edit-page', ['page' => $row->id]))
             ->rowActions([
                 $this->viewOnSiteAction($s),
+                $this->duplicateAction($s),
                 $this->restoreAction($s),
                 $this->forceDeleteAction($s),
             ]);
@@ -238,6 +241,25 @@ class PagesPage extends AdminPage
             // A trashed page has no live path (its slugs were removed by
             // PageObserver::deleting()) — the link would 404.
             ->hiddenIf('deleted_at', 'not empty');
+    }
+
+    private function duplicateAction(S $s): ActionBuilder
+    {
+        return ReplicateAction::make($s, $this->duplicate(...), name: 'pageDuplicate')
+            ->label(__('tbtop-cms::pages.actions.duplicate'))
+            // Only active rows can be duplicated — a trashed page has no live
+            // slug/children guarantees to clone from meaningfully, and
+            // restore/forceDelete already own the trashed-row action slot.
+            ->hiddenIf('deleted_at', 'not empty');
+    }
+
+    private function duplicate(ActionCtx $ctx): Effects
+    {
+        $page = Page::findOrFail((int) ($ctx->row['id'] ?? 0));
+
+        app(PageDuplicator::class)->duplicate($page);
+
+        return Effects::make()->notify(__('tbtop-cms::pages.duplicate.notify'))->refreshTable();
     }
 
     private function restoreAction(S $s): ActionBuilder
