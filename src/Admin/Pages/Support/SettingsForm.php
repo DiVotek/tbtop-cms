@@ -30,6 +30,8 @@ class SettingsForm
      */
     public static function apply(array $form, array $map, Settings $settings): void
     {
+        $applied = [];
+
         foreach ($map as $field => $key) {
             if (! array_key_exists($field, $form)) {
                 continue;
@@ -42,9 +44,12 @@ class SettingsForm
             }
 
             $settings->set($key, $value);
+            $applied[] = $key;
         }
 
-        event(new SettingsSaved(array_keys($map)));
+        if ($applied !== []) {
+            event(new SettingsSaved($applied));
+        }
     }
 
     private static function isBlank(mixed $value): bool

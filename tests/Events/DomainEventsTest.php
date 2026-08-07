@@ -254,18 +254,27 @@ it('does not raise SubmissionReceived when the honeypot field is tripped', funct
 
 // --- Settings: SettingsSaved ---
 
-it('raises SettingsSaved once per apply() call, carrying the map field names', function (): void {
+it('raises SettingsSaved once per apply() call, carrying the store keys actually written', function (): void {
     Event::fake([SettingsSaved::class]);
     $settings = app(Settings::class);
 
+    // seo_title is absent from the form and must not be reported as saved.
     SettingsForm::apply(
-        ['site_name' => 'Acme', 'seo_title' => 'Acme | Home'],
+        ['site_name' => 'Acme'],
         ['site_name' => 'site.name', 'seo_title' => 'seo.title'],
         $settings,
     );
 
     Event::assertDispatched(SettingsSaved::class, 1);
-    Event::assertDispatched(SettingsSaved::class, fn (SettingsSaved $e): bool => $e->keys === ['site_name', 'seo_title']);
+    Event::assertDispatched(SettingsSaved::class, fn (SettingsSaved $e): bool => $e->keys === ['site.name']);
+});
+
+it('does not raise SettingsSaved when the submission writes nothing', function (): void {
+    Event::fake([SettingsSaved::class]);
+
+    SettingsForm::apply([], ['site_name' => 'site.name'], app(Settings::class));
+
+    Event::assertNotDispatched(SettingsSaved::class);
 });
 
 // --- Menu: MenuSaved / MenuDeleted ---
