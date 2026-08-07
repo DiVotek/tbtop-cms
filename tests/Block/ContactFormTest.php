@@ -2,15 +2,22 @@
 
 declare(strict_types=1);
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
 use Tbtop\Cms\Mail\ContactFormMail;
+use Tbtop\Cms\Settings\Settings;
 
-it('exposes code-authored fields and copy to the frontend without leaking the recipient', function (): void {
+uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    config(['cache.default' => 'array']);
+});
+
+it('exposes code-authored fields and copy to the frontend and ignores a stored legacy recipient', function (): void {
     $props = (new ContactForm)->resolve([
         'heading' => 'Talk to us',
         'submitLabel' => 'Go',
@@ -32,43 +39,41 @@ it('requires name, email and message on submit', function (): void {
         ->and($rules['email'])->toContain('email');
 });
 
-it('requires the recipient field to be a valid email', function (): void {
-    $field = collect((new ContactForm)->form(new S))->firstWhere('name', 'recipient');
-
-    expect($field)->not->toBeNull()
-        ->and($field->ruleEntries())->toContain('email');
-});
-
-it('does not send mail and logs a warning when the configured recipient is not a valid email', function (): void {
+it('does not send mail when notifications are disabled', function (): void {
     Mail::fake();
     Log::spy();
+    app(Settings::class)->set('notifications.mail.enabled', false);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
 
     $payload = ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'];
 
-    (new ContactForm)->handleSubmit($payload, ['recipient' => 'not-an-email'], new SubmitContext('en', 'en'));
+    (new ContactForm)->handleSubmit($payload, [], new SubmitContext('en', 'en'));
 
     Mail::assertNothingSent();
-    Log::shouldHaveReceived('warning')->with('form.contact.invalid_recipient', Mockery::type('array'))->once();
+    Log::shouldHaveReceived('debug')->with('form.contact.notifications_disabled', Mockery::type('array'))->once();
 });
 
-it('does not send mail and logs a warning when the recipient contains header injection characters', function (): void {
+it('does not send mail when enabled but no recipients are configured', function (): void {
     Mail::fake();
     Log::spy();
+    app(Settings::class)->set('notifications.mail.enabled', true);
 
     $payload = ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'];
 
-    (new ContactForm)->handleSubmit($payload, ['recipient' => "victim@example.test\r\nBcc: attacker@example.test"], new SubmitContext('en', 'en'));
+    (new ContactForm)->handleSubmit($payload, [], new SubmitContext('en', 'en'));
 
     Mail::assertNothingSent();
-    Log::shouldHaveReceived('warning')->with('form.contact.invalid_recipient', Mockery::type('array'))->once();
+    Log::shouldHaveReceived('debug')->with('form.contact.no_recipients', Mockery::type('array'))->once();
 });
 
-it('sends mail to a validly configured recipient', function (): void {
+it('sends mail to every configured recipient when enabled, ignoring the legacy per-block recipient', function (): void {
     Mail::fake();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', "ops@example.test\nsales@example.test");
 
     $payload = ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'];
 
-    (new ContactForm)->handleSubmit($payload, ['recipient' => 'ops@example.test'], new SubmitContext('en', 'en'));
+    (new ContactForm)->handleSubmit($payload, ['recipient' => 'legacy@example.test'], new SubmitContext('en', 'en'));
 
-    Mail::assertSent(ContactFormMail::class, fn (ContactFormMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(ContactFormMail::class, fn (ContactFormMail $mail): bool => $mail->hasTo('ops@example.test') && $mail->hasTo('sales@example.test') && ! $mail->hasTo('legacy@example.test'));
 });

@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Cms\Admin\Pages\Support\SettingsForm;
 use Tbtop\Cms\Admin\Support\EditFooter;
@@ -20,7 +21,7 @@ abstract class SettingsPageBase extends Page
     /** @return array<string, string> */
     abstract protected function map(): array;
 
-    /** @return list<Field|Node> */
+    /** @return list<Field|Node|TextBlock> */
     abstract protected function fields(S $s): array;
 
     #[\Override]

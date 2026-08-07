@@ -13,6 +13,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Mail\ContactFormMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 
@@ -25,6 +26,8 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     Mail::fake();
     app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
 });
 
 function contactFormPage(): Page

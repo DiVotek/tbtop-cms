@@ -62,7 +62,7 @@ return [
     ],
     'settings' => [
         'secret' => [
-            'notifications.mail.smtp_password',
+            'mail.password',
         ],
     ],
     'frontend' => [

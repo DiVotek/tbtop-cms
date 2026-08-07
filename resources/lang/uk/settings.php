@@ -31,15 +31,36 @@ return [
     ],
     'notifications' => [
         'title' => 'Сповіщення',
-        'subtitle' => 'Вихідні поштові сповіщення та дані SMTP.',
+        'subtitle' => 'Поштовий транспорт сайту та отримувачі сповіщень про нові заявки.',
+        'sections' => [
+            'notifications' => 'Сповіщення',
+            'mail_transport' => 'Поштовий транспорт',
+        ],
         'fields' => [
             'mail_enabled' => 'Пошта увімкнена',
             'recipients' => 'Отримувачі',
-            'smtp_password' => 'Пароль SMTP',
+            'mail_host' => 'Хост SMTP',
+            'mail_port' => 'Порт SMTP',
+            'mail_username' => 'Користувач SMTP',
+            'mail_password' => 'Пароль SMTP',
+            'mail_encryption' => 'Шифрування',
+            'mail_from_address' => 'Адреса відправника',
+            'mail_from_name' => 'Ім’я відправника',
         ],
         'helpers' => [
-            'recipients' => 'Одна email-адреса на рядок.',
-            'smtp_password' => 'Залиште порожнім, щоб зберегти поточне значення.',
+            'recipients' => 'Одна email-адреса на рядок або через кому.',
+            'mail_password' => 'Залиште порожнім, щоб зберегти поточне значення.',
+        ],
+        'encryption' => [
+            'none' => 'Немає',
+            'tls' => 'TLS',
+            'ssl' => 'SSL',
+        ],
+        'actions' => [
+            'send_test_email' => 'Надіслати тестовий лист',
+            'test_email_sent' => 'Тестовий лист надіслано.',
+            'test_email_no_recipients' => 'Додайте хоча б одного отримувача перед надсиланням тестового листа.',
+            'test_email_failed' => 'Не вдалося надіслати тестовий лист: :error',
         ],
     ],
 ];
