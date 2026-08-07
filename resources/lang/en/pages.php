@@ -98,6 +98,11 @@ return [
         'force_delete_title' => 'Delete permanently?',
         'force_delete_confirm' => 'This cannot be undone.',
         'force_deleted' => 'Page deleted permanently',
+        'duplicate' => 'Duplicate',
+    ],
+    'duplicate' => [
+        'name_suffix' => '(copy)',
+        'notify' => 'Page duplicated',
     ],
     'blocks' => [
         'section_title' => 'Blocks',

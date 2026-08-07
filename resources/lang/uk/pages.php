@@ -98,6 +98,11 @@ return [
         'force_delete_title' => 'Видалити остаточно?',
         'force_delete_confirm' => 'Цю дію неможливо скасувати.',
         'force_deleted' => 'Сторінку остаточно видалено',
+        'duplicate' => 'Дублювати',
+    ],
+    'duplicate' => [
+        'name_suffix' => '(копія)',
+        'notify' => 'Сторінку дубльовано',
     ],
     'blocks' => [
         'section_title' => 'Блоки',
