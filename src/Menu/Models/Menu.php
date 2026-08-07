@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * A named site-navigation menu. Items are stored as a nested tree in the
- * `items` JSON column (two levels deep: item -> children). The tree is not
- * rendered on the frontend yet — this is the admin/authoring layer.
+ * `items` JSON column (two levels deep: item -> children); label/url/anchor
+ * are per-locale maps. Delivered to the frontend as `props.cms.menus` by
+ * MenuResolver, keyed by `key`. `name` is an untranslated admin identifier.
  *
  * @property int $id
  * @property string $key

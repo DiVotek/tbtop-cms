@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\ViewErrorBag;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
+use Tbtop\Cms\Frontend\MenuResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Settings\Settings;
@@ -19,6 +20,7 @@ class ShareCmsProps
         private readonly Languages $languages,
         private readonly Settings $settings,
         private readonly LayoutResolver $layoutResolver,
+        private readonly MenuResolver $menus,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -35,6 +37,7 @@ class ShareCmsProps
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
             'layout' => $this->layoutResolver->resolve(),
+            'menus' => $this->menus->forLocale((string) app()->getLocale()),
         ]);
 
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));

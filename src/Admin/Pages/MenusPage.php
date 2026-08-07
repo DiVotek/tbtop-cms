@@ -69,16 +69,10 @@ class MenusPage extends AdminPage
 
     public function view(S $s): Node
     {
-        $editHref = str_replace(
-            '__ROWID__',
-            '{row.id}',
-            route('tbtop.cms.menu-edit-page', ['menu' => '__ROWID__']),
-        );
-
         $table = $s->table('menus')
             ->query($this->query(...))
             ->columns([
-                Column::make('name')->label(__('tbtop-cms::menus.columns.name'))->searchable(),
+                Column::make('name')->label(__('tbtop-cms::menus.columns.name'))->searchable()->emphasized(),
                 Column::make('key')->label(__('tbtop-cms::menus.columns.key'))->searchable()->muted(),
                 Column::make('updated_at')->label(__('tbtop-cms::menus.columns.updated'))
                     ->date(__('tbtop-cms::menus.date_format'))->muted(),
@@ -90,9 +84,8 @@ class MenusPage extends AdminPage
                 __('tbtop-cms::menus.empty.description'),
                 'menu',
             )
+            ->recordUrl(static fn (Menu $row): string => route('tbtop.cms.menu-edit-page', ['menu' => $row->id]))
             ->rowActions([
-                $s->action('menuEdit')->label(__('tbtop-cms::menus.actions.edit'))
-                    ->visit($editHref),
                 $this->deleteAction($s),
             ]);
 

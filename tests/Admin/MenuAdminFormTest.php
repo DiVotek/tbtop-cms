@@ -36,17 +36,17 @@ it('persists a nested item tree, keeping only fields for each chosen type', func
         'key' => 'main',
         'items' => [
             [
-                'label' => 'Products',
+                'label' => ['en' => 'Products'],
                 'type' => 'page',
                 'page_id' => '7',
                 'target_blank' => true,
                 // url/category/anchor for other types must be dropped on a page item
-                'url' => 'https://leak.example',
+                'url' => ['en' => 'https://leak.example'],
                 'category_id' => '99',
                 'children' => [
-                    ['label' => 'Blog', 'type' => 'category', 'category_id' => '3'],
-                    ['label' => 'Laptops', 'type' => 'url', 'url' => 'https://shop/laptops'],
-                    ['label' => 'Jump', 'type' => 'anchor', 'anchor' => '#deals'],
+                    ['label' => ['en' => 'Blog'], 'type' => 'category', 'category_id' => '3'],
+                    ['label' => ['en' => 'Laptops'], 'type' => 'url', 'url' => ['en' => 'https://shop/laptops']],
+                    ['label' => ['en' => 'Jump'], 'type' => 'anchor', 'anchor' => ['en' => '#deals']],
                 ],
             ],
         ],
@@ -58,13 +58,13 @@ it('persists a nested item tree, keeping only fields for each chosen type', func
         ->and($menu->items)->toBe([
             [
                 'type' => 'page',
-                'label' => 'Products',
+                'label' => ['en' => 'Products'],
                 'page_id' => 7,
                 'target_blank' => true,
                 'children' => [
-                    ['type' => 'category', 'label' => 'Blog', 'category_id' => 3],
-                    ['type' => 'url', 'label' => 'Laptops', 'url' => 'https://shop/laptops'],
-                    ['type' => 'anchor', 'label' => 'Jump', 'anchor' => '#deals'],
+                    ['type' => 'category', 'label' => ['en' => 'Blog'], 'category_id' => 3],
+                    ['type' => 'url', 'label' => ['en' => 'Laptops'], 'url' => ['en' => 'https://shop/laptops']],
+                    ['type' => 'anchor', 'label' => ['en' => 'Jump'], 'anchor' => ['en' => '#deals']],
                 ],
             ],
         ]);
@@ -75,7 +75,7 @@ it('omits target_blank when the checkbox is off', function (): void {
         'name' => 'Main',
         'key' => 'main',
         'items' => [
-            ['label' => 'Home', 'type' => 'url', 'url' => '/', 'target_blank' => false],
+            ['label' => ['en' => 'Home'], 'type' => 'url', 'url' => ['en' => '/'], 'target_blank' => false],
         ],
     ]);
 
@@ -87,16 +87,24 @@ it('requires each type target only for its type, scoped per row at both levels',
 
     // The reference must be the full wildcard path to the sibling type, or
     // Laravel resolves it against a non-existent top-level `type` and never fires.
-    expect($rules['items.*.url'])->toBe(['required_if:items.*.type,url'])
+    // Translatable url/anchor/label expand to per-locale keys; only the
+    // default locale carries the required_if — other locales fall back.
+    expect($rules['items.*.url'])->toBe(['nullable', 'array'])
+        ->and($rules['items.*.url.en'])->toBe(['required_if:items.*.type,url'])
+        ->and($rules['items.*.label.en'])->toBe(['required_if:items.*.type,url,anchor'])
         ->and($rules['items.*.page_id'])->toBe(['required_if:items.*.type,page'])
-        ->and($rules['items.*.children.*.url'])->toBe(['required_if:items.*.children.*.type,url']);
+        ->and($rules['items.*.children.*.url.en'])->toBe(['required_if:items.*.children.*.type,url']);
 
     // And the rule actually fires: an empty url on a url item is rejected.
-    $data = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'url', 'label' => 'a', 'url' => '']]];
+    $data = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'url', 'label' => ['en' => 'a'], 'url' => ['en' => '']]]];
     expect(validator($data, $rules)->fails())->toBeTrue();
 
-    $valid = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'url', 'label' => 'a', 'url' => '/ok']]];
+    $valid = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'url', 'label' => ['en' => 'a'], 'url' => ['en' => '/ok']]]];
     expect(validator($valid, $rules)->fails())->toBeFalse();
+
+    // A label is not required on a page item — it falls back to the page name.
+    $pageItem = ['name' => 'X', 'key' => 'x', 'items' => [['type' => 'page', 'page_id' => '1', 'label' => ['en' => '']]]];
+    expect(validator($pageItem, $rules)->fails())->toBeFalse();
 });
 
 it('drops items whose type has no target, for every type', function (): void {
@@ -104,16 +112,16 @@ it('drops items whose type has no target, for every type', function (): void {
         'name' => 'Main',
         'key' => 'main',
         'items' => [
-            ['label' => 'No page', 'type' => 'page', 'page_id' => ''],
-            ['label' => 'No category', 'type' => 'category', 'category_id' => null],
-            ['label' => 'Blank url', 'type' => 'url', 'url' => '   '],
-            ['label' => 'Empty anchor', 'type' => 'anchor', 'anchor' => ''],
-            ['label' => 'Real', 'type' => 'url', 'url' => 'https://ok'],
+            ['label' => ['en' => 'No page'], 'type' => 'page', 'page_id' => ''],
+            ['label' => ['en' => 'No category'], 'type' => 'category', 'category_id' => null],
+            ['label' => ['en' => 'Blank url'], 'type' => 'url', 'url' => ['en' => '   ']],
+            ['label' => ['en' => 'Empty anchor'], 'type' => 'anchor', 'anchor' => ['en' => '']],
+            ['label' => ['en' => 'Real'], 'type' => 'url', 'url' => ['en' => 'https://ok']],
         ],
     ]);
 
     expect($menu->items)->toBe([
-        ['type' => 'url', 'label' => 'Real', 'url' => 'https://ok'],
+        ['type' => 'url', 'label' => ['en' => 'Real'], 'url' => ['en' => 'https://ok']],
     ]);
 });
 
@@ -122,15 +130,15 @@ it('drops rows with an empty label and caps nesting at two levels', function ():
         'name' => 'Main',
         'key' => 'main',
         'items' => [
-            ['label' => '', 'type' => 'url', 'url' => 'https://ignored'],
+            ['label' => ['en' => ''], 'type' => 'url', 'url' => ['en' => 'https://ignored']],
             [
-                'label' => 'Kept',
+                'label' => ['en' => 'Kept'],
                 'type' => 'url',
-                'url' => 'https://kept',
+                'url' => ['en' => 'https://kept'],
                 'children' => [
                     // a third level must never persist
-                    ['label' => 'Deep', 'type' => 'url', 'url' => 'https://deep', 'children' => [
-                        ['label' => 'Too deep', 'type' => 'url', 'url' => 'https://x'],
+                    ['label' => ['en' => 'Deep'], 'type' => 'url', 'url' => ['en' => 'https://deep'], 'children' => [
+                        ['label' => ['en' => 'Too deep'], 'type' => 'url', 'url' => ['en' => 'https://x']],
                     ]],
                 ],
             ],
@@ -138,7 +146,7 @@ it('drops rows with an empty label and caps nesting at two levels', function ():
     ]);
 
     expect($menu->items)->toHaveCount(1)
-        ->and($menu->items[0]['label'])->toBe('Kept')
+        ->and($menu->items[0]['label'])->toBe(['en' => 'Kept'])
         ->and($menu->items[0]['children'][0])->not->toHaveKey('children');
 });
 
@@ -152,10 +160,11 @@ it('keeps the key fixed on edit even if a different key is submitted', function 
         ->and($menu->fresh()->name)->toBe('Header renamed');
 });
 
-it('loads a stored menu back into repeater rows', function (): void {
+it('loads a stored menu back into repeater rows, lifting legacy scalars into locale maps', function (): void {
     $menu = Menu::create([
         'name' => 'Footer',
         'key' => 'footer',
+        // pre-translation row: scalar label/url belong to the default locale
         'items' => [['type' => 'url', 'label' => 'Home', 'url' => '/']],
     ]);
 
@@ -163,8 +172,97 @@ it('loads a stored menu back into repeater rows', function (): void {
 
     expect($row['name'])->toBe('Footer')
         ->and($row['key'])->toBe('footer')
-        ->and($row['items'][0]['label'])->toBe('Home')
-        ->and($row['items'][0]['url'])->toBe('/');
+        ->and($row['items'][0]['label'])->toBe(['en' => 'Home'])
+        ->and($row['items'][0]['url'])->toBe(['en' => '/']);
+});
+
+it('stores only label overrides for page items, dropping locales that echo the page name', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About us', 'uk' => 'Про нас'],
+    ]);
+
+    $menu = MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [[
+            'type' => 'page',
+            'page_id' => (string) $page->id,
+            // en echoes the page name (untouched prefill), uk is a real override
+            'label' => ['en' => 'About us', 'uk' => 'Наша команда'],
+        ]],
+    ]);
+
+    expect($menu->items[0]['label'])->toBe(['uk' => 'Наша команда']);
+
+    // A fully matching label stores no override at all — the fallback stays live.
+    $menu = MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [[
+            'type' => 'page',
+            'page_id' => (string) $page->id,
+            'label' => ['en' => 'About us', 'uk' => 'Про нас'],
+        ]],
+    ], $menu->id);
+
+    expect($menu->items[0])->not->toHaveKey('label');
+});
+
+it('does not freeze the old page name as an override when a row is repointed', function (): void {
+    $old = Page::factory()->create([
+        'type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Alpha'],
+    ]);
+    $new = Page::factory()->create([
+        'type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Beta'],
+    ]);
+
+    $menu = Menu::create([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [['type' => 'page', 'page_id' => $old->id]],
+    ]);
+
+    // Repoint to Beta without touching the label: the submitted label still
+    // carries Alpha's prefill and must not persist as an override.
+    $menu = MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [['type' => 'page', 'page_id' => (string) $new->id, 'label' => ['en' => 'Alpha']]],
+    ], $menu->id);
+
+    expect($menu->items[0])->not->toHaveKey('label')
+        ->and($menu->items[0]['page_id'])->toBe($new->id);
+
+    // On a menu that never referenced Alpha, the same text is a real override.
+    $other = MenuForm::save([
+        'name' => 'Other',
+        'key' => 'other',
+        'items' => [['type' => 'page', 'page_id' => (string) $new->id, 'label' => ['en' => 'Alpha']]],
+    ]);
+
+    expect($other->items[0]['label'])->toBe(['en' => 'Alpha']);
+});
+
+it('prefills page-item labels from name translations on load, keeping stored overrides', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About us', 'uk' => 'Про нас'],
+    ]);
+
+    $menu = Menu::create([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [['type' => 'page', 'page_id' => $page->id, 'label' => ['uk' => 'Наша команда']]],
+    ]);
+
+    $label = MenuForm::loadRow($menu->id)['items'][0]['label'];
+
+    expect($label)->toEqual(['en' => 'About us', 'uk' => 'Наша команда']);
 });
 
 it('offers only published pages in the page picker, excluding categories and articles', function (): void {
