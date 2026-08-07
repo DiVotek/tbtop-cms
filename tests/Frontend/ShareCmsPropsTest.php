@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
@@ -15,6 +16,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     config()->set('tbtop-cms.blocks.types', [HeroBlock::class]);
+    config()->set('cache.default', 'array');
 });
 
 it('shares the default locale and per-language is_default flags', function (): void {
@@ -83,6 +85,27 @@ it('shares empty layout slots when no layout rows exist', function (): void {
         ->assertOk()
         ->assertJsonPath('props.cms.layout.header', [])
         ->assertJsonPath('props.cms.layout.footer', []);
+});
+
+it('serves a fresh layout after a slot is saved via LayoutForm::save()', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertJsonPath('props.cms.layout.header', []);
+
+    LayoutForm::save([
+        'content' => [['kind' => 'Hero', 'title' => 'Hi']],
+    ], Slots::HEADER);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertJsonPath('props.cms.layout.header.0.props.title', 'Hi');
 });
 
 it('skips an inactive block in a layout slot', function (): void {

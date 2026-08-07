@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tbtop\Admin\Media\Models\Media;
+use Tbtop\Cms\Admin\Pages\Support\SettingsForm;
+use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Settings\Models\Setting;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Settings\Support\SettingCodec;
@@ -99,4 +101,33 @@ it('resolves seo.default_og_image to a public url in the frontend payload', func
 
     expect($settings->forFrontend()['seo.default_og_image'])
         ->toBe(Storage::disk('public')->url('media/og.png'));
+});
+
+it('serves a fresh value from a new Settings instance after SettingsForm::apply()', function (): void {
+    (new Settings)->set('site.name', 'Original');
+    // Prime the cross-request cache the way a frontend request would.
+    (new Settings)->get('site.name');
+
+    SettingsForm::apply(['site_name' => 'Updated'], ['site_name' => 'site.name'], new Settings);
+
+    // A brand-new instance stands in for the next incoming request.
+    expect((new Settings)->get('site.name'))->toBe('Updated');
+});
+
+it('never stores a decrypted secret value in the cached settings payload', function (): void {
+    (new Settings)->set('mail.password', 'hunter2');
+
+    // Read through CmsCache the same way Settings::rawAll() populates it, to
+    // inspect exactly what landed in the store under the versioned key.
+    /** @var array<string, string|null> $cachedRaw */
+    $cachedRaw = app(CmsCache::class)->remember(
+        'tbtop-cms.settings',
+        static fn (): array => Setting::query()->pluck('value', 'key')->all(),
+    );
+
+    expect($cachedRaw['mail.password'])->not->toBeNull()
+        ->and($cachedRaw['mail.password'])->not->toContain('hunter2')
+        // decode() proves it's still ciphertext: it only comes back out
+        // correctly when told this key is secret.
+        ->and(SettingCodec::decode($cachedRaw['mail.password'], true))->toBe('hunter2');
 });
