@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Language;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Language\Models\Language;
 
 /**
@@ -14,10 +15,14 @@ use Tbtop\Cms\Language\Models\Language;
  */
 class Languages
 {
+    private const string CACHE_KEY = 'tbtop-cms.languages';
+
     /** @var list<LanguageRow>|null */
     private ?array $cache = null;
 
     private ?string $currentLocale = null;
+
+    public function __construct(private readonly CmsCache $contentCache = new CmsCache) {}
 
     /** @return list<LanguageRow> */
     public function all(): array
@@ -108,9 +113,16 @@ class Languages
         $this->refresh();
     }
 
+    /**
+     * Forces this instance to reflect a write it (or a caller in the same
+     * request) just made — bypasses the cross-request cache on purpose:
+     * LanguageObserver calls this before LanguagesChanged is dispatched, so
+     * reading through the cache here would read/write against a version
+     * that's about to be bumped anyway, for no benefit.
+     */
     public function refresh(): void
     {
-        $this->cache = $this->buildFromDatabase();
+        $this->cache = $this->queryFromDatabase();
         $this->syncFallbackLocale();
     }
 
@@ -130,7 +142,7 @@ class Languages
     private function load(): array
     {
         if ($this->cache === null) {
-            $this->cache = $this->buildFromDatabase();
+            $this->cache = $this->contentCache->remember(self::CACHE_KEY, fn (): array => $this->queryFromDatabase());
             $this->syncFallbackLocale();
         }
 
@@ -138,7 +150,7 @@ class Languages
     }
 
     /** @return list<LanguageRow> */
-    private function buildFromDatabase(): array
+    private function queryFromDatabase(): array
     {
         if (! Schema::hasTable((new Language)->getTable())) {
             return [];

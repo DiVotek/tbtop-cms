@@ -3,11 +3,16 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
 use Tbtop\Cms\Database\Seeders\LanguageSeeder;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    config(['cache.default' => 'array']);
+});
 
 it('reads the default language', function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
@@ -86,4 +91,22 @@ it('preserves the existing default when the target is gone', function (): void {
 
     expect(app(Languages::class)->defaultLocale())->toBe('en')
         ->and(Language::where('is_default', true)->count())->toBe(1);
+});
+
+it('serves a fresh list from a new Languages instance after LanguageForm::save() dispatches LanguagesChanged', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+    // Prime the cross-request cache the way a frontend request would.
+    (new Languages)->frontendActive();
+
+    LanguageForm::save([
+        'locale' => 'uk',
+        'is_default' => false,
+        'is_admin_active' => true,
+        'is_frontend_active' => true,
+        'sort_order' => 1,
+    ]);
+
+    // A brand-new instance stands in for the next incoming request.
+    expect(collect((new Languages)->frontendActive())->pluck('locale')->all())
+        ->toEqualCanonicalizing(['en', 'uk']);
 });

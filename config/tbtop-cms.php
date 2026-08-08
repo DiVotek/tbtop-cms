@@ -60,6 +60,17 @@ return [
         // published host configs override whole sections and won't have this key.
         'link_ttl_hours' => 72,
     ],
+    'cache' => [
+        // Cross-request cache for frontend content reads (settings, languages,
+        // layout, menus). Admin reads always stay live regardless of this flag.
+        'enabled' => true,
+        // Seconds a cached entry lives before recomputing, subject to the
+        // schedule-aware cap CmsCache::rememberLive() applies on top.
+        'ttl' => 3600,
+        // Cache store name to use (see config/cache.php stores). Null uses the
+        // host application's default store.
+        'store' => null,
+    ],
     'settings' => [
         'secret' => [
             'mail.password',

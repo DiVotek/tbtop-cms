@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\ViewErrorBag;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
+use Tbtop\Cms\Block\ResolvedBlock;
+use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Frontend\MenuResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
@@ -21,6 +23,7 @@ class ShareCmsProps
         private readonly Settings $settings,
         private readonly LayoutResolver $layoutResolver,
         private readonly MenuResolver $menus,
+        private readonly CmsCache $cache,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -36,8 +39,8 @@ class ShareCmsProps
             'locale' => (string) app()->getLocale(),
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
-            'layout' => $this->layoutResolver->resolve(),
-            'menus' => $this->menus->forLocale((string) app()->getLocale()),
+            'layout' => $this->resolveLayout(),
+            'menus' => $this->resolveMenus(),
         ]);
 
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));
@@ -56,6 +59,35 @@ class ShareCmsProps
             ],
             $this->languages->frontendActive(),
         );
+    }
+
+    /**
+     * Cached here rather than inside LayoutResolver: this middleware is the
+     * service's only frontend caller (admin's layout editor loads Layout
+     * models directly), so caching at the call site keeps admin reads live
+     * without LayoutResolver needing to know which caller it's serving.
+     *
+     * @return array<string, list<ResolvedBlock>>
+     */
+    private function resolveLayout(): array
+    {
+        return $this->cache->remember('layout', fn (): array => $this->layoutResolver->resolve());
+    }
+
+    /**
+     * Cached per locale, live-capped: menus reference pages by id and a
+     * page's live scope can flip purely on its schedule (published_at /
+     * unpublish_at) with no write and no event, so a plain TTL is not
+     * enough — rememberLive() also bounds the entry to the nearest such
+     * transition. Same call-site-only caching rationale as resolveLayout().
+     *
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function resolveMenus(): array
+    {
+        $locale = (string) app()->getLocale();
+
+        return $this->cache->rememberLive('menus:' . $locale, fn (): array => $this->menus->forLocale($locale));
     }
 
     private function validationErrors(Request $request): object

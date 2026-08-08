@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Admin\Pages\Support\MenuForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Menu\Models\Menu;
@@ -165,4 +166,60 @@ it('serves a legacy scalar menu row to every locale', function (): void {
         ->assertOk()
         ->assertJsonPath('props.cms.menus.footer.0.label', 'Contact')
         ->assertJsonPath('props.cms.menus.footer.0.url', '/contact');
+});
+
+it('serves a fresh menu payload after the menu is edited via MenuForm::save()', function (): void {
+    config(['cache.default' => 'array']);
+    menuPage(['en' => 'Home']);
+    $menu = Menu::create(['name' => 'Main', 'key' => 'main', 'items' => [
+        ['type' => 'url', 'label' => ['en' => 'Old label'], 'url' => ['en' => '/old']],
+    ]]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/home', ['X-Inertia' => 'true'])
+        ->assertJsonPath('props.cms.menus.main.0.label', 'Old label');
+
+    MenuForm::save([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [['type' => 'url', 'label' => ['en' => 'New label'], 'url' => ['en' => '/new']]],
+    ], $menu->id);
+
+    $this->get('/home', ['X-Inertia' => 'true'])
+        ->assertJsonPath('props.cms.menus.main.0.label', 'New label');
+});
+
+it('drops a scheduled item from the cached menu once its cache-capped TTL has elapsed and the transition has passed', function (): void {
+    config(['cache.default' => 'array', 'tbtop-cms.cache.ttl' => 3600]);
+    $live = menuPage(['en' => 'Live']);
+    $scheduled = Page::factory()->create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Scheduled'],
+        'published_at' => now()->addSeconds(5),
+    ]);
+
+    Menu::create([
+        'name' => 'Main',
+        'key' => 'main',
+        'items' => [
+            ['type' => 'page', 'page_id' => $scheduled->id],
+            ['type' => 'page', 'page_id' => $live->id],
+        ],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    // Before the transition: only the already-live page appears.
+    $this->get('/live', ['X-Inertia' => 'true'])
+        ->assertJsonCount(1, 'props.cms.menus.main');
+
+    // rememberLive() must have capped this entry's TTL to ~5s (the schedule
+    // distance), not the configured 3600s ttl, so it has expired by now and
+    // MenuResolver reruns against a Page that is live at this point.
+    test()->travel(6)->seconds();
+
+    $this->get('/live', ['X-Inertia' => 'true'])
+        ->assertJsonCount(2, 'props.cms.menus.main');
 });

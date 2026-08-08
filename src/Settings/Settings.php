@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Settings;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Tbtop\Cms\Block\MediaUrlResolver;
+use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Settings\Models\Setting;
 use Tbtop\Cms\Settings\Support\SettingCodec;
 use Throwable;
@@ -25,6 +25,7 @@ class Settings
 
     public function __construct(
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
+        private readonly CmsCache $cache = new CmsCache,
     ) {}
 
     public function get(string $key, mixed $default = null): mixed
@@ -97,15 +98,24 @@ class Settings
         return in_array($key, $secrets, true);
     }
 
-    /** @return array<string, string|null> */
+    /**
+     * Cached under CmsCache's versioned key rather than kept only in $memo:
+     * this map is read on every admin and frontend request alike, and
+     * SettingsSaved already bumps the version on every write path
+     * (SettingsForm::apply), so a shared cross-request cache is safe for
+     * both kinds of readers. Only the raw (still-encrypted-if-secret) column
+     * values are cached — decryption happens lazily per key in get(), so a
+     * cache dump never exposes a decrypted secret.
+     *
+     * @return array<string, string|null>
+     */
     private function rawAll(): array
     {
         if ($this->memo !== null) {
             return $this->memo;
         }
 
-        /** @var array<string, string|null> $raw */
-        $raw = Cache::rememberForever(
+        $raw = $this->cache->remember(
             self::CACHE_KEY,
             static fn (): array => Setting::query()->pluck('value', 'key')->all(),
         );
@@ -113,9 +123,14 @@ class Settings
         return $this->memo = $raw;
     }
 
+    /**
+     * set()/forget() can be called directly (tests, block code) without
+     * going through SettingsForm::apply()/SettingsSaved, so this bumps the
+     * shared version itself rather than relying on that event to arrive.
+     */
     private function flush(): void
     {
-        Cache::forget(self::CACHE_KEY);
+        $this->cache->bump();
         $this->memo = null;
     }
 }

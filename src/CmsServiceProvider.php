@@ -6,6 +6,7 @@ namespace Tbtop\Cms;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Spatie\LaravelPackageTools\Package;
@@ -18,12 +19,23 @@ use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Cache\CmsCache;
+use Tbtop\Cms\Cache\InvalidatesContentCache;
 use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Frontend\PageResolver;
+use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Mail\CmsMailer;
+use Tbtop\Cms\Menu\Events\MenuDeleted;
+use Tbtop\Cms\Menu\Events\MenuSaved;
+use Tbtop\Cms\Page\Events\PageDeleted;
+use Tbtop\Cms\Page\Events\PagePublished;
+use Tbtop\Cms\Page\Events\PageRestored;
+use Tbtop\Cms\Page\Events\PageSaved;
+use Tbtop\Cms\Page\Events\PageUnpublished;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\Observers\PageRevisions;
@@ -31,6 +43,7 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
 use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
 use Tbtop\Cms\Redirect\RedirectResolver;
+use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 
 class CmsServiceProvider extends PackageServiceProvider
@@ -81,6 +94,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(Settings::class);
         $this->app->scoped(CmsMailer::class);
         $this->app->scoped(Cms::class);
+        $this->app->scoped(CmsCache::class);
         $this->registerAdminPanel();
     }
 
@@ -92,6 +106,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireRedirectMaintenance();
         $this->wirePageRevisions();
         $this->wireRoleGates();
+        $this->wireContentCacheInvalidation();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -217,6 +232,30 @@ class CmsServiceProvider extends PackageServiceProvider
             'tbtop-cms.users',
         ] as $ability) {
             Gate::define($ability, static fn (Authenticatable $user): bool => CurrentAdmin::roleOf($user)?->can($ability) ?? false);
+        }
+    }
+
+    /**
+     * Every domain event that changes frontend-visible content bumps the
+     * content cache version — see InvalidatesContentCache's docblock for why
+     * one blanket bump instead of per-event targeted invalidation.
+     * SubmissionReceived is intentionally excluded: submissions aren't content.
+     */
+    private function wireContentCacheInvalidation(): void
+    {
+        foreach ([
+            PageSaved::class,
+            PagePublished::class,
+            PageUnpublished::class,
+            PageDeleted::class,
+            PageRestored::class,
+            MenuSaved::class,
+            MenuDeleted::class,
+            LayoutSaved::class,
+            SettingsSaved::class,
+            LanguagesChanged::class,
+        ] as $event) {
+            Event::listen($event, InvalidatesContentCache::class);
         }
     }
 }
