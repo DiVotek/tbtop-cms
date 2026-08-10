@@ -64,7 +64,11 @@ class LoginPage extends Page
             ]),
         ])->onSubmit($this->authenticate(...));
 
-        return $s->section(['variant' => 'card', 'class' => 'w-full max-w-sm mx-auto'], [
+        // Fixed width, not w-full: the center-layout wrapper shrink-wraps its
+        // content, so a percentage width breathes with it — the card widened
+        // whenever a long validation message appeared and snapped back once it
+        // cleared. max-w-full keeps small viewports usable.
+        return $s->section(['variant' => 'card', 'class' => 'w-96 max-w-full mx-auto'], [
             // Outer stack spaces the header away from the form; "Sign in" only
             // appears once on screen now (the button), so the header carries
             // just the brand heading plus the muted subtitle.
