@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tbtop\Cms\Frontend\Render;
+namespace Tbtop\Cms\Richtext;
 
 class RichtextNodeRenderer
 {

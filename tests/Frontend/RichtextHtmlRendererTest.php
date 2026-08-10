@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Tbtop\Cms\Frontend\Render\RichtextHtmlRenderer;
+use Tbtop\Cms\Richtext\RichtextHtmlRenderer;
 
 beforeEach(function (): void {
     $this->renderer = new RichtextHtmlRenderer;
@@ -218,6 +218,28 @@ it('drops data: urls but keeps the link text', function (): void {
 
     expect($html)->toBe('bad');
 });
+
+it('drops javascript: urls regardless of scheme casing', function (): void {
+    $html = $this->renderer->render(editorState([
+        ['type' => 'link', 'url' => 'JavaScript:alert(1)', 'children' => [textNode('click me')]],
+    ]));
+
+    expect($html)->toBe('click me');
+});
+
+it('drops javascript: urls disguised with whitespace the browser strips before parsing', function (string $url): void {
+    $html = $this->renderer->render(editorState([
+        ['type' => 'link', 'url' => $url, 'children' => [textNode('click me')]],
+    ]));
+
+    expect($html)->toBe('click me');
+})->with([
+    'leading space' => [' javascript:alert(1)'],
+    'leading tab' => ["\tjavascript:alert(1)"],
+    'leading newline' => ["\njavascript:alert(1)"],
+    'tab inside the scheme' => ["java\tscript:alert(1)"],
+    'newline inside the scheme' => ["java\nscript:alert(1)"],
+]);
 
 it('escapes script tags inside text nodes', function (): void {
     $html = $this->renderer->render(editorState([

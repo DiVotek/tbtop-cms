@@ -203,7 +203,7 @@ class FormSubmissionPage extends AdminPage
 
     private static function stringifyValue(mixed $value): string
     {
-        return is_scalar($value) ? (string) $value : (string) json_encode($value);
+        return is_scalar($value) ? (string) $value : (json_encode($value, JSON_UNESCAPED_UNICODE) ?: '');
     }
 
     /**

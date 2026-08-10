@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Layout;
 
+use Illuminate\Support\Facades\Schema;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Layout\Models\Layout;
@@ -17,6 +18,10 @@ class LayoutResolver
     /** @return array<string, list<ResolvedBlock>> */
     public function resolve(): array
     {
+        if (! Schema::hasTable((new Layout)->getTable())) {
+            return array_fill_keys(Slots::all(), []);
+        }
+
         $slots = [];
 
         foreach (Slots::all() as $slot) {

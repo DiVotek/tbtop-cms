@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Frontend\Seo;
 
 use Tbtop\Cms\Block\MediaUrlResolver;
-use Tbtop\Cms\Frontend\PageUrl;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Settings\Settings;
 
 class SeoResolver

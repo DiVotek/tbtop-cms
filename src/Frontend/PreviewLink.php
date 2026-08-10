@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Frontend;
 
 use Illuminate\Support\Facades\URL;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageUrl;
 
 /**
  * Builds a shareable, time-limited signed URL for a draft page — hits the
