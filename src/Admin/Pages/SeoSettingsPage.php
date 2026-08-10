@@ -21,6 +21,7 @@ class SeoSettingsPage extends SettingsPageBase
             'group' => 'settings',
             'label' => __('tbtop-cms::nav.items.seo_settings'),
             'order' => 30,
+            'icon' => 'search',
         ];
     }
 

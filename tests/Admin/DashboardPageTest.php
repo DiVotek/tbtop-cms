@@ -276,8 +276,8 @@ it('pins the KPI stat sparklines to the bottom of the card', function (): void {
 
 it('renders recently updated pages as a card-list with status color and an "open" action', function (): void {
     actingAsDashboardAdmin();
-    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Home']]);
-    Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'About']]);
+    $home = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Home']]);
+    $about = Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'About']]);
 
     $structure = $this->get('/admin/dashboard', ['X-Inertia' => 'true'])
         ->assertOk()
@@ -298,9 +298,12 @@ it('renders recently updated pages as a card-list with status color and an "open
     $pagesList = collect($lists)->first(fn (array $list): bool => collect($list['items'])->contains('title', 'Home'));
 
     $colorByTitle = array_column($pagesList['items'], 'color', 'title');
+    $urlByTitle = array_column($pagesList['items'], 'url', 'title');
     expect($colorByTitle['Home'])->toBe('success')
         ->and($colorByTitle['About'])->toBe('muted')
-        ->and($pagesList['items'][0]['url'])->toBe(route('tbtop.cms.pages-page'));
+        // 5.12: each item opens its own page editor, not the general list.
+        ->and($urlByTitle['Home'])->toBe(route('tbtop.cms.page-edit-page', ['page' => $home->id]))
+        ->and($urlByTitle['About'])->toBe(route('tbtop.cms.page-edit-page', ['page' => $about->id]));
 });
 
 it('caps recently updated pages and latest submissions at 5 items each', function (): void {
@@ -355,6 +358,28 @@ it('colors the latest-submissions list by lead status', function (): void {
     $colors = collect($submissionsList['items'])->pluck('color')->all();
 
     expect($colors)->toContain('danger', 'success', 'muted');
+});
+
+it('links each latest-submission item to its own detail page', function (): void {
+    actingAsDashboardAdmin();
+    $submission = FormSubmission::query()->create([
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada'],
+        'status' => SubmissionStatus::Handled,
+        'lead_status' => LeadStatus::New,
+        'created_at' => now(),
+    ]);
+
+    $lists = dashboardStructureNodesOfKind('list');
+    $submissionsList = collect($lists)->first(
+        fn (array $list): bool => collect($list['items'])->contains('title', 'Ada'),
+    );
+    $item = collect($submissionsList['items'])->firstWhere('title', 'Ada');
+
+    // 5.12: each item opens its own submission detail page, not the general list.
+    expect($item['url'])->toBe(route('tbtop.cms.form-submission-page', ['submission' => $submission->id]));
 });
 
 // ---------------------------------------------------------------------------

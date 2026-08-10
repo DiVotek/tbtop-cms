@@ -35,6 +35,7 @@ class LanguagesPage extends AdminPage
             'group' => 'settings',
             'label' => __('tbtop-cms::nav.items.languages'),
             'order' => 10,
+            'icon' => 'languages',
         ];
     }
 
@@ -133,7 +134,7 @@ class LanguagesPage extends AdminPage
 
     private function createAction(S $s): ActionBuilder
     {
-        $cancel = $s->action('languageCreateCancel')->label(__('tbtop-cms::languages.actions.cancel'))
+        $cancel = $s->action('languageCreateCancel')->label(__('tbtop-cms::common.actions.cancel'))
             ->handle(static fn (): Effects => Effects::make()->closeModal());
         $create = $s->action('languageCreateSave')->label(__('tbtop-cms::languages.actions.create'))->color('primary')
             ->handle($this->create(...), needs: ['form']);

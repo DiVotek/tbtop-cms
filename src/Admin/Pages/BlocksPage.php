@@ -35,6 +35,7 @@ class BlocksPage extends AdminPage
             'group' => 'design',
             'label' => __('tbtop-cms::nav.items.blocks'),
             'order' => 40,
+            'icon' => 'blocks',
         ];
     }
 
@@ -72,7 +73,8 @@ class BlocksPage extends AdminPage
 
         if ($blocks === []) {
             return $s->stack([
-                $s->displayAlert(__('tbtop-cms::blocks_showcase.empty')),
+                $s->displayAlert(__('tbtop-cms::blocks_showcase.empty.description'))
+                    ->title(__('tbtop-cms::blocks_showcase.empty.title')),
             ]);
         }
 

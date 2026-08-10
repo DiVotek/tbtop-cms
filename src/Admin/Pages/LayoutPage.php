@@ -24,6 +24,7 @@ class LayoutPage extends AdminPage
             'group' => 'design',
             'label' => __('tbtop-cms::nav.items.layout'),
             'order' => 20,
+            'icon' => 'panels-top-left',
         ];
     }
 

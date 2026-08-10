@@ -42,7 +42,6 @@ return [
     'actions' => [
         'new' => 'New',
         'create' => 'Create',
-        'cancel' => 'Cancel',
         'created' => 'Language created',
         'saved' => 'Language saved',
         'edit' => 'Edit',

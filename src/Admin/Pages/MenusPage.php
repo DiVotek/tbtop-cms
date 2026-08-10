@@ -30,6 +30,7 @@ class MenusPage extends AdminPage
             'group' => 'design',
             'label' => __('tbtop-cms::nav.items.menus'),
             'order' => 30,
+            'icon' => 'list',
         ];
     }
 

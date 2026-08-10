@@ -46,6 +46,7 @@ class UsersPage extends AdminPage
             'group' => 'settings',
             'label' => __('tbtop-cms::nav.items.users'),
             'order' => 20,
+            'icon' => 'users',
         ];
     }
 

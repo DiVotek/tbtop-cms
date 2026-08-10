@@ -66,6 +66,17 @@ it('no longer carries a create action on the table itself', function (): void {
     expect($node['options']['headerActions'] ?? null)->toBeNull();
 });
 
+it('opens the edit modal on row click and hides the separate Edit button', function (): void {
+    // 5.10: row click opens editing everywhere — the edit action stays
+    // registered (rowClick needs it) but is hidden from the row-actions cell.
+    $node = redirectsTableNode();
+    $actions = array_column($node['options']['rowActions'], null, 'name');
+
+    expect($node['options']['rowClick'] ?? null)->toBe('redirectEdit')
+        ->and($actions['redirectEdit']['meta']['hidden'] ?? null)->toBeTrue()
+        ->and($actions['redirectDelete']['meta']['hidden'] ?? null)->not->toBeTrue();
+});
+
 // Radix Select throws on <Select.Item value="">, which crashed the whole
 // admin page when the create-redirect modal opened. "All locales" must be
 // a non-empty sentinel, mapped to null on save.

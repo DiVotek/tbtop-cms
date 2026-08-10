@@ -43,6 +43,7 @@ class PagesPage extends AdminPage
             'group' => 'content',
             'label' => __('tbtop-cms::nav.items.pages'),
             'order' => 10,
+            'icon' => 'files',
         ];
     }
 
@@ -120,13 +121,17 @@ class PagesPage extends AdminPage
                     ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", '!=', 'category')->whereNull("{$pages}.parent_id")),
                 $this->tab('articles')
                     ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", '!=', 'category')->whereNotNull("{$pages}.parent_id")),
-                Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))
+                Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))->count()
                     ->description(__('tbtop-cms::pages.tabs_deleted_description'))
                     ->query($this->onlyTrashedScope(...)),
             ])
             ->searchable(["{$pages}.name"])
             ->defaultSort('sort_key', 'asc')
-            ->emptyState(__('tbtop-cms::pages.empty'))
+            ->emptyState(
+                __('tbtop-cms::pages.empty.title'),
+                __('tbtop-cms::pages.empty.description'),
+                'files',
+            )
             // null for a trashed row: no edit page for a soft-deleted record,
             // so the row falls back to non-clickable (see tableRow.tsx —
             // recordUrl is only honored when _recordUrl is a string).
@@ -219,7 +224,7 @@ class PagesPage extends AdminPage
 
     private function createAction(S $s): ActionBuilder
     {
-        $cancel = $s->action('pageCreateCancel')->label(__('tbtop-cms::pages.actions.cancel'))
+        $cancel = $s->action('pageCreateCancel')->label(__('tbtop-cms::common.actions.cancel'))
             ->handle(static fn (): Effects => Effects::make()->closeModal());
         $create = $s->action('pageCreateSave')->label(__('tbtop-cms::pages.actions.create'))->color('primary')
             ->handle($this->create(...), needs: ['form']);
@@ -312,7 +317,7 @@ class PagesPage extends AdminPage
     {
         $label = __('tbtop-cms::pages.tabs.' . $name);
 
-        return Tab::make($name)->label($label)
+        return Tab::make($name)->label($label)->count()
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
     }
 

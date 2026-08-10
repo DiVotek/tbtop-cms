@@ -176,7 +176,9 @@ it('renders an empty state when no blocks are registered', function (): void {
         ->assertOk()
         ->json('props.structure');
 
-    expect(json_encode($structure))->toContain(__('tbtop-cms::blocks_showcase.empty'));
+    expect(json_encode($structure))
+        ->toContain(__('tbtop-cms::blocks_showcase.empty.title'))
+        ->toContain(__('tbtop-cms::blocks_showcase.empty.description'));
 });
 
 it('redirects a guest away from the blocks showcase', function (): void {

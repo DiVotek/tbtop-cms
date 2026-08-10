@@ -23,6 +23,7 @@ class MediaLibraryPage extends AdminMediaLibraryPage
             'group' => 'content',
             'label' => __('tbtop-cms::nav.items.media_library'),
             'order' => 30,
+            'icon' => 'image',
         ];
     }
 
