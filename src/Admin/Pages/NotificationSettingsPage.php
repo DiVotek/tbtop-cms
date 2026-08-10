@@ -97,8 +97,8 @@ class NotificationSettingsPage extends SettingsPageBase
         return [
             $s->displayText(__('tbtop-cms::settings.notifications.sections.notifications'))->variant('subheading'),
             $s->boolean('notification_mail_enabled')->label(__('tbtop-cms::settings.notifications.fields.mail_enabled')),
-            $s->textarea('notification_mail_recipients')->label(__('tbtop-cms::settings.notifications.fields.recipients'))
-                ->rules('nullable')->helperText(__('tbtop-cms::settings.notifications.helpers.recipients')),
+            $s->tags('notification_mail_recipients')->label(__('tbtop-cms::settings.notifications.fields.recipients'))
+                ->rules('nullable|array')->helperText(__('tbtop-cms::settings.notifications.helpers.recipients')),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::settings.notifications.sections.mail_transport'))->variant('subheading'),
             $s->text('mail_host')->label(__('tbtop-cms::settings.notifications.fields.mail_host'))
@@ -125,8 +125,8 @@ class NotificationSettingsPage extends SettingsPageBase
             $s->boolean('notification_telegram_enabled')->label(__('tbtop-cms::settings.notifications.fields.telegram_enabled')),
             $s->password('notification_telegram_bot_token')->label(__('tbtop-cms::settings.notifications.fields.telegram_bot_token'))
                 ->rules('nullable|max:255')->helperText(__('tbtop-cms::settings.notifications.helpers.mail_password')),
-            $s->textarea('notification_telegram_chat_ids')->label(__('tbtop-cms::settings.notifications.fields.telegram_chat_ids'))
-                ->rules('nullable')->helperText(__('tbtop-cms::settings.notifications.helpers.telegram_chat_ids')),
+            $s->tags('notification_telegram_chat_ids')->label(__('tbtop-cms::settings.notifications.fields.telegram_chat_ids'))
+                ->rules('nullable|array')->helperText(__('tbtop-cms::settings.notifications.helpers.telegram_chat_ids')),
         ];
     }
 
@@ -263,6 +263,47 @@ class NotificationSettingsPage extends SettingsPageBase
             'chat' => $chatTitle,
             'id' => $chatId,
         ]));
+    }
+
+    private const array TAG_FIELDS = ['notification_mail_recipients', 'notification_telegram_chat_ids'];
+
+    /**
+     * Recipients and chat ids are stored as one separator-joined string
+     * (Recipients/ChatIds parse it at send time) but edited as tag chips —
+     * one chip per entry, a labeled chat id ("123 # Dima") staying one chip.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function presentRecord(array $record): array
+    {
+        foreach (self::TAG_FIELDS as $field) {
+            $raw = $record[$field] ?? null;
+            $pieces = is_string($raw) ? (preg_split('/[,;\r\n]+/', $raw) ?: []) : [];
+            $record[$field] = array_values(array_filter(
+                array_map(static fn (string $piece): string => trim($piece), $pieces),
+                static fn (string $piece): bool => $piece !== '',
+            ));
+        }
+
+        return $record;
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function normalizeForm(array $form): array
+    {
+        foreach (self::TAG_FIELDS as $field) {
+            if (array_key_exists($field, $form) && is_array($form[$field])) {
+                $form[$field] = implode("\n", array_map(strval(...), $form[$field]));
+            }
+        }
+
+        return $form;
     }
 
     private function telegramToken(Settings $settings): ?string

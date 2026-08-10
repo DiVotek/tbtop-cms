@@ -60,7 +60,7 @@ it('saves and notifies from common translations', function (string $url): void {
     $payload = match ($url) {
         'site-settings' => ['site_name' => 'Acme Inc'],
         'seo-settings' => ['seo_title_suffix' => ' — Acme'],
-        'notification-settings' => ['notification_mail_recipients' => 'admin@example.com'],
+        'notification-settings' => ['notification_mail_recipients' => ['admin@example.com']],
     };
 
     test()->post("/admin/{$url}/forms/{$url}", $payload)->assertRedirect();
@@ -122,6 +122,27 @@ it('labels notification settings fields and helper text from translations', func
 
     $mailPassword = settingsFindFieldByName($structure, 'mail_password');
     expect($mailPassword['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.notifications.helpers.mail_password'));
+});
+
+it('round-trips recipients and chat ids between the stored string and tag chips', function (): void {
+    app(Settings::class)->set('notifications.mail.recipients', "a@example.com\nb@example.com");
+    app(Settings::class)->set('notifications.telegram.chat_ids', "111 # Dima\n222");
+
+    $data = test()->get('/admin/notification-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.notification-settings');
+
+    // Stored separator-joined strings render as one chip per entry, a
+    // labeled chat id staying a single chip.
+    expect($data['notification_mail_recipients'])->toBe(['a@example.com', 'b@example.com'])
+        ->and($data['notification_telegram_chat_ids'])->toBe(['111 # Dima', '222']);
+
+    test()->post('/admin/notification-settings/forms/notification-settings', [
+        'notification_mail_recipients' => ['c@example.com'],
+        'notification_telegram_chat_ids' => ['333 # Olena', '444'],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(app(Settings::class)->get('notifications.mail.recipients'))->toBe('c@example.com')
+        ->and(app(Settings::class)->get('notifications.telegram.chat_ids'))->toBe("333 # Olena\n444");
 });
 
 it('does not return mail.password on the notification settings record', function (): void {

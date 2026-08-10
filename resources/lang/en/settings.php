@@ -52,9 +52,9 @@ return [
             'telegram_chat_ids' => 'Chat IDs',
         ],
         'helpers' => [
-            'recipients' => 'One email address per line, or separated by commas.',
+            'recipients' => 'Type an address and press Enter to add it.',
             'mail_password' => 'Leave blank to keep the current value.',
-            'telegram_chat_ids' => 'One chat ID per line, optionally with a label after # ("123456789 # Dima"). Use "Create invite" below to add a chat with its name filled in automatically.',
+            'telegram_chat_ids' => 'Type a chat ID and press Enter to add it; a label after # ("123456789 # Dima") is kept. "Create invite" below adds a chat with its name filled in automatically.',
         ],
         'encryption' => [
             'none' => 'None',
