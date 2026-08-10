@@ -184,6 +184,31 @@ it('throttles the 6th failed attempt with the cms-owned translation', function (
     $response->assertSessionHasErrors(['email' => $message]);
 });
 
+it('links back to the site below the card', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $htmlBlocks = loginCollectByKind($structure, 'displayHtml');
+    $links = array_values(array_filter($htmlBlocks, static fn (array $b): bool => str_contains((string) ($b['options']['html'] ?? ''), 'href="' . url('/') . '"')));
+
+    expect($links)->toHaveCount(1)
+        ->and($links[0]['options']['html'])->toContain(e(__('tbtop-cms::login.links.site')));
+});
+
+it('renders the product mark and a footer with copyright and version', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $htmlBlocks = loginCollectByKind($structure, 'displayHtml');
+    $marks = array_values(array_filter($htmlBlocks, static fn (array $b): bool => str_contains((string) ($b['options']['html'] ?? ''), '<svg')));
+    expect($marks)->toHaveCount(1);
+
+    $texts = loginCollectByKind($structure, 'displayText');
+    $footer = array_values(array_filter($texts, static fn (array $t): bool => str_starts_with((string) ($t['options']['content'] ?? ''), 'TableTop CMS ©')));
+    expect($footer)->toHaveCount(1)
+        ->and($footer[0]['options']['content'])->toContain(date('Y'));
+});
+
 /** @param  array<string, mixed>  $node @return array<string, mixed>|null */
 function loginFindFieldByName(array $node, string $name): ?array
 {

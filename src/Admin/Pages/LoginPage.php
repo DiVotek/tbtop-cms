@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Composer\InstalledVersions;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -68,7 +69,7 @@ class LoginPage extends Page
         // content, so a percentage width breathes with it — the card widened
         // whenever a long validation message appeared and snapped back once it
         // cleared. max-w-full keeps small viewports usable.
-        return $s->section(['variant' => 'card', 'class' => 'w-96 max-w-full mx-auto'], [
+        $card = $s->section(['variant' => 'card', 'class' => 'w-96 max-w-full mx-auto shadow-md'], [
             // Outer stack spaces the header away from the form; "Sign in" only
             // appears once on screen now (the button), so the header carries
             // just the brand heading plus the muted subtitle.
@@ -82,6 +83,43 @@ class LoginPage extends Page
                 $form,
             ], ['class' => 'gap-6']),
         ]);
+
+        $siteLink = sprintf(
+            '<a href="%s" class="block text-center text-sm text-muted-foreground hover:text-foreground">&larr; %s</a>',
+            e(url('/')),
+            e(__('tbtop-cms::login.links.site')),
+        );
+
+        return $s->stack([
+            // Placeholder product mark until a real logo lands in the panel
+            // config; inline SVG with currentColor so it follows the theme.
+            $s->displayHtml(self::LOGO_SVG),
+            $card,
+            $s->displayHtml($siteLink),
+            // Pinned to the viewport bottom, outside the centered flow.
+            $s->stack([
+                $s->displayText($this->footerLine())->variant('muted'),
+            ], ['class' => 'fixed bottom-0 inset-x-0 py-4 text-center']),
+        ], ['class' => 'gap-6']);
+    }
+
+    /**
+     * A d6 die in the lucide line style — the tabletop nod. Stroke inherits
+     * currentColor, so it stays visible in both themes.
+     */
+    private const LOGO_SVG = <<<'SVG'
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto h-12 w-12 text-foreground" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg>
+        SVG;
+
+    private function footerLine(): string
+    {
+        // Path installs report a branch alias (dev-*), tagged installs the
+        // release; either is useful on a support screenshot.
+        $version = InstalledVersions::isInstalled('tbtop/cms')
+            ? InstalledVersions::getPrettyVersion('tbtop/cms')
+            : null;
+
+        return 'TableTop CMS © ' . date('Y') . ($version !== null && $version !== '' ? ' · ' . $version : '');
     }
 
     private function brand(): string
