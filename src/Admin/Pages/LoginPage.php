@@ -113,13 +113,19 @@ class LoginPage extends Page
 
     private function footerLine(): string
     {
-        // Path installs report a branch alias (dev-*), tagged installs the
-        // release; either is useful on a support screenshot.
-        $version = InstalledVersions::isInstalled('tbtop/cms')
-            ? InstalledVersions::getPrettyVersion('tbtop/cms')
-            : null;
+        $line = 'TableTop CMS © ' . date('Y');
 
-        return 'TableTop CMS © ' . date('Y') . ($version !== null && $version !== '' ? ' · ' . $version : '');
+        // Only tagged installs read as a version ("ver. 1.2.3"); dev installs
+        // report a branch name (dev-main), which means nothing on a support
+        // screenshot, so the footer drops the version part entirely.
+        $version = (string) (InstalledVersions::isInstalled('tbtop/cms')
+            ? InstalledVersions::getPrettyVersion('tbtop/cms')
+            : '');
+        if (preg_match('/^v?\d+(\.\d+)+$/', $version) === 1) {
+            $line .= ' · ver. ' . ltrim($version, 'v');
+        }
+
+        return $line;
     }
 
     private function brand(): string

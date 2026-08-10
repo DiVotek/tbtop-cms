@@ -195,7 +195,7 @@ it('links back to the site below the card', function (): void {
         ->and($links[0]['options']['html'])->toContain(e(__('tbtop-cms::login.links.site')));
 });
 
-it('renders the product mark and a footer with copyright and version', function (): void {
+it('renders the product mark and a copyright footer without dev-branch noise', function (): void {
     $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
 
@@ -206,7 +206,10 @@ it('renders the product mark and a footer with copyright and version', function 
     $texts = loginCollectByKind($structure, 'displayText');
     $footer = array_values(array_filter($texts, static fn (array $t): bool => str_starts_with((string) ($t['options']['content'] ?? ''), 'TableTop CMS ©')));
     expect($footer)->toHaveCount(1)
-        ->and($footer[0]['options']['content'])->toContain(date('Y'));
+        ->and($footer[0]['options']['content'])->toContain(date('Y'))
+        // The package under test resolves as dev-main: the version segment
+        // must be omitted, not rendered as a branch name.
+        ->and($footer[0]['options']['content'])->not->toContain('dev-');
 });
 
 /** @param  array<string, mixed>  $node @return array<string, mixed>|null */
