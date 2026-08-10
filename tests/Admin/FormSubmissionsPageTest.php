@@ -151,7 +151,7 @@ it('declares the retry row action hidden when the submission is not failed', fun
         ->toContain('"retry"');
 });
 
-it('shows both the lead status and the mail delivery status columns', function (): void {
+it('keeps both lead_status and delivery status in the table structure (column + filter)', function (): void {
     actingAsCmsAdmin();
 
     $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])
@@ -161,31 +161,6 @@ it('shows both the lead status and the mail delivery status columns', function (
     expect(json_encode($structure))
         ->toContain('"lead_status"')
         ->toContain('"status"');
-});
-
-it('loads the payload for the view action', function (): void {
-    actingAsCmsAdmin();
-    $page = contactPageForListing();
-
-    $submission = FormSubmission::query()->create([
-        'page_id' => $page->getKey(),
-        'block_id' => 'form-1',
-        'kind' => 'ContactForm',
-        'locale' => 'en',
-        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
-        'status' => SubmissionStatus::Pending,
-    ]);
-
-    // 5.3: the modal's query() data is no longer a raw 'payload' map fed into
-    // an editable keyvalue field — it's a flattened, read-only 'payloadText'
-    // string (one "key: value" line per pair) plus separate meta keys, bound
-    // via field()-bound DisplayValueBlocks (see FormSubmissionsPage::viewAction()).
-    $data = $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk()->json('data');
-
-    expect($data['payloadText'])->toContain('name: Ada')
-        ->and($data['payloadText'])->toContain('email: ada@example.test');
 });
 
 function submissionWithLead(LeadStatus $lead): FormSubmission
@@ -274,24 +249,6 @@ it('omits the inbox badge when nothing is unread', function (): void {
     expect(inboxActionOptions())->not->toHaveKey('badge');
 });
 
-it('marks a new submission read when its payload is opened', function (): void {
-    actingAsCmsAdmin();
-    $submission = submissionWithLead(LeadStatus::New);
-
-    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk();
-
-    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Read);
-});
-
-it('leaves an already-read submission unchanged when reopened', function (): void {
-    actingAsCmsAdmin();
-    $submission = submissionWithLead(LeadStatus::Processed);
-
-    $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk();
-
-    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Processed);
-});
+// Detail-page equivalents (open marks New -> Read, other statuses untouched)
+// live in FormSubmissionDetailPageTest.php now that payload viewing moved
+// off this list page's removed viewPayload modal.

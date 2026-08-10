@@ -24,6 +24,9 @@ use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Cache\InvalidatesContentCache;
 use Tbtop\Cms\Console\InstallCommand;
+use Tbtop\Cms\Form\Events\SubmissionReceived;
+use Tbtop\Cms\Form\Listeners\NotifiesAdminsOfSubmission;
+use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
@@ -47,6 +50,9 @@ use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
 use Tbtop\Cms\Redirect\RedirectResolver;
 use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Telegram\TelegramClient;
+use Tbtop\Cms\Telegram\TelegramInvites;
+use Tbtop\Cms\Telegram\TelegramSubmissionNotifier;
 
 class CmsServiceProvider extends PackageServiceProvider
 {
@@ -74,6 +80,8 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000016_update_cms_user_profiles_add_role_table')
             ->hasMigration('2026_01_01_000017_create_page_revisions_table')
             ->hasMigration('2026_01_01_000018_update_pages_add_scheduling_table')
+            ->hasMigration('2026_01_01_000019_create_form_submission_comments_table')
+            ->hasMigration('2026_01_01_000020_create_notifications_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -97,6 +105,10 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(CmsMailer::class);
         $this->app->scoped(Cms::class);
         $this->app->scoped(CmsCache::class);
+        $this->app->scoped(TelegramClient::class);
+        $this->app->scoped(TelegramInvites::class);
+        $this->app->scoped(TelegramSubmissionNotifier::class);
+        $this->app->scoped(SubmissionNotifier::class);
         $this->registerAdminPanel();
     }
 
@@ -110,6 +122,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireRoleGates();
         $this->wireContentCacheInvalidation();
         $this->wireLocaleSeeding();
+        $this->wireSubmissionNotifications();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -269,5 +282,14 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireLocaleSeeding(): void
     {
         Event::listen(Login::class, SeedsLocaleFromProfile::class);
+    }
+
+    /**
+     * See NotifiesAdminsOfSubmission's docblock for why the actual fan-out
+     * is deferred to app()->terminating() rather than run here.
+     */
+    private function wireSubmissionNotifications(): void
+    {
+        Event::listen(SubmissionReceived::class, NotifiesAdminsOfSubmission::class);
     }
 }

@@ -41,67 +41,10 @@ function lifecycleSubmission(array $overrides = []): FormSubmission
     ], ...$overrides]);
 }
 
-/**
- * @param  array<string, mixed>  $node
- * @return array<string, mixed>|null
- */
-function findLifecycleActionByName(array $node, string $name): ?array
-{
-    if (($node['kind'] ?? null) === 'action' && ($node['name'] ?? null) === $name) {
-        return $node;
-    }
-
-    $children = $node['options']['children'] ?? [];
-    foreach (is_array($children) ? $children : [] as $child) {
-        if (is_array($child)) {
-            $found = findLifecycleActionByName($child, $name);
-            if ($found !== null) {
-                return $found;
-            }
-        }
-    }
-
-    // rowActions/bulkActions live directly under table options, not as
-    // 'children' — walk those arrays too.
-    foreach (['rowActions', 'bulkActions'] as $key) {
-        foreach ((array) ($node['options'][$key] ?? []) as $action) {
-            if (is_array($action)) {
-                $found = findLifecycleActionByName($action, $name);
-                if ($found !== null) {
-                    return $found;
-                }
-            }
-        }
-    }
-
-    return null;
-}
-
 // -----------------------------------------------------------------------
-// Row-action lifecycle: mark processed / discard / delete
+// Row-action lifecycle: delete (mark processed / discard now live on the
+// detail page — see FormSubmissionDetailPageTest.php)
 // -----------------------------------------------------------------------
-
-it('marks a submission processed via the row action', function (): void {
-    actingAsLifecycleAdmin();
-    $submission = lifecycleSubmission(['lead_status' => LeadStatus::New]);
-
-    $this->postJson('/admin/form-submissions/actions/markProcessed', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk()->assertJsonPath('effects.0.kind', 'notify');
-
-    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Processed);
-});
-
-it('discards a submission via the row action', function (): void {
-    actingAsLifecycleAdmin();
-    $submission = lifecycleSubmission(['lead_status' => LeadStatus::Read]);
-
-    $this->postJson('/admin/form-submissions/actions/discard', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk()->assertJsonPath('effects.0.kind', 'notify');
-
-    expect($submission->fresh()->lead_status)->toBe(LeadStatus::Discarded);
-});
 
 it('permanently deletes a submission via the row action', function (): void {
     actingAsLifecycleAdmin();
@@ -114,37 +57,21 @@ it('permanently deletes a submission via the row action', function (): void {
     expect(FormSubmission::query()->whereKey($submission->id)->exists())->toBeFalse();
 });
 
-it('hides mark-processed and discard when already processed, and hides discard when already discarded', function (): void {
+it('declares the row-click target as the detail page url', function (): void {
     actingAsLifecycleAdmin();
+    $submission = lifecycleSubmission();
 
     $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
+    expect(json_encode($structure))->toContain('"recordUrl":true');
 
-    $markProcessed = findLifecycleActionByName($structure, 'markProcessed');
-    $discard = findLifecycleActionByName($structure, 'discard');
+    // The per-row resolver output rides on the table data endpoint as
+    // _recordUrl (see ColumnProjection) — the structure only carries the
+    // boolean flag that a resolver exists.
+    $row = $this->getJson('/admin/form-submissions/tables/formSubmissions')
+        ->assertOk()->json('data.data.0');
 
-    // hiddenIf serializes under the node's 'meta' key (not 'options'), and
-    // compares against the PROJECTED (translated) lead_status label, not the
-    // raw enum — same quirk the pre-existing retry action documents.
-    expect($markProcessed['meta']['hiddenIf'] ?? null)->not->toBeNull()
-        ->and($markProcessed['meta']['hiddenIf']['op'])->toBe('in')
-        ->and($markProcessed['meta']['hiddenIf']['value'])->toBe([
-            __('tbtop-cms::form-submissions.statuses.processed'),
-            __('tbtop-cms::form-submissions.statuses.discarded'),
-        ]);
-
-    expect($discard['meta']['hiddenIf'] ?? null)->not->toBeNull()
-        ->and($discard['meta']['hiddenIf']['op'])->toBe('eq')
-        ->and($discard['meta']['hiddenIf']['value'])->toBe(__('tbtop-cms::form-submissions.statuses.discarded'));
-});
-
-it('never offers a reopen action anywhere on the page', function (): void {
-    actingAsLifecycleAdmin();
-
-    $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])
-        ->assertOk()->json('props.structure');
-
-    expect(json_encode($structure))->not->toContain('reopen')->not->toContain('Reopen');
+    expect($row['_recordUrl'])->toBe(route('tbtop.cms.form-submission-page', ['submission' => $submission->id]));
 });
 
 // -----------------------------------------------------------------------
@@ -253,15 +180,14 @@ it('filters the table by delivery status', function (): void {
     lifecycleSubmission(['status' => SubmissionStatus::Failed, 'error' => 'boom']);
     lifecycleSubmission(['status' => SubmissionStatus::Handled]);
 
-    // Filtering happens server-side against the RAW column (TableFilterApplier
-    // applies WHERE status = 'failed' before projection/formatUsing runs),
-    // but the row's own 'status' value comes back projected/translated —
-    // same formatUsing() quirk as lead_status above.
+    // Filtering happens server-side against the RAW column; with no delivery
+    // column formatting the projection anymore, status also comes back raw
+    // (which is what the retry action's hiddenIf compares against).
     $rows = $this->getJson('/admin/form-submissions/tables/formSubmissions?filters[status]=failed')
         ->assertOk()->json('data.data');
 
     expect($rows)->toHaveCount(1)
-        ->and($rows[0]['status'])->toBe(__('tbtop-cms::form-submissions.delivery.failed'));
+        ->and($rows[0]['status'])->toBe('failed');
 });
 
 it('filters the table by locale', function (): void {
@@ -370,49 +296,4 @@ it('carries the lead identity as the title and the form kind in meta on dashboar
 
     $item = collect($submissionsList['items'])->firstWhere('title', 'Ada Lovelace · ada@example.test');
     expect($item['meta'])->toContain('ContactForm');
-});
-
-// -----------------------------------------------------------------------
-// Read-only view modal (5.3)
-// -----------------------------------------------------------------------
-
-it('renders the view modal body with field-bound displayValue blocks, not an editable keyvalue field', function (): void {
-    actingAsLifecycleAdmin();
-
-    $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])
-        ->assertOk()->json('props.structure');
-
-    $viewAction = findLifecycleActionByName($structure, 'viewPayload');
-    expect($viewAction)->not->toBeNull();
-
-    $body = $viewAction['options']['spec']['body'] ?? null;
-    expect($body)->not->toBeNull();
-
-    $json = json_encode($body);
-    expect($json)->toContain('"displayValue"')
-        ->toContain('"payloadText"')
-        ->not->toContain('"keyvalue"');
-});
-
-it('includes the delivery error text in the view modal data for a failed submission', function (): void {
-    actingAsLifecycleAdmin();
-    $submission = lifecycleSubmission(['status' => SubmissionStatus::Failed, 'error' => 'mail server unreachable']);
-
-    $data = $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk()->json('data');
-
-    expect($data['error'])->toBe('mail server unreachable')
-        ->and($data['deliveryStatus'])->toBe(__('tbtop-cms::form-submissions.delivery.failed'));
-});
-
-it('shows a placeholder instead of an error string in the view modal data for a non-failed submission', function (): void {
-    actingAsLifecycleAdmin();
-    $submission = lifecycleSubmission(['status' => SubmissionStatus::Handled, 'error' => null]);
-
-    $data = $this->postJson('/admin/form-submissions/actions/viewPayload/data', [
-        'payload' => ['row' => ['id' => $submission->id]],
-    ])->assertOk()->json('data');
-
-    expect($data['error'])->toBe(__('tbtop-cms::form-submissions.values.no_error'));
 });

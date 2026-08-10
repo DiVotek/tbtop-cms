@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Block\Blocks;
 
-use Illuminate\Support\Facades\Log;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
-use Tbtop\Cms\Mail\CmsMailer;
-use Tbtop\Cms\Mail\ContactFormMail;
-use Tbtop\Cms\Mail\Recipients;
-use Tbtop\Cms\Settings\Settings;
 
 /**
- * Reference form block: an anonymous contact form that mails its submission to
- * the global notification recipients configured on NotificationSettingsPage
- * (notifications.mail.enabled + notifications.mail.recipients), not a
- * per-block address. The visitor-facing fields are authored in code
- * (SPEC_V2 §3); the admin only edits copy. Real projects swap
- * {@see handleSubmit()} to forward to a CRM, queue a job, store a lead, etc.
+ * Reference form block: an anonymous contact form. Notifying the team about
+ * a submission (mail/bell/Telegram, per NotificationSettingsPage) is a
+ * cms-owned concern handled by SubmissionNotifier off the SubmissionReceived
+ * event, not by this block — handleSubmit() here is a no-op. The
+ * visitor-facing fields are authored in code (SPEC_V2 §3); the admin only
+ * edits copy. Real projects swap {@see handleSubmit()} to forward to a CRM,
+ * queue a job, store a lead, etc.; it still runs (and is still retried by
+ * SubmissionRetrier) for that purpose, independent of the notification
+ * fan-out.
  */
 class ContactForm extends Block implements HandlesFormSubmission
 {
@@ -95,27 +93,11 @@ class ContactForm extends Block implements HandlesFormSubmission
     }
 
     /**
+     * No-op: see the class docblock. Kept because HandlesFormSubmission
+     * requires it.
+     *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $blockData
      */
-    public function handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void
-    {
-        $settings = app(Settings::class);
-
-        if (! $settings->get('notifications.mail.enabled')) {
-            Log::debug('form.contact.notifications_disabled', ['page' => $ctx->page?->getKey()]);
-
-            return;
-        }
-
-        $recipients = Recipients::parse($settings->get('notifications.mail.recipients'));
-
-        if ($recipients === []) {
-            Log::debug('form.contact.no_recipients', ['page' => $ctx->page?->getKey()]);
-
-            return;
-        }
-
-        app(CmsMailer::class)->send(new ContactFormMail($payload), $recipients);
-    }
+    public function handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void {}
 }

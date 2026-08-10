@@ -40,10 +40,34 @@ abstract class SettingsPageBase extends Page
             ...$this->fields($s),
             $footer,
         ])
-            ->record(SettingsForm::record($this->map(), app(Settings::class)))
+            ->record($this->presentRecord(SettingsForm::record($this->map(), app(Settings::class))))
             ->onSubmit($this->save(...));
 
         return $s->stack([$form]);
+    }
+
+    /**
+     * Hook for pages whose field widgets need a different shape than the
+     * stored value (e.g. a tags field editing a newline-joined string).
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    protected function presentRecord(array $record): array
+    {
+        return $record;
+    }
+
+    /**
+     * Inverse of presentRecord() — maps submitted widget values back to the
+     * stored shape before they hit the settings store.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    protected function normalizeForm(array $form): array
+    {
+        return $form;
     }
 
     private function saveAction(S $s): ActionBuilder
@@ -54,7 +78,7 @@ abstract class SettingsPageBase extends Page
 
     private function save(ActionCtx $ctx): Effects
     {
-        SettingsForm::apply($ctx->form, $this->map(), app(Settings::class));
+        SettingsForm::apply($this->normalizeForm($ctx->form), $this->map(), app(Settings::class));
 
         return Effects::make()->notify(__('tbtop-cms::settings.common.saved'));
     }

@@ -35,6 +35,7 @@ return [
         'sections' => [
             'notifications' => 'Сповіщення',
             'mail_transport' => 'Поштовий транспорт',
+            'telegram' => 'Telegram',
         ],
         'fields' => [
             'mail_enabled' => 'Пошта увімкнена',
@@ -46,10 +47,14 @@ return [
             'mail_encryption' => 'Шифрування',
             'mail_from_address' => 'Адреса відправника',
             'mail_from_name' => 'Ім’я відправника',
+            'telegram_enabled' => 'Telegram увімкнено',
+            'telegram_bot_token' => 'Токен бота',
+            'telegram_chat_ids' => 'ID чатів',
         ],
         'helpers' => [
-            'recipients' => 'Одна email-адреса на рядок або через кому.',
+            'recipients' => 'Введіть адресу та натисніть Enter, щоб додати її.',
             'mail_password' => 'Залиште порожнім, щоб зберегти поточне значення.',
+            'telegram_chat_ids' => 'Введіть ID чату та натисніть Enter, щоб додати його; підпис після # («123456789 # Дмитро») зберігається. «Створити запрошення» нижче додає чат разом з іменем автоматично.',
         ],
         'encryption' => [
             'none' => 'Немає',
@@ -61,6 +66,19 @@ return [
             'test_email_sent' => 'Тестовий лист надіслано.',
             'test_email_no_recipients' => 'Додайте хоча б одного отримувача перед надсиланням тестового листа.',
             'test_email_failed' => 'Не вдалося надіслати тестовий лист: :error',
+            'send_test_telegram' => 'Надіслати тестове повідомлення Telegram',
+            'test_telegram_sent' => 'Тестове повідомлення Telegram надіслано.',
+            'test_telegram_failed' => 'Не вдалося надіслати тестове повідомлення Telegram: :error',
+            'telegram_no_token' => 'Збережіть токен бота перед використанням сповіщень Telegram.',
+            'telegram_no_chat_ids' => 'Додайте хоча б один ID чату перед надсиланням тестового повідомлення.',
+            'create_telegram_invite' => 'Створити запрошення',
+            'telegram_invite_created' => 'Запрошення створено. Відкрийте це посилання в Telegram і натисніть Start: :link',
+            'telegram_invite_failed' => 'Не вдалося створити запрошення: :error',
+            'check_telegram_invite' => 'Перевірити запрошення',
+            'telegram_invite_expired' => 'Немає активного запрошення, або його термін дії минув. Створіть нове.',
+            'telegram_invite_pending' => 'Повідомлення від цього запрошення ще не надійшло. Відкрийте посилання в Telegram, натисніть Start, потім перевірте ще раз.',
+            'telegram_invite_check_failed' => 'Не вдалося перевірити запрошення: :error',
+            'telegram_invite_claimed' => 'Чат «:chat» (:id) додано до списку отримувачів.',
         ],
     ],
 ];

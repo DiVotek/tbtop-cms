@@ -10,7 +10,7 @@ use Tbtop\Cms\Cms;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
-use Tbtop\Cms\Mail\ContactFormMail;
+use Tbtop\Cms\Mail\SubmissionMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -61,13 +61,17 @@ it('exposes the submit action url in the rendered form block props', function ()
 it('handles a valid submission and mails the recipient', function (): void {
     $page = contactFormPage();
 
+    // The after-response fan-out (app()->terminating()) has already run by
+    // the time a test's post() returns: MakesHttpRequests::call() invokes
+    // $kernel->terminate() itself, same as public/index.php does for a real
+    // request — no explicit wait needed here or in the assertions below.
     $this->post(submitUrl($page, 'form-1'), [
         'name' => 'Ada',
         'email' => 'ada@example.test',
         'message' => 'Hello there',
     ])->assertRedirect();
 
-    Mail::assertSent(ContactFormMail::class, fn (ContactFormMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(SubmissionMail::class, fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test'));
 });
 
 it('rejects a submission that fails server-side validation', function (): void {
@@ -368,7 +372,7 @@ it('still persists and delivers a submission when the honeypot field is left emp
         'website' => '',
     ])->assertRedirect();
 
-    Mail::assertSent(ContactFormMail::class, fn (ContactFormMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(SubmissionMail::class, fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test'));
     expect(FormSubmission::query()->count())->toBe(1);
 });
 
@@ -383,6 +387,6 @@ it('bypasses the honeypot check entirely when disabled via config', function ():
         'website' => 'https://spam.example.test',
     ])->assertRedirect();
 
-    Mail::assertSent(ContactFormMail::class);
+    Mail::assertSent(SubmissionMail::class);
     expect(FormSubmission::query()->count())->toBe(1);
 });

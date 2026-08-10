@@ -3,13 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Tbtop\Cms\Admin\Enums\CmsRole;
+use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Mail\SubmissionMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 
 uses(RefreshDatabase::class);
@@ -118,4 +125,75 @@ it('retries a submission in its stored locale, not the current app locale', func
 
     expect(RecordingFormBlock::$locale)->toBe('uk')
         ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
+});
+
+it('re-runs the notification fan-out on retry and can flip failed to handled via mail', function (): void {
+    Mail::fake();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+
+    $page = contactPageForRetry();
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'mail server unreachable',
+    ]);
+
+    app(SubmissionRetrier::class)->retry($submission);
+    $submission->refresh();
+
+    expect($submission->status)->toBe(SubmissionStatus::Handled);
+    Mail::assertSent(SubmissionMail::class, fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test'));
+});
+
+it('re-runs the bell fan-out on retry, notifying every current admin', function (): void {
+    $admin = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.test', 'password' => 'secret']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $admin->id, 'role' => CmsRole::SuperAdministrator]);
+    config(['tbtop-cms.admin.model' => AdminUser::class]);
+
+    $page = contactPageForRetry();
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'mail server unreachable',
+    ]);
+
+    app(SubmissionRetrier::class)->retry($submission);
+
+    expect($admin->notifications()->count())->toBe(1);
+});
+
+it('keeps the submission failed with a joined error when the fan-out still fails on retry', function (): void {
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'still down'], 400)]);
+    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+
+    $page = contactPageForRetry();
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'previous error',
+    ]);
+
+    app(SubmissionRetrier::class)->retry($submission);
+    $submission->refresh();
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toContain('still down');
 });

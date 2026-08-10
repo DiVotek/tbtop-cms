@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Form\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\SubmissionStatus;
@@ -68,5 +69,15 @@ class FormSubmission extends Model
     public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
+    }
+
+    /**
+     * Oldest first — the detail page renders comments as a chronological thread.
+     *
+     * @return HasMany<FormSubmissionComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(FormSubmissionComment::class, 'submission_id')->oldest();
     }
 }

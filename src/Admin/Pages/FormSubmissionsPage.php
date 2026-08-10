@@ -14,7 +14,6 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\Tab;
-use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
@@ -77,6 +76,16 @@ class FormSubmissionsPage extends AdminPage
         $table = $s->table('formSubmissions')
             ->query($this->query(...))
             ->columns([
+                // Mirrors the Pages table shape (identity -> attributes ->
+                // status -> date) so status sits in the same place across
+                // admin tables. Delivery and locale left the list — both live
+                // on the detail page; failed rows still surface via the
+                // delivery filter and the retry row action.
+                Column::make('payload')->label(__('tbtop-cms::form-submissions.columns.lead'))
+                    ->formatUsing($this->leadLabel(...))->emphasized(),
+                Column::make('kind')->label(__('tbtop-cms::form-submissions.columns.form')),
+                Column::make('page')->label(__('tbtop-cms::form-submissions.columns.page'))
+                    ->formatUsing($this->formatPage(...)),
                 Column::make('lead_status')->label(__('tbtop-cms::form-submissions.columns.status'))
                     ->formatUsing($this->leadStatusLabel(...))
                     ->badge([
@@ -85,23 +94,6 @@ class FormSubmissionsPage extends AdminPage
                         __('tbtop-cms::form-submissions.statuses.processed') => Color::Success,
                         __('tbtop-cms::form-submissions.statuses.discarded') => Color::Gray,
                     ]),
-                // First data column after lead_status: "who is this" outranks
-                // "what form/page" for a triage-first inbox — a manager
-                // scanning the list wants to know who reached out before
-                // which form they used.
-                Column::make('payload')->label(__('tbtop-cms::form-submissions.columns.lead'))
-                    ->formatUsing($this->leadLabel(...)),
-                Column::make('status')->label(__('tbtop-cms::form-submissions.columns.delivery'))
-                    ->formatUsing($this->deliveryLabel(...))
-                    ->badge([
-                        __('tbtop-cms::form-submissions.delivery.pending') => Color::Warning,
-                        __('tbtop-cms::form-submissions.delivery.handled') => Color::Success,
-                        __('tbtop-cms::form-submissions.delivery.failed') => Color::Danger,
-                    ]),
-                Column::make('kind')->label(__('tbtop-cms::form-submissions.columns.form')),
-                Column::make('page')->label(__('tbtop-cms::form-submissions.columns.page'))
-                    ->formatUsing($this->formatPage(...)),
-                Column::make('locale')->label(__('tbtop-cms::form-submissions.columns.locale')),
                 Column::make('created_at')->label(__('tbtop-cms::form-submissions.columns.submitted'))
                     ->datetime(__('tbtop-cms::form-submissions.date_format'))->muted(),
             ])
@@ -113,11 +105,14 @@ class FormSubmissionsPage extends AdminPage
                 __('tbtop-cms::form-submissions.empty.description'),
                 'inbox',
             )
+            // Row click opens the detail page (FormSubmissionPage), which now
+            // owns payload viewing, status changes, retry, and delete for a
+            // single record — see that class. markProcessed/discard row
+            // actions moved there too; retry stays here so a failed row can
+            // be retried without leaving the list.
+            ->recordUrl(static fn (FormSubmission $row): string => route('tbtop.cms.form-submission-page', ['submission' => $row->id]))
             ->rowActions([
-                $this->viewAction($s),
                 $this->retryAction($s),
-                $this->markProcessedAction($s),
-                $this->discardAction($s),
                 $this->deleteAction($s),
             ])
             ->bulkActions([
@@ -217,14 +212,6 @@ class FormSubmissionsPage extends AdminPage
         return $label === $key ? (string) $value : $label;
     }
 
-    private function deliveryLabel(mixed $value): string
-    {
-        $key = 'tbtop-cms::form-submissions.delivery.' . $value;
-        $label = __($key);
-
-        return $label === $key ? (string) $value : $label;
-    }
-
     /**
      * The 'payload' column formats its own raw value, exactly like every
      * other formatUsing() column here (e.g. 'page' formats the projected
@@ -277,135 +264,14 @@ class FormSubmissionsPage extends AdminPage
         return null;
     }
 
-    /**
-     * Read-only view modal (5.3 fix): the old body was an editable keyvalue
-     * FORM field (disabledIf'd, but still rendering add/remove-row controls
-     * — see KeyvalueForm client-side, which has no true read-only mode).
-     * displayKeyValue() is the DSL's read-only key/value block, but unlike
-     * DisplayValueBlock it has no field()-style live-data binding — its
-     * `entries` map bakes at author time (page-render time), before any
-     * specific submission id is known. Since the payload's KEYS are
-     * genuinely dynamic (host apps author custom form blocks with arbitrary
-     * payload shapes — see the class docblock on LeadIdentity), there is no
-     * fixed set of DisplayValueBlock::field() bindings that could cover it.
-     *
-     * The fix: flatten the payload into ONE pre-formatted multi-line string
-     * server-side (in loadPayload(), where the real row is known) and bind
-     * that single string via a field()-bound DisplayValueBlock — genuinely
-     * read-only (no input, no add/remove buttons), unlike the old field.
-     * The surrounding meta (page/locale/submitted/delivery/error) IS a fixed
-     * set of keys, so each gets its own field()-bound DisplayValueBlock,
-     * formatted the same way the table's own columns are.
-     */
-    private function viewAction(S $s): ActionBuilder
-    {
-        $body = $s->stack([
-            $s->flex([
-                $this->metaLabel($s, __('tbtop-cms::form-submissions.columns.page')),
-                $s->displayValue('page')->field('page'),
-            ], gap: 2),
-            $s->flex([
-                $this->metaLabel($s, __('tbtop-cms::form-submissions.columns.locale')),
-                $s->displayValue('locale')->field('locale'),
-            ], gap: 2),
-            $s->flex([
-                $this->metaLabel($s, __('tbtop-cms::form-submissions.columns.submitted')),
-                $s->displayValue('submittedAt')->field('submittedAt'),
-            ], gap: 2),
-            $s->flex([
-                $this->metaLabel($s, __('tbtop-cms::form-submissions.columns.delivery')),
-                $s->displayValue('deliveryStatus')->field('deliveryStatus')->badge([
-                    __('tbtop-cms::form-submissions.delivery.pending') => 'warning',
-                    __('tbtop-cms::form-submissions.delivery.handled') => 'success',
-                    __('tbtop-cms::form-submissions.delivery.failed') => 'danger',
-                ]),
-            ], gap: 2, align: 'center'),
-            $s->displayText(__('tbtop-cms::form-submissions.fields.error'))->variant('muted'),
-            $s->displayValue('error')->field('error'),
-            $s->displayDivider(),
-            $s->displayText(__('tbtop-cms::form-submissions.fields.payload'))->variant('muted'),
-            $s->displayValue('payloadText')->field('payloadText')->multiline(),
-        ]);
-
-        return $s->action('viewPayload')->label(__('tbtop-cms::form-submissions.actions.view'))
-            ->modal(__('tbtop-cms::form-submissions.actions.view_title'), $body)
-            ->query($this->loadPayload(...), needs: ['row']);
-    }
-
-    private function metaLabel(S $s, string $label): TextBlock
-    {
-        return $s->displayText($label)->variant('muted');
-    }
-
-    /** @return array<string, mixed> */
-    private function loadPayload(ActionCtx $ctx): array
-    {
-        $submission = FormSubmission::query()->with('page.slugs')->findOrFail((int) ($ctx->row['id'] ?? 0));
-        $this->markRead($submission);
-
-        $page = $submission->page;
-
-        return [
-            'page' => $page !== null
-                ? $this->formatPage([
-                    'id' => $page->getKey(),
-                    'name' => $page->getTranslations('name'),
-                    'title' => $page->getTranslations('title'),
-                    'slugs' => $page->slugs->map(static fn ($slug): array => ['path' => $slug->path])->all(),
-                ])
-                : __('tbtop-cms::form-submissions.values.page_deleted'),
-            'locale' => $submission->locale,
-            'submittedAt' => optional($submission->created_at)
-                ->format(__('tbtop-cms::form-submissions.date_format')) ?? '',
-            'deliveryStatus' => $this->deliveryLabel($submission->status->value),
-            'error' => $submission->error ?? __('tbtop-cms::form-submissions.values.no_error'),
-            'payloadText' => $this->formatPayloadText($submission->payload),
-        ];
-    }
-
-    /**
-     * One "key: value" pair per line — a plain string is the only read-only,
-     * live-bindable shape available (see viewAction()'s docblock); this is
-     * the closest visual equivalent to displayKeyValue's dt/dl rows that a
-     * field()-bound DisplayValueBlock can carry.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    private function formatPayloadText(array $payload): string
-    {
-        if ($payload === []) {
-            return __('tbtop-cms::form-submissions.values.empty_payload');
-        }
-
-        $lines = [];
-        foreach ($payload as $key => $value) {
-            $lines[] = $key . ': ' . self::stringifyValue($value);
-        }
-
-        return implode("\n", $lines);
-    }
-
-    /** Opening a submission clears its unread state. */
-    private function markRead(FormSubmission $submission): void
-    {
-        if ($submission->lead_status === LeadStatus::New) {
-            $submission->forceFill(['lead_status' => LeadStatus::Read])->save();
-        }
-    }
-
-    private static function stringifyValue(mixed $value): string
-    {
-        return is_scalar($value) ? (string) $value : (string) json_encode($value);
-    }
-
     private function retryAction(S $s): ActionBuilder
     {
-        // hiddenIf evaluates client-side against the projected row, where
-        // status is already the translated delivery label — compare to it,
-        // not to the raw enum value.
+        // With no delivery column formatting the row, status reaches the
+        // client as the raw enum value — hiddenIf compares against it
+        // directly (no more coupling to the translated label).
         return $s->action('retry')->label(__('tbtop-cms::form-submissions.actions.retry'))
             ->handle($this->retry(...), needs: ['row'])
-            ->hiddenIf('status', '!=', $this->deliveryLabel(SubmissionStatus::Failed->value));
+            ->hiddenIf('status', '!=', SubmissionStatus::Failed->value);
     }
 
     private function retry(ActionCtx $ctx): Effects
@@ -418,49 +284,6 @@ class FormSubmissionsPage extends AdminPage
         return $submission->status === SubmissionStatus::Handled
             ? Effects::make()->notify(__('tbtop-cms::form-submissions.actions.retried'))->refreshTable()
             : Effects::make()->notify((string) $submission->error, 'error')->refreshTable();
-    }
-
-    /**
-     * No Reopen action anywhere in this page (locked design: lifecycle only
-     * moves forward — New→Read is the only automatic/implicit transition,
-     * and Processed/Discarded are terminal from the UI's perspective; nothing
-     * here writes lead_status back to New or Read once it has advanced past
-     * them). hiddenIf compares the PROJECTED (translated) lead_status label,
-     * same quirk retryAction() already documents for the delivery column.
-     */
-    private function markProcessedAction(S $s): ActionBuilder
-    {
-        return $s->action('markProcessed')->label(__('tbtop-cms::form-submissions.actions.mark_processed'))
-            ->handle($this->markProcessed(...), needs: ['row'])
-            ->hiddenIf('lead_status', 'in', [
-                __('tbtop-cms::form-submissions.statuses.processed'),
-                __('tbtop-cms::form-submissions.statuses.discarded'),
-            ]);
-    }
-
-    private function markProcessed(ActionCtx $ctx): Effects
-    {
-        $this->applyLeadStatus([(int) ($ctx->row['id'] ?? 0)], LeadStatus::Processed);
-
-        return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.marked_processed'))->refreshTable();
-    }
-
-    private function discardAction(S $s): ActionBuilder
-    {
-        return $s->action('discard')->label(__('tbtop-cms::form-submissions.actions.discard'))
-            ->confirm(
-                __('tbtop-cms::form-submissions.actions.discard_title'),
-                __('tbtop-cms::form-submissions.actions.discard_confirm'),
-            )
-            ->handle($this->discard(...), needs: ['row'])
-            ->hiddenIf('lead_status', '=', __('tbtop-cms::form-submissions.statuses.discarded'));
-    }
-
-    private function discard(ActionCtx $ctx): Effects
-    {
-        $this->applyLeadStatus([(int) ($ctx->row['id'] ?? 0)], LeadStatus::Discarded);
-
-        return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.discarded'))->refreshTable();
     }
 
     /**

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\BlocksPage;
 use Tbtop\Cms\Admin\Pages\DashboardPage;
+use Tbtop\Cms\Admin\Pages\FormSubmissionPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionsPage;
 use Tbtop\Cms\Admin\Pages\LanguagesPage;
 use Tbtop\Cms\Admin\Pages\LayoutEditPage;
@@ -74,6 +75,7 @@ return [
     'settings' => [
         'secret' => [
             'mail.password',
+            'notifications.telegram.bot_token',
         ],
     ],
     'frontend' => [
@@ -141,6 +143,7 @@ return [
             'menu_edit' => MenuEditPage::class,
             'blocks' => BlocksPage::class,
             'form_submissions' => FormSubmissionsPage::class,
+            'form_submission' => FormSubmissionPage::class,
             'users' => UsersPage::class,
         ],
     ],
