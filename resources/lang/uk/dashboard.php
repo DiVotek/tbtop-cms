@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'Панель керування',
-    'welcome' => 'Ласкаво просимо до tbtop CMS.',
+    'welcome' => 'Ласкаво просимо до TableTop CMS.',
     'actions' => [
         'refresh' => 'Оновити',
         'view_site' => 'Переглянути сайт',

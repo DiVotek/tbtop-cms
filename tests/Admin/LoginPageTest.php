@@ -110,13 +110,15 @@ it('carries the page title and a single breadcrumb from translations', function 
         ]);
 });
 
-it('labels fields from translations and does not duplicate the sign-in heading', function (): void {
+it('labels fields from translations and does not show the sign-in title in the card body', function (): void {
     $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
 
+    // The "Sign in" title line was dropped from the header (it duplicated the
+    // subtitle and the button); only the browser <title> still carries it.
     $texts = loginCollectByKind($structure, 'displayText');
-    $headings = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['content'] ?? null) === __('tbtop-cms::login.title')));
-    expect($headings)->toHaveCount(1);
+    $titleLines = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['content'] ?? null) === __('tbtop-cms::login.title')));
+    expect($titleLines)->toHaveCount(0);
 
     $labels = loginFieldLabels($structure);
     expect($labels['email'])->toBe(__('tbtop-cms::login.fields.email'))
@@ -146,7 +148,7 @@ it('keeps remember-me a checkbox, not a boolean switch', function (): void {
         ->and($remember['kind'])->toBe('checkbox');
 });
 
-it('renders the panel brand in the card, falling back to the shared nav.title', function (): void {
+it('renders the configured panel brand in the card', function (): void {
     $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
 
@@ -154,7 +156,60 @@ it('renders the panel brand in the card, falling back to the shared nav.title', 
     $brand = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['variant'] ?? null) === 'heading'));
 
     expect($brand)->toHaveCount(1)
-        ->and($brand[0]['options']['content'] ?? null)->toBe(__('tbtop-admin::admin.nav.title'));
+        ->and($brand[0]['options']['content'] ?? null)->toBe('TableTop CMS');
+});
+
+it('rejects an invalid password with the cms-owned translation, not the host app key', function (): void {
+    makeLoginableAdmin();
+
+    $response = submitLoginForm(['email' => 'a@example.com', 'password' => 'wrong'])->assertInvalid(['email']);
+
+    $message = __('tbtop-cms::login.errors.failed');
+    expect($message)->not->toBe('tbtop-cms::login.errors.failed');
+    $response->assertSessionHasErrors(['email' => $message]);
+});
+
+it('throttles the 6th failed attempt with the cms-owned translation', function (): void {
+    makeLoginableAdmin();
+
+    for ($i = 0; $i < 5; $i++) {
+        submitLoginForm(['email' => 'a@example.com', 'password' => 'wrong'])->assertInvalid(['email']);
+    }
+
+    $response = submitLoginForm(['email' => 'a@example.com', 'password' => 'wrong'])->assertInvalid(['email']);
+
+    $seconds = RateLimiter::availableIn('a@example.com|127.0.0.1');
+    $message = __('tbtop-cms::login.errors.throttle', ['seconds' => $seconds]);
+    expect($message)->not->toBe('tbtop-cms::login.errors.throttle');
+    $response->assertSessionHasErrors(['email' => $message]);
+});
+
+it('links back to the site below the card', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $htmlBlocks = loginCollectByKind($structure, 'displayHtml');
+    $links = array_values(array_filter($htmlBlocks, static fn (array $b): bool => str_contains((string) ($b['options']['html'] ?? ''), 'href="' . url('/') . '"')));
+
+    expect($links)->toHaveCount(1)
+        ->and($links[0]['options']['html'])->toContain(e(__('tbtop-cms::login.links.site')));
+});
+
+it('renders the product mark and a copyright footer without dev-branch noise', function (): void {
+    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $htmlBlocks = loginCollectByKind($structure, 'displayHtml');
+    $marks = array_values(array_filter($htmlBlocks, static fn (array $b): bool => str_contains((string) ($b['options']['html'] ?? ''), '<svg')));
+    expect($marks)->toHaveCount(1);
+
+    $texts = loginCollectByKind($structure, 'displayText');
+    $footer = array_values(array_filter($texts, static fn (array $t): bool => str_starts_with((string) ($t['options']['content'] ?? ''), 'TableTop CMS ©')));
+    expect($footer)->toHaveCount(1)
+        ->and($footer[0]['options']['content'])->toContain(date('Y'))
+        // The package under test resolves as dev-main: the version segment
+        // must be omitted, not rendered as a branch name.
+        ->and($footer[0]['options']['content'])->not->toContain('dev-');
 });
 
 /** @param  array<string, mixed>  $node @return array<string, mixed>|null */

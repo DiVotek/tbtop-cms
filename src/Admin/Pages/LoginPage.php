@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Composer\InstalledVersions;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -52,7 +53,7 @@ class LoginPage extends Page
     {
         $form = $s->form('login', [
             $s->text('email')->label(__('tbtop-cms::login.fields.email'))
-                ->placeholder('admin@example.com')->required()->rules('email'),
+                ->required()->rules('email'),
             $s->password('password')->label(__('tbtop-cms::login.fields.password'))->required(),
             $s->checkbox('remember')->label(__('tbtop-cms::login.fields.remember')),
             // Bare stack (not actionsRow, which is flex-row/justify-between):
@@ -64,16 +65,70 @@ class LoginPage extends Page
             ]),
         ])->onSubmit($this->authenticate(...));
 
-        return $s->section(['variant' => 'card', 'class' => 'w-full max-w-sm mx-auto'], [
-            // TextBlock (displayText's return type) has no class() escape hatch,
-            // so centering wraps the brand/title/subtitle group in a stack instead.
+        // Fixed width, not w-full: the center-layout wrapper shrink-wraps its
+        // content, so a percentage width breathes with it — the card widened
+        // whenever a long validation message appeared and snapped back once it
+        // cleared. max-w-full keeps small viewports usable.
+        $card = $s->section(['variant' => 'card', 'class' => 'w-96 max-w-full mx-auto shadow-md'], [
+            // Outer stack spaces the header away from the form; "Sign in" only
+            // appears once on screen now (the button), so the header carries
+            // just the brand heading plus the muted subtitle.
             $s->stack([
-                $s->displayText($this->brand())->variant('heading'),
-                $s->displayText(__('tbtop-cms::login.title'))->variant('subheading'),
-                $s->displayText(__('tbtop-cms::login.subtitle'))->variant('muted'),
-            ], ['class' => 'text-center gap-1']),
-            $form,
+                // TextBlock (displayText's return type) has no class() escape hatch,
+                // so centering wraps the brand/subtitle group in a stack instead.
+                $s->stack([
+                    $s->displayText($this->brand())->variant('heading'),
+                    $s->displayText(__('tbtop-cms::login.subtitle'))->variant('muted'),
+                ], ['class' => 'text-center gap-1']),
+                $form,
+            ], ['class' => 'gap-6']),
         ]);
+
+        $siteLink = sprintf(
+            '<a href="%s" class="block text-center text-sm text-muted-foreground hover:text-foreground">&larr; %s</a>',
+            e(url('/')),
+            e(__('tbtop-cms::login.links.site')),
+        );
+
+        return $s->stack([
+            // Placeholder product mark until a real logo lands in the panel
+            // config; inline SVG with currentColor so it follows the theme.
+            $s->displayHtml(self::LOGO_SVG),
+            $card,
+            $s->displayHtml($siteLink),
+            // Pinned to the viewport bottom, outside the centered flow; opaque
+            // background so content scrolling beneath stays readable. The
+            // outer stack's pb-14 reserves matching space in the flow so the
+            // footer never covers the site link on short viewports.
+            $s->stack([
+                $s->displayText($this->footerLine())->variant('muted'),
+            ], ['class' => 'fixed bottom-0 inset-x-0 py-4 text-center bg-background']),
+        ], ['class' => 'gap-6 pb-14']);
+    }
+
+    /**
+     * A d6 die in the lucide line style — the tabletop nod. Stroke inherits
+     * currentColor, so it stays visible in both themes.
+     */
+    private const LOGO_SVG = <<<'SVG'
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto h-12 w-12 text-foreground" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg>
+        SVG;
+
+    private function footerLine(): string
+    {
+        $line = 'TableTop CMS © ' . date('Y');
+
+        // Only tagged installs read as a version ("ver. 1.2.3"); dev installs
+        // report a branch name (dev-main), which means nothing on a support
+        // screenshot, so the footer drops the version part entirely.
+        $version = (string) (InstalledVersions::isInstalled('tbtop/cms')
+            ? InstalledVersions::getPrettyVersion('tbtop/cms')
+            : '');
+        if (preg_match('/^v?\d+(\.\d+)+$/', $version) === 1) {
+            $line .= ' · ver. ' . ltrim($version, 'v');
+        }
+
+        return $line;
     }
 
     private function brand(): string
@@ -95,7 +150,7 @@ class LoginPage extends Page
             $seconds = RateLimiter::availableIn($throttleKey);
 
             throw ValidationException::withMessages([
-                'email' => __('auth.throttle', ['seconds' => $seconds]),
+                'email' => __('tbtop-cms::login.errors.throttle', ['seconds' => $seconds]),
             ]);
         }
 
@@ -107,7 +162,7 @@ class LoginPage extends Page
         if (! $ok) {
             RateLimiter::hit($throttleKey, 60);
 
-            throw ValidationException::withMessages(['email' => __('auth.failed')]);
+            throw ValidationException::withMessages(['email' => __('tbtop-cms::login.errors.failed')]);
         }
 
         RateLimiter::clear($throttleKey);

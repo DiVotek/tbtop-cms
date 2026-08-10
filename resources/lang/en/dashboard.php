@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'Dashboard',
-    'welcome' => 'Welcome to the tbtop CMS.',
+    'welcome' => 'Welcome to TableTop CMS.',
     'actions' => [
         'refresh' => 'Refresh',
         'view_site' => 'View site',
