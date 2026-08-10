@@ -54,7 +54,7 @@ return [
         'helpers' => [
             'recipients' => 'One email address per line, or separated by commas.',
             'mail_password' => 'Leave blank to keep the current value.',
-            'telegram_chat_ids' => 'One chat ID per line, or separated by commas. Use "Create invite" below to add one without knowing its ID.',
+            'telegram_chat_ids' => 'One chat ID per line, optionally with a label after # ("123456789 # Dima"). Use "Create invite" below to add a chat with its name filled in automatically.',
         ],
         'encryption' => [
             'none' => 'None',

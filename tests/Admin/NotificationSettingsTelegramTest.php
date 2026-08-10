@@ -156,7 +156,35 @@ it('claims a pending invite from getUpdates and appends the chat id to settings'
             'id' => '555',
         ]));
 
-    expect(app(Settings::class)->get('notifications.telegram.chat_ids'))->toContain('555');
+    // The claimed line carries the chat's name so the admin can tell whose
+    // chat each id is.
+    expect(app(Settings::class)->get('notifications.telegram.chat_ids'))->toContain('555 # Ops Team');
+});
+
+it('labels a claimed private chat with the person name and username', function (): void {
+    Http::fake([
+        'api.telegram.org/*getMe*' => Http::response(['ok' => true, 'result' => ['username' => 'my_cms_bot']]),
+        'api.telegram.org/*getUpdates*' => function () {
+            $code = Cache::get('tbtop-cms:telegram:current-invite-code');
+
+            return Http::response(['ok' => true, 'result' => [
+                [
+                    'update_id' => 1,
+                    'message' => [
+                        'message_id' => 5,
+                        'text' => "/start {$code}",
+                        'chat' => ['id' => 777, 'type' => 'private', 'first_name' => 'Dima', 'last_name' => 'S', 'username' => 'dima'],
+                    ],
+                ],
+            ]]);
+        },
+    ]);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+
+    $this->postJson('/admin/notification-settings/actions/createTelegramInvite', ['payload' => []])->assertOk();
+    $this->postJson('/admin/notification-settings/actions/checkTelegramInvite', ['payload' => []])->assertOk();
+
+    expect(app(Settings::class)->get('notifications.telegram.chat_ids'))->toContain('777 # Dima S (@dima)');
 });
 
 it('notifies pending when no matching message has arrived yet', function (): void {

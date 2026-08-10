@@ -141,12 +141,37 @@ final class TelegramInvites
                 continue;
             }
 
-            $title = $chat['title'] ?? $chat['username'] ?? $chat['first_name'] ?? (string) $chat['id'];
-
-            return ['chatId' => (string) $chat['id'], 'chatTitle' => (string) $title];
+            return ['chatId' => (string) $chat['id'], 'chatTitle' => $this->chatLabel($chat)];
         }
 
         return null;
+    }
+
+    /**
+     * Human label for a chat: group title, or "First Last (@username)" for a
+     * private chat — whatever identifies the person best; the bare id is the
+     * last resort.
+     *
+     * @param  array<string, mixed>  $chat
+     */
+    private function chatLabel(array $chat): string
+    {
+        $title = trim((string) ($chat['title'] ?? ''));
+        if ($title !== '') {
+            return $title;
+        }
+
+        $name = trim(implode(' ', array_filter([
+            trim((string) ($chat['first_name'] ?? '')),
+            trim((string) ($chat['last_name'] ?? '')),
+        ], static fn (string $part): bool => $part !== '')));
+
+        $username = trim((string) ($chat['username'] ?? ''));
+        if ($username !== '') {
+            $name = $name === '' ? "@{$username}" : "{$name} (@{$username})";
+        }
+
+        return $name !== '' ? $name : (string) $chat['id'];
     }
 
     private function passesCooldown(): bool

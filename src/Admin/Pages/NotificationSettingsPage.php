@@ -256,7 +256,7 @@ class NotificationSettingsPage extends SettingsPageBase
     private function appendChatIdAndNotify(string $chatId, string $chatTitle): Effects
     {
         $settings = app(Settings::class);
-        $updated = ChatIds::append($settings->get('notifications.telegram.chat_ids'), $chatId);
+        $updated = ChatIds::append($settings->get('notifications.telegram.chat_ids'), $chatId, $chatTitle);
         $settings->set('notifications.telegram.chat_ids', $updated);
 
         return Effects::make()->notify(__('tbtop-cms::settings.notifications.actions.telegram_invite_claimed', [
