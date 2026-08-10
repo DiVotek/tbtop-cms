@@ -97,14 +97,14 @@ final class TelegramInvites
         }
 
         try {
-            $offset = Cache::get($this->offsetKey());
+            $offset = Cache::get($this->offsetKey($token));
             $result = $this->client->getUpdates($token, is_int($offset) ? $offset : null);
         } catch (TelegramApiException $e) {
             return ['status' => 'error', 'error' => $e->getMessage()];
         }
 
         if ($result['nextOffset'] !== null) {
-            Cache::put($this->offsetKey(), $result['nextOffset'], self::OFFSET_TTL_SECONDS);
+            Cache::put($this->offsetKey($token), $result['nextOffset'], self::OFFSET_TTL_SECONDS);
         }
 
         $match = $this->findCodeMatch($result['updates'], $code);
@@ -229,9 +229,12 @@ final class TelegramInvites
         return 'tbtop-cms:telegram:bot-username:' . Str::substr(hash('sha256', $token), 0, 16);
     }
 
-    private function offsetKey(): string
+    private function offsetKey(string $token): string
     {
-        return 'tbtop-cms:telegram:updates-offset';
+        // getUpdates offsets are opaque and per-bot: replaying another bot's
+        // offset after a token rotation could permanently skip the new bot's
+        // pending updates, so the key is scoped by token like the username.
+        return 'tbtop-cms:telegram:updates-offset:' . Str::substr(hash('sha256', $token), 0, 16);
     }
 
     private function cooldownKey(): string
