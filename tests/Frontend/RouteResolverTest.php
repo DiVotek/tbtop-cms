@@ -106,3 +106,31 @@ it('preserves the query string when canonicalizing the locale prefix', function 
 
     $this->get('/en/about?ref=x')->assertRedirect('/about?ref=x');
 });
+
+it('stops and then resumes serving a locale across a deactivate/reactivate cycle, keeping its translations', function (): void {
+    $uk = Language::factory()->create(['locale' => 'uk']);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.page.id', $page->id)
+        ->assertJsonPath('props.cms.locale', 'uk');
+
+    $uk->update(['is_frontend_active' => false]);
+
+    $this->getJson('/uk/' . $page->pathFor('uk'))->assertNotFound();
+
+    $uk->update(['is_frontend_active' => true]);
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.page.id', $page->id)
+        ->assertJsonPath('props.cms.locale', 'uk')
+        ->assertJsonPath('props.page.name', 'Pro nas');
+});

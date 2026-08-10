@@ -34,6 +34,8 @@ return [
     ],
     'helpers' => [
         'locale' => 'Locale cannot be changed after creation.',
+        'is_admin_active' => 'Turning this off also removes the language from the site (Active on site is switched off too).',
+        'is_frontend_active' => 'Turning this off removes the language from the site: its URLs stop responding, but its translations are kept and come back when you switch it on again.',
     ],
     'create_title' => 'New language',
     'edit_title' => 'Edit language',
@@ -47,7 +49,7 @@ return [
         'delete' => 'Delete',
         'deleted' => 'Language deleted',
         'delete_title' => 'Delete language?',
-        'delete_confirm' => 'The language will be moved to Deleted, where you can restore it later.',
+        'delete_confirm' => 'The language will be moved to Deleted and its URLs will stop responding on the site. Translations are kept and come back if you restore it later.',
         'restore' => 'Restore',
         'restored' => 'Language restored',
         'force_delete' => 'Delete permanently',

@@ -83,6 +83,24 @@ it('clears the failure count on a successful login', function (): void {
     expect(RateLimiter::attempts('a@example.com|127.0.0.1'))->toBe(0);
 });
 
+it('applies the profile locale to the admin panel right after login', function (): void {
+    $user = AdminUser::create(['name' => 'A', 'email' => 'a@example.com', 'password' => 'correct-password']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator, 'locale' => 'uk']);
+
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+
+    test()->get('/admin/dashboard', ['X-Inertia' => 'true'])->assertOk();
+    expect(app()->getLocale())->toBe('uk');
+});
+
+it('keeps the default locale when the profile has none set', function (): void {
+    makeLoginableAdmin();
+
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+
+    expect(session('tbtop.locale'))->toBeNull();
+});
+
 it('carries the page title and a single breadcrumb from translations', function (): void {
     $response = test()->get('/admin/login', ['X-Inertia' => 'true'])->assertOk();
 

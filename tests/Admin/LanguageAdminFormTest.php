@@ -7,6 +7,8 @@ use Illuminate\Validation\ValidationException;
 use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
 use Tbtop\Cms\Language\LocaleCatalog;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Models\Page;
 
 uses(RefreshDatabase::class);
 
@@ -87,4 +89,24 @@ it('restores a soft-deleted language when its locale is picked again', function 
         ->and($restored->is_frontend_active)->toBeTrue()
         ->and($restored->sort_order)->toBe(7)
         ->and(Language::query()->where('locale', 'de')->count())->toBe(1);
+});
+
+it('keeps a page translation intact across a language delete and revive-on-recreate cycle', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+    $de = LanguageForm::save(['locale' => 'de', 'is_admin_active' => true, 'is_frontend_active' => true]);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'de' => 'Ueber uns'],
+    ]);
+
+    $de->delete();
+
+    LanguageForm::save([
+        'locale' => 'de',
+        'is_admin_active' => true,
+        'is_frontend_active' => true,
+    ]);
+
+    expect($page->fresh()->getTranslation('name', 'de'))->toBe('Ueber uns');
 });

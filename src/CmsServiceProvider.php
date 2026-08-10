@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms;
 
+use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Support\Facades\Event;
@@ -16,6 +17,7 @@ use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
+use Tbtop\Cms\Admin\Listeners\SeedsLocaleFromProfile;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
@@ -107,6 +109,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wirePageRevisions();
         $this->wireRoleGates();
         $this->wireContentCacheInvalidation();
+        $this->wireLocaleSeeding();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -257,5 +260,14 @@ class CmsServiceProvider extends PackageServiceProvider
         ] as $event) {
             Event::listen($event, InvalidatesContentCache::class);
         }
+    }
+
+    /**
+     * Seeds session('tbtop.locale') from the profile right after login —
+     * see SeedsLocaleFromProfile's docblock for why this is needed.
+     */
+    private function wireLocaleSeeding(): void
+    {
+        Event::listen(Login::class, SeedsLocaleFromProfile::class);
     }
 }

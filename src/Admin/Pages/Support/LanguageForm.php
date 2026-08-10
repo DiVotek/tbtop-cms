@@ -34,8 +34,10 @@ class LanguageForm
             $s->text('locale')->label(__('tbtop-cms::languages.fields.locale'))->required()->rules('max:5')
                 ->meta('disabled', true)->helperText(__('tbtop-cms::languages.helpers.locale')),
             $s->boolean('is_default')->label(__('tbtop-cms::languages.fields.is_default')),
-            $s->boolean('is_admin_active')->label(__('tbtop-cms::languages.fields.is_admin_active')),
-            $s->boolean('is_frontend_active')->label(__('tbtop-cms::languages.fields.is_frontend_active')),
+            $s->boolean('is_admin_active')->label(__('tbtop-cms::languages.fields.is_admin_active'))
+                ->helperText(__('tbtop-cms::languages.helpers.is_admin_active')),
+            $s->boolean('is_frontend_active')->label(__('tbtop-cms::languages.fields.is_frontend_active'))
+                ->helperText(__('tbtop-cms::languages.helpers.is_frontend_active')),
             $s->number('sort_order')->label(__('tbtop-cms::languages.fields.sort_order')),
         ];
     }
