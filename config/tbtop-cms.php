@@ -75,6 +75,7 @@ return [
     'settings' => [
         'secret' => [
             'mail.password',
+            'notifications.telegram.bot_token',
         ],
     ],
     'frontend' => [

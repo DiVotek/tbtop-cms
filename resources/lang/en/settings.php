@@ -35,6 +35,7 @@ return [
         'sections' => [
             'notifications' => 'Notifications',
             'mail_transport' => 'Mail transport',
+            'telegram' => 'Telegram',
         ],
         'fields' => [
             'mail_enabled' => 'Mail enabled',
@@ -46,10 +47,14 @@ return [
             'mail_encryption' => 'Encryption',
             'mail_from_address' => 'From address',
             'mail_from_name' => 'From name',
+            'telegram_enabled' => 'Telegram enabled',
+            'telegram_bot_token' => 'Bot token',
+            'telegram_chat_ids' => 'Chat IDs',
         ],
         'helpers' => [
             'recipients' => 'One email address per line, or separated by commas.',
             'mail_password' => 'Leave blank to keep the current value.',
+            'telegram_chat_ids' => 'One chat ID per line, or separated by commas. Use "Create invite" below to add one without knowing its ID.',
         ],
         'encryption' => [
             'none' => 'None',
@@ -61,6 +66,19 @@ return [
             'test_email_sent' => 'Test email sent.',
             'test_email_no_recipients' => 'Add at least one recipient before sending a test email.',
             'test_email_failed' => 'Could not send the test email: :error',
+            'send_test_telegram' => 'Send test Telegram message',
+            'test_telegram_sent' => 'Test Telegram message sent.',
+            'test_telegram_failed' => 'Could not send the test Telegram message: :error',
+            'telegram_no_token' => 'Save a bot token before using Telegram notifications.',
+            'telegram_no_chat_ids' => 'Add at least one chat ID before sending a test message.',
+            'create_telegram_invite' => 'Create invite',
+            'telegram_invite_created' => 'Invite created. Open this link in Telegram and press Start: :link',
+            'telegram_invite_failed' => 'Could not create the invite: :error',
+            'check_telegram_invite' => 'Check invite',
+            'telegram_invite_expired' => 'No pending invite, or it expired. Create a new one.',
+            'telegram_invite_pending' => 'No message from that invite yet. Open the link in Telegram, press Start, then check again.',
+            'telegram_invite_check_failed' => 'Could not check the invite: :error',
+            'telegram_invite_claimed' => 'Added chat ":chat" (:id) to the recipient list.',
         ],
     ],
 ];

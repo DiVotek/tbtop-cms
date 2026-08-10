@@ -10,10 +10,22 @@ use Tbtop\Cms\Frontend\Form\LocatedFormBlock;
 use Tbtop\Cms\Page\Models\Page;
 use Throwable;
 
+/**
+ * Retry has two independent deliveries to re-run, both of which the original
+ * submit attempted: the block's own handleSubmit() (a custom block may
+ * forward to a CRM, queue a job, etc — HandlesFormSubmission's contract,
+ * unrelated to cms-owned notifications) and SubmissionNotifier's bell/mail/
+ * telegram fan-out. Both run; the submission is Handled only if both
+ * succeed, Failed with both errors joined if either doesn't — a retry that
+ * silently drops one of the two original delivery paths would be a
+ * regression for any block that relies on handleSubmit() for its own
+ * delivery, not just the notification rework.
+ */
 class SubmissionRetrier
 {
     public function __construct(
         private readonly FormBlockLocator $locator,
+        private readonly SubmissionNotifier $notifier,
     ) {}
 
     public function retry(FormSubmission $submission): void
@@ -34,10 +46,23 @@ class SubmissionRetrier
             return;
         }
 
+        $errors = [];
+
         try {
             $located->block->handleSubmit($submission->payload, $located->data, $located->context);
         } catch (Throwable $e) {
-            $this->markFailed($submission, $e->getMessage());
+            $errors[] = $e->getMessage();
+        }
+
+        $this->notifier->notify($submission, $page);
+        $submission->refresh();
+
+        if ($submission->status === SubmissionStatus::Failed) {
+            $errors[] = (string) $submission->error;
+        }
+
+        if ($errors !== []) {
+            $this->markFailed($submission, implode(' | ', $errors));
 
             return;
         }
