@@ -91,14 +91,17 @@ class PageForm
     public static function generalFields(S $s, bool $withSlug = true): array
     {
         return [
-            $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
-            $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
+            $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable()
+                ->helperText(__('tbtop-cms::pages.fields.name_hint')),
+            $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable()
+                ->helperText(__('tbtop-cms::pages.fields.title_hint')),
             ...($withSlug ? [
                 $s->slug('slug')->label(__('tbtop-cms::pages.fields.slug'))->required()
                     ->translatable()->fromField('name')
                     ->helperText(__('tbtop-cms::pages.fields.slug_edit_hint')),
             ] : []),
-            $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable(),
+            $s->text('heading')->label(__('tbtop-cms::pages.fields.heading'))->translatable()
+                ->helperText(__('tbtop-cms::pages.fields.heading_hint')),
             $s->textarea('summary')->label(__('tbtop-cms::pages.fields.summary'))->translatable(),
             $s->richtext('body')->label(__('tbtop-cms::pages.fields.body'))->translatable(),
         ];

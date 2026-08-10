@@ -10,7 +10,7 @@ return [
         'updated' => 'Updated',
         'updated_by' => 'Updated by',
     ],
-    'date_format' => 'n/j/Y',
+    'date_format' => 'M j, Y',
     'empty' => [
         'title' => 'No templates yet',
         'description' => 'Create your first template.',

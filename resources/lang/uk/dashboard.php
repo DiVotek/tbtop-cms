@@ -21,7 +21,7 @@ return [
         'templates_layouts_description' => ':templates шаблонів · :layouts макетів',
     ],
     'charts' => [
-        'leads_by_status' => 'Звернення за статусом',
+        'leads_by_status' => 'Заявки за статусом',
         'submissions_daily' => 'Звернення в часі',
         'period' => 'Період',
         'period_7' => 'Останні 7 днів',

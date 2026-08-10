@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'title' => 'Layout',
+    'title' => 'Layouts',
     'subtitle' => 'Header and footer blocks shared across every page.',
     'slots' => [
         'header' => 'Header',
@@ -12,7 +12,6 @@ return [
     'actions' => [
         'edit' => 'Edit',
         'save' => 'Save',
-        'cancel' => 'Cancel',
         'saved' => 'Layout saved',
     ],
     'edit_title' => 'Edit :slot layout',

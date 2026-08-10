@@ -104,7 +104,7 @@ class BlocksPage extends AdminPage
                 $s->displayText($info['label'])->variant('subheading'),
                 $s->displayValue($category)->badge([$category => Color::Info]),
                 $s->flex([
-                    $s->displayText(__('tbtop-cms::blocks_showcase.usage_count', ['count' => (string) count($usage)]))
+                    $s->displayText(trans_choice('tbtop-cms::blocks_showcase.usage_count', count($usage), ['count' => (string) count($usage)]))
                         ->variant('muted'),
                     $this->detailsAction($s, $info, $usage),
                 ], justify: 'between', align: 'center'),

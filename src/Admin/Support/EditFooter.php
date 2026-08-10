@@ -18,7 +18,7 @@ final class EditFooter
     public static function build(S $s, string $cancelUrl, ActionBuilder $save, ?ActionBuilder $delete = null): Node
     {
         $cancel = $s->action('cancel')
-            ->label(__('tbtop-cms::pages.actions.cancel'))
+            ->label(__('tbtop-cms::common.actions.cancel'))
             ->visit($cancelUrl);
 
         $children = $delete !== null

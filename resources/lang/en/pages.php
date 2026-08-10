@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'title' => 'Content',
+    'title' => 'Pages',
     'tab_description' => ':tab — categories group content, pages stand alone, articles live under a category.',
     'tabs' => [
         'all' => 'All',
@@ -33,7 +33,7 @@ return [
         'category' => 'Category',
         'article' => 'Article',
     ],
-    'date_format' => 'n/j/Y',
+    'date_format' => 'M j, Y',
     'empty' => 'Nothing here yet.',
     'tabs_edit' => [
         'general' => 'General',
@@ -51,10 +51,13 @@ return [
     ],
     'fields' => [
         'name' => 'Name',
+        'name_hint' => 'Internal name shown in the admin lists and navigation tree — not shown on the site.',
         'title' => 'Title',
+        'title_hint' => 'Browser-tab and SEO title — falls back to Name when left empty.',
         'slug' => 'Slug',
         'slug_edit_hint' => 'Changing the slug changes the page URL; an automatic redirect is created from the old address.',
         'heading' => 'Heading',
+        'heading_hint' => 'The H1 shown on the page itself.',
         'summary' => 'Summary',
         'body' => 'Content',
         'type' => 'Type',
