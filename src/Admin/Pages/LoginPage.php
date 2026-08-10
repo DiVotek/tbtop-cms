@@ -96,11 +96,14 @@ class LoginPage extends Page
             $s->displayHtml(self::LOGO_SVG),
             $card,
             $s->displayHtml($siteLink),
-            // Pinned to the viewport bottom, outside the centered flow.
+            // Pinned to the viewport bottom, outside the centered flow; opaque
+            // background so content scrolling beneath stays readable. The
+            // outer stack's pb-14 reserves matching space in the flow so the
+            // footer never covers the site link on short viewports.
             $s->stack([
                 $s->displayText($this->footerLine())->variant('muted'),
-            ], ['class' => 'fixed bottom-0 inset-x-0 py-4 text-center']),
-        ], ['class' => 'gap-6']);
+            ], ['class' => 'fixed bottom-0 inset-x-0 py-4 text-center bg-background']),
+        ], ['class' => 'gap-6 pb-14']);
     }
 
     /**
