@@ -41,9 +41,7 @@ return [
         'empty_payload' => '(empty payload)',
     ],
     'actions' => [
-        'view' => 'View payload',
-        'view_title' => 'Submission payload',
-        'close' => 'Close',
+        'close' => 'Back to inbox',
         'retry' => 'Retry',
         'retried' => 'Submission retried successfully',
         'mark_processed' => 'Mark processed',
@@ -62,6 +60,20 @@ return [
         'delete_confirm' => 'This cannot be undone.',
         'delete_bulk_title' => 'Delete selected submissions permanently?',
         'delete_bulk_confirm' => 'This cannot be undone.',
+    ],
+    'status_section' => [
+        'title' => 'Status',
+        'set_to' => 'Mark as :status',
+        'updated' => 'Status updated to :status',
+    ],
+    'comments' => [
+        'title' => 'Comments',
+        'label' => 'Comment',
+        'placeholder' => 'Add a note for the team…',
+        'submit' => 'Add comment',
+        'added' => 'Comment added',
+        'empty' => 'No comments yet.',
+        'unknown_author' => 'User #:id',
     ],
     'empty' => [
         'title' => 'No submissions yet',
