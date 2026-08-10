@@ -52,7 +52,7 @@ class LoginPage extends Page
     {
         $form = $s->form('login', [
             $s->text('email')->label(__('tbtop-cms::login.fields.email'))
-                ->placeholder('admin@example.com')->required()->rules('email'),
+                ->required()->rules('email'),
             $s->password('password')->label(__('tbtop-cms::login.fields.password'))->required(),
             $s->checkbox('remember')->label(__('tbtop-cms::login.fields.remember')),
             // Bare stack (not actionsRow, which is flex-row/justify-between):
@@ -65,14 +65,18 @@ class LoginPage extends Page
         ])->onSubmit($this->authenticate(...));
 
         return $s->section(['variant' => 'card', 'class' => 'w-full max-w-sm mx-auto'], [
-            // TextBlock (displayText's return type) has no class() escape hatch,
-            // so centering wraps the brand/title/subtitle group in a stack instead.
+            // Outer stack spaces the header away from the form; "Sign in" only
+            // appears once on screen now (the button), so the header carries
+            // just the brand heading plus the muted subtitle.
             $s->stack([
-                $s->displayText($this->brand())->variant('heading'),
-                $s->displayText(__('tbtop-cms::login.title'))->variant('subheading'),
-                $s->displayText(__('tbtop-cms::login.subtitle'))->variant('muted'),
-            ], ['class' => 'text-center gap-1']),
-            $form,
+                // TextBlock (displayText's return type) has no class() escape hatch,
+                // so centering wraps the brand/subtitle group in a stack instead.
+                $s->stack([
+                    $s->displayText($this->brand())->variant('heading'),
+                    $s->displayText(__('tbtop-cms::login.subtitle'))->variant('muted'),
+                ], ['class' => 'text-center gap-1']),
+                $form,
+            ], ['class' => 'gap-6']),
         ]);
     }
 
@@ -95,7 +99,7 @@ class LoginPage extends Page
             $seconds = RateLimiter::availableIn($throttleKey);
 
             throw ValidationException::withMessages([
-                'email' => __('auth.throttle', ['seconds' => $seconds]),
+                'email' => __('tbtop-cms::login.errors.throttle', ['seconds' => $seconds]),
             ]);
         }
 
@@ -107,7 +111,7 @@ class LoginPage extends Page
         if (! $ok) {
             RateLimiter::hit($throttleKey, 60);
 
-            throw ValidationException::withMessages(['email' => __('auth.failed')]);
+            throw ValidationException::withMessages(['email' => __('tbtop-cms::login.errors.failed')]);
         }
 
         RateLimiter::clear($throttleKey);

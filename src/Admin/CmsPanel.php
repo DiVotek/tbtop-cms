@@ -25,6 +25,9 @@ class CmsPanel extends Panel
             ->guard((string) config('tbtop-cms.admin.guard', 'web'))
             ->middleware(['web', EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
             ->chrome(CmsChrome::class)
+            // Product brand (the CMS itself, not the host site) shown in the topbar
+            // and on the login card. A logo will replace/accompany it later.
+            ->brand('TableTop CMS')
             ->locales(['en', 'uk'])
             ->density('compact')
             ->maxContentWidth('full')
