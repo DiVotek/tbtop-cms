@@ -76,6 +76,16 @@ class FormSubmissionsPage extends AdminPage
         $table = $s->table('formSubmissions')
             ->query($this->query(...))
             ->columns([
+                // Mirrors the Pages table shape (identity -> attributes ->
+                // status -> date) so status sits in the same place across
+                // admin tables. Delivery and locale left the list — both live
+                // on the detail page; failed rows still surface via the
+                // delivery filter and the retry row action.
+                Column::make('payload')->label(__('tbtop-cms::form-submissions.columns.lead'))
+                    ->formatUsing($this->leadLabel(...))->emphasized(),
+                Column::make('kind')->label(__('tbtop-cms::form-submissions.columns.form')),
+                Column::make('page')->label(__('tbtop-cms::form-submissions.columns.page'))
+                    ->formatUsing($this->formatPage(...)),
                 Column::make('lead_status')->label(__('tbtop-cms::form-submissions.columns.status'))
                     ->formatUsing($this->leadStatusLabel(...))
                     ->badge([
@@ -84,23 +94,6 @@ class FormSubmissionsPage extends AdminPage
                         __('tbtop-cms::form-submissions.statuses.processed') => Color::Success,
                         __('tbtop-cms::form-submissions.statuses.discarded') => Color::Gray,
                     ]),
-                // First data column after lead_status: "who is this" outranks
-                // "what form/page" for a triage-first inbox — a manager
-                // scanning the list wants to know who reached out before
-                // which form they used.
-                Column::make('payload')->label(__('tbtop-cms::form-submissions.columns.lead'))
-                    ->formatUsing($this->leadLabel(...)),
-                Column::make('status')->label(__('tbtop-cms::form-submissions.columns.delivery'))
-                    ->formatUsing($this->deliveryLabel(...))
-                    ->badge([
-                        __('tbtop-cms::form-submissions.delivery.pending') => Color::Warning,
-                        __('tbtop-cms::form-submissions.delivery.handled') => Color::Success,
-                        __('tbtop-cms::form-submissions.delivery.failed') => Color::Danger,
-                    ]),
-                Column::make('kind')->label(__('tbtop-cms::form-submissions.columns.form')),
-                Column::make('page')->label(__('tbtop-cms::form-submissions.columns.page'))
-                    ->formatUsing($this->formatPage(...)),
-                Column::make('locale')->label(__('tbtop-cms::form-submissions.columns.locale')),
                 Column::make('created_at')->label(__('tbtop-cms::form-submissions.columns.submitted'))
                     ->datetime(__('tbtop-cms::form-submissions.date_format'))->muted(),
             ])
@@ -219,14 +212,6 @@ class FormSubmissionsPage extends AdminPage
         return $label === $key ? (string) $value : $label;
     }
 
-    private function deliveryLabel(mixed $value): string
-    {
-        $key = 'tbtop-cms::form-submissions.delivery.' . $value;
-        $label = __($key);
-
-        return $label === $key ? (string) $value : $label;
-    }
-
     /**
      * The 'payload' column formats its own raw value, exactly like every
      * other formatUsing() column here (e.g. 'page' formats the projected
@@ -281,12 +266,12 @@ class FormSubmissionsPage extends AdminPage
 
     private function retryAction(S $s): ActionBuilder
     {
-        // hiddenIf evaluates client-side against the projected row, where
-        // status is already the translated delivery label — compare to it,
-        // not to the raw enum value.
+        // With no delivery column formatting the row, status reaches the
+        // client as the raw enum value — hiddenIf compares against it
+        // directly (no more coupling to the translated label).
         return $s->action('retry')->label(__('tbtop-cms::form-submissions.actions.retry'))
             ->handle($this->retry(...), needs: ['row'])
-            ->hiddenIf('status', '!=', $this->deliveryLabel(SubmissionStatus::Failed->value));
+            ->hiddenIf('status', '!=', SubmissionStatus::Failed->value);
     }
 
     private function retry(ActionCtx $ctx): Effects

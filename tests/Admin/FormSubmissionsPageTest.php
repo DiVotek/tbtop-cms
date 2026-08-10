@@ -151,7 +151,7 @@ it('declares the retry row action hidden when the submission is not failed', fun
         ->toContain('"retry"');
 });
 
-it('shows both the lead status and the mail delivery status columns', function (): void {
+it('keeps both lead_status and delivery status in the table structure (column + filter)', function (): void {
     actingAsCmsAdmin();
 
     $structure = $this->get('/admin/form-submissions', ['X-Inertia' => 'true'])

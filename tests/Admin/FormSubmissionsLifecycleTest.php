@@ -180,15 +180,14 @@ it('filters the table by delivery status', function (): void {
     lifecycleSubmission(['status' => SubmissionStatus::Failed, 'error' => 'boom']);
     lifecycleSubmission(['status' => SubmissionStatus::Handled]);
 
-    // Filtering happens server-side against the RAW column (TableFilterApplier
-    // applies WHERE status = 'failed' before projection/formatUsing runs),
-    // but the row's own 'status' value comes back projected/translated —
-    // same formatUsing() quirk as lead_status above.
+    // Filtering happens server-side against the RAW column; with no delivery
+    // column formatting the projection anymore, status also comes back raw
+    // (which is what the retry action's hiddenIf compares against).
     $rows = $this->getJson('/admin/form-submissions/tables/formSubmissions?filters[status]=failed')
         ->assertOk()->json('data.data');
 
     expect($rows)->toHaveCount(1)
-        ->and($rows[0]['status'])->toBe(__('tbtop-cms::form-submissions.delivery.failed'));
+        ->and($rows[0]['status'])->toBe('failed');
 });
 
 it('filters the table by locale', function (): void {
