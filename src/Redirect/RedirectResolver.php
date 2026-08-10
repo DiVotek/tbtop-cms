@@ -6,7 +6,7 @@ namespace Tbtop\Cms\Redirect;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Tbtop\Cms\Frontend\PageUrl;
+use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Redirect\Models\Redirect;
 use Tbtop\Cms\Redirect\Support\RedirectPath;
 

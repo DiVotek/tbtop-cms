@@ -6,9 +6,9 @@ namespace Tbtop\Cms\Frontend\Seo;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Tbtop\Cms\Frontend\PageUrl;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageUrl;
 
 /**
  * @phpstan-type SitemapEntry array{loc: string, lastmod: string, alternates: array<string, string>}

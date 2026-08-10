@@ -19,6 +19,7 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
+use Tbtop\Cms\Admin\Support\EnumLabel;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -317,18 +318,12 @@ class PagesPage extends AdminPage
 
     private function typeLabel(mixed $value): string
     {
-        $key = 'tbtop-cms::pages.types.' . $value;
-        $label = __($key);
-
-        return $label === $key ? ucfirst((string) $value) : $label;
+        return EnumLabel::make('tbtop-cms::pages.types', $value);
     }
 
     private function statusLabel(mixed $value): string
     {
-        $key = 'tbtop-cms::pages.status.' . $value;
-        $label = __($key);
-
-        return $label === $key ? ucfirst((string) $value) : $label;
+        return EnumLabel::make('tbtop-cms::pages.status', $value);
     }
 
     private function create(ActionCtx $ctx): Effects

@@ -13,8 +13,8 @@ use Tbtop\Cms\Frontend\Http\Controllers\SitemapController;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
-use Tbtop\Cms\Frontend\PageUrl;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageUrl;
 
 class Cms
 {

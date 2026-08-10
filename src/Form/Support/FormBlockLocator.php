@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tbtop\Cms\Frontend\Form;
+namespace Tbtop\Cms\Form\Support;
 
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;

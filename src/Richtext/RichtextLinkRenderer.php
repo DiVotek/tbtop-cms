@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tbtop\Cms\Frontend\Render;
+namespace Tbtop\Cms\Richtext;
 
 class RichtextLinkRenderer
 {
@@ -52,6 +52,13 @@ class RichtextLinkRenderer
 
     private function isAllowedUrl(string $url): bool
     {
+        // Browsers delete tab/CR/LF anywhere in a URL and trim C0 controls
+        // and spaces from its ends before parsing, so " javascript:alert(1)"
+        // and "java\tscript:..." execute as javascript: — validate what the
+        // browser will parse, not the raw string.
+        $url = str_replace(["\t", "\r", "\n"], '', $url);
+        $url = trim($url, "\x00..\x20");
+
         if ($url === '') {
             return false;
         }

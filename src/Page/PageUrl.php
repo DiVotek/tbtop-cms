@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tbtop\Cms\Frontend;
+namespace Tbtop\Cms\Page;
 
 use Tbtop\Cms\Language\Languages;
 

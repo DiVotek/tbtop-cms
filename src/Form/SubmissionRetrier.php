@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Form;
 
 use Tbtop\Cms\Form\Models\FormSubmission;
-use Tbtop\Cms\Frontend\Form\FormBlockLocator;
-use Tbtop\Cms\Frontend\Form\LocatedFormBlock;
+use Tbtop\Cms\Form\Support\FormBlockLocator;
+use Tbtop\Cms\Form\Support\LocatedFormBlock;
 use Tbtop\Cms\Page\Models\Page;
 use Throwable;
 

@@ -8,6 +8,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Menu\Models\Menu;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\PageUrl;
 
 /**
  * Resolves every stored menu into frontend-ready items for one locale:

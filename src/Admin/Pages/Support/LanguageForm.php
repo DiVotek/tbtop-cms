@@ -31,7 +31,7 @@ class LanguageForm
     {
         return [
             $s->text('name')->label(__('tbtop-cms::languages.fields.name'))->required(),
-            $s->text('locale')->label(__('tbtop-cms::languages.fields.locale'))->required()->rules('max:5')
+            $s->text('locale')->label(__('tbtop-cms::languages.fields.locale'))->required()
                 ->meta('disabled', true)->helperText(__('tbtop-cms::languages.helpers.locale')),
             $s->boolean('is_default')->label(__('tbtop-cms::languages.fields.is_default')),
             $s->boolean('is_admin_active')->label(__('tbtop-cms::languages.fields.is_admin_active'))

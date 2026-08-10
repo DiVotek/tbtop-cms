@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Block;
 
-use Tbtop\Cms\Frontend\Render\RichtextHtmlRenderer;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Richtext\RichtextHtmlRenderer;
 
 final readonly class ResolveContext
 {

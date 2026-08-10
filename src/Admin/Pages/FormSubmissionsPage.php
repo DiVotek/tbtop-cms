@@ -15,6 +15,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Admin\Support\EnumLabel;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
@@ -206,10 +207,7 @@ class FormSubmissionsPage extends AdminPage
 
     private function leadStatusLabel(mixed $value): string
     {
-        $key = 'tbtop-cms::form-submissions.statuses.' . $value;
-        $label = __($key);
-
-        return $label === $key ? (string) $value : $label;
+        return EnumLabel::make('tbtop-cms::form-submissions.statuses', $value);
     }
 
     /**

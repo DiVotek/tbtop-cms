@@ -132,6 +132,18 @@ it('rejects a protocol-relative to path even when the host is allowlisted', func
     RedirectForm::save(['from_path' => 'gone', 'to_path' => '//evil.com', 'locale' => '', 'status_code' => '301']);
 })->throws(ValidationException::class);
 
+it('rejects backslash variants of a protocol-relative to path', function (string $to) {
+    // Browsers fold "\" into "/", so these resolve like "//evil.com" —
+    // they must hit the same external-URL validation instead of slipping
+    // through as internal page paths.
+    config()->set('tbtop-cms.redirects.allowed_external_hosts', ['evil.com']);
+
+    RedirectForm::save(['from_path' => 'gone', 'to_path' => $to, 'locale' => '', 'status_code' => '301']);
+})->with([
+    'double backslash' => ['\\\\evil.com'],
+    'slash backslash' => ['/\\evil.com'],
+])->throws(ValidationException::class);
+
 it('resolves the userinfo-tricked host to the real host, not the disguised one', function (): void {
     // "https://evil.com\@good.com" looks like it points at evil.com, but parse_url
     // reads "evil.com\" as userinfo and "good.com" as the actual host.

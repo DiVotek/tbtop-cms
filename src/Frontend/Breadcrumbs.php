@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Frontend;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Page\Support\AncestorChain;
 
 class Breadcrumbs
