@@ -17,6 +17,7 @@ use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 
 uses(RefreshDatabase::class);
@@ -89,6 +90,22 @@ it('does not notify a user with no admin profile row', function (): void {
     ])->assertRedirect();
 
     expect($stranger->notifications()->count())->toBe(0);
+});
+
+it('resolves bell recipients through the CmsAdmin contract when the user model implements it', function (): void {
+    config(['tbtop-cms.admin.model' => GatedContractAdminUser::class]);
+    $admitted = GatedContractAdminUser::create(['name' => 'Ops', 'email' => 'ops@admins.test', 'password' => 'secret']);
+    $denied = GatedContractAdminUser::create(['name' => 'Guest', 'email' => 'guest@example.test', 'password' => 'secret']);
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    // Contract-admitted users are reached without any CmsUserProfile row;
+    // contract-denied users are excluded by the same rule as panel access.
+    expect($admitted->notifications()->count())->toBe(1)
+        ->and($denied->notifications()->count())->toBe(0);
 });
 
 it('marks a submission handled from the bell channel alone when mail and telegram are both disabled', function (): void {
