@@ -13,7 +13,7 @@ return [
         'redirects' => 'Перенаправлення',
         'media_library' => 'Медіатека',
         'templates' => 'Шаблони',
-        'layout' => 'Макет',
+        'layout' => 'Макети',
         'menus' => 'Меню',
         'blocks' => 'Блоки',
         'languages' => 'Мови',

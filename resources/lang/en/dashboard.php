@@ -21,7 +21,7 @@ return [
         'templates_layouts_description' => ':templates templates · :layouts layouts',
     ],
     'charts' => [
-        'leads_by_status' => 'Leads by status',
+        'leads_by_status' => 'Submissions by status',
         'submissions_daily' => 'Submissions over time',
         'period' => 'Period',
         'period_7' => 'Last 7 days',

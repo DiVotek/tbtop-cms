@@ -17,7 +17,7 @@ return [
     'tabs' => [
         'all' => 'All',
     ],
-    'date_format' => 'n/j/Y H:i',
+    'date_format' => 'M j, Y H:i',
     'statuses' => [
         'new' => 'New',
         'read' => 'Read',
