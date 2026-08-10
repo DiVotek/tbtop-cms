@@ -23,6 +23,8 @@ return [
     'errors' => [
         'bell' => 'Bell notification failed: :error',
         'mail' => 'Mail delivery failed: :error',
+        'mail_no_recipients' => 'Mail notifications are enabled but no recipients are configured.',
         'telegram' => 'Telegram delivery failed: :error',
+        'telegram_not_configured' => 'Telegram notifications are enabled but the bot token or chat IDs are not configured.',
     ],
 ];

@@ -31,6 +31,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('notifications');
+        // Intentionally a no-op: up() skips creation when the host already
+        // owns a notifications table, and a migration has no way to remember
+        // whether it was the one that created it — dropping here could
+        // destroy the host application's own notification data on a package
+        // rollback. The table is shared Laravel infrastructure; a host that
+        // really wants it gone drops it explicitly.
     }
 };

@@ -93,8 +93,11 @@ class SubmissionNotifier
 
         $recipients = Recipients::parse($this->settings->get('notifications.mail.recipients'));
 
+        // Enabled with nothing to send to is a misconfiguration, not a
+        // success — reporting it keeps the delivery status honest instead of
+        // showing "Handled" while nobody was mailed.
         if ($recipients === []) {
-            return [];
+            return [__('tbtop-cms::notifications.errors.mail_no_recipients')];
         }
 
         try {
@@ -116,8 +119,10 @@ class SubmissionNotifier
         $token = $this->settings->get('notifications.telegram.bot_token');
         $chatIds = ChatIds::parse($this->settings->get('notifications.telegram.chat_ids'));
 
+        // Same honesty rule as mail: enabled without a token or without any
+        // chat to deliver to must surface as a failure, not a silent skip.
         if (! is_string($token) || trim($token) === '' || $chatIds === []) {
-            return [];
+            return [__('tbtop-cms::notifications.errors.telegram_not_configured')];
         }
 
         $errors = $this->telegram->notify($token, $chatIds, $submission, $this->pageName($page));

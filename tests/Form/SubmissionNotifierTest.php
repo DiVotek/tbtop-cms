@@ -105,6 +105,43 @@ it('marks a submission handled from the bell channel alone when mail and telegra
 });
 
 // -----------------------------------------------------------------------
+// Enabled-but-misconfigured channels fail honestly (never silent success)
+// -----------------------------------------------------------------------
+
+it('marks the submission failed when mail is enabled but no recipients are configured', function (): void {
+    Mail::fake();
+    notifierAdmin();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', '');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toContain(__('tbtop-cms::notifications.errors.mail_no_recipients'));
+    Mail::assertNothingSent();
+});
+
+it('marks the submission failed when telegram is enabled but token or chat ids are missing', function (): void {
+    notifierAdmin();
+    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'a-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toContain(__('tbtop-cms::notifications.errors.telegram_not_configured'));
+});
+
+// -----------------------------------------------------------------------
 // Mail
 // -----------------------------------------------------------------------
 
