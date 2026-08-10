@@ -49,14 +49,14 @@ class DashboardRecent
     /** @return list<array{title: string, meta: string, color: string, url?: string}> */
     private static function recentPagesItems(): array
     {
-        $url = self::pagesUrl();
+        $hasEdit = Route::has('tbtop.cms.page-edit-page');
 
         return Page::query()->orderByDesc('updated_at')->limit(self::LIMIT)->get()
             ->map(static fn (Page $page): array => [
                 'title' => (string) $page->getTranslation('name', app()->getLocale()),
                 'meta' => optional($page->updated_at)->diffForHumans() ?? '',
                 'color' => self::displayStateColor($page->displayState()),
-                ...($url !== null ? ['url' => $url] : []),
+                ...($hasEdit ? ['url' => route('tbtop.cms.page-edit-page', ['page' => $page->id])] : []),
             ])
             ->all();
     }
@@ -82,14 +82,14 @@ class DashboardRecent
      */
     private static function latestSubmissionsItems(): array
     {
-        $url = self::submissionsUrl();
+        $hasDetail = Route::has('tbtop.cms.form-submission-page');
 
         return FormSubmission::query()->orderByDesc('created_at')->limit(self::LIMIT)->get()
             ->map(static fn (FormSubmission $submission): array => [
                 'title' => LeadIdentity::label($submission->payload) ?? $submission->kind,
                 'meta' => $submission->kind . ' · ' . (optional($submission->created_at)->diffForHumans() ?? ''),
                 'color' => self::leadStatusColor($submission->lead_status),
-                ...($url !== null ? ['url' => $url] : []),
+                ...($hasDetail ? ['url' => route('tbtop.cms.form-submission-page', ['submission' => $submission->id])] : []),
             ])
             ->all();
     }
@@ -102,16 +102,6 @@ class DashboardRecent
             LeadStatus::Processed => 'success',
             LeadStatus::Read, LeadStatus::Discarded => 'muted',
         };
-    }
-
-    private static function pagesUrl(): ?string
-    {
-        return Route::has('tbtop.cms.pages-page') ? route('tbtop.cms.pages-page') : null;
-    }
-
-    private static function submissionsUrl(): ?string
-    {
-        return Route::has('tbtop.cms.form-submissions-page') ? route('tbtop.cms.form-submissions-page') : null;
     }
 
     /** @return array{action?: array{label: string, url: string}} */

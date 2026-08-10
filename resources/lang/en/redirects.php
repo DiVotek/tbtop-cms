@@ -31,7 +31,6 @@ return [
     'actions' => [
         'new' => 'New',
         'create' => 'Create',
-        'cancel' => 'Cancel',
         'create_title' => 'New redirect',
         'created' => 'Redirect created',
         'edit' => 'Edit',

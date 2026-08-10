@@ -148,3 +148,23 @@ it('excludes gated nav items from an editor shared nav but includes them for an 
 
     expect($adminHrefs)->toContain('/admin/pages', '/admin/media-library', '/admin/users', '/admin/languages', '/admin/redirects', '/admin/menus', '/admin/blocks', '/admin/templates', '/admin/layout');
 });
+
+it('gives every sidebar nav item a lucide icon (5.13)', function (): void {
+    actingAsRole(CmsRole::SuperAdministrator);
+    $nav = test()->get('/admin/dashboard', ['X-Inertia' => 'true'])->assertOk()->json('props.tbtop.nav');
+    $items = collect($nav)->pluck('items')->flatten(1);
+    $iconByHref = $items->pluck('icon.name', 'href');
+
+    expect($iconByHref['/admin/pages'])->toBe('files')
+        ->and($iconByHref['/admin/redirects'])->toBe('corner-up-right')
+        ->and($iconByHref['/admin/media-library'])->toBe('image')
+        ->and($iconByHref['/admin/templates'])->toBe('layout-template')
+        ->and($iconByHref['/admin/layout'])->toBe('panels-top-left')
+        ->and($iconByHref['/admin/menus'])->toBe('list')
+        ->and($iconByHref['/admin/blocks'])->toBe('blocks')
+        ->and($iconByHref['/admin/languages'])->toBe('languages')
+        ->and($iconByHref['/admin/site-settings'])->toBe('settings')
+        ->and($iconByHref['/admin/users'])->toBe('users')
+        ->and($iconByHref['/admin/seo-settings'])->toBe('search')
+        ->and($iconByHref['/admin/notification-settings'])->toBe('bell');
+});

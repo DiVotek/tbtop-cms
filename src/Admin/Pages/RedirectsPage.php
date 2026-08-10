@@ -32,6 +32,7 @@ class RedirectsPage extends AdminPage
             'group' => 'content',
             'label' => __('tbtop-cms::nav.items.redirects'),
             'order' => 20,
+            'icon' => 'corner-up-right',
         ];
     }
 
@@ -92,6 +93,7 @@ class RedirectsPage extends AdminPage
                 __('tbtop-cms::redirects.empty.description'),
                 'arrow-right',
             )
+            ->rowClick('redirectEdit')
             ->rowActions([$this->editAction($s), $this->deleteAction($s)]);
 
         return $s->stack([$table]);
@@ -108,7 +110,7 @@ class RedirectsPage extends AdminPage
 
     private function createAction(S $s): ActionBuilder
     {
-        $cancel = $s->action('redirectCreateCancel')->label(__('tbtop-cms::redirects.actions.cancel'))
+        $cancel = $s->action('redirectCreateCancel')->label(__('tbtop-cms::common.actions.cancel'))
             ->handle(static fn (): Effects => Effects::make()->closeModal());
         $create = $s->action('redirectCreateSave')->label(__('tbtop-cms::redirects.actions.create'))->color('primary')
             ->handle($this->create(...), needs: ['form']);
@@ -130,7 +132,7 @@ class RedirectsPage extends AdminPage
      */
     private function editAction(S $s): ActionBuilder
     {
-        $cancel = $s->action('redirectEditCancel')->label(__('tbtop-cms::redirects.actions.cancel'))
+        $cancel = $s->action('redirectEditCancel')->label(__('tbtop-cms::common.actions.cancel'))
             ->handle(static fn (): Effects => Effects::make()->closeModal());
         $save = $s->action('redirectEditSave')->label(__('tbtop-cms::redirects.actions.save'))->color('primary')
             ->handle($this->update(...), needs: ['row', 'form']);
@@ -140,9 +142,13 @@ class RedirectsPage extends AdminPage
             $s->flex([$s->spacer(), $cancel, $save], justify: 'end'),
         ]);
 
+        // Hidden (5.10): the visible Edit button is gone in favor of
+        // rowClick('redirectEdit') above — the action stays registered so
+        // the row click has a modal to open.
         return $s->action('redirectEdit')->label(__('tbtop-cms::redirects.actions.edit'))
             ->modal(__('tbtop-cms::redirects.actions.edit_title'), $form)
-            ->query(static fn (ActionCtx $ctx): array => RedirectForm::loadRow((int) ($ctx->row['id'] ?? 0)), needs: ['row']);
+            ->query(static fn (ActionCtx $ctx): array => RedirectForm::loadRow((int) ($ctx->row['id'] ?? 0)), needs: ['row'])
+            ->meta('hidden', true);
     }
 
     private function update(ActionCtx $ctx): Effects

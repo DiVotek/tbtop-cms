@@ -109,6 +109,38 @@ it('links each row to its dedicated edit page', function (): void {
         ->and($rows[0]['_recordUrl'])->toEndWith("/admin/pages/{$page->id}/edit");
 });
 
+it('opts every tab into a count badge, including Deleted', function (): void {
+    $node = pagesTableNode();
+
+    $counts = array_column($node['options']['tabs'], 'count', 'name');
+    expect($counts)->toBe([
+        'all' => true,
+        'categories' => true,
+        'pages' => true,
+        'articles' => true,
+        'deleted' => true,
+    ]);
+});
+
+it('returns per-tab counts scoped by each tab\'s own query, ignoring the active tab filter', function (): void {
+    $category = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+    $trashed = Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'Old']]);
+    $trashed->delete();
+
+    $counts = $this->getJson('/admin/pages/tables/pages?tab=categories')
+        ->assertOk()
+        ->json('data.tabCounts');
+
+    expect($counts)->toBe([
+        'all' => 2,
+        'categories' => 1,
+        'pages' => 1,
+        'articles' => 0,
+        'deleted' => 1,
+    ]);
+});
+
 it('scopes the tab queries by page type and parent', function (): void {
     $category = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
     Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);

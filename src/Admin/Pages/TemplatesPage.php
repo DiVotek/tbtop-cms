@@ -32,6 +32,7 @@ class TemplatesPage extends AdminPage
             'group' => 'design',
             'label' => __('tbtop-cms::nav.items.templates'),
             'order' => 10,
+            'icon' => 'layout-template',
         ];
     }
 
@@ -72,12 +73,6 @@ class TemplatesPage extends AdminPage
 
     public function view(S $s): Node
     {
-        $editHref = str_replace(
-            '__ROWID__',
-            '{row.id}',
-            route('tbtop.cms.template-edit-page', ['template' => '__ROWID__']),
-        );
-
         $table = $s->table('templates')
             ->query($this->query(...))
             ->columns([
@@ -94,10 +89,9 @@ class TemplatesPage extends AdminPage
                 __('tbtop-cms::templates.empty.description'),
                 'layout-template',
             )
+            ->recordUrl(static fn (Template $row): string => route('tbtop.cms.template-edit-page', ['template' => $row->id]))
             ->rowActions([
                 $this->applyAction($s),
-                $s->action('templateEdit')->label(__('tbtop-cms::templates.actions.edit'))
-                    ->visit($editHref),
                 $this->deleteAction($s),
             ]);
 

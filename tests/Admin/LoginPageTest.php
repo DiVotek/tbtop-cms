@@ -170,6 +170,10 @@ it('rejects an invalid password with the cms-owned translation, not the host app
 });
 
 it('throttles the 6th failed attempt with the cms-owned translation', function (): void {
+    // The throttle message bakes RateLimiter::availableIn() in at response
+    // time and the assertion recomputes it below; a second ticking between
+    // the two made this flaky on CI (59 vs 60) — freeze the clock.
+    test()->freezeTime();
     makeLoginableAdmin();
 
     for ($i = 0; $i < 5; $i++) {

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Template\Models\Template;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -61,4 +62,23 @@ it('no longer carries a create action on the table itself', function (): void {
     $node = templatesTableNode();
 
     expect($node['options']['headerActions'] ?? null)->toBeNull();
+});
+
+it('opens the template edit page on row click and drops the separate Edit row-action', function (): void {
+    // 5.10: row click opens editing everywhere — TemplatesPage moves from an
+    // Edit row-action (recordUrl with __ROWID__) to a real recordUrl() closure.
+    $node = templatesTableNode();
+    $actions = array_column($node['options']['rowActions'], null, 'name');
+
+    expect($node['options']['recordUrl'] ?? null)->toBeTrue()
+        ->and(array_keys($actions))->toBe(['templateApply', 'templateDelete']);
+});
+
+it('resolves each row to its own template edit URL', function (): void {
+    $template = Template::query()->create(['name' => 'Landing']);
+
+    $rows = test()->getJson('/admin/templates/tables/templates')->assertOk()->json('data.data');
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['_recordUrl'])->toEndWith("/admin/templates/{$template->id}/edit");
 });

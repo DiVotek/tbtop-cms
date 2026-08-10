@@ -22,6 +22,7 @@ class SiteSettingsPage extends SettingsPageBase
             'group' => 'settings',
             'label' => __('tbtop-cms::nav.items.site_settings'),
             'order' => 20,
+            'icon' => 'settings',
         ];
     }
 

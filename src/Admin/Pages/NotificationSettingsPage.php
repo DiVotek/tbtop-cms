@@ -35,6 +35,7 @@ class NotificationSettingsPage extends SettingsPageBase
             'group' => 'settings',
             'label' => __('tbtop-cms::nav.items.notification_settings'),
             'order' => 40,
+            'icon' => 'bell',
         ];
     }
 

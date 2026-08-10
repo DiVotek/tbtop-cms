@@ -34,7 +34,10 @@ return [
         'article' => 'Article',
     ],
     'date_format' => 'M j, Y',
-    'empty' => 'Nothing here yet.',
+    'empty' => [
+        'title' => 'Nothing here yet',
+        'description' => 'Create your first page to get started.',
+    ],
     'tabs_edit' => [
         'general' => 'General',
         'seo' => 'SEO',
@@ -85,7 +88,6 @@ return [
         'preview_link' => 'Preview link',
         'preview_link_title' => 'Draft preview link',
         'create' => 'Create',
-        'cancel' => 'Cancel',
         'create_title' => 'New page',
         'created' => 'Page created',
         'save' => 'Save',
