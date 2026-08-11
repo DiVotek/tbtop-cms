@@ -26,9 +26,9 @@ among them form submissions (lead PII), template editing, and global settings.
   eight `tbtop-cms.*` gates in your app **before** upgrading. See the README.
 - To accept the flat model, no action is needed beyond running migrations.
 
-`UsersPage` remains, reduced to granting and revoking access; it no longer
-assigns roles. `cms:admin:create`, `cms:admin:grant`, and `cms:admin:revoke`
-are unchanged.
+`UsersPage` remains, reduced to granting and revoking access (later restored
+to also create and edit users — see Added below); it no longer assigns roles.
+`cms:admin:create`, `cms:admin:grant`, and `cms:admin:revoke` are unchanged.
 
 ### Added
 
@@ -37,6 +37,21 @@ are unchanged.
   (from the Users page or the `cms:admin:grant`/`revoke` commands). A
   roles/permissions extension package can subscribe to seed or clean up its
   own per-user assignments.
+- Users can now be created and edited directly from the Users page (a UI
+  mirror of `cms:admin:create`'s assumptions), not just granted/revoked
+  access.
+- A protected owner: `tbtop_user_profiles.is_owner` marks the first admin of
+  a fresh install (or, on upgrade, the earliest existing admin — backfilled
+  by migration). The owner cannot be revoked or have their name/email/
+  password edited by anyone but themselves. This is a protection only — the
+  owner gets no extra section rights; that axis is still entirely the host's
+  business via `tbtop-cms.roles`.
+
+### Changed
+
+- `cms:admin:revoke` now refuses to revoke the owner, printing an explicit
+  error and exiting with `FAILURE` instead of a false "revoked" success
+  message.
 
 ### Fixed
 

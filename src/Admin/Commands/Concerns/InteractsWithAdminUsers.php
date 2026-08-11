@@ -34,6 +34,11 @@ trait InteractsWithAdminUsers
         AdminAccess::revoke(self::userId($user));
     }
 
+    protected function isOwner(Model $user): bool
+    {
+        return AdminAccess::isOwner(self::userId($user));
+    }
+
     private static function userId(Model $user): int | string
     {
         $id = $user->getKey();

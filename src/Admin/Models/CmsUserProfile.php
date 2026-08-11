@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $user_id
+ * @property bool $is_owner
  * @property string|null $locale
  * @property string|null $avatar_media_id
  * @property string|null $display_name
@@ -19,13 +20,17 @@ class CmsUserProfile extends Model
     protected $table = 'tbtop_user_profiles';
 
     /**
-     * locale/display_name/avatar_media_id are written only via forceFill()
-     * (ProfileActions::personal()/preferences()), which bypasses this list
-     * entirely — user_id is the only mass-assignable column.
+     * locale/display_name/avatar_media_id/is_owner are written only via
+     * forceFill() (ProfileActions::personal()/preferences(), AdminAccess),
+     * which bypasses this list entirely — user_id is the only
+     * mass-assignable column.
      *
      * @var list<string>
      */
     protected $fillable = ['user_id'];
+
+    /** @var array<string, string> */
+    protected $casts = ['is_owner' => 'boolean'];
 
     /** @return BelongsTo<Model, $this> */
     public function user(): BelongsTo
