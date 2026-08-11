@@ -64,9 +64,10 @@ frontend (non-admin) Inertia response:
 ### Server-rendered `<head>` (SEO)
 
 Frontend meta tags (title, description, canonical, Open Graph, Twitter Card,
-hreflang, favicon, JSON-LD) are rendered server-side in blade so crawlers and
-social-network bots see them without executing JS. Add the include to the
-host's root view, **above** `@inertiaHead`:
+hreflang, favicon, JSON-LD) are rendered server-side so crawlers and
+social-network bots see them without executing JS — whether or not full-page
+SSR (see the next section) is turned on. Add the include to the host's root
+view, **above** `@inertiaHead`:
 
 ```blade
 {{-- resources/views/app.blade.php --}}
@@ -78,9 +79,130 @@ host's root view, **above** `@inertiaHead`:
 The included view (`resources/views/head.blade.php` in this package) reads
 `$page['props']['seo']` off the Inertia root view's own `$page` array and
 renders nothing when it is absent (e.g. the root view reused by a non-cms
-route) — no extra wiring needed beyond the `@include` line. Client-side Inertia navigation keeps the same tags in sync
-via `CmsPage.tsx`'s `<Head>`; the two are reconciled by matching
-`data-inertia`/`head-key` attributes, so hydration does not duplicate them.
+route) — no extra wiring needed beyond the `@include` line. Client-side Inertia
+navigation keeps the same tags in sync via `CmsPage.tsx`'s `<Head>`; the two
+are reconciled by matching `data-inertia`/`head-key` attributes, so hydration
+does not duplicate them.
+
+With SSR enabled, the same tags come from the SSR-rendered `<Head>` instead:
+the include detects this (via Inertia's own SSR dispatch) and renders nothing,
+so the tags are never duplicated. If the SSR process is down, this view falls
+back to rendering the tags itself — the head is never silently empty.
+
+### Server-side rendering
+
+By default the cms frontend body renders client-side only: Googlebot's
+second-wave render queue, non-rendering crawlers (LLM bots, smaller search
+engines), and initial paint all pay for that. Turning on Inertia SSR renders
+the full page (head **and** body) on the server for every frontend request.
+
+SSR is **opt-in and cms-scoped**: the flag lives at `tbtop-cms.ssr.enabled`
+(default `false`), not at Inertia's own `inertia.ssr.enabled`. This package
+forces `inertia.ssr.enabled` to `false` at boot (unless the host has
+published its own `config/inertia.php`) and only raises it back to `true` for
+the duration of a single request, via a middleware
+(`Tbtop\Cms\Frontend\Http\Middleware\EnableSsr`) registered on the cms
+frontend route group next to `SetLanguage`. **Do not set
+`inertia.ssr.enabled` to `true` yourself in the host** (env var, published
+config, or otherwise) — that routes the admin panel through SSR too, and the
+admin client is not built or verified for it.
+
+#### Host recipe
+
+1. An SSR entry point that resolves cms pages only — never import
+   `@tbtop/inertia-admin` here, so the SSR bundle stays free of the (large,
+   SSR-unverified) admin client:
+
+   ```tsx
+   // resources/js/ssr.tsx
+   import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react';
+   import createServer from '@inertiajs/react/server';
+   import ReactDOMServer from 'react-dom/server';
+
+   createServer((page) =>
+       createInertiaApp({
+           page,
+           render: ReactDOMServer.renderToString,
+           resolve: (name) => {
+               const pages = import.meta.glob<{ default: ResolvedComponent }>('./pages/**/*.tsx');
+
+               return pages[`./pages/${name}.tsx`]().then((module) => module.default);
+           },
+           setup: ({ App, props }) => <App {...props} />,
+       }),
+   );
+   ```
+
+2. Add the SSR entry to the Vite build input and build both bundles:
+
+   ```js
+   // vite.config.js
+   laravel({
+       input: ['resources/css/app.css', 'resources/js/app.tsx'],
+       ssr: 'resources/js/ssr.tsx',
+       refresh: true,
+   }),
+   ```
+
+   ```json
+   // package.json
+   { "scripts": { "build": "vite build && vite build --ssr" } }
+   ```
+
+   `vite build --ssr` reads `ssr.tsx` (per the `ssr` input above) and writes
+   `bootstrap/ssr/ssr.js`, which is what `php artisan inertia:start-ssr`
+   looks for by default.
+
+3. Turn the flag on (config, not `.env`, if the host's `tbtop-cms.php` is a
+   published static array — check how the rest of the host's config is set):
+
+   ```php
+   // config/tbtop-cms.php
+   'ssr' => ['enabled' => true],
+   ```
+
+4. Start the SSR process. `php artisan inertia:start-ssr` runs it in the
+   foreground; in production, run it under a supervisor (systemd unit,
+   Supervisor program, etc.) so it restarts on crash and on deploy, pointing
+   at `bootstrap/ssr/ssr.js`.
+
+5. Dev mode: whenever the Vite dev server is running, inertia-laravel v3.1
+   dispatches SSR to it (`/__inertia_ssr`) instead of the built node process.
+   That endpoint is served by the official `@inertiajs/vite` plugin — without
+   it, dev requests silently fall back to client rendering (with the blade
+   head, so nothing breaks — but what you see in dev is not what SSR serves
+   in production):
+
+   ```bash
+   bun add -d @inertiajs/vite
+   ```
+
+   ```js
+   // vite.config.js
+   import inertia from '@inertiajs/vite';
+   // plugins: [laravel({...}), inertia({ ssr: 'resources/js/ssr.tsx' }), react()]
+   ```
+
+   If the cms package (and its `@json-render/*` dependencies) resolve through
+   a path outside the host's own `node_modules` (composer vendor dir,
+   symlinked packages), dev SSR externalizes them to Node's resolution and
+   can load a second React copy ("Cannot read properties of null" hook
+   crashes). Force them through the Vite pipeline so `resolve.dedupe`
+   applies:
+
+   ```js
+   // vite.config.js
+   ssr: { noExternal: ['@json-render/react', '@json-render/core'] },
+   ```
+
+#### Fallback semantics
+
+- Flag off (default): behaves exactly as the blade-only head above — no SSR
+  gateway call is made.
+- Flag on, SSR process reachable: full page (head + body) comes from SSR.
+- Flag on, SSR process down or erroring: falls back to the blade head and a
+  client-rendered body, same as the flag being off — a broken SSR process
+  never means a missing `<head>`.
 
 ### `public/robots.txt` must not exist
 

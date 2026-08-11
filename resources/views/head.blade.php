@@ -17,12 +17,26 @@
     `// src/head.ts` section). <title> is the one exception: Inertia matches
     it by tag name regardless of key, same as its own auto-generated
     `<title data-inertia="">`.
+
+    When SSR is enabled (see EnableSsr) and the SSR gateway actually
+    rendered this request, its head — produced by the same client <Head>
+    code CmsPage.tsx uses — already covers everything below, so this view
+    renders nothing to avoid duplicating it. Inertia\Ssr\SsrState is bound
+    `scoped()` and memoizes the gateway dispatch per request (one call
+    covers this include and the @inertiaHead directive that follows it in
+    the host's root view), so asking it here is free of extra SSR round
+    trips. If SSR is down or returns null, or the flag is off, this view
+    renders the fallback tags below exactly as PR #101 did — SSR failure
+    must never mean "no head". `config('inertia.ssr.enabled')` is checked
+    first so the non-SSR path never touches SsrState at all.
 --}}
 @php
     /** @var array<string, mixed>|null $seo */
     $seo = $page['props']['seo'] ?? null;
+    $ssrOwnsHead = (bool) config('inertia.ssr.enabled')
+        && app(\Inertia\Ssr\SsrState::class)->dispatch() !== null;
 @endphp
-@if (is_array($seo))
+@if (is_array($seo) && ! $ssrOwnsHead)
     <title data-inertia="">{{ $seo['title'] ?? '' }}</title>
     @if (! empty($seo['description']))
         <meta data-inertia="meta-description" name="description" content="{{ $seo['description'] }}">
