@@ -11,14 +11,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasColumn('tbtop_user_profiles', 'is_owner')) {
-            return;
+        if (! Schema::hasColumn('tbtop_user_profiles', 'is_owner')) {
+            Schema::table('tbtop_user_profiles', function (Blueprint $table): void {
+                $table->boolean('is_owner')->default(false)->after('user_id');
+            });
         }
 
-        Schema::table('tbtop_user_profiles', function (Blueprint $table): void {
-            $table->boolean('is_owner')->default(false)->after('user_id');
-        });
-
+        // Outside the column guard on purpose: on engines with
+        // non-transactional DDL a crash can land between the column add and
+        // the backfill, and a retry must still assign the owner. The
+        // backfill itself is idempotent (skips when an owner already exists).
         $this->backfillOwner();
     }
 

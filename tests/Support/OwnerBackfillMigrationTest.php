@@ -61,13 +61,26 @@ it('does not touch an existing owner when re-run', function (): void {
     DB::table('tbtop_user_profiles')->where('user_id', $second->id)->update(['is_owner' => true]);
 
     // Rerunning the migration must not overwrite an already-designated
-    // owner even though it isn't the smallest id — hasColumn() short-
-    // circuits before the backfill runs, exactly like the existing role
-    // migration's guard.
+    // owner even though it isn't the smallest id — the backfill always runs
+    // but skips as soon as any owner exists.
     runOwnerBackfillMigration();
 
     expect((bool) DB::table('tbtop_user_profiles')->where('user_id', $first->id)->value('is_owner'))->toBeFalse()
         ->and((bool) DB::table('tbtop_user_profiles')->where('user_id', $second->id)->value('is_owner'))->toBeTrue();
+});
+
+// Non-transactional DDL can crash between the column add and the backfill;
+// the retry sees the column already present and must still assign the owner
+// instead of short-circuiting past the backfill.
+it('backfills on rerun when the column exists but no owner was assigned', function (): void {
+    $first = AdminUser::create(['name' => 'First', 'email' => 'first@example.com', 'password' => 'x']);
+    DB::table('tbtop_user_profiles')->insert([
+        ['user_id' => $first->id, 'is_owner' => false],
+    ]);
+
+    runOwnerBackfillMigration();
+
+    expect((bool) DB::table('tbtop_user_profiles')->where('user_id', $first->id)->value('is_owner'))->toBeTrue();
 });
 
 it('is a no-op on an empty profiles table', function (): void {
