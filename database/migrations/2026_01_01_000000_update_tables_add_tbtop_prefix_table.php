@@ -23,7 +23,6 @@ return new class extends Migration
         'cms_templates' => 'tbtop_templates',
         'cms_form_submissions' => 'tbtop_form_submissions',
         'cms_layouts' => 'tbtop_layouts',
-        'cms_menus' => 'tbtop_menus',
     ];
 
     /**

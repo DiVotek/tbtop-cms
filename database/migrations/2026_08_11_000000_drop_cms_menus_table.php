@@ -9,13 +9,16 @@ return new class extends Migration
 {
     /**
      * Drops the menus table: the feature was removed entirely (the frontend
-     * host site never consumed props.cms.menus). Guarded so it is a no-op on
-     * both fresh installs (table never created) and installs that already
-     * ran this migration.
+     * host site never consumed props.cms.menus). The legacy pre-prefix name
+     * is dropped too — its rename entry was removed from the 000000 prefix
+     * migration along with the feature. Guarded so it is a no-op on both
+     * fresh installs (table never created) and installs that already ran
+     * this migration.
      */
     public function up(): void
     {
         Schema::dropIfExists('tbtop_menus');
+        Schema::dropIfExists('cms_menus');
     }
 
     /**

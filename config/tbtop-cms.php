@@ -62,8 +62,7 @@ return [
         // Cross-request cache for frontend content reads (settings, languages,
         // layout). Admin reads always stay live regardless of this flag.
         'enabled' => true,
-        // Seconds a cached entry lives before recomputing, subject to the
-        // schedule-aware cap CmsCache::rememberLive() applies on top.
+        // Seconds a cached entry lives before recomputing.
         'ttl' => 3600,
         // Cache store name to use (see config/cache.php stores). Null uses the
         // host application's default store.
