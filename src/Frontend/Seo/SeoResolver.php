@@ -231,7 +231,14 @@ class SeoResolver
         return $this->jsonLd->identity($type, $name, url('/'), $logo, $this->sameAs());
     }
 
-    /** @return list<string> */
+    /**
+     * Validated again at emit time (not only on save in SeoSettingsPage):
+     * the tags field only enforces "array", so a programmatically-written
+     * setting could hold anything — non-URL entries must never be published
+     * as sameAs structured data.
+     *
+     * @return list<string>
+     */
     private function sameAs(): array
     {
         $raw = $this->settings->get('seo.identity.same_as', []);
@@ -240,7 +247,10 @@ class SeoResolver
             return [];
         }
 
-        return array_values(array_filter($raw, static fn (mixed $url): bool => is_string($url) && $url !== ''));
+        return array_values(array_filter(
+            $raw,
+            static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
+        ));
     }
 
     /** @return list<string> */

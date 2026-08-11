@@ -36,7 +36,7 @@ it('resolves a null gtmId when the setting is unset', function (): void {
 });
 
 it('extracts the id from a stored full install snippet and drops malformed values', function (): void {
-    app(Settings::class)->set('seo.gtm_container_id', "<!-- Google Tag Manager -->\n<script>...gtm.js?id='+i+dl...'GTM-XYZ987');</script>");
+    app(Settings::class)->set('seo.gtm_container_id', "<!-- Google Tag Manager -->\n<script>j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;...('GTM-XYZ987');</script>");
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $this->get('/about', ['X-Inertia' => 'true'])
@@ -60,4 +60,12 @@ it('extracts and validates container ids', function (): void {
         ->and(GtmContainerId::valid('GTM-'))->toBeFalse()
         ->and(GtmContainerId::valid('plain'))->toBeFalse()
         ->and(GtmContainerId::valid(''))->toBeFalse();
+});
+
+it('does not mine a GTM-looking substring out of unrecognized surrounding text', function (): void {
+    // Neither a bare anchored id nor a recognized install snippet — returned
+    // as-is, so valid() rejects it and no GTM markup is ever rendered.
+    expect(GtmContainerId::extract('not-a-container-GTM-ABC123'))->toBe('not-a-container-GTM-ABC123')
+        ->and(GtmContainerId::valid(GtmContainerId::extract('not-a-container-GTM-ABC123')))->toBeFalse()
+        ->and(GtmContainerId::valid(GtmContainerId::extract('GTM-ABC123<script>')))->toBeFalse();
 });

@@ -166,7 +166,7 @@ it('round-trips recipients and chat ids between the stored string and tag chips'
 
 it('normalizes a pasted full GTM install snippet down to the bare container id on save', function (): void {
     test()->post('/admin/seo-settings/forms/seo-settings', [
-        'seo_gtm_container_id' => "<!-- Google Tag Manager -->\n<script>(function(w,d,s,l,i){...})(window,document,'script','dataLayer','GTM-AB12CD3');</script>",
+        'seo_gtm_container_id' => "<!-- Google Tag Manager -->\n<script>j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;(function(w,d,s,l,i){...})(window,document,'script','dataLayer','GTM-AB12CD3');</script>",
     ])->assertRedirect()->assertSessionHasNoErrors();
 
     expect(app(Settings::class)->get('seo.gtm_container_id'))->toBe('GTM-AB12CD3');
@@ -175,6 +175,14 @@ it('normalizes a pasted full GTM install snippet down to the bare container id o
         ->assertOk()->json('props.data.seo-settings');
 
     expect($record['seo_gtm_container_id'])->toBe('GTM-AB12CD3');
+});
+
+it('drops non-URL profile links from seo.identity.same_as on save', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_identity_same_as' => ['https://github.com/acme', 'not a url', 'javascript:alert(1)', 'ftp://x.example'],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(app(Settings::class)->get('seo.identity.same_as'))->toBe(['https://github.com/acme']);
 });
 
 it('does not return mail.password on the notification settings record', function (): void {

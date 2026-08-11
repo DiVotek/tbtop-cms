@@ -11,17 +11,28 @@ namespace Tbtop\Cms\Frontend\Seo;
 class GtmContainerId
 {
     /**
-     * Pulls the first GTM-… token out of the raw value; anything without one
-     * (including the empty string) comes back trimmed as-is so the admin sees
-     * their input back instead of it silently vanishing.
+     * Accepts exactly two shapes: a bare container id (anchored match), or
+     * Google's install snippet — recognized by its googletagmanager.com
+     * reference — from which the first GTM-… token is mined. Anything else
+     * (including arbitrary text that merely contains a GTM-looking
+     * substring, e.g. "not-a-container-GTM-ABC123") comes back trimmed
+     * as-is: the admin sees their input back instead of it silently
+     * vanishing, and valid() rejects it so no snippet is rendered.
      */
     public static function extract(string $raw): string
     {
-        if (preg_match('/GTM-[A-Z0-9]+/i', $raw, $matches) === 1) {
+        $trimmed = trim($raw);
+
+        if (preg_match('/^GTM-[A-Z0-9]+$/i', $trimmed) === 1) {
+            return strtoupper($trimmed);
+        }
+
+        if (stripos($trimmed, 'googletagmanager.com') !== false
+            && preg_match('/GTM-[A-Z0-9]+/i', $trimmed, $matches) === 1) {
             return strtoupper($matches[0]);
         }
 
-        return trim($raw);
+        return $trimmed;
     }
 
     /**

@@ -162,6 +162,31 @@ it('renders the identity JSON-LD object after WebSite and BreadcrumbList', funct
         ->toContain('"name":"Acme Organization"');
 });
 
+it('filters non-URL entries out of the emitted sameAs structured data', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    // Written directly to the store (bypassing the settings form's own
+    // normalize) — emit-time filtering must hold on its own.
+    app(Settings::class)->set('seo.identity.same_as', [
+        'https://github.com/acme', 'not a url', 'javascript:alert(1)',
+    ]);
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    // Scoped to the ld+json payloads: the raw setting also rides along in
+    // the serialized cms.settings prop (forFrontend() ships all non-secret
+    // settings), where it is inert JSON — only the structured data must be
+    // clean.
+    preg_match_all('#<script[^>]*application/ld\+json[^>]*>(.*?)</script>#s', $html, $matches);
+    $jsonLd = implode("\n", $matches[1]);
+
+    expect($jsonLd)
+        ->toContain('"sameAs":["https://github.com/acme"]')
+        ->not->toContain('javascript:alert');
+});
+
 it('renders the robots noindex tag for a noindex page', function (): void {
     app(Cms::class)->frontendRoutes();
     $page = Page::factory()->create([

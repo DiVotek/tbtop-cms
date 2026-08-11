@@ -9,6 +9,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
+use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 
 class SeoSettingsPage extends SettingsPageBase
 {
@@ -140,10 +141,12 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * The GTM container id is normalized on read too (SeoResolver::gtmId()
-     * extracts and validates), but normalizing here as well means a re-opened
-     * settings page shows the bare "GTM-…" id instead of the full install
-     * snippet the admin pasted.
+     * Both cleanups also happen on read (SeoResolver::gtmId() extracts and
+     * validates, sameAs() filters), but normalizing here as well means a
+     * re-opened settings page shows the cleaned value — the bare "GTM-…" id
+     * instead of the pasted install snippet, and only the profile links that
+     * will actually be published (the tags field can't express a per-element
+     * url rule, so non-URL entries are dropped rather than rejected).
      *
      * @param  array<string, mixed>  $form
      * @return array<string, mixed>
@@ -153,6 +156,13 @@ class SeoSettingsPage extends SettingsPageBase
     {
         if (isset($form['seo_gtm_container_id']) && is_string($form['seo_gtm_container_id'])) {
             $form['seo_gtm_container_id'] = GtmContainerId::extract($form['seo_gtm_container_id']);
+        }
+
+        if (isset($form['seo_identity_same_as']) && is_array($form['seo_identity_same_as'])) {
+            $form['seo_identity_same_as'] = array_values(array_filter(
+                $form['seo_identity_same_as'],
+                static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
+            ));
         }
 
         return $form;
