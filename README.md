@@ -65,14 +65,20 @@ frontend (non-admin) Inertia response:
 
 Access to the admin panel is binary and owned by this package: a user has it if
 a `cms_user_profiles` row exists for them, or if the host's user model
-implements `Tbtop\Cms\Admin\Contracts\CmsAdmin` and returns `true`. Grant and
-revoke it from the Users page, or from the CLI:
+implements `Tbtop\Cms\Admin\Contracts\CmsAdmin` and returns `true`. Users can
+be created and edited, and access granted and revoked, from the Users page, or
+from the CLI:
 
 ```bash
 php artisan cms:admin:create admin@example.com   # create a user and grant access
 php artisan cms:admin:grant admin@example.com    # grant to an existing user
 php artisan cms:admin:revoke admin@example.com   # revoke
 ```
+
+**The first admin becomes the owner.** The owner cannot be revoked or edited
+by other admins — this is a protection, not a privilege: it grants no extra
+section rights. What an admin may do is still entirely the host's business via
+`tbtop-cms.roles` below.
 
 **What an admin may then do is the host's decision.** The package ships no
 roles. Each admin page declares a `tbtop-cms.*` ability (the full set is

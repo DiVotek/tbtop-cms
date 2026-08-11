@@ -78,6 +78,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000020_create_notifications_table')
             ->hasMigration('2026_08_11_000000_drop_cms_menus_table')
             ->hasMigration('2026_08_11_000001_update_cms_user_profiles_drop_role_table')
+            ->hasMigration('2026_08_11_000002_update_cms_user_profiles_add_is_owner_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

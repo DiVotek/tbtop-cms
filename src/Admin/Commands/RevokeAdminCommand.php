@@ -27,6 +27,15 @@ class RevokeAdminCommand extends Command
             return self::FAILURE;
         }
 
+        // AdminAccess::revoke() already refuses to delete an owner row by
+        // construction; detect it here so the operator sees an explicit
+        // error instead of a false "revoked" success message.
+        if ($this->isOwner($user)) {
+            $this->error("{$email} is the protected owner and cannot be revoked.");
+
+            return self::FAILURE;
+        }
+
         $this->revokeAccess($user);
 
         if ($this->overridesProfileAccess($user)) {

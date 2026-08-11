@@ -39,6 +39,12 @@ it('rejects creating a user with a password shorter than 8 characters', function
 });
 
 it('grants then revokes access for an existing user', function (): void {
+    // The very first profile row ever becomes the protected owner (see
+    // UsersOwnerTest) and could not be revoked — grant an unrelated first
+    // user so `a@example.com` below is not that row.
+    AdminUser::create(['name' => 'Owner', 'email' => 'owner@example.com', 'password' => 'x']);
+    $this->artisan('cms:admin:grant', ['email' => 'owner@example.com'])->assertExitCode(0);
+
     $user = AdminUser::create(['name' => 'A', 'email' => 'a@example.com', 'password' => 'x']);
 
     $this->artisan('cms:admin:grant', ['email' => 'a@example.com'])->assertExitCode(0);
@@ -68,4 +74,15 @@ it('warns instead of silently no-op-ing when revoking a CmsAdmin-contract user',
     $this->artisan('cms:admin:revoke', ['email' => 'contract@example.com'])
         ->assertExitCode(0)
         ->expectsOutputToContain('implements CmsAdmin; access is controlled by canAccessCmsAdmin()');
+});
+
+it('fails to revoke the owner via the CLI instead of a false success message', function (): void {
+    $owner = AdminUser::create(['name' => 'Owner', 'email' => 'owner@example.com', 'password' => 'x']);
+    $this->artisan('cms:admin:grant', ['email' => 'owner@example.com'])->assertExitCode(0);
+
+    $this->artisan('cms:admin:revoke', ['email' => 'owner@example.com'])
+        ->assertExitCode(1)
+        ->expectsOutputToContain('protected owner');
+
+    expect(CmsUserProfile::where('user_id', $owner->id)->exists())->toBeTrue();
 });

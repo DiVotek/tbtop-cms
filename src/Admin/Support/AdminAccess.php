@@ -20,19 +20,39 @@ final class AdminAccess
 {
     public static function grant(int | string $userId): void
     {
+        $wasEmpty = ! CmsUserProfile::query()->exists();
         $profile = CmsUserProfile::query()->firstOrCreate(['user_id' => $userId]);
 
-        if ($profile->wasRecentlyCreated) {
-            Event::dispatch(new CmsAccessGranted($userId));
+        if (! $profile->wasRecentlyCreated) {
+            return;
         }
+
+        // The first profile row of a fresh install becomes the owner
+        // automatically — no installer coupling needed. Protection only,
+        // never an extra ability: see CmsUserProfile::$casts.
+        if ($wasEmpty) {
+            $profile->forceFill(['is_owner' => true])->save();
+        }
+
+        Event::dispatch(new CmsAccessGranted($userId));
     }
 
+    /**
+     * The owner row is never deleted — `is_owner = false` in the delete
+     * query makes that guard hold by construction for every caller (page,
+     * commands, future code), not just the ones that remember to check first.
+     */
     public static function revoke(int | string $userId): void
     {
-        $deleted = CmsUserProfile::query()->where('user_id', $userId)->delete();
+        $deleted = CmsUserProfile::query()->where('user_id', $userId)->where('is_owner', false)->delete();
 
         if ($deleted > 0) {
             Event::dispatch(new CmsAccessRevoked($userId));
         }
+    }
+
+    public static function isOwner(int | string $userId): bool
+    {
+        return CmsUserProfile::query()->where('user_id', $userId)->where('is_owner', true)->exists();
     }
 }
