@@ -127,7 +127,7 @@ class PageForm
      *
      * @return list<Node|Field>
      */
-    public static function seoFields(S $s, ?Page $page): array
+    public static function seoFields(S $s, ?Page $page = null): array
     {
         $placeholders = self::computedPlaceholders($page);
         $canonical = $s->text('seo_canonical')->label(__('tbtop-cms::pages.fields.seo_canonical'))
