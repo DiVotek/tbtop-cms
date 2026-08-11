@@ -35,7 +35,10 @@ it('opens every section to anyone with admin access when roles are off', functio
     config(['tbtop-cms.roles' => false]);
     actingAsSectionAdmin();
 
-    test()->get('/admin/' . $path)->assertOk();
+    // X-Inertia: a JSON response, so the blade root view (and its @vite,
+    // which has no built manifest on CI) never renders — same as the other
+    // admin page tests.
+    test()->get('/admin/' . $path, ['X-Inertia' => 'true'])->assertOk();
 })->with(['pages', 'media-library', 'form-submissions', 'redirects', 'templates', 'languages', 'users']);
 
 it('hands the section ability to the host when roles are on', function (): void {
@@ -44,8 +47,8 @@ it('hands the section ability to the host when roles are on', function (): void 
     Gate::define('tbtop-cms.redirects', static fn (): bool => false);
     actingAsSectionAdmin();
 
-    test()->get('/admin/pages')->assertOk();
-    test()->get('/admin/redirects')->assertForbidden();
+    test()->get('/admin/pages', ['X-Inertia' => 'true'])->assertOk();
+    test()->get('/admin/redirects', ['X-Inertia' => 'true'])->assertForbidden();
 });
 
 // The package defines no section gates, so an ability the host has not
@@ -54,14 +57,14 @@ it('denies a section the host left unanswered when roles are on', function (): v
     config(['tbtop-cms.roles' => true]);
     actingAsSectionAdmin();
 
-    test()->get('/admin/pages')->assertForbidden();
+    test()->get('/admin/pages', ['X-Inertia' => 'true'])->assertForbidden();
 });
 
 it('keeps admin access independent of the roles flag', function (bool $roles): void {
     config(['tbtop-cms.roles' => $roles]);
     $stranger = AdminUser::create(['name' => 'Stranger', 'email' => 'stranger@example.com', 'password' => 'secret']);
 
-    test()->actingAs($stranger, 'web')->get('/admin/dashboard')->assertForbidden();
+    test()->actingAs($stranger, 'web')->get('/admin/dashboard', ['X-Inertia' => 'true'])->assertForbidden();
 })->with([
     'roles off' => [false],
     'roles on' => [true],
