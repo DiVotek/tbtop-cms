@@ -56,6 +56,15 @@ to also create and edit users — see Added below); it no longer assigns roles.
   substitutions are stripped. An empty template keeps the legacy
   `seo.title_suffix` behavior byte-for-byte — the suffix setting still works
   but is no longer shown in the UI.
+- Description template: `seo.description_template` (translatable) mirrors the
+  title template with `{description}`, `{site_name}`, `{sep}` — applied to
+  every page's resolved meta description; an empty template leaves
+  descriptions untouched. og:description keeps falling back to the
+  untemplated description, same as og:title.
+- Helper hints under every SEO field — settings page and the page editor's
+  SEO tab — explaining each field's fallback chain and where it is used. The
+  verification hint now says the fields can stay empty when the site is
+  verified another way (DNS, Google Tag Manager, Analytics).
 - Canonical URL override is now editable in the page SEO tab (advanced) — and
   actually persists: previously a `canonical` key in the seo JSON was wiped on
   every save because the bag is rebuilt wholesale.

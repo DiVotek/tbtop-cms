@@ -137,20 +137,28 @@ class PageForm
 
         return [
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))
-                ->translatable()->placeholder($placeholders['title']),
+                ->translatable()->placeholder($placeholders['title'])
+                ->helperText(__('tbtop-cms::pages.fields.seo_title_hint')),
             $s->textarea('seo_description')->label(__('tbtop-cms::pages.fields.seo_description'))
-                ->translatable()->set('placeholder', $placeholders['description']),
+                ->translatable()->set('placeholder', $placeholders['description'])
+                ->helperText(__('tbtop-cms::pages.fields.seo_description_hint')),
             $s->text('seo_focus_keyword')->label(__('tbtop-cms::pages.fields.seo_focus_keyword'))
-                ->translatable(),
+                ->translatable()
+                ->helperText(__('tbtop-cms::pages.fields.seo_focus_keyword_hint')),
             $s->section(['title' => __('tbtop-cms::pages.sections.social')], [
-                // og:title falls back to the UNtemplated meta title (see
-                // SeoResolver: ogTitle uses metaTitle, not title()), so its
-                // placeholder shows ogTitle rather than the templated title.
+                // og:title/og:description fall back to the UNtemplated meta
+                // values (see SeoResolver: ogTitle uses metaTitle, not
+                // title()), so their placeholders show ogTitle/ogDescription
+                // rather than the templated outputs.
                 $s->text('og_title')->label(__('tbtop-cms::pages.fields.og_title'))
-                    ->translatable()->placeholder($placeholders['og_title']),
+                    ->translatable()->placeholder($placeholders['og_title'])
+                    ->helperText(__('tbtop-cms::pages.fields.og_title_hint')),
                 $s->textarea('og_description')->label(__('tbtop-cms::pages.fields.og_description'))
-                    ->translatable()->set('placeholder', $placeholders['description']),
-                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))->variant('preview'),
+                    ->translatable()->set('placeholder', $placeholders['og_description'])
+                    ->helperText(__('tbtop-cms::pages.fields.og_description_hint')),
+                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))
+                    ->helperText(__('tbtop-cms::pages.fields.og_image_hint'))
+                    ->variant('preview'),
             ]),
             $canonical,
         ];
@@ -182,12 +190,12 @@ class PageForm
      * title/description cascade a second time. null $page (create modal, not
      * reached today) or an unsaved record yields empty placeholders.
      *
-     * @return array{title: string, description: string, og_title: string}
+     * @return array{title: string, description: string, og_title: string, og_description: string}
      */
     private static function computedPlaceholders(?Page $page): array
     {
         if ($page === null || ! $page->exists) {
-            return ['title' => '', 'description' => '', 'og_title' => ''];
+            return ['title' => '', 'description' => '', 'og_title' => '', 'og_description' => ''];
         }
 
         $locale = app(Languages::class)->defaultLocale();
@@ -197,6 +205,7 @@ class PageForm
             'title' => $resolved['title'],
             'description' => $resolved['description'],
             'og_title' => $resolved['ogTitle'],
+            'og_description' => $resolved['ogDescription'],
         ];
     }
 

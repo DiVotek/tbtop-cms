@@ -53,13 +53,16 @@ class SeoResolver
         $canonical = $this->canonical($page, $seo, $locale);
         $ogImage = $this->ogImage($page, $seo);
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
+        // og:description falls back to the UNtemplated base, same as og:title
+        // falls back to the untemplated metaTitle — social snippets should not
+        // carry the site-name branding a template typically appends.
         $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale) ?: $metaDescription;
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
 
         return [
             'title' => $this->title($metaTitle, $locale),
-            'description' => $metaDescription,
+            'description' => $this->descriptionWithTemplate($metaDescription, $locale),
             'canonical' => $canonical,
             'ogImage' => $ogImage,
             'ogTitle' => $ogTitle,
@@ -293,7 +296,25 @@ class SeoResolver
             return $this->titleWithSuffix($base);
         }
 
-        return $this->renderTitleTemplate($template, $base, $locale);
+        return $this->renderTemplate($template, ['{title}' => $base], $locale);
+    }
+
+    /**
+     * `seo.description_template` (translatable) mirrors the title template:
+     * applied on top of whatever the description cascade resolved to, with an
+     * empty template meaning "use the description as is" — existing sites
+     * keep byte-identical descriptions until they opt in. Shares
+     * `seo.title_separator` for {sep}.
+     */
+    private function descriptionWithTemplate(string $base, string $locale): string
+    {
+        $template = LocalizedSeo::value($this->settings->get('seo.description_template'), $locale);
+
+        if ($template === '') {
+            return $base;
+        }
+
+        return $this->renderTemplate($template, ['{description}' => $base], $locale);
     }
 
     private function titleWithSuffix(string $base): string
@@ -307,28 +328,29 @@ class SeoResolver
         return $base === '' ? $suffix : $base . ' ' . $suffix;
     }
 
-    private function renderTitleTemplate(string $template, string $base, string $locale): string
+    /** @param  array<string, string>  $vars  Template-specific substitutions ({title} or {description}). */
+    private function renderTemplate(string $template, array $vars, string $locale): string
     {
         $siteName = (string) $this->settings->get('site.name', '');
         $separator = LocalizedSeo::value($this->settings->get('seo.title_separator', '—'), $locale) ?: '—';
 
-        $rendered = strtr($template, [
-            '{title}' => $base,
+        $rendered = strtr($template, $vars + [
             '{site_name}' => $siteName,
             '{sep}' => $separator,
         ]);
 
-        return $this->cleanupTitle($rendered, $separator);
+        return $this->cleanupRendered($rendered, $separator);
     }
 
     /**
-     * An empty {title}/{site_name} substitution leaves a dangling separator
-     * and/or run of whitespace behind (e.g. "{title} {sep} {site_name}" with
-     * an empty site_name renders "My Page — "). Collapses whitespace runs
-     * first, then strips any separator left stranded at either edge, so the
-     * result never opens or closes on a bare separator.
+     * An empty {title}/{description}/{site_name} substitution leaves a
+     * dangling separator and/or run of whitespace behind (e.g.
+     * "{title} {sep} {site_name}" with an empty site_name renders
+     * "My Page — "). Collapses whitespace runs first, then strips any
+     * separator left stranded at either edge, so the result never opens or
+     * closes on a bare separator.
      */
-    private function cleanupTitle(string $rendered, string $separator): string
+    private function cleanupRendered(string $rendered, string $separator): string
     {
         $collapsed = trim((string) preg_replace('/\s+/u', ' ', $rendered));
         $quotedSep = preg_quote($separator, '/');

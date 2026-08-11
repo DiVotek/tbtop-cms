@@ -93,6 +93,7 @@ it('labels SEO settings fields from translations and placeholders the title temp
 
     expect($labels['seo_title_template'])->toBe(__('tbtop-cms::settings.seo.fields.title_template'))
         ->and($labels['seo_title_separator'])->toBe(__('tbtop-cms::settings.seo.fields.title_separator'))
+        ->and($labels['seo_description_template'])->toBe(__('tbtop-cms::settings.seo.fields.description_template'))
         ->and($labels['seo_default_description'])->toBe(__('tbtop-cms::settings.seo.fields.default_description'))
         ->and($labels['seo_default_og_image'])->toBe(__('tbtop-cms::settings.seo.fields.default_og_image'))
         ->and($labels['seo_indexing_enabled'])->toBe(__('tbtop-cms::settings.seo.fields.indexing_enabled'));

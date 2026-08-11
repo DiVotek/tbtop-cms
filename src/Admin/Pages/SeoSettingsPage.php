@@ -65,6 +65,7 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_title_suffix' => 'seo.title_suffix',
             'seo_title_template' => 'seo.title_template',
             'seo_title_separator' => 'seo.title_separator',
+            'seo_description_template' => 'seo.description_template',
             'seo_default_description' => 'seo.default_description',
             'seo_default_og_image' => 'seo.default_og_image',
             'seo_indexing_enabled' => 'seo.indexing_enabled',
@@ -89,18 +90,31 @@ class SeoSettingsPage extends SettingsPageBase
                 ->helperText(__('tbtop-cms::settings.seo.helpers.title_template'))
                 ->rules('nullable|max:255'),
             $s->text('seo_title_separator')->label(__('tbtop-cms::settings.seo.fields.title_separator'))
-                ->placeholder('—')->rules('nullable|max:10'),
+                ->placeholder('—')
+                ->helperText(__('tbtop-cms::settings.seo.helpers.title_separator'))
+                ->rules('nullable|max:10'),
+            $s->text('seo_description_template')->label(__('tbtop-cms::settings.seo.fields.description_template'))
+                ->translatable()
+                ->placeholder(__('tbtop-cms::settings.seo.placeholders.description_template'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.description_template'))
+                ->rules('nullable|max:500'),
             $s->textarea('seo_default_description')->label(__('tbtop-cms::settings.seo.fields.default_description'))
-                ->translatable()->rules('nullable|max:500'),
-            $s->media('seo_default_og_image')->label(__('tbtop-cms::settings.seo.fields.default_og_image'))->variant('preview'),
+                ->translatable()
+                ->helperText(__('tbtop-cms::settings.seo.helpers.default_description'))
+                ->rules('nullable|max:500'),
+            $s->media('seo_default_og_image')->label(__('tbtop-cms::settings.seo.fields.default_og_image'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.default_og_image'))
+                ->variant('preview'),
             $s->select('seo_twitter_card')->label(__('tbtop-cms::settings.seo.fields.twitter_card'))
                 ->options([
                     ['value' => 'auto', 'label' => __('tbtop-cms::settings.seo.twitter_card.auto')],
                     ['value' => 'summary', 'label' => __('tbtop-cms::settings.seo.twitter_card.summary')],
                     ['value' => 'summary_large_image', 'label' => __('tbtop-cms::settings.seo.twitter_card.summary_large_image')],
                 ])
+                ->helperText(__('tbtop-cms::settings.seo.helpers.twitter_card'))
                 ->rules('nullable|in:auto,summary,summary_large_image'),
-            $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled')),
+            $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.indexing_enabled')),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::settings.seo.sections.verification'))->variant('subheading'),
             $s->text('seo_verification_google')->label(__('tbtop-cms::settings.seo.fields.verification_google'))
@@ -117,10 +131,13 @@ class SeoSettingsPage extends SettingsPageBase
                     ['value' => 'organization', 'label' => __('tbtop-cms::settings.seo.identity_type.organization')],
                     ['value' => 'person', 'label' => __('tbtop-cms::settings.seo.identity_type.person')],
                 ])
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_type'))
                 ->rules('nullable|in:none,organization,person'),
             $s->text('seo_identity_name')->label(__('tbtop-cms::settings.seo.fields.identity_name'))
                 ->placeholder(__('tbtop-cms::settings.seo.placeholders.identity_name'))->rules('nullable|max:255'),
-            $s->media('seo_identity_logo')->label(__('tbtop-cms::settings.seo.fields.identity_logo'))->variant('preview'),
+            $s->media('seo_identity_logo')->label(__('tbtop-cms::settings.seo.fields.identity_logo'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_logo'))
+                ->variant('preview'),
             $s->tags('seo_identity_same_as')->label(__('tbtop-cms::settings.seo.fields.identity_same_as'))
                 ->rules('nullable|array')->helperText(__('tbtop-cms::settings.seo.helpers.identity_same_as')),
         ];
