@@ -42,9 +42,14 @@ final class NextScheduleTransition
             return null;
         }
 
-        $remaining = $at - Carbon::now()->getTimestamp();
-
-        return $remaining > 0 ? $remaining : null;
+        // A transition at or just past the second boundary must NOT collapse
+        // into "no transition" (null) — that would hand a freshly written
+        // entry the full default TTL right as the live set flips. Clamping to
+        // 1 instead bounds the worst-case staleness around a transition to
+        // ~1s (integer-second cache TTLs cannot do better): the entry expires
+        // within a second and the next read recomputes the following
+        // transition once this memo entry has expired too.
+        return max(1, $at - Carbon::now()->getTimestamp());
     }
 
     /** Absolute epoch second of the nearest future transition, or null when none is scheduled. */

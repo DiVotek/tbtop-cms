@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Cache\NextScheduleTransition;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -95,6 +96,25 @@ it('caps rememberLive TTL to the schedule distance when a page is scheduled soon
     // The cache entry must have expired by the time the schedule transition
     // passed, forcing a second closure run instead of serving stale 'v1'.
     expect($calls)->toBe(2);
+});
+
+it('clamps to the minimum TTL instead of null while the memoized transition sits at/past the boundary', function (): void {
+    $cache = app(CmsCache::class);
+
+    // Seed the memo with a transition timestamp that has JUST elapsed —
+    // the state a memo entry is in when second-flooring lets it outlive its
+    // own transition by a fraction of a second. Interpreting it as null
+    // ("no transition") would hand a freshly written rememberLive() entry
+    // the full default TTL while a later transition (still unknown until
+    // the memo expires and recomputes) may be minutes away — the
+    // bot-reported boundary bug. It must clamp to the 1s minimum instead.
+    $versionedKey = (function (string $key): string {
+        /** @var CmsCache $this */
+        return $this->versionedKey($key); // @phpstan-ignore method.private
+    })->call($cache, 'tbtop-cms:next-schedule-transition');
+    Cache::store('array')->put($versionedKey, [now()->getTimestamp()], 60);
+
+    expect(NextScheduleTransition::seconds($cache))->toBe(1);
 });
 
 it('uses the configured ttl for rememberLive when no page has a future schedule transition', function (): void {
