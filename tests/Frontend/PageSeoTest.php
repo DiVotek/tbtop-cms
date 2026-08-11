@@ -9,6 +9,8 @@ use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Models\PageRevision;
+use Tbtop\Cms\Page\Support\PageRevisionWriter;
 use Tbtop\Cms\Settings\Settings;
 
 uses(RefreshDatabase::class);
@@ -318,4 +320,203 @@ it('emits alternates/xDefault even for a noindex page', function (): void {
         ->assertJsonPath('props.seo.noindex', true)
         ->assertJsonCount(2, 'props.seo.alternates')
         ->assertJsonPath('props.seo.xDefault', fn (string $url): bool => $url !== '');
+});
+
+it('resolves translatable seo fields per locale from a locale-map seo bag', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        'seo' => [
+            'title' => ['en' => 'About EN', 'uk' => 'Pro EN'],
+            'description' => ['en' => 'Desc EN', 'uk' => 'Desc UK'],
+            'og_title' => ['en' => 'OG EN', 'uk' => 'OG UK'],
+            'og_description' => ['en' => 'OGD EN', 'uk' => 'OGD UK'],
+        ],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'About EN — Acme')
+        ->assertJsonPath('props.seo.description', 'Desc EN')
+        ->assertJsonPath('props.seo.ogTitle', 'OG EN')
+        ->assertJsonPath('props.seo.ogDescription', 'OGD EN');
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'Pro EN — Acme')
+        ->assertJsonPath('props.seo.description', 'Desc UK')
+        ->assertJsonPath('props.seo.ogTitle', 'OG UK')
+        ->assertJsonPath('props.seo.ogDescription', 'OGD UK');
+});
+
+it('resolves a legacy scalar-shaped seo bag identically on the default AND a non-default locale', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        // Pre-translatable shape: plain strings, not locale maps — written
+        // before seo_title/seo_description became translatable.
+        'seo' => ['title' => 'Legacy title', 'description' => 'Legacy description'],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'Legacy title — Acme')
+        ->assertJsonPath('props.seo.description', 'Legacy description');
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'Legacy title — Acme')
+        ->assertJsonPath('props.seo.description', 'Legacy description');
+});
+
+it('falls the identity name back to site.name when seo.identity.name is empty', function (): void {
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
+    $identity = collect($jsonLd)->firstWhere('@type', 'Organization');
+
+    expect($identity)->not->toBeNull()
+        ->and($identity['name'])->toBe('Acme Co');
+});
+
+it('emits no identity object when both seo.identity.name and site.name are empty', function (): void {
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
+
+    expect(collect($jsonLd)->firstWhere('@type', 'Organization'))->toBeNull();
+});
+
+it('filters blank entries out of seo.identity.same_as', function (): void {
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    app(Settings::class)->set('seo.identity.name', 'Acme Inc');
+    app(Settings::class)->set('seo.identity.same_as', ['https://twitter.com/acme', '', 'https://github.com/acme']);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
+    $identity = collect($jsonLd)->firstWhere('@type', 'Organization');
+
+    expect($identity['sameAs'])->toBe(['https://twitter.com/acme', 'https://github.com/acme']);
+});
+
+it('resolves seo.identity.logo to a public url on the Organization object', function (): void {
+    $logo = media('org-logo.png');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    app(Settings::class)->set('seo.identity.name', 'Acme Inc');
+    app(Settings::class)->set('seo.identity.logo', (string) $logo->getKey());
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
+    $identity = collect($jsonLd)->firstWhere('@type', 'Organization');
+
+    expect($identity['logo'])->toBe(Storage::disk('public')->url('media/org-logo.png'));
+});
+
+it('resolves seo correctly after restoring a revision snapshot that carries a legacy scalar-shaped seo payload', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        'seo' => ['title' => 'Current title'],
+    ]);
+
+    $revision = PageRevision::query()->create([
+        'page_id' => $page->id,
+        'kind' => 'save',
+        // Snapshot frozen before title became translatable — a plain string.
+        'payload' => ['seo' => ['title' => 'Snapshot title']],
+        'created_at' => now(),
+    ]);
+
+    app(PageRevisionWriter::class)->restore($page, $revision);
+    $page->refresh();
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'Snapshot title — Acme');
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'Snapshot title — Acme');
+});
+
+it('persists and resolves the canonical override per locale, winning over the computed URL', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        'seo' => ['canonical' => ['en' => 'https://example.com/custom-en']],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.canonical', 'https://example.com/custom-en')
+        ->assertJsonPath('props.seo.ogUrl', 'https://example.com/custom-en');
+
+    // No uk override set — falls back to the computed URL for that locale.
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.canonical', url('/uk/' . $page->pathFor('uk')));
+});
+
+it('lets an explicit seo.twitter_card choice win over the auto-derived value', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    app(Settings::class)->set('seo.twitter_card', 'summary');
+
+    // beforeEach seeds seo.default_og_image, so auto-derivation would pick
+    // summary_large_image here — proving the explicit choice actually wins.
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.twitterCard', 'summary');
+});
+
+it('sets noindex on every page when seo.indexing_enabled is false, regardless of is_indexable', function (): void {
+    app(Settings::class)->set('seo.indexing_enabled', false);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.noindex', true);
+});
+
+it('resolves seo.default_description per locale from a locale-map setting', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    app(Settings::class)->set('seo.default_description', ['en' => 'Default EN', 'uk' => 'Default UK']);
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About', 'uk' => 'Pro nas']]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.description', 'Default EN');
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.description', 'Default UK');
+});
+
+it('still resolves a legacy scalar seo.default_description on a non-default locale', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    // beforeEach already sets this as a plain string ('Global description').
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About', 'uk' => 'Pro nas']]);
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.description', 'Global description');
+});
+
+it('treats a literally-stored JSON null for seo.indexing_enabled as indexing enabled', function (): void {
+    // Settings::get() only applies its $default when the KEY is absent, not
+    // when it decodes to null — set() with a literal null value simulates a
+    // row whose stored JSON is the string "null".
+    app(Settings::class)->set('seo.indexing_enabled', null);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.noindex', false);
 });

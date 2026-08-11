@@ -18,7 +18,7 @@ class Settings
     // Settings keys whose stored value is a media id (from an $s->media()
     // field) rather than the value itself — forFrontend() resolves these to
     // public URLs so consumers never see a raw id.
-    private const array MEDIA_KEYS = ['site.logo', 'site.favicon', 'seo.default_og_image'];
+    private const array MEDIA_KEYS = ['site.logo', 'site.favicon', 'seo.default_og_image', 'seo.identity.logo'];
 
     /** @var array<string, string|null>|null */
     private ?array $memo = null;

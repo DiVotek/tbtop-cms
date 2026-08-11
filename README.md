@@ -89,6 +89,12 @@ the include detects this (via Inertia's own SSR dispatch) and renders nothing,
 so the tags are never duplicated. If the SSR process is down, this view falls
 back to rendering the tags itself — the head is never silently empty.
 
+Google Tag Manager needs no wiring at all: when a container ID is set in the
+SEO settings, the `InjectGtm` middleware inserts both halves of Google's
+snippet into every full-page frontend response — the loader `<script>` right
+after the opening `<head>` tag, the `<noscript>` iframe right after `<body>` —
+per Google's install rules. The admin panel never gets the snippet.
+
 ### Server-side rendering
 
 By default the cms frontend body renders client-side only: Googlebot's

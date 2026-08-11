@@ -138,7 +138,7 @@ class PageEditPage extends AdminPage
     {
         return [
             ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s, ! $page->is_system))],
-            ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s))],
+            ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s, $page))],
             ...PageEditBlockTabs::build($s, $page),
         ];
     }

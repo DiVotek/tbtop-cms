@@ -121,6 +121,72 @@ it('omits the WebSite object when site.name is empty', function (): void {
     expect($html)->not->toContain('"@type":"WebSite"');
 });
 
+it('renders both halves of the GTM snippet when a container id is configured', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('seo.gtm_container_id', 'GTM-ABC1234');
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)
+        ->toContain("'https://www.googletagmanager.com/gtm.js?id='+i+dl")
+        ->toContain("'GTM-ABC1234'")
+        ->toContain('<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-ABC1234"');
+});
+
+it('renders no GTM markup when the container id is unset or malformed', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('seo.gtm_container_id', '"><script>alert(1)</script>');
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)->not->toContain('googletagmanager.com');
+});
+
+it('renders the identity JSON-LD object after WebSite and BreadcrumbList', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    app(Settings::class)->set('seo.identity.name', 'Acme Organization');
+    $parent = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Guides'], 'title' => ['en' => '']]);
+    $page = Page::factory()->article()->create(['status' => PageStatus::Published, 'parent_id' => $parent->id, 'name' => ['en' => 'Setup']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)
+        ->toContain('data-inertia="jsonld-0"')
+        ->toContain('data-inertia="jsonld-1"')
+        ->toContain('data-inertia="jsonld-2"')
+        ->toContain('"@type":"Organization"')
+        ->toContain('"name":"Acme Organization"');
+});
+
+it('filters non-URL entries out of the emitted sameAs structured data', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    // Written directly to the store (bypassing the settings form's own
+    // normalize) — emit-time filtering must hold on its own.
+    app(Settings::class)->set('seo.identity.same_as', [
+        'https://github.com/acme', 'not a url', 'javascript:alert(1)',
+    ]);
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    // Scoped to the ld+json payloads: the raw setting also rides along in
+    // the serialized cms.settings prop (forFrontend() ships all non-secret
+    // settings), where it is inert JSON — only the structured data must be
+    // clean.
+    preg_match_all('#<script[^>]*application/ld\+json[^>]*>(.*?)</script>#s', $html, $matches);
+    $jsonLd = implode("\n", $matches[1]);
+
+    expect($jsonLd)
+        ->toContain('"sameAs":["https://github.com/acme"]')
+        ->not->toContain('javascript:alert');
+});
+
 it('renders the robots noindex tag for a noindex page', function (): void {
     app(Cms::class)->frontendRoutes();
     $page = Page::factory()->create([

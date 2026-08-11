@@ -13,6 +13,8 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\Seo\SeoResolver;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Events\PagePublished;
 use Tbtop\Cms\Page\Events\PageSaved;
@@ -111,24 +113,99 @@ class PageForm
      * Fields for the "SEO" tab of the dedicated edit page. is_indexable lives
      * in the sidebar's "Publication" card (PageEditSidebar), not here.
      *
+     * seo_title/seo_description/seo_focus_keyword/og_title/og_description are
+     * translatable — hreflang variants of the same page routinely want a
+     * different meta title/description per locale. og_image stays a plain
+     * scalar: an image isn't per-locale, and hreflang pages share it.
+     *
+     * Placeholders show the COMPUTED final value (template/suffix applied)
+     * for the DEFAULT locale only — a static, single-per-field hint (same
+     * string in every locale tab) rather than a live per-locale preview; see
+     * computedPlaceholders() below. $page is only absent for the create
+     * modal, which never renders this tab today, but the guard keeps the
+     * method safe if that ever changes.
+     *
      * @return list<Node|Field>
      */
-    public static function seoFields(S $s): array
+    public static function seoFields(S $s, ?Page $page = null): array
     {
+        $placeholders = self::computedPlaceholders($page);
+        $canonical = $s->text('seo_canonical')->label(__('tbtop-cms::pages.fields.seo_canonical'))
+            ->translatable()->rules(['nullable', 'url'])
+            ->helperText(__('tbtop-cms::pages.fields.seo_canonical_hint'));
+        self::applyCanonicalLocaleRules($canonical);
+
         return [
-            $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title')),
-            $s->textarea('seo_description')->label(__('tbtop-cms::pages.fields.seo_description')),
-            $s->text('seo_focus_keyword')->label(__('tbtop-cms::pages.fields.seo_focus_keyword')),
+            $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))
+                ->translatable()->placeholder($placeholders['title'])
+                ->helperText(__('tbtop-cms::pages.fields.seo_title_hint')),
+            $s->textarea('seo_description')->label(__('tbtop-cms::pages.fields.seo_description'))
+                ->translatable()->set('placeholder', $placeholders['description'])
+                ->helperText(__('tbtop-cms::pages.fields.seo_description_hint')),
+            $s->text('seo_focus_keyword')->label(__('tbtop-cms::pages.fields.seo_focus_keyword'))
+                ->translatable()
+                ->helperText(__('tbtop-cms::pages.fields.seo_focus_keyword_hint')),
             $s->section(['title' => __('tbtop-cms::pages.sections.social')], [
-                // Text has no client-side placeholder wiring (unlike textarea);
-                // helperText renders instead so the "defaults to..." hint is
-                // still visible.
+                // og:title/og:description fall back to the UNtemplated meta
+                // values (see SeoResolver: ogTitle uses metaTitle, not
+                // title()), so their placeholders show ogTitle/ogDescription
+                // rather than the templated outputs.
                 $s->text('og_title')->label(__('tbtop-cms::pages.fields.og_title'))
-                    ->helperText(__('tbtop-cms::pages.fields.og_title_placeholder')),
+                    ->translatable()->placeholder($placeholders['og_title'])
+                    ->helperText(__('tbtop-cms::pages.fields.og_title_hint')),
                 $s->textarea('og_description')->label(__('tbtop-cms::pages.fields.og_description'))
-                    ->set('placeholder', __('tbtop-cms::pages.fields.og_description_placeholder')),
-                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))->variant('preview'),
+                    ->translatable()->set('placeholder', $placeholders['og_description'])
+                    ->helperText(__('tbtop-cms::pages.fields.og_description_hint')),
+                $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))
+                    ->helperText(__('tbtop-cms::pages.fields.og_image_hint'))
+                    ->variant('preview'),
             ]),
+            $canonical,
+        ];
+    }
+
+    /**
+     * RuleWalker applies a translatable field's own ->rules() to the default
+     * locale only (see RuleWalker::fromTranslatableField()); every other
+     * active locale needs the same "nullable|url" via ->rulesForLocale()
+     * explicitly, or it would validate as bare 'nullable' and accept
+     * anything. Locales come from the same Languages source ContentLocales
+     * syncs into config('tbtop-admin.content_locales') for this request.
+     */
+    private static function applyCanonicalLocaleRules(Field $field): void
+    {
+        $languages = app(Languages::class);
+        $default = $languages->defaultLocale();
+
+        foreach ($languages->adminActive() as $row) {
+            if ($row['locale'] !== $default) {
+                $field->rulesForLocale($row['locale'], ['nullable', 'url']);
+            }
+        }
+    }
+
+    /**
+     * Computed values a blank SEO field would actually resolve to, for the
+     * default locale — reuses SeoResolver rather than re-deriving the
+     * title/description cascade a second time. null $page (create modal, not
+     * reached today) or an unsaved record yields empty placeholders.
+     *
+     * @return array{title: string, description: string, og_title: string, og_description: string}
+     */
+    private static function computedPlaceholders(?Page $page): array
+    {
+        if ($page === null || ! $page->exists) {
+            return ['title' => '', 'description' => '', 'og_title' => '', 'og_description' => ''];
+        }
+
+        $locale = app(Languages::class)->defaultLocale();
+        $resolved = app(SeoResolver::class)->resolve($page, $locale);
+
+        return [
+            'title' => $resolved['title'],
+            'description' => $resolved['description'],
+            'og_title' => $resolved['ogTitle'],
+            'og_description' => $resolved['ogDescription'],
         ];
     }
 
@@ -305,18 +382,26 @@ class PageForm
     }
 
     /**
+     * Rebuilds the `seo` JSON bag wholesale on every save — any key not
+     * listed here is dropped, so every persisted seo key must be listed.
+     * title/description/focus_keyword/og_title/og_description are
+     * translatable (stringMap() per key, same as name/title); og_image and
+     * canonical follow the same shapes as their form fields (scalar and
+     * translatable respectively).
+     *
      * @param  array<string, mixed>  $form
-     * @return array{title: string, description: string, focus_keyword: string, og_title: string, og_description: string, og_image: string}
+     * @return array{title: array<string, string>, description: array<string, string>, focus_keyword: array<string, string>, og_title: array<string, string>, og_description: array<string, string>, og_image: string, canonical: array<string, string>}
      */
     private static function seoAttribute(array $form): array
     {
         return [
-            'title' => (string) ($form['seo_title'] ?? ''),
-            'description' => (string) ($form['seo_description'] ?? ''),
-            'focus_keyword' => (string) ($form['seo_focus_keyword'] ?? ''),
-            'og_title' => (string) ($form['og_title'] ?? ''),
-            'og_description' => (string) ($form['og_description'] ?? ''),
+            'title' => self::stringMap($form['seo_title'] ?? null),
+            'description' => self::stringMap($form['seo_description'] ?? null),
+            'focus_keyword' => self::stringMap($form['seo_focus_keyword'] ?? null),
+            'og_title' => self::stringMap($form['og_title'] ?? null),
+            'og_description' => self::stringMap($form['og_description'] ?? null),
             'og_image' => (string) ($form['og_image'] ?? ''),
+            'canonical' => self::stringMap($form['seo_canonical'] ?? null),
         ];
     }
 
@@ -347,12 +432,18 @@ class PageForm
             'slug' => $page->slugs->pluck('slug', 'locale')->all(),
             'content' => BlockContentField::toRows($page->content),
             'image' => (string) ($page->image ?? ''),
-            'seo_title' => (string) ($seo['title'] ?? ''),
-            'seo_description' => (string) ($seo['description'] ?? ''),
-            'seo_focus_keyword' => (string) ($seo['focus_keyword'] ?? ''),
-            'og_title' => (string) ($seo['og_title'] ?? ''),
-            'og_description' => (string) ($seo['og_description'] ?? ''),
+            // Passed through raw (scalar or locale map) rather than cast to
+            // string: TranslatableRecord::normalize() expands a legacy
+            // scalar into a locale map client-side (see the field's
+            // ->translatable() docs), so casting here would collapse an
+            // already-translated map back into a single string.
+            'seo_title' => $seo['title'] ?? '',
+            'seo_description' => $seo['description'] ?? '',
+            'seo_focus_keyword' => $seo['focus_keyword'] ?? '',
+            'og_title' => $seo['og_title'] ?? '',
+            'og_description' => $seo['og_description'] ?? '',
             'og_image' => (string) ($seo['og_image'] ?? ''),
+            'seo_canonical' => $seo['canonical'] ?? '',
             // Seeds the pageEditor form's hidden lock_version field (see
             // PageEditPage::view()). The client would round-trip an
             // undeclared record key on its own, but FormSubmitController's

@@ -46,6 +46,47 @@ to also create and edit users — see Added below); it no longer assigns roles.
   **Host action required:** delete `public/robots.txt` if it exists — Laravel's
   default scaffold ships one, and as a static file it shadows this package's
   dynamic `/robots.txt` route.
+- Per-locale SEO: a page's meta title, description, focus keyword, OG
+  title/description, and the new canonical override are translatable (locale
+  tabs in the SEO tab); rows saved before this change keep serving their
+  single value on every locale until re-saved. Site-wide, `seo.default_description`
+  and the new `seo.title_template` are translatable the same way.
+- Title template: `seo.title_template` supports `{title}`, `{site_name}`, and
+  `{sep}` (from `seo.title_separator`); dangling separators from empty
+  substitutions are stripped. An empty template keeps the legacy
+  `seo.title_suffix` behavior byte-for-byte — the suffix setting still works
+  but is no longer shown in the UI.
+- Description template: `seo.description_template` (translatable) mirrors the
+  title template with `{description}`, `{site_name}`, `{sep}` — applied to
+  every page's resolved meta description; an empty template leaves
+  descriptions untouched. og:description keeps falling back to the
+  untemplated description, same as og:title.
+- Helper hints under every SEO field — settings page and the page editor's
+  SEO tab — explaining each field's fallback chain and where it is used. The
+  verification hint now says the fields can stay empty when the site is
+  verified another way (DNS, Google Tag Manager, Analytics).
+- Canonical URL override is now editable in the page SEO tab (advanced) — and
+  actually persists: previously a `canonical` key in the seo JSON was wiped on
+  every save because the bag is rebuilt wholesale.
+- Google Tag Manager: set the container ID in the SEO settings (paste the
+  bare `GTM-…` id or the full install code — both normalize to the id) and
+  both halves of Google's snippet are inserted on every frontend page per
+  Google's rules — the loader `<script>` right after the opening `<head>`
+  tag, the `<noscript>` iframe right after `<body>`. Injection happens in
+  the `InjectGtm` middleware on frontend routes, so it works with zero host
+  wiring and the admin panel never gets the snippet. Malformed ids are
+  dropped at render time, never interpolated into the markup.
+- Identity JSON-LD: an `Organization`/`Person` object (name falling back to
+  `site.name`, logo, `sameAs` profile links) emitted on every page when
+  enabled in the SEO settings.
+- `seo.twitter_card` setting: `auto` (default, large card when an OG image
+  exists — the previous behavior), or force `summary`/`summary_large_image`.
+- SEO fields in the page editor now show the computed inherited value as
+  their placeholder (what will actually render if the override stays empty).
+- Behavior fix: turning `seo.indexing_enabled` off now also emits
+  `<meta name="robots" content="noindex">` on every page — previously it only
+  affected robots.txt and the sitemap, and a blocked-but-linked URL could
+  still be indexed.
 - Server-side rendering for the cms frontend (opt-in): set
   `tbtop-cms.ssr.enabled` to `true` and the full page — head and body — is
   rendered server-side via Inertia SSR for cms frontend responses only; the

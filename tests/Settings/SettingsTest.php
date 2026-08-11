@@ -103,6 +103,17 @@ it('resolves seo.default_og_image to a public url in the frontend payload', func
         ->toBe(Storage::disk('public')->url('media/og.png'));
 });
 
+it('resolves seo.identity.logo to a public url in the frontend payload', function (): void {
+    Storage::fake('public');
+    $logo = Media::create(['name' => 'identity-logo.png', 'disk' => 'public', 'path' => 'media/identity-logo.png', 'mime' => 'image/png', 'size' => 10]);
+
+    $settings = app(Settings::class);
+    $settings->set('seo.identity.logo', (string) $logo->getKey());
+
+    expect($settings->forFrontend()['seo.identity.logo'])
+        ->toBe(Storage::disk('public')->url('media/identity-logo.png'));
+});
+
 it('serves a fresh value from a new Settings instance after SettingsForm::apply()', function (): void {
     (new Settings)->set('site.name', 'Original');
     // Prime the cross-request cache the way a frontend request would.
