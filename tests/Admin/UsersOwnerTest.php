@@ -29,6 +29,21 @@ it('marks the first-ever grant as owner but not the second', function (): void {
         ->and(AdminAccess::isOwner($second->id))->toBeFalse();
 });
 
+// Pins the guard living in the UPDATE statement itself (not a
+// check-then-write): rows created outside AdminAccess leave no owner, and
+// the next grant self-heals by claiming ownership — while a second owner is
+// impossible by construction.
+it('marks a grant as owner when rows exist but none is owner yet', function (): void {
+    $stray = AdminUser::create(['name' => 'Stray', 'email' => 'stray@example.com', 'password' => 'secret']);
+    $next = AdminUser::create(['name' => 'Next', 'email' => 'next@example.com', 'password' => 'secret']);
+    CmsUserProfile::query()->create(['user_id' => $stray->id]);
+
+    AdminAccess::grant($next->id);
+
+    expect(AdminAccess::isOwner($next->id))->toBeTrue()
+        ->and(CmsUserProfile::query()->where('is_owner', true)->count())->toBe(1);
+});
+
 it('never deletes the owner row via AdminAccess::revoke, dispatching no event', function (): void {
     $owner = AdminUser::create(['name' => 'Owner', 'email' => 'owner@example.com', 'password' => 'secret']);
     AdminAccess::grant($owner->id);

@@ -77,6 +77,13 @@ class UserForm
         $name = trim((string) ($form['name'] ?? ''));
         $password = (string) ($form['password'] ?? '');
 
+        // The form marks name required, but the server must enforce it too —
+        // a direct action request bypasses the client-side check. Create has
+        // no such assert on purpose: there a blank name falls back to email.
+        if ($name === '') {
+            throw ValidationException::withMessages(['name' => __('tbtop-cms::users.validation.name_required')]);
+        }
+
         self::assertValidEmail($email);
         self::assertEmailAvailable($model, $email, $id, 'email_taken');
 

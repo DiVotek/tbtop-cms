@@ -49,6 +49,7 @@ return [
         'no_access' => 'This user has no CMS access to revoke.',
         'cannot_revoke_owner' => 'The owner cannot be revoked.',
         'cannot_edit_owner' => 'Only the owner can edit their own account.',
+        'name_required' => 'Enter a name.',
         'email_invalid' => 'Enter a valid email address.',
         'email_exists' => 'A user with this email already exists. Use Grant access instead.',
         'email_taken' => 'Another user already uses this email address.',
