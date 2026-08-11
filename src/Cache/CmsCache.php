@@ -42,7 +42,7 @@ final class CmsCache
      * Like remember(), but the TTL is additionally capped so a cached entry
      * never outlives the nearest upcoming page schedule transition
      * (published_at/unpublish_at) — content that depends on a page's live
-     * scope (e.g. menus) must not read stale past that instant.
+     * scope must not read stale past that instant.
      *
      * @template TCacheValue
      *

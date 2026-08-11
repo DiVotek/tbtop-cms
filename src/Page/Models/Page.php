@@ -150,8 +150,7 @@ class Page extends Model
      * Single source of truth for frontend visibility: published, and (if
      * scheduled) currently within its go-live/go-dark window. Every
      * frontend-facing query that used to filter on status alone should use
-     * this instead — see PageResolver/MenuResolver/SitemapEntryBuilder/
-     * FormSubmitController.
+     * this instead — see PageResolver/SitemapEntryBuilder/FormSubmitController.
      *
      * @param  Builder<Page>  $query
      * @return Builder<Page>

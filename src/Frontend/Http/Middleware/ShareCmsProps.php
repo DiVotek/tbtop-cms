@@ -11,7 +11,6 @@ use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Cache\CmsCache;
-use Tbtop\Cms\Frontend\MenuResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Settings\Settings;
@@ -22,7 +21,6 @@ class ShareCmsProps
         private readonly Languages $languages,
         private readonly Settings $settings,
         private readonly LayoutResolver $layoutResolver,
-        private readonly MenuResolver $menus,
         private readonly CmsCache $cache,
     ) {}
 
@@ -40,7 +38,6 @@ class ShareCmsProps
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
             'layout' => $this->resolveLayout(),
-            'menus' => $this->resolveMenus(),
         ]);
 
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));
@@ -72,22 +69,6 @@ class ShareCmsProps
     private function resolveLayout(): array
     {
         return $this->cache->remember('layout', fn (): array => $this->layoutResolver->resolve());
-    }
-
-    /**
-     * Cached per locale, live-capped: menus reference pages by id and a
-     * page's live scope can flip purely on its schedule (published_at /
-     * unpublish_at) with no write and no event, so a plain TTL is not
-     * enough — rememberLive() also bounds the entry to the nearest such
-     * transition. Same call-site-only caching rationale as resolveLayout().
-     *
-     * @return array<string, list<array<string, mixed>>>
-     */
-    private function resolveMenus(): array
-    {
-        $locale = (string) app()->getLocale();
-
-        return $this->cache->rememberLive('menus:' . $locale, fn (): array => $this->menus->forLocale($locale));
     }
 
     private function validationErrors(Request $request): object

@@ -9,9 +9,6 @@ use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\Models\Layout;
-use Tbtop\Cms\Menu\Events\MenuDeleted;
-use Tbtop\Cms\Menu\Events\MenuSaved;
-use Tbtop\Cms\Menu\Models\Menu;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PagePublished;
 use Tbtop\Cms\Page\Events\PageRestored;
@@ -45,8 +42,6 @@ dataset('bumping events', [
     'PageUnpublished' => [fn () => new PageUnpublished(Page::factory()->make())],
     'PageDeleted' => [fn () => new PageDeleted(Page::factory()->make(), false)],
     'PageRestored' => [fn () => new PageRestored(Page::factory()->make())],
-    'MenuSaved' => [fn () => new MenuSaved(new Menu(['key' => 'main', 'name' => 'Main']), true)],
-    'MenuDeleted' => [fn () => new MenuDeleted(new Menu(['key' => 'main', 'name' => 'Main']))],
     'LayoutSaved' => [fn () => new LayoutSaved(new Layout(['slot' => 'header']))],
     'SettingsSaved' => [fn () => new SettingsSaved(['site.name'])],
     'LanguagesChanged' => [fn () => new LanguagesChanged],

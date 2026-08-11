@@ -34,8 +34,6 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Mail\CmsMailer;
-use Tbtop\Cms\Menu\Events\MenuDeleted;
-use Tbtop\Cms\Menu\Events\MenuSaved;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PagePublished;
 use Tbtop\Cms\Page\Events\PageRestored;
@@ -74,7 +72,6 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000010_update_pages_add_body_table')
             ->hasMigration('2026_01_01_000011_create_cms_layouts_table')
             ->hasMigration('2026_01_01_000012_update_pages_add_image_table')
-            ->hasMigration('2026_01_01_000013_create_cms_menus_table')
             ->hasMigration('2026_01_01_000014_update_user_id_columns_match_host_key_type')
             ->hasMigration('2026_01_01_000015_update_cms_user_profiles_add_user_id_foreign_table')
             ->hasMigration('2026_01_01_000016_update_cms_user_profiles_add_role_table')
@@ -82,6 +79,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000018_update_pages_add_scheduling_table')
             ->hasMigration('2026_01_01_000019_create_form_submission_comments_table')
             ->hasMigration('2026_01_01_000020_create_notifications_table')
+            ->hasMigration('2026_08_11_000000_drop_cms_menus_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -243,7 +241,6 @@ class CmsServiceProvider extends PackageServiceProvider
             'tbtop-cms.redirects',
             'tbtop-cms.settings',
             'tbtop-cms.design',
-            'tbtop-cms.menus',
             'tbtop-cms.languages',
             'tbtop-cms.users',
         ] as $ability) {
@@ -265,8 +262,6 @@ class CmsServiceProvider extends PackageServiceProvider
             PageUnpublished::class,
             PageDeleted::class,
             PageRestored::class,
-            MenuSaved::class,
-            MenuDeleted::class,
             LayoutSaved::class,
             SettingsSaved::class,
             LanguagesChanged::class,

@@ -8,7 +8,6 @@ use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
 use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
-use Tbtop\Cms\Admin\Pages\Support\MenuForm;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\SettingsForm;
 use Tbtop\Cms\Block\Blocks\ContactForm;
@@ -19,9 +18,6 @@ use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\Slots;
-use Tbtop\Cms\Menu\Events\MenuDeleted;
-use Tbtop\Cms\Menu\Events\MenuSaved;
-use Tbtop\Cms\Menu\Models\Menu;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PagePublished;
@@ -275,46 +271,6 @@ it('does not raise SettingsSaved when the submission writes nothing', function (
     SettingsForm::apply([], ['site_name' => 'site.name'], app(Settings::class));
 
     Event::assertNotDispatched(SettingsSaved::class);
-});
-
-// --- Menu: MenuSaved / MenuDeleted ---
-
-it('raises MenuSaved(wasCreated: true) when a menu is created', function (): void {
-    Event::fake([MenuSaved::class]);
-
-    $menu = MenuForm::save(['name' => 'Main', 'key' => 'main', 'items' => []]);
-
-    Event::assertDispatched(MenuSaved::class, fn (MenuSaved $e): bool => $e->menu->is($menu) && $e->wasCreated === true);
-});
-
-it('raises MenuSaved(wasCreated: false) when an existing menu is updated', function (): void {
-    $menu = Menu::create(['name' => 'Main', 'key' => 'main', 'items' => []]);
-    Event::fake([MenuSaved::class]);
-
-    MenuForm::save(['name' => 'Main renamed', 'key' => 'main', 'items' => []], $menu->id);
-
-    Event::assertDispatched(MenuSaved::class, fn (MenuSaved $e): bool => $e->wasCreated === false);
-});
-
-it('raises MenuDeleted when an existing menu is deleted', function (): void {
-    $menu = Menu::create(['name' => 'Main', 'key' => 'main', 'items' => []]);
-    Event::fake([MenuDeleted::class]);
-
-    test()->actingAs(makeEventsAdmin(), 'web')
-        ->postJson('/admin/menus/actions/menuDelete', ['payload' => ['row' => ['id' => $menu->id]]])
-        ->assertOk();
-
-    Event::assertDispatched(MenuDeleted::class, fn (MenuDeleted $e): bool => $e->menu->getKey() === $menu->id);
-});
-
-it('does not raise MenuDeleted when deleting a non-existent menu id', function (): void {
-    Event::fake([MenuDeleted::class]);
-
-    test()->actingAs(makeEventsAdmin(), 'web')
-        ->postJson('/admin/menus/actions/menuDelete', ['payload' => ['row' => ['id' => 999999]]])
-        ->assertOk();
-
-    Event::assertNotDispatched(MenuDeleted::class);
 });
 
 // --- Layout: LayoutSaved ---

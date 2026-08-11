@@ -9,7 +9,6 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Language\Models\Language;
-use Tbtop\Cms\Menu\Models\Menu;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -136,51 +135,6 @@ it('template target_page_id relation-search resolve mode returns the picked page
 
     $response->assertOk()
         ->assertExactJson(['option' => ['value' => (string) $page->id, 'label' => 'Contact']]);
-});
-
-// --- MenuForm page_id/category_id relation-search (repeater subfields) ---
-
-it('menu page_id relation-search on the create page returns only published pages', function (): void {
-    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
-    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
-    Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'A category']]);
-
-    $response = test()->actingAs(makeRelationPickerAdmin(), 'web')->postJson(
-        '/admin/menus/create/relation-search/page_id',
-        ['search' => ''],
-    );
-
-    $response->assertOk();
-    $labels = array_column($response->json('options'), 'label');
-
-    expect($labels)->toContain('Live page')
-        ->and($labels)->not->toContain('Draft page')
-        ->and($labels)->not->toContain('A category');
-});
-
-it('menu category_id relation-search resolve mode returns the picked category', function (): void {
-    $category = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Blog']]);
-
-    $response = test()->actingAs(makeRelationPickerAdmin(), 'web')->postJson(
-        '/admin/menus/create/relation-search/category_id',
-        ['value' => (string) $category->id],
-    );
-
-    $response->assertOk()
-        ->assertExactJson(['option' => ['value' => (string) $category->id, 'label' => 'Blog']]);
-});
-
-it('menu page_id relation-search resolves on the edit page route too', function (): void {
-    $menu = Menu::create(['name' => 'Main', 'key' => 'main', 'items' => []]);
-    $page = Page::factory()->create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
-
-    $response = test()->actingAs(makeRelationPickerAdmin(), 'web')->postJson(
-        "/admin/menus/{$menu->id}/edit/relation-search/page_id",
-        ['value' => (string) $page->id],
-    );
-
-    $response->assertOk()
-        ->assertExactJson(['option' => ['value' => (string) $page->id, 'label' => 'Live page']]);
 });
 
 // --- PageForm::save() parent_id regression coverage for the new field's clear semantics ---
