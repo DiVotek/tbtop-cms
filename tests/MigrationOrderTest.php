@@ -22,7 +22,6 @@ const LEGACY_TABLE_NAMES = [
     'tbtop_templates' => 'cms_templates',
     'tbtop_form_submissions' => 'cms_form_submissions',
     'tbtop_layouts' => 'cms_layouts',
-    'tbtop_menus' => 'cms_menus',
 ];
 
 function migrationIndexOf(array $names, string $suffix): int

@@ -49,7 +49,6 @@ dataset('editor_gated_pages', [
     'languages' => ['/admin/languages'],
     'templates' => ['/admin/templates'],
     'layout' => ['/admin/layout'],
-    'menus' => ['/admin/menus'],
     'blocks' => ['/admin/blocks'],
     'users' => ['/admin/users'],
 ]);
@@ -72,7 +71,6 @@ dataset('administrator_pages', [
     'languages' => ['/admin/languages'],
     'templates' => ['/admin/templates'],
     'layout' => ['/admin/layout'],
-    'menus' => ['/admin/menus'],
     'blocks' => ['/admin/blocks'],
     'users' => ['/admin/users'],
 ]);
@@ -140,13 +138,13 @@ it('excludes gated nav items from an editor shared nav but includes them for an 
     $editorHrefs = collect($editorNav)->pluck('items')->flatten(1)->pluck('href')->all();
 
     expect($editorHrefs)->toContain('/admin/pages', '/admin/media-library')
-        ->and($editorHrefs)->not->toContain('/admin/users', '/admin/languages', '/admin/redirects', '/admin/menus', '/admin/blocks', '/admin/templates', '/admin/layout');
+        ->and($editorHrefs)->not->toContain('/admin/users', '/admin/languages', '/admin/redirects', '/admin/blocks', '/admin/templates', '/admin/layout');
 
     actingAsRole(CmsRole::Administrator);
     $adminNav = test()->get('/admin/dashboard', ['X-Inertia' => 'true'])->assertOk()->json('props.tbtop.nav');
     $adminHrefs = collect($adminNav)->pluck('items')->flatten(1)->pluck('href')->all();
 
-    expect($adminHrefs)->toContain('/admin/pages', '/admin/media-library', '/admin/users', '/admin/languages', '/admin/redirects', '/admin/menus', '/admin/blocks', '/admin/templates', '/admin/layout');
+    expect($adminHrefs)->toContain('/admin/pages', '/admin/media-library', '/admin/users', '/admin/languages', '/admin/redirects', '/admin/blocks', '/admin/templates', '/admin/layout');
 });
 
 it('gives every sidebar nav item a lucide icon (5.13)', function (): void {
@@ -160,7 +158,6 @@ it('gives every sidebar nav item a lucide icon (5.13)', function (): void {
         ->and($iconByHref['/admin/media-library'])->toBe('image')
         ->and($iconByHref['/admin/templates'])->toBe('layout-template')
         ->and($iconByHref['/admin/layout'])->toBe('panels-top-left')
-        ->and($iconByHref['/admin/menus'])->toBe('list')
         ->and($iconByHref['/admin/blocks'])->toBe('blocks')
         ->and($iconByHref['/admin/languages'])->toBe('languages')
         ->and($iconByHref['/admin/site-settings'])->toBe('settings')

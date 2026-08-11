@@ -10,9 +10,6 @@ use Tbtop\Cms\Admin\Pages\LayoutEditPage;
 use Tbtop\Cms\Admin\Pages\LayoutPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\MediaLibraryPage;
-use Tbtop\Cms\Admin\Pages\MenuCreatePage;
-use Tbtop\Cms\Admin\Pages\MenuEditPage;
-use Tbtop\Cms\Admin\Pages\MenusPage;
 use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
 use Tbtop\Cms\Admin\Pages\PageEditPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
@@ -63,10 +60,9 @@ return [
     ],
     'cache' => [
         // Cross-request cache for frontend content reads (settings, languages,
-        // layout, menus). Admin reads always stay live regardless of this flag.
+        // layout). Admin reads always stay live regardless of this flag.
         'enabled' => true,
-        // Seconds a cached entry lives before recomputing, subject to the
-        // schedule-aware cap CmsCache::rememberLive() applies on top.
+        // Seconds a cached entry lives before recomputing.
         'ttl' => 3600,
         // Cache store name to use (see config/cache.php stores). Null uses the
         // host application's default store.
@@ -138,9 +134,6 @@ return [
             'template_edit' => TemplateEditPage::class,
             'layout' => LayoutPage::class,
             'layout_edit' => LayoutEditPage::class,
-            'menus' => MenusPage::class,
-            'menu_create' => MenuCreatePage::class,
-            'menu_edit' => MenuEditPage::class,
             'blocks' => BlocksPage::class,
             'form_submissions' => FormSubmissionsPage::class,
             'form_submission' => FormSubmissionPage::class,
