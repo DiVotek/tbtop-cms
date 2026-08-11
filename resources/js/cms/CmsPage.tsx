@@ -21,12 +21,6 @@ interface SeoAlternate {
     url: string;
 }
 
-interface SeoVerification {
-    key: string;
-    name: string;
-    content: string;
-}
-
 interface Seo {
     title: string;
     description: string;
@@ -45,7 +39,7 @@ interface Seo {
     xDefault: string | null;
     favicon: string | null;
     jsonLd: Record<string, unknown>[];
-    verification: SeoVerification[];
+    gtmId: string | null;
 }
 
 interface CmsPageProps {
@@ -77,9 +71,9 @@ export default function CmsPage() {
                 {seo.canonical ? <link head-key="link-canonical" rel="canonical" href={seo.canonical} /> : null}
                 {seo.noindex ? <meta head-key="meta-robots" name="robots" content="noindex" /> : null}
                 {seo.favicon ? <link head-key="link-icon" rel="icon" href={seo.favicon} /> : null}
-                {seo.verification.map((entry) => (
-                    <meta key={entry.key} head-key={`verify-${entry.key}`} name={entry.name} content={entry.content} />
-                ))}
+                {/* GTM is not rendered here: the blade head/body partials emit Google's
+                    snippet outside Inertia's head manager, so it survives hydration and
+                    SPA navigations without ever being re-inserted. */}
                 {showAlternates
                     ? seo.alternates.map((alternate) => (
                           <AlternateLink

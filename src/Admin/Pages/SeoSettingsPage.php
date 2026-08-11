@@ -8,7 +8,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
-use Tbtop\Cms\Frontend\Seo\VerificationCode;
+use Tbtop\Cms\Frontend\Seo\GtmContainerId;
 
 class SeoSettingsPage extends SettingsPageBase
 {
@@ -69,9 +69,7 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_default_description' => 'seo.default_description',
             'seo_default_og_image' => 'seo.default_og_image',
             'seo_indexing_enabled' => 'seo.indexing_enabled',
-            'seo_verification_google' => 'seo.verification.google',
-            'seo_verification_bing' => 'seo.verification.bing',
-            'seo_verification_yandex' => 'seo.verification.yandex',
+            'seo_gtm_container_id' => 'seo.gtm_container_id',
             'seo_identity_type' => 'seo.identity.type',
             'seo_identity_name' => 'seo.identity.name',
             'seo_identity_logo' => 'seo.identity.logo',
@@ -116,13 +114,11 @@ class SeoSettingsPage extends SettingsPageBase
             $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled'))
                 ->helperText(__('tbtop-cms::settings.seo.helpers.indexing_enabled')),
             $s->displayDivider(),
-            $s->displayText(__('tbtop-cms::settings.seo.sections.verification'))->variant('subheading'),
-            $s->text('seo_verification_google')->label(__('tbtop-cms::settings.seo.fields.verification_google'))
-                ->helperText(__('tbtop-cms::settings.seo.helpers.verification'))->rules('nullable|max:255'),
-            $s->text('seo_verification_bing')->label(__('tbtop-cms::settings.seo.fields.verification_bing'))
-                ->helperText(__('tbtop-cms::settings.seo.helpers.verification'))->rules('nullable|max:255'),
-            $s->text('seo_verification_yandex')->label(__('tbtop-cms::settings.seo.fields.verification_yandex'))
-                ->helperText(__('tbtop-cms::settings.seo.helpers.verification'))->rules('nullable|max:255'),
+            $s->displayText(__('tbtop-cms::settings.seo.sections.gtm'))->variant('subheading'),
+            $s->text('seo_gtm_container_id')->label(__('tbtop-cms::settings.seo.fields.gtm_container_id'))
+                ->placeholder('GTM-XXXXXXX')
+                ->helperText(__('tbtop-cms::settings.seo.helpers.gtm_container_id'))
+                ->rules('nullable|max:2000'),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::settings.seo.sections.identity'))->variant('subheading'),
             $s->select('seo_identity_type')->label(__('tbtop-cms::settings.seo.fields.identity_type'))
@@ -144,10 +140,10 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * Verification codes are normalized on read too (SeoResolver reads
-     * through VerificationCode::extract() directly), but normalizing here as
-     * well means a re-opened settings page shows the cleaned-up value instead
-     * of the pasted tag the admin never sees stripped.
+     * The GTM container id is normalized on read too (SeoResolver::gtmId()
+     * extracts and validates), but normalizing here as well means a re-opened
+     * settings page shows the bare "GTM-…" id instead of the full install
+     * snippet the admin pasted.
      *
      * @param  array<string, mixed>  $form
      * @return array<string, mixed>
@@ -155,10 +151,8 @@ class SeoSettingsPage extends SettingsPageBase
     #[\Override]
     protected function normalizeForm(array $form): array
     {
-        foreach (['seo_verification_google', 'seo_verification_bing', 'seo_verification_yandex'] as $field) {
-            if (isset($form[$field]) && is_string($form[$field])) {
-                $form[$field] = VerificationCode::extract($form[$field]);
-            }
+        if (isset($form['seo_gtm_container_id']) && is_string($form['seo_gtm_container_id'])) {
+            $form['seo_gtm_container_id'] = GtmContainerId::extract($form['seo_gtm_container_id']);
         }
 
         return $form;

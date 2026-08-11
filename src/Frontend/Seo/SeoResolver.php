@@ -13,17 +13,9 @@ use Tbtop\Cms\Settings\Settings;
 /**
  * @phpstan-type Alternate array{locale: string, url: string}
  * @phpstan-type Breadcrumb array{label: string, path: string, url: string}
- * @phpstan-type Verification array{key: string, name: string, content: string}
  */
 class SeoResolver
 {
-    /** key => the meta tag's `name` attribute. */
-    private const array VERIFICATION_META_NAMES = [
-        'google' => 'google-site-verification',
-        'bing' => 'msvalidate.01',
-        'yandex' => 'yandex-verification',
-    ];
-
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
@@ -42,7 +34,7 @@ class SeoResolver
      *     ogType: string, ogUrl: string, ogLocale: string, ogLocaleAlternates: list<string>,
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
-     *     verification: list<Verification>,
+     *     gtmId: string|null,
      * }
      */
     public function resolve(Page $page, string $locale, array $breadcrumbs = []): array
@@ -78,7 +70,7 @@ class SeoResolver
             'xDefault' => $this->xDefault($alternates),
             'favicon' => $this->favicon(),
             'jsonLd' => $this->jsonLd($page, $locale, $siteName, $ogTitle, $canonical, $breadcrumbs),
-            'verification' => $this->verification(),
+            'gtmId' => $this->gtmId(),
         ];
     }
 
@@ -106,27 +98,23 @@ class SeoResolver
         };
     }
 
-    /** @return list<Verification> */
-    private function verification(): array
+    /**
+     * Extracted at read time too (not only on save in SeoSettingsPage), so a
+     * value written programmatically or as the full pasted snippet still
+     * resolves; anything that doesn't normalize to a well-formed GTM-… id is
+     * dropped rather than interpolated into the script/iframe URLs.
+     */
+    private function gtmId(): ?string
     {
-        $entries = [];
+        $raw = $this->settings->get('seo.gtm_container_id', '');
 
-        foreach (self::VERIFICATION_META_NAMES as $key => $metaName) {
-            $content = $this->verificationContent($key);
-
-            if ($content !== '') {
-                $entries[] = ['key' => $key, 'name' => $metaName, 'content' => $content];
-            }
+        if (! is_string($raw)) {
+            return null;
         }
 
-        return $entries;
-    }
+        $id = GtmContainerId::extract($raw);
 
-    private function verificationContent(string $key): string
-    {
-        $raw = $this->settings->get("seo.verification.{$key}", '');
-
-        return is_string($raw) ? VerificationCode::extract($raw) : '';
+        return GtmContainerId::valid($id) ? $id : null;
     }
 
     /**

@@ -121,18 +121,27 @@ it('omits the WebSite object when site.name is empty', function (): void {
     expect($html)->not->toContain('"@type":"WebSite"');
 });
 
-it('renders verification meta tags with data-inertia keys for each configured provider', function (): void {
+it('renders both halves of the GTM snippet when a container id is configured', function (): void {
     app(Cms::class)->frontendRoutes();
-    app(Settings::class)->set('seo.verification.google', 'g-code');
-    app(Settings::class)->set('seo.verification.yandex', 'y-code');
+    app(Settings::class)->set('seo.gtm_container_id', 'GTM-ABC1234');
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
 
     expect($html)
-        ->toContain('data-inertia="verify-google" name="google-site-verification" content="g-code"')
-        ->toContain('data-inertia="verify-yandex" name="yandex-verification" content="y-code"')
-        ->not->toContain('data-inertia="verify-bing"');
+        ->toContain("'https://www.googletagmanager.com/gtm.js?id='+i+dl")
+        ->toContain("'GTM-ABC1234'")
+        ->toContain('<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-ABC1234"');
+});
+
+it('renders no GTM markup when the container id is unset or malformed', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('seo.gtm_container_id', '"><script>alert(1)</script>');
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)->not->toContain('googletagmanager.com');
 });
 
 it('renders the identity JSON-LD object after WebSite and BreadcrumbList', function (): void {

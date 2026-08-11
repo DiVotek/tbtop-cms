@@ -89,6 +89,21 @@ the include detects this (via Inertia's own SSR dispatch) and renders nothing,
 so the tags are never duplicated. If the SSR process is down, this view falls
 back to rendering the tags itself — the head is never silently empty.
 
+Also add the body include immediately after the opening `<body>` tag:
+
+```blade
+<body>
+    @include('tbtop-cms::body')
+    @inertia
+</body>
+```
+
+It renders body-start markup the cms manages — currently the `<noscript>` half
+of the Google Tag Manager snippet, which Google's install rules require right
+after `<body>` (the `<script>` half is emitted by the head include; both
+appear only when a GTM container ID is set in the SEO settings). Like the head
+include, it renders nothing on non-cms routes.
+
 ### Server-side rendering
 
 By default the cms frontend body renders client-side only: Googlebot's

@@ -21,6 +21,7 @@
     @inertiaHead
 </head>
 <body>
+    @include('tbtop-cms::body')
     @inertia
 </body>
 </html>

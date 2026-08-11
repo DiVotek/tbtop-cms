@@ -68,8 +68,15 @@ to also create and edit users — see Added below); it no longer assigns roles.
 - Canonical URL override is now editable in the page SEO tab (advanced) — and
   actually persists: previously a `canonical` key in the seo JSON was wiped on
   every save because the bag is rebuilt wholesale.
-- Search-console verification meta tags (Google / Bing / Yandex) — paste the
-  bare code or the whole `<meta>` tag, both normalize to the code.
+- Google Tag Manager: set the container ID in the SEO settings (paste the
+  bare `GTM-…` id or the full install code — both normalize to the id) and
+  both halves of Google's snippet are inserted on every frontend page per
+  Google's rules — the loader `<script>` in `<head>`, the `<noscript>`
+  iframe right after `<body>`. **Host action required:** add
+  `@include('tbtop-cms::body')` immediately after the opening `<body>` tag
+  in the root view — see the README's "Server-rendered `<head>`" section.
+  The admin panel never gets the snippet. Malformed ids are dropped at
+  render time, never interpolated into the markup.
 - Identity JSON-LD: an `Organization`/`Person` object (name falling back to
   `site.name`, logo, `sameAs` profile links) emitted on every page when
   enabled in the SEO settings.

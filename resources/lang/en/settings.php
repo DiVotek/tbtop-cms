@@ -20,7 +20,7 @@ return [
         'title' => 'SEO settings',
         'subtitle' => 'Default metadata used across the site unless a page overrides it.',
         'sections' => [
-            'verification' => 'Search console verification',
+            'gtm' => 'Google Tag Manager',
             'identity' => 'Identity',
         ],
         'fields' => [
@@ -32,9 +32,7 @@ return [
             'default_og_image' => 'Default OG image',
             'indexing_enabled' => 'Allow search engines to index this site',
             'twitter_card' => 'Twitter card type',
-            'verification_google' => 'Google Search Console',
-            'verification_bing' => 'Bing Webmaster Tools',
-            'verification_yandex' => 'Yandex Webmaster',
+            'gtm_container_id' => 'Container ID',
             'identity_type' => 'Identity type',
             'identity_name' => 'Name',
             'identity_logo' => 'Logo',
@@ -54,7 +52,7 @@ return [
             'default_og_image' => 'Shown when a shared page has no OG image of its own and no page image.',
             'twitter_card' => 'How links to this site are presented when shared on X (Twitter).',
             'indexing_enabled' => 'When off, robots.txt disallows crawling, the sitemap is disabled, and every page gets a noindex meta tag.',
-            'verification' => 'Paste the verification code, or the full <meta> tag the provider gives you — either works. Not needed if the site is verified another way (DNS, Google Tag Manager, Analytics): leave empty and no tag is emitted.',
+            'gtm_container_id' => 'Paste the container ID (GTM-XXXXXXX) or the full install code from Google Tag Manager — either works. Both parts of the GTM snippet are inserted on every site page per Google\'s rules; leave empty and nothing is inserted.',
             'identity_type' => 'Adds an Organization/Person structured-data object to every page — search engines may use it for the knowledge panel.',
             'identity_logo' => 'Logo for the knowledge panel (organizations only).',
             'identity_same_as' => 'Type a profile URL (e.g. social media, Wikipedia) and press Enter to add it.',

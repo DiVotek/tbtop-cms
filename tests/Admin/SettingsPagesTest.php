@@ -106,15 +106,13 @@ it('labels SEO settings fields from translations and placeholders the title temp
     expect($titleTemplate['options']['placeholder'] ?? null)->toBe(__('tbtop-cms::settings.seo.placeholders.title_template'));
 });
 
-it('labels SEO identity/verification fields from translations', function (): void {
+it('labels SEO identity/GTM fields from translations', function (): void {
     $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
 
     $labels = settingsFieldLabels($structure);
 
-    expect($labels['seo_verification_google'])->toBe(__('tbtop-cms::settings.seo.fields.verification_google'))
-        ->and($labels['seo_verification_bing'])->toBe(__('tbtop-cms::settings.seo.fields.verification_bing'))
-        ->and($labels['seo_verification_yandex'])->toBe(__('tbtop-cms::settings.seo.fields.verification_yandex'))
+    expect($labels['seo_gtm_container_id'])->toBe(__('tbtop-cms::settings.seo.fields.gtm_container_id'))
         ->and($labels['seo_identity_type'])->toBe(__('tbtop-cms::settings.seo.fields.identity_type'))
         ->and($labels['seo_identity_name'])->toBe(__('tbtop-cms::settings.seo.fields.identity_name'))
         ->and($labels['seo_identity_logo'])->toBe(__('tbtop-cms::settings.seo.fields.identity_logo'))
@@ -166,17 +164,17 @@ it('round-trips recipients and chat ids between the stored string and tag chips'
         ->and(app(Settings::class)->get('notifications.telegram.chat_ids'))->toBe("333 # Olena\n444");
 });
 
-it('normalizes a pasted full verification meta tag down to just its content value on save', function (): void {
+it('normalizes a pasted full GTM install snippet down to the bare container id on save', function (): void {
     test()->post('/admin/seo-settings/forms/seo-settings', [
-        'seo_verification_google' => '<meta name="google-site-verification" content="g-code-abc" />',
+        'seo_gtm_container_id' => "<!-- Google Tag Manager -->\n<script>(function(w,d,s,l,i){...})(window,document,'script','dataLayer','GTM-AB12CD3');</script>",
     ])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect(app(Settings::class)->get('seo.verification.google'))->toBe('g-code-abc');
+    expect(app(Settings::class)->get('seo.gtm_container_id'))->toBe('GTM-AB12CD3');
 
     $record = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.data.seo-settings');
 
-    expect($record['seo_verification_google'])->toBe('g-code-abc');
+    expect($record['seo_gtm_container_id'])->toBe('GTM-AB12CD3');
 });
 
 it('does not return mail.password on the notification settings record', function (): void {

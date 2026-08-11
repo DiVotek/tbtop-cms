@@ -20,7 +20,7 @@ return [
         'title' => 'SEO-налаштування',
         'subtitle' => 'Метадані за замовчуванням для всього сайту, якщо сторінка їх не перевизначає.',
         'sections' => [
-            'verification' => 'Верифікація в пошукових консолях',
+            'gtm' => 'Google Tag Manager',
             'identity' => 'Ідентичність',
         ],
         'fields' => [
@@ -32,9 +32,7 @@ return [
             'default_og_image' => 'OG-зображення за замовчуванням',
             'indexing_enabled' => 'Дозволити пошуковим системам індексувати сайт',
             'twitter_card' => 'Тип Twitter-картки',
-            'verification_google' => 'Google Search Console',
-            'verification_bing' => 'Bing Webmaster Tools',
-            'verification_yandex' => 'Yandex Webmaster',
+            'gtm_container_id' => 'ID контейнера',
             'identity_type' => 'Тип ідентичності',
             'identity_name' => 'Назва',
             'identity_logo' => 'Логотип',
@@ -54,7 +52,7 @@ return [
             'default_og_image' => 'Показується, коли сторінка, якою поділилися, не має власного OG-зображення та зображення сторінки.',
             'twitter_card' => 'Як виглядають посилання на сайт, коли ними діляться в X (Twitter).',
             'indexing_enabled' => 'Коли вимкнено: robots.txt забороняє сканування, sitemap вимикається, і кожна сторінка отримує метатег noindex.',
-            'verification' => 'Вставте код верифікації або повний тег <meta>, наданий сервісом, — підійде будь-який варіант. Не потрібно, якщо сайт верифіковано інакше (DNS, Google Tag Manager, Analytics): залиште порожнім — тег не виводитиметься.',
+            'gtm_container_id' => 'Вставте ID контейнера (GTM-XXXXXXX) або повний код встановлення з Google Tag Manager — підійде будь-який варіант. Обидві частини коду GTM вставляються на кожну сторінку сайту за правилами Google; залиште порожнім — нічого не вставляється.',
             'identity_type' => 'Додає структуровані дані Organization/Person на кожну сторінку — пошукові системи можуть використати їх для панелі знань.',
             'identity_logo' => 'Логотип для панелі знань (лише для організацій).',
             'identity_same_as' => 'Введіть URL профілю (соцмережа, Вікіпедія тощо) і натисніть Enter, щоб додати.',
