@@ -73,7 +73,8 @@ class PageController
         // withDrafts=true branch — see hasPreviewAccess()) and should see the
         // preview affordances, same as a plain draft did before scheduling.
         $isPreview = ! $page->isLive();
-        $seo = $this->seo->resolve($page, $locale);
+        $breadcrumbs = $this->breadcrumbs->forPage($page, $locale);
+        $seo = $this->seo->resolve($page, $locale, $breadcrumbs);
 
         if ($isPreview) {
             $seo['noindex'] = true;
@@ -92,7 +93,7 @@ class PageController
             ],
             'render' => $this->assembler->assemble($resolved),
             'seo' => $seo,
-            'breadcrumbs' => $this->breadcrumbs->forPage($page, $locale),
+            'breadcrumbs' => $breadcrumbs,
             'path' => $path,
             'isPreview' => $isPreview,
         ];

@@ -32,6 +32,30 @@ to also create and edit users — see Added below); it no longer assigns roles.
 
 ### Added
 
+- Server-rendered `<head>`: title, description, canonical, full Open Graph
+  (`og:type/url/site_name/locale/locale:alternate` plus the existing
+  title/description/image), Twitter Card, hreflang (+ `x-default`), favicon,
+  and JSON-LD (`WebSite` + `BreadcrumbList`) are now rendered in blade on the
+  initial HTML response, so crawlers and social-network bots (which don't
+  execute JS) see them — previously these tags existed only in Inertia's
+  client-side `<Head>`. Host apps must add
+  `@include('tbtop-cms::head')` to their root view, above `@inertiaHead` —
+  see the README's "Server-rendered `<head>`" section. Client-side navigation
+  keeps rendering the same tags via `CmsPage.tsx`; the two are reconciled by
+  Inertia's `data-inertia`/`head-key` matching so hydration never duplicates them.
+  **Host action required:** delete `public/robots.txt` if it exists — Laravel's
+  default scaffold ships one, and as a static file it shadows this package's
+  dynamic `/robots.txt` route.
+- `SeoResolver::resolve()` gained `siteName`, `ogType`, `ogUrl`, `ogLocale`,
+  `ogLocaleAlternates`, `twitterCard`, `alternates`, `xDefault`, `favicon`,
+  and `jsonLd` — additive; existing keys are unchanged.
+- The sitemap's built XML is now cached (respecting `tbtop-cms.cache.enabled`)
+  with a TTL capped to the next page schedule transition
+  (`published_at`/`unpublish_at`), reusing the same content-cache
+  invalidation events as the rest of the frontend. `seo.indexing_enabled`
+  is still checked per-request, never from the cache.
+- `Tbtop\Cms\Cache\CmsCache::rememberLive()`/`rememberWithTtl()`/`defaultTtl()`
+  and `Tbtop\Cms\Cache\NextScheduleTransition` (restored).
 - `Tbtop\Cms\Admin\Events\CmsAccessGranted` and `CmsAccessRevoked` domain
   events, dispatched when a user's cms admin access is granted or revoked
   (from the Users page or the `cms:admin:grant`/`revoke` commands). A

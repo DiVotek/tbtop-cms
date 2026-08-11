@@ -61,6 +61,39 @@ frontend (non-admin) Inertia response:
 - `cms.layout` — resolved block lists (`header`/`footer`) the host renders in
   its persistent layout.
 
+### Server-rendered `<head>` (SEO)
+
+Frontend meta tags (title, description, canonical, Open Graph, Twitter Card,
+hreflang, favicon, JSON-LD) are rendered server-side in blade so crawlers and
+social-network bots see them without executing JS. Add the include to the
+host's root view, **above** `@inertiaHead`:
+
+```blade
+{{-- resources/views/app.blade.php --}}
+@vite(['resources/css/app.css', 'resources/js/app.tsx'])
+@include('tbtop-cms::head')
+@inertiaHead
+```
+
+The included view (`resources/views/head.blade.php` in this package) reads
+`$page['props']['seo']` off the Inertia root view's own `$page` array and
+renders nothing when it is absent (e.g. the root view reused by a non-cms
+route) — no extra wiring needed beyond the `@include` line. Client-side Inertia navigation keeps the same tags in sync
+via `CmsPage.tsx`'s `<Head>`; the two are reconciled by matching
+`data-inertia`/`head-key` attributes, so hydration does not duplicate them.
+
+### `public/robots.txt` must not exist
+
+Laravel's default scaffold ships `public/robots.txt`. Static files under
+`public/` are served before any route, so that file **shadows** this
+package's dynamic `/robots.txt` route (`RobotsController`) — the host's
+sitemap reference and indexing toggle never take effect while it's present.
+Delete it:
+
+```bash
+rm public/robots.txt
+```
+
 ## Admin access and roles
 
 Access to the admin panel is binary and owned by this package: a user has it if
