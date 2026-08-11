@@ -98,14 +98,19 @@ the full page (head **and** body) on the server for every frontend request.
 
 SSR is **opt-in and cms-scoped**: the flag lives at `tbtop-cms.ssr.enabled`
 (default `false`), not at Inertia's own `inertia.ssr.enabled`. This package
-forces `inertia.ssr.enabled` to `false` at boot (unless the host has
-published its own `config/inertia.php`) and only raises it back to `true` for
-the duration of a single request, via a middleware
+owns the Inertia flag: it forces `inertia.ssr.enabled` to `false` at boot —
+even when the host has published `config/inertia.php`, since the vendor stub
+defaults it to `true` and publishing the file for an unrelated tweak must not
+silently route the admin through SSR — and only raises it for the duration of
+a single cms frontend request, via a middleware
 (`Tbtop\Cms\Frontend\Http\Middleware\EnableSsr`) registered on the cms
-frontend route group next to `SetLanguage`. **Do not set
-`inertia.ssr.enabled` to `true` yourself in the host** (env var, published
-config, or otherwise) — that routes the admin panel through SSR too, and the
-admin client is not built or verified for it.
+frontend route group next to `SetLanguage`; the previous value is restored
+when the request unwinds, so long-lived workers never leak the raised flag
+into admin requests. **Do not enable global SSR in the host** — the admin
+client is not built or verified for it. A host that genuinely needs it can
+set `config(['inertia.ssr.enabled' => true])` in its own service provider's
+`boot()` (application providers boot after package providers, so that
+assignment wins) — at its own risk.
 
 #### Host recipe
 

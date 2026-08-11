@@ -49,12 +49,30 @@ it('mirrors the cms flag onto inertia.ssr.enabled in console so inertia:start-ss
     expect(config('inertia.ssr.enabled'))->toBeTrue();
 });
 
-it('flips inertia.ssr.enabled on for the current request when the cms flag is on', function (): void {
+it('flips inertia.ssr.enabled on for the duration of the request and restores it after', function (): void {
+    config(['tbtop-cms.ssr.enabled' => true, 'inertia.ssr.enabled' => false]);
+    $seenInside = null;
+
+    (new EnableSsr)->handle(request(), function ($request) use (&$seenInside) {
+        $seenInside = config('inertia.ssr.enabled');
+
+        return response('ok');
+    });
+
+    // Config is application-global: on a long-lived worker a raised flag
+    // left behind would SSR a later admin request in the same process
+    // (bot-reported). The flag must be true only while $next() runs.
+    expect($seenInside)->toBeTrue()
+        ->and(config('inertia.ssr.enabled'))->toBeFalse();
+});
+
+it('restores the flag even when the downstream pipeline throws', function (): void {
     config(['tbtop-cms.ssr.enabled' => true, 'inertia.ssr.enabled' => false]);
 
-    (new EnableSsr)->handle(request(), fn ($request) => response('ok'));
-
-    expect(config('inertia.ssr.enabled'))->toBeTrue();
+    expect(fn () => (new EnableSsr)->handle(request(), function ($request): never {
+        throw new RuntimeException('boom');
+    }))->toThrow(RuntimeException::class)
+        ->and(config('inertia.ssr.enabled'))->toBeFalse();
 });
 
 // The admin panel (Tbtop\Admin\Http\PageController) always calls
@@ -96,6 +114,11 @@ it('applies EnableSsr to cms frontend routes, flipping the config for that reque
 
     $html = test()->get($page->pathFor('en'))->assertOk()->getContent();
 
+    // The response WAS server-rendered (dispatch happened inside $next(),
+    // where Router::prepareResponse renders the Inertia view), yet the
+    // global flag is back to false once the request has unwound — an admin
+    // request handled next by the same process must not inherit it.
     expect(RecordingSsrGateway::$calls)->toBe(1)
-        ->and($html)->toContain('SSR Title');
+        ->and($html)->toContain('SSR Title')
+        ->and(config('inertia.ssr.enabled'))->toBeFalse();
 });

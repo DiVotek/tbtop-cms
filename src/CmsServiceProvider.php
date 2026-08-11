@@ -168,11 +168,14 @@ class CmsServiceProvider extends PackageServiceProvider
      * is on, is what makes SSR an opt-in cms-only capability rather than an
      * ambient one.
      *
-     * Only applies when the host has not published `config/inertia.php`:
-     * once that file exists on disk, `enabled` is the host's own explicit
-     * choice (even if it happens to be `true`) and must not be overridden —
-     * that's the host opting into global SSR, which the README warns
-     * against but does not forbid.
+     * Applied unconditionally — a published `config/inertia.php` is NOT
+     * treated as an opt-out, because the vendor stub it is copied from
+     * defaults `enabled` to true: a host publishing the file for an
+     * unrelated tweak (ssr port, bundle path) would silently route the
+     * admin through SSR. A host that genuinely wants global SSR keeps the
+     * standard escape hatch: set `config(['inertia.ssr.enabled' => true])`
+     * in its own service provider's boot() — application providers boot
+     * after discovered package providers, so that assignment wins.
      *
      * In console the flag mirrors `tbtop-cms.ssr.enabled` instead of being
      * forced false: `inertia:start-ssr` refuses to boot the SSR process when
@@ -185,10 +188,6 @@ class CmsServiceProvider extends PackageServiceProvider
      */
     private function forceSsrOffByDefault(): void
     {
-        if (file_exists(config_path('inertia.php'))) {
-            return;
-        }
-
         config(['inertia.ssr.enabled' => $this->app->runningInConsole()
             ? (bool) config('tbtop-cms.ssr.enabled', false)
             : false,
