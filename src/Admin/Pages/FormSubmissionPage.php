@@ -15,6 +15,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Support\AuthorNames;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
@@ -52,7 +53,7 @@ class FormSubmissionPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.submissions';
+        return CmsAbilities::for('tbtop-cms.submissions');
     }
 
     #[\Override]

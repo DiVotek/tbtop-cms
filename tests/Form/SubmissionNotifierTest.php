@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Cms;
@@ -34,7 +33,7 @@ beforeEach(function (): void {
 function notifierAdmin(string $email = 'admin@example.test'): AdminUser
 {
     $user = AdminUser::create(['name' => 'Admin', 'email' => $email, 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
 
     return $user;
 }

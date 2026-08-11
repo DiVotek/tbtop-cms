@@ -6,7 +6,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Tests\Fixtures\UuidAdminUser;
 
 // Provider order for the affected migrations — proves the corrective
@@ -84,7 +83,6 @@ it('lets a uuid-pk host save a profile row and a page revision snapshot with the
 
     DB::connection('uuid_host_test')->table('tbtop_user_profiles')->insert([
         'user_id' => $userId,
-        'role' => CmsRole::SuperAdministrator->value,
     ]);
 
     $storedProfileUserId = DB::connection('uuid_host_test')->table('tbtop_user_profiles')->where('user_id', $userId)->value('user_id');

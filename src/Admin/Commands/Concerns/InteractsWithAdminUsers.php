@@ -6,7 +6,7 @@ namespace Tbtop\Cms\Admin\Commands\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Tbtop\Cms\Admin\Contracts\CmsAdmin;
-use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Admin\Support\AdminAccess;
 
 trait InteractsWithAdminUsers
 {
@@ -26,12 +26,19 @@ trait InteractsWithAdminUsers
 
     protected function grantAccess(Model $user): void
     {
-        CmsUserProfile::query()->firstOrCreate(['user_id' => $user->getKey()]);
+        AdminAccess::grant(self::userId($user));
     }
 
     protected function revokeAccess(Model $user): void
     {
-        CmsUserProfile::query()->where('user_id', $user->getKey())->delete();
+        AdminAccess::revoke(self::userId($user));
+    }
+
+    private static function userId(Model $user): int | string
+    {
+        $id = $user->getKey();
+
+        return is_int($id) ? $id : (string) $id;
     }
 
     protected function overridesProfileAccess(Model $user): bool

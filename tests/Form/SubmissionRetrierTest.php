@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\Models\FormSubmission;
@@ -153,7 +152,7 @@ it('re-runs the notification fan-out on retry and can flip failed to handled via
 
 it('re-runs the bell fan-out on retry, notifying every current admin', function (): void {
     $admin = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.test', 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $admin->id, 'role' => CmsRole::SuperAdministrator]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $admin->id]);
     config(['tbtop-cms.admin.model' => AdminUser::class]);
 
     $page = contactPageForRetry();

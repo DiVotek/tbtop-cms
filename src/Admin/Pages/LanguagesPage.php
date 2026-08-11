@@ -18,6 +18,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Models\Language;
 
@@ -42,7 +43,7 @@ class LanguagesPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.languages';
+        return CmsAbilities::for('tbtop-cms.languages');
     }
 
     #[\Override]

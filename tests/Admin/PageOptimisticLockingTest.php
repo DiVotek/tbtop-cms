@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -25,7 +24,7 @@ function makeLockingAdmin(): AdminUser
     static $n = 0;
     $n++;
     $user = AdminUser::create(['name' => 'Admin ' . $n, 'email' => "locking-admin{$n}@example.com", 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
 
     return $user;
 }

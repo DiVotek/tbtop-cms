@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\LeadStatus;
@@ -27,16 +27,7 @@ beforeEach(function (): void {
 function actingAsCmsAdmin(): AdminUser
 {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
-    test()->actingAs($user, 'web');
-
-    return $user;
-}
-
-function actingAsCmsEditor(): AdminUser
-{
-    $user = AdminUser::create(['name' => 'Editor', 'email' => 'editor@example.com', 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::Editor]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
     test()->actingAs($user, 'web');
 
     return $user;
@@ -220,10 +211,26 @@ it('shows the unread lead count on the inbox badge', function (): void {
     expect(inboxActionOptions()['badge'])->toBe('2');
 });
 
-// Editors lack tbtop-cms.submissions (CmsRole::sections()) and can't reach
-// /admin/form-submissions itself, so the header is read off /admin/pages.
-it('hides the Inbox header item from an editor, who lacks tbtop-cms.submissions', function (): void {
-    actingAsCmsEditor();
+// CmsChrome only calls authorize('tbtop-cms.submissions') when roles are on
+// (see its docblock) — an unconditional call would hide the inbox for
+// everyone once tbtop-cms.roles defaults to off and the package defines no
+// gates of its own.
+it('shows the Inbox header item to anyone with admin access when roles are off', function (): void {
+    config(['tbtop-cms.roles' => false]);
+    actingAsCmsAdmin();
+
+    $header = test()->get('/admin/pages', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.tbtop.chrome.header');
+
+    expect(findNodeByName($header, 'inbox'))->not->toBeNull();
+});
+
+it('hides the Inbox header item from a user who lacks tbtop-cms.submissions when roles are on', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.pages', static fn (): bool => true);
+    Gate::define('tbtop-cms.submissions', static fn (): bool => false);
+    actingAsCmsAdmin();
 
     $header = test()->get('/admin/pages', ['X-Inertia' => 'true'])
         ->assertOk()
@@ -232,7 +239,10 @@ it('hides the Inbox header item from an editor, who lacks tbtop-cms.submissions'
     expect(findNodeByName($header, 'inbox'))->toBeNull();
 });
 
-it('shows the Inbox header item to a superadministrator, who has tbtop-cms.submissions', function (): void {
+it('shows the Inbox header item to a user who has tbtop-cms.submissions when roles are on', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.pages', static fn (): bool => true);
+    Gate::define('tbtop-cms.submissions', static fn (): bool => true);
     actingAsCmsAdmin();
 
     $header = test()->get('/admin/pages', ['X-Inertia' => 'true'])
