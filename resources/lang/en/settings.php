@@ -19,14 +19,45 @@ return [
     'seo' => [
         'title' => 'SEO settings',
         'subtitle' => 'Default metadata used across the site unless a page overrides it.',
+        'sections' => [
+            'verification' => 'Search console verification',
+            'identity' => 'Identity',
+        ],
         'fields' => [
             'title_suffix' => 'Title suffix',
+            'title_template' => 'Title template',
+            'title_separator' => 'Title separator',
             'default_description' => 'Default description',
             'default_og_image' => 'Default OG image',
             'indexing_enabled' => 'Allow search engines to index this site',
+            'twitter_card' => 'Twitter card type',
+            'verification_google' => 'Google Search Console',
+            'verification_bing' => 'Bing Webmaster Tools',
+            'verification_yandex' => 'Yandex Webmaster',
+            'identity_type' => 'Identity type',
+            'identity_name' => 'Name',
+            'identity_logo' => 'Logo',
+            'identity_same_as' => 'Profile links',
         ],
         'placeholders' => [
             'title_suffix' => ' — Site Name',
+            'title_template' => '{title} {sep} {site_name}',
+            'identity_name' => 'Defaults to the site name',
+        ],
+        'helpers' => [
+            'title_template' => 'Available placeholders: {title}, {site_name}, {sep}. Leave empty to keep the legacy title suffix behavior.',
+            'verification' => 'Paste the verification code, or the full <meta> tag the provider gives you — either works.',
+            'identity_same_as' => 'Type a profile URL (e.g. social media, Wikipedia) and press Enter to add it.',
+        ],
+        'twitter_card' => [
+            'auto' => 'Auto (summary with image, otherwise plain summary)',
+            'summary' => 'Summary',
+            'summary_large_image' => 'Summary with large image',
+        ],
+        'identity_type' => [
+            'none' => 'None',
+            'organization' => 'Organization',
+            'person' => 'Person',
         ],
     ],
     'notifications' => [

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages;
 
 use Tbtop\Admin\Dsl\Fields\Field;
+use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Admin\Dsl\TextBlock;
+use Tbtop\Cms\Frontend\Seo\VerificationCode;
 
 class SeoSettingsPage extends SettingsPageBase
 {
@@ -47,27 +50,100 @@ class SeoSettingsPage extends SettingsPageBase
         ];
     }
 
-    /** @return array<string, string> */
+    /**
+     * seo_title_suffix stays mapped (and functional under the hood in
+     * SeoResolver — see its title()/titleWithSuffix()) but no longer has a
+     * field below: seo_title_template replaces it in the UI, and both a
+     * legacy-suffix site and one that never opens this page again must keep
+     * rendering titles exactly as before. Never migrated/deleted.
+     *
+     * @return array<string, string>
+     */
     protected function map(): array
     {
         return [
             'seo_title_suffix' => 'seo.title_suffix',
+            'seo_title_template' => 'seo.title_template',
+            'seo_title_separator' => 'seo.title_separator',
             'seo_default_description' => 'seo.default_description',
             'seo_default_og_image' => 'seo.default_og_image',
             'seo_indexing_enabled' => 'seo.indexing_enabled',
+            'seo_verification_google' => 'seo.verification.google',
+            'seo_verification_bing' => 'seo.verification.bing',
+            'seo_verification_yandex' => 'seo.verification.yandex',
+            'seo_identity_type' => 'seo.identity.type',
+            'seo_identity_name' => 'seo.identity.name',
+            'seo_identity_logo' => 'seo.identity.logo',
+            'seo_identity_same_as' => 'seo.identity.same_as',
+            'seo_twitter_card' => 'seo.twitter_card',
         ];
     }
 
-    /** @return list<Field> */
+    /** @return list<Field|Node|TextBlock> */
     protected function fields(S $s): array
     {
         return [
-            $s->text('seo_title_suffix')->label(__('tbtop-cms::settings.seo.fields.title_suffix'))
-                ->placeholder(__('tbtop-cms::settings.seo.placeholders.title_suffix'))->rules('nullable|max:255'),
+            $s->text('seo_title_template')->label(__('tbtop-cms::settings.seo.fields.title_template'))
+                ->translatable()
+                ->placeholder(__('tbtop-cms::settings.seo.placeholders.title_template'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.title_template'))
+                ->rules('nullable|max:255'),
+            $s->text('seo_title_separator')->label(__('tbtop-cms::settings.seo.fields.title_separator'))
+                ->placeholder('—')->rules('nullable|max:10'),
             $s->textarea('seo_default_description')->label(__('tbtop-cms::settings.seo.fields.default_description'))
-                ->rules('nullable|max:500'),
+                ->translatable()->rules('nullable|max:500'),
             $s->media('seo_default_og_image')->label(__('tbtop-cms::settings.seo.fields.default_og_image'))->variant('preview'),
+            $s->select('seo_twitter_card')->label(__('tbtop-cms::settings.seo.fields.twitter_card'))
+                ->options([
+                    ['value' => 'auto', 'label' => __('tbtop-cms::settings.seo.twitter_card.auto')],
+                    ['value' => 'summary', 'label' => __('tbtop-cms::settings.seo.twitter_card.summary')],
+                    ['value' => 'summary_large_image', 'label' => __('tbtop-cms::settings.seo.twitter_card.summary_large_image')],
+                ])
+                ->rules('nullable|in:auto,summary,summary_large_image'),
             $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled')),
+            $s->displayDivider(),
+            $s->displayText(__('tbtop-cms::settings.seo.sections.verification'))->variant('subheading'),
+            $s->text('seo_verification_google')->label(__('tbtop-cms::settings.seo.fields.verification_google'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.verification'))->rules('nullable|max:255'),
+            $s->text('seo_verification_bing')->label(__('tbtop-cms::settings.seo.fields.verification_bing'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.verification'))->rules('nullable|max:255'),
+            $s->text('seo_verification_yandex')->label(__('tbtop-cms::settings.seo.fields.verification_yandex'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.verification'))->rules('nullable|max:255'),
+            $s->displayDivider(),
+            $s->displayText(__('tbtop-cms::settings.seo.sections.identity'))->variant('subheading'),
+            $s->select('seo_identity_type')->label(__('tbtop-cms::settings.seo.fields.identity_type'))
+                ->options([
+                    ['value' => 'none', 'label' => __('tbtop-cms::settings.seo.identity_type.none')],
+                    ['value' => 'organization', 'label' => __('tbtop-cms::settings.seo.identity_type.organization')],
+                    ['value' => 'person', 'label' => __('tbtop-cms::settings.seo.identity_type.person')],
+                ])
+                ->rules('nullable|in:none,organization,person'),
+            $s->text('seo_identity_name')->label(__('tbtop-cms::settings.seo.fields.identity_name'))
+                ->placeholder(__('tbtop-cms::settings.seo.placeholders.identity_name'))->rules('nullable|max:255'),
+            $s->media('seo_identity_logo')->label(__('tbtop-cms::settings.seo.fields.identity_logo'))->variant('preview'),
+            $s->tags('seo_identity_same_as')->label(__('tbtop-cms::settings.seo.fields.identity_same_as'))
+                ->rules('nullable|array')->helperText(__('tbtop-cms::settings.seo.helpers.identity_same_as')),
         ];
+    }
+
+    /**
+     * Verification codes are normalized on read too (SeoResolver reads
+     * through VerificationCode::extract() directly), but normalizing here as
+     * well means a re-opened settings page shows the cleaned-up value instead
+     * of the pasted tag the admin never sees stripped.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function normalizeForm(array $form): array
+    {
+        foreach (['seo_verification_google', 'seo_verification_bing', 'seo_verification_yandex'] as $field) {
+            if (isset($form[$field]) && is_string($form[$field])) {
+                $form[$field] = VerificationCode::extract($form[$field]);
+            }
+        }
+
+        return $form;
     }
 }

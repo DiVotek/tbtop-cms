@@ -121,6 +121,38 @@ it('omits the WebSite object when site.name is empty', function (): void {
     expect($html)->not->toContain('"@type":"WebSite"');
 });
 
+it('renders verification meta tags with data-inertia keys for each configured provider', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('seo.verification.google', 'g-code');
+    app(Settings::class)->set('seo.verification.yandex', 'y-code');
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)
+        ->toContain('data-inertia="verify-google" name="google-site-verification" content="g-code"')
+        ->toContain('data-inertia="verify-yandex" name="yandex-verification" content="y-code"')
+        ->not->toContain('data-inertia="verify-bing"');
+});
+
+it('renders the identity JSON-LD object after WebSite and BreadcrumbList', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    app(Settings::class)->set('seo.identity.name', 'Acme Organization');
+    $parent = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Guides'], 'title' => ['en' => '']]);
+    $page = Page::factory()->article()->create(['status' => PageStatus::Published, 'parent_id' => $parent->id, 'name' => ['en' => 'Setup']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)
+        ->toContain('data-inertia="jsonld-0"')
+        ->toContain('data-inertia="jsonld-1"')
+        ->toContain('data-inertia="jsonld-2"')
+        ->toContain('"@type":"Organization"')
+        ->toContain('"name":"Acme Organization"');
+});
+
 it('renders the robots noindex tag for a noindex page', function (): void {
     app(Cms::class)->frontendRoutes();
     $page = Page::factory()->create([

@@ -13,9 +13,17 @@ use Tbtop\Cms\Settings\Settings;
 /**
  * @phpstan-type Alternate array{locale: string, url: string}
  * @phpstan-type Breadcrumb array{label: string, path: string, url: string}
+ * @phpstan-type Verification array{key: string, name: string, content: string}
  */
 class SeoResolver
 {
+    /** key => the meta tag's `name` attribute. */
+    private const array VERIFICATION_META_NAMES = [
+        'google' => 'google-site-verification',
+        'bing' => 'msvalidate.01',
+        'yandex' => 'yandex-verification',
+    ];
+
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
@@ -34,6 +42,7 @@ class SeoResolver
      *     ogType: string, ogUrl: string, ogLocale: string, ogLocaleAlternates: list<string>,
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
+     *     verification: list<Verification>,
      * }
      */
     public function resolve(Page $page, string $locale, array $breadcrumbs = []): array
@@ -43,30 +52,78 @@ class SeoResolver
         $metaDescription = $this->description($page, $seo, $locale);
         $canonical = $this->canonical($page, $seo, $locale);
         $ogImage = $this->ogImage($page, $seo);
-        $ogTitle = $this->str($seo, 'og_title') ?: $metaTitle;
-        $ogDescription = $this->str($seo, 'og_description') ?: $metaDescription;
+        $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
+        $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale) ?: $metaDescription;
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
 
         return [
-            'title' => $this->title($metaTitle),
+            'title' => $this->title($metaTitle, $locale),
             'description' => $metaDescription,
             'canonical' => $canonical,
             'ogImage' => $ogImage,
             'ogTitle' => $ogTitle,
             'ogDescription' => $ogDescription,
-            'noindex' => ! $page->is_indexable,
+            'noindex' => ! $page->is_indexable || ! $this->indexingEnabled(),
             'siteName' => $siteName,
             'ogType' => 'website',
             'ogUrl' => $canonical,
             'ogLocale' => $locale,
             'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
-            'twitterCard' => $ogImage !== null ? 'summary_large_image' : 'summary',
+            'twitterCard' => $this->twitterCard($ogImage),
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
             'favicon' => $this->favicon(),
             'jsonLd' => $this->jsonLd($page, $locale, $siteName, $ogTitle, $canonical, $breadcrumbs),
+            'verification' => $this->verification(),
         ];
+    }
+
+    /**
+     * `seo.indexing_enabled` stores a plain boolean, but a setting row can
+     * exist with a literally-stored JSON null (Settings::get() only applies
+     * its $default when the KEY is absent, not when it decodes to null) — an
+     * unset boolean must read as "indexing on", not silently flip every page
+     * to noindex, so null is treated the same as a missing key here.
+     */
+    private function indexingEnabled(): bool
+    {
+        $value = $this->settings->get('seo.indexing_enabled', true);
+
+        return $value === null || (bool) $value;
+    }
+
+    private function twitterCard(?string $ogImage): string
+    {
+        $choice = (string) $this->settings->get('seo.twitter_card', 'auto');
+
+        return match ($choice) {
+            'summary', 'summary_large_image' => $choice,
+            default => $ogImage !== null ? 'summary_large_image' : 'summary',
+        };
+    }
+
+    /** @return list<Verification> */
+    private function verification(): array
+    {
+        $entries = [];
+
+        foreach (self::VERIFICATION_META_NAMES as $key => $metaName) {
+            $content = $this->verificationContent($key);
+
+            if ($content !== '') {
+                $entries[] = ['key' => $key, 'name' => $metaName, 'content' => $content];
+            }
+        }
+
+        return $entries;
+    }
+
+    private function verificationContent(string $key): string
+    {
+        $raw = $this->settings->get("seo.verification.{$key}", '');
+
+        return is_string($raw) ? VerificationCode::extract($raw) : '';
     }
 
     /**
@@ -158,7 +215,41 @@ class SeoResolver
             $objects[] = $breadcrumbList;
         }
 
+        $identity = $this->identity();
+
+        if ($identity !== null) {
+            $objects[] = $identity;
+        }
+
         return $objects;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function identity(): ?array
+    {
+        $type = (string) $this->settings->get('seo.identity.type', 'none');
+        $name = (string) $this->settings->get('seo.identity.name', '');
+
+        if ($name === '') {
+            $name = (string) $this->settings->get('site.name', '');
+        }
+
+        $logoId = $this->settings->get('seo.identity.logo');
+        $logo = is_string($logoId) && $logoId !== '' ? $this->mediaUrlResolver->resolve($logoId) : null;
+
+        return $this->jsonLd->identity($type, $name, url('/'), $logo, $this->sameAs());
+    }
+
+    /** @return list<string> */
+    private function sameAs(): array
+    {
+        $raw = $this->settings->get('seo.identity.same_as', []);
+
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter($raw, static fn (mixed $url): bool => is_string($url) && $url !== ''));
     }
 
     /** @return list<string> */
@@ -171,24 +262,41 @@ class SeoResolver
     }
 
     /**
-     * The meta title before the global suffix is appended — also the base
+     * The meta title before the template/suffix is applied — also the base
      * that og:title falls back to when no og_title override is set.
      *
      * Cascade: seo.title → page.title → page.name. The last link matters:
      * name is the only required editorial field, so a page with empty
      * Title/Meta title still gets a non-empty <title> instead of a bare
-     * suffix (or nothing at all when no suffix is configured).
+     * template/suffix (or nothing at all when neither is configured).
      *
      * @param  array<string, mixed>  $seo
      */
     private function metaTitle(Page $page, array $seo, string $locale): string
     {
-        return $this->str($seo, 'title')
+        return LocalizedSeo::value($seo['title'] ?? null, $locale)
             ?: (string) $page->getTranslation('title', $locale)
             ?: (string) $page->getTranslation('name', $locale);
     }
 
-    private function title(string $base): string
+    /**
+     * `seo.title_template` (translatable) supersedes the legacy single-space
+     * suffix when set for this locale — existing sites that never touch the
+     * new setting must see byte-identical titles, so an empty template falls
+     * straight back to append-suffix.
+     */
+    private function title(string $base, string $locale): string
+    {
+        $template = LocalizedSeo::value($this->settings->get('seo.title_template'), $locale);
+
+        if ($template === '') {
+            return $this->titleWithSuffix($base);
+        }
+
+        return $this->renderTitleTemplate($template, $base, $locale);
+    }
+
+    private function titleWithSuffix(string $base): string
     {
         $suffix = (string) $this->settings->get('seo.title_suffix', '');
 
@@ -199,10 +307,40 @@ class SeoResolver
         return $base === '' ? $suffix : $base . ' ' . $suffix;
     }
 
+    private function renderTitleTemplate(string $template, string $base, string $locale): string
+    {
+        $siteName = (string) $this->settings->get('site.name', '');
+        $separator = LocalizedSeo::value($this->settings->get('seo.title_separator', '—'), $locale) ?: '—';
+
+        $rendered = strtr($template, [
+            '{title}' => $base,
+            '{site_name}' => $siteName,
+            '{sep}' => $separator,
+        ]);
+
+        return $this->cleanupTitle($rendered, $separator);
+    }
+
+    /**
+     * An empty {title}/{site_name} substitution leaves a dangling separator
+     * and/or run of whitespace behind (e.g. "{title} {sep} {site_name}" with
+     * an empty site_name renders "My Page — "). Collapses whitespace runs
+     * first, then strips any separator left stranded at either edge, so the
+     * result never opens or closes on a bare separator.
+     */
+    private function cleanupTitle(string $rendered, string $separator): string
+    {
+        $collapsed = trim((string) preg_replace('/\s+/u', ' ', $rendered));
+        $quotedSep = preg_quote($separator, '/');
+        $trimmed = preg_replace("/^(?:{$quotedSep}\\s*)+|(?:\\s*{$quotedSep})+\$/u", '', $collapsed);
+
+        return trim((string) $trimmed);
+    }
+
     /** @param array<string, mixed> $seo */
     private function canonical(Page $page, array $seo, string $locale): string
     {
-        $override = $this->str($seo, 'canonical');
+        $override = LocalizedSeo::value($seo['canonical'] ?? null, $locale);
 
         if ($override !== '') {
             return $override;
@@ -216,14 +354,16 @@ class SeoResolver
      * fields — each stores a media id, not a URL, so all three go through
      * the same id-to-url resolver. Fallback order: the page's explicit
      * og_image override, then the page's own image, then the global default.
+     * og_image itself is NOT translatable (see PageForm::seoFields()) — an
+     * image isn't per-locale, so it's read as a plain scalar.
      *
      * @param  array<string, mixed>  $seo
      */
     private function ogImage(Page $page, array $seo): ?string
     {
-        $override = $this->str($seo, 'og_image');
+        $override = $seo['og_image'] ?? null;
 
-        if ($override !== '') {
+        if (is_string($override) && $override !== '') {
             return $this->mediaUrlResolver->resolve($override);
         }
 
@@ -239,7 +379,7 @@ class SeoResolver
     /** @param array<string, mixed> $seo */
     private function description(Page $page, array $seo, string $locale): string
     {
-        $override = $this->str($seo, 'description');
+        $override = LocalizedSeo::value($seo['description'] ?? null, $locale);
 
         if ($override !== '') {
             return $override;
@@ -251,16 +391,6 @@ class SeoResolver
             return $summary;
         }
 
-        $global = $this->settings->get('seo.default_description', '');
-
-        return is_string($global) ? $global : '';
-    }
-
-    /** @param array<string, mixed> $seo */
-    private function str(array $seo, string $key): string
-    {
-        $value = $seo[$key] ?? null;
-
-        return is_string($value) ? $value : '';
+        return LocalizedSeo::value($this->settings->get('seo.default_description', ''), $locale);
     }
 }

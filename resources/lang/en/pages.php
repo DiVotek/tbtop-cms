@@ -76,10 +76,10 @@ return [
         'seo_description' => 'Meta description',
         'seo_focus_keyword' => 'Focus keyword',
         'og_title' => 'OG title',
-        'og_title_placeholder' => 'Defaults to the meta title',
         'og_description' => 'OG description',
-        'og_description_placeholder' => 'Defaults to the meta description',
         'og_image' => 'OG image',
+        'seo_canonical' => 'Canonical URL override',
+        'seo_canonical_hint' => 'Advanced use only — overrides the computed canonical URL for this page in this locale.',
         'image' => 'Image',
     ],
     'actions' => [

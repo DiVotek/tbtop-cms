@@ -10,6 +10,7 @@ use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Redirect\Models\Redirect;
+use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
@@ -310,12 +311,13 @@ it('saves general and SEO fields including the seo json column', function (): vo
             'parent_id' => 'none',
             'status' => PageStatus::Published->value,
             'sort_order' => 5,
-            'seo_title' => 'Meta title',
-            'seo_description' => 'Meta description',
-            'seo_focus_keyword' => 'widgets',
-            'og_title' => 'OG title',
-            'og_description' => 'OG description',
+            'seo_title' => ['en' => 'Meta title'],
+            'seo_description' => ['en' => 'Meta description'],
+            'seo_focus_keyword' => ['en' => 'widgets'],
+            'og_title' => ['en' => 'OG title'],
+            'og_description' => ['en' => 'OG description'],
             'og_image' => '42',
+            'seo_canonical' => ['en' => 'https://example.com/canonical'],
             'is_indexable' => true,
         ],
     );
@@ -326,13 +328,64 @@ it('saves general and SEO fields including the seo json column', function (): vo
     expect($page->getTranslation('name', 'en'))->toBe('About Updated')
         ->and($page->sort_order)->toBe(5)
         ->and($page->seo)->toBe([
-            'title' => 'Meta title',
-            'description' => 'Meta description',
-            'focus_keyword' => 'widgets',
-            'og_title' => 'OG title',
-            'og_description' => 'OG description',
+            'title' => ['en' => 'Meta title'],
+            'description' => ['en' => 'Meta description'],
+            'focus_keyword' => ['en' => 'widgets'],
+            'og_title' => ['en' => 'OG title'],
+            'og_description' => ['en' => 'OG description'],
             'og_image' => '42',
+            'canonical' => ['en' => 'https://example.com/canonical'],
         ]);
+});
+
+it('placeholders seo_title/seo_description/og_title/og_description with the computed final value for the default locale', function (): void {
+    app(Settings::class)->set('seo.title_suffix', '— Acme');
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About Page'],
+        'summary' => ['en' => 'A short summary.'],
+    ]);
+
+    $tabs = editFormTabs($page->id);
+    $seoChildren = $tabs[1]['body']['options']['children'];
+    $seoTitle = collect($seoChildren)->firstWhere('name', 'seo_title');
+    $seoDescription = collect($seoChildren)->firstWhere('name', 'seo_description');
+
+    expect($seoTitle['options']['placeholder'] ?? null)->toBe('About Page — Acme')
+        ->and($seoDescription['options']['placeholder'] ?? null)->toBe('A short summary.');
+});
+
+it('rejects an invalid seo_canonical URL for the default locale', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...baseEditPayload(), 'seo_canonical' => ['en' => 'not-a-url']],
+    )->assertSessionHasErrors('seo_canonical.en');
+});
+
+it('rejects an invalid seo_canonical URL for a non-default locale', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...baseEditPayload(), 'seo_canonical' => ['en' => '', 'uk' => 'not-a-url']],
+    )->assertSessionHasErrors('seo_canonical.uk');
+});
+
+it('accepts a valid seo_canonical URL for a non-default locale', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...baseEditPayload(), 'seo_canonical' => ['en' => '', 'uk' => 'https://example.com/uk-canonical']],
+    )->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($page->refresh()->seo['canonical'])->toBe(['en' => '', 'uk' => 'https://example.com/uk-canonical']);
 });
 
 it('round-trips the new SEO keys back into the edit form via loadRow', function (): void {
@@ -343,9 +396,9 @@ it('round-trips the new SEO keys back into the edit form via loadRow', function 
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
             ...baseEditPayload(),
-            'seo_focus_keyword' => 'widgets',
-            'og_title' => 'OG title',
-            'og_description' => 'OG description',
+            'seo_focus_keyword' => ['en' => 'widgets'],
+            'og_title' => ['en' => 'OG title'],
+            'og_description' => ['en' => 'OG description'],
             'og_image' => '42',
         ],
     )->assertRedirect();
@@ -353,9 +406,9 @@ it('round-trips the new SEO keys back into the edit form via loadRow', function 
     $pageEditor = $session->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
         ->assertOk()->json('props.data.pageEditor');
 
-    expect($pageEditor['seo_focus_keyword'])->toBe('widgets')
-        ->and($pageEditor['og_title'])->toBe('OG title')
-        ->and($pageEditor['og_description'])->toBe('OG description')
+    expect($pageEditor['seo_focus_keyword'])->toBe(['en' => 'widgets'])
+        ->and($pageEditor['og_title'])->toBe(['en' => 'OG title'])
+        ->and($pageEditor['og_description'])->toBe(['en' => 'OG description'])
         ->and($pageEditor['og_image'])->toBe('42');
 });
 
@@ -587,11 +640,11 @@ it('saves the system page with no slug key in the payload and keeps its slug/pat
             'parent_id' => 'none',
             'status' => PageStatus::Published->value,
             'sort_order' => 0,
-            'seo_title' => '',
-            'seo_description' => '',
-            'seo_focus_keyword' => '',
-            'og_title' => '',
-            'og_description' => '',
+            'seo_title' => ['en' => ''],
+            'seo_description' => ['en' => ''],
+            'seo_focus_keyword' => ['en' => ''],
+            'og_title' => ['en' => ''],
+            'og_description' => ['en' => ''],
             'og_image' => '',
             'is_indexable' => true,
         ],
@@ -622,11 +675,11 @@ it('ignores a slug override submitted for the system page and keeps its slug/pat
             'parent_id' => 'none',
             'status' => PageStatus::Published->value,
             'sort_order' => 0,
-            'seo_title' => '',
-            'seo_description' => '',
-            'seo_focus_keyword' => '',
-            'og_title' => '',
-            'og_description' => '',
+            'seo_title' => ['en' => ''],
+            'seo_description' => ['en' => ''],
+            'seo_focus_keyword' => ['en' => ''],
+            'og_title' => ['en' => ''],
+            'og_description' => ['en' => ''],
             'og_image' => '',
             'is_indexable' => true,
         ],
@@ -798,11 +851,11 @@ function baseEditPayload(): array
         'parent_id' => 'none',
         'status' => PageStatus::Published->value,
         'sort_order' => 0,
-        'seo_title' => '',
-        'seo_description' => '',
-        'seo_focus_keyword' => '',
-        'og_title' => '',
-        'og_description' => '',
+        'seo_title' => ['en' => ''],
+        'seo_description' => ['en' => ''],
+        'seo_focus_keyword' => ['en' => ''],
+        'og_title' => ['en' => ''],
+        'og_description' => ['en' => ''],
         'og_image' => '',
         'is_indexable' => true,
     ];

@@ -32,6 +32,37 @@ final class JsonLd
     }
 
     /**
+     * @param  list<string>  $sameAs  Non-empty profile URLs only — callers filter blanks before calling.
+     * @return array{'@context': string, '@type': string, name: string, url: string, logo?: string, sameAs?: list<string>}|null
+     */
+    public function identity(string $type, string $name, string $url, ?string $logo, array $sameAs): ?array
+    {
+        if ($type === 'none' || $name === '') {
+            return null;
+        }
+
+        $object = [
+            '@context' => 'https://schema.org',
+            '@type' => $type === 'person' ? 'Person' : 'Organization',
+            'name' => $name,
+            'url' => $url,
+        ];
+
+        // Logo is an Organization-only property in schema.org's Person/Organization
+        // vocabulary — a Person's photo would be a different property (`image`),
+        // which this settings field isn't scoped to represent.
+        if ($type === 'organization' && $logo !== null && $logo !== '') {
+            $object['logo'] = $logo;
+        }
+
+        if ($sameAs !== []) {
+            $object['sameAs'] = $sameAs;
+        }
+
+        return $object;
+    }
+
+    /**
      * $currentUrl is the current page's already-absolute canonical URL — the list's final item.
      *
      * @param  list<array{label: string, path: string, url: string}>  $breadcrumbs  Ancestors only (root-relative `url`), current page excluded.

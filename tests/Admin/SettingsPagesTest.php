@@ -58,7 +58,7 @@ it('labels the save action from common translations and renders the standard Edi
 it('saves and notifies from common translations', function (string $url): void {
     $payload = match ($url) {
         'site-settings' => ['site_name' => 'Acme Inc'],
-        'seo-settings' => ['seo_title_suffix' => ' — Acme'],
+        'seo-settings' => ['seo_title_separator' => '|'],
         'notification-settings' => ['notification_mail_recipients' => ['admin@example.com']],
     };
 
@@ -85,19 +85,40 @@ it('labels site settings fields from translations', function (): void {
         ->and($labels['site_favicon'])->toBe(__('tbtop-cms::settings.site.fields.favicon'));
 });
 
-it('labels SEO settings fields from translations and placeholders the title suffix', function (): void {
+it('labels SEO settings fields from translations and placeholders the title template', function (): void {
     $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
 
     $labels = settingsFieldLabels($structure);
 
-    expect($labels['seo_title_suffix'])->toBe(__('tbtop-cms::settings.seo.fields.title_suffix'))
+    expect($labels['seo_title_template'])->toBe(__('tbtop-cms::settings.seo.fields.title_template'))
+        ->and($labels['seo_title_separator'])->toBe(__('tbtop-cms::settings.seo.fields.title_separator'))
         ->and($labels['seo_default_description'])->toBe(__('tbtop-cms::settings.seo.fields.default_description'))
         ->and($labels['seo_default_og_image'])->toBe(__('tbtop-cms::settings.seo.fields.default_og_image'))
         ->and($labels['seo_indexing_enabled'])->toBe(__('tbtop-cms::settings.seo.fields.indexing_enabled'));
 
-    $titleSuffix = settingsFindFieldByName($structure, 'seo_title_suffix');
-    expect($titleSuffix['options']['placeholder'] ?? null)->toBe(__('tbtop-cms::settings.seo.placeholders.title_suffix'));
+    // seo_title_suffix stays a mapped/functional setting (SeoResolver's legacy
+    // fallback) but is intentionally no longer a field in this form's tree.
+    expect(settingsFindFieldByName($structure, 'seo_title_suffix'))->toBeNull();
+
+    $titleTemplate = settingsFindFieldByName($structure, 'seo_title_template');
+    expect($titleTemplate['options']['placeholder'] ?? null)->toBe(__('tbtop-cms::settings.seo.placeholders.title_template'));
+});
+
+it('labels SEO identity/verification fields from translations', function (): void {
+    $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $labels = settingsFieldLabels($structure);
+
+    expect($labels['seo_verification_google'])->toBe(__('tbtop-cms::settings.seo.fields.verification_google'))
+        ->and($labels['seo_verification_bing'])->toBe(__('tbtop-cms::settings.seo.fields.verification_bing'))
+        ->and($labels['seo_verification_yandex'])->toBe(__('tbtop-cms::settings.seo.fields.verification_yandex'))
+        ->and($labels['seo_identity_type'])->toBe(__('tbtop-cms::settings.seo.fields.identity_type'))
+        ->and($labels['seo_identity_name'])->toBe(__('tbtop-cms::settings.seo.fields.identity_name'))
+        ->and($labels['seo_identity_logo'])->toBe(__('tbtop-cms::settings.seo.fields.identity_logo'))
+        ->and($labels['seo_identity_same_as'])->toBe(__('tbtop-cms::settings.seo.fields.identity_same_as'))
+        ->and($labels['seo_twitter_card'])->toBe(__('tbtop-cms::settings.seo.fields.twitter_card'));
 });
 
 it('labels notification settings fields and helper text from translations', function (): void {
@@ -142,6 +163,19 @@ it('round-trips recipients and chat ids between the stored string and tag chips'
 
     expect(app(Settings::class)->get('notifications.mail.recipients'))->toBe('c@example.com')
         ->and(app(Settings::class)->get('notifications.telegram.chat_ids'))->toBe("333 # Olena\n444");
+});
+
+it('normalizes a pasted full verification meta tag down to just its content value on save', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_verification_google' => '<meta name="google-site-verification" content="g-code-abc" />',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(app(Settings::class)->get('seo.verification.google'))->toBe('g-code-abc');
+
+    $record = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.seo-settings');
+
+    expect($record['seo_verification_google'])->toBe('g-code-abc');
 });
 
 it('does not return mail.password on the notification settings record', function (): void {

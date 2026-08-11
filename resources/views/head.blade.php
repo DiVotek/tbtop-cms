@@ -51,6 +51,13 @@
         <link data-inertia="link-icon" rel="icon" href="{{ $seo['favicon'] }}">
     @endif
     @php
+        /** @var list<array{key: string, name: string, content: string}> $verification */
+        $verification = $seo['verification'] ?? [];
+    @endphp
+    @foreach ($verification as $entry)
+        <meta data-inertia="verify-{{ $entry['key'] }}" name="{{ $entry['name'] }}" content="{{ $entry['content'] }}">
+    @endforeach
+    @php
         /** @var list<array{locale: string, url: string}> $alternates */
         $alternates = $seo['alternates'] ?? [];
     @endphp

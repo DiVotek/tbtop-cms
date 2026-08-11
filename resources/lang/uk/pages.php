@@ -76,10 +76,10 @@ return [
         'seo_description' => 'SEO-опис',
         'seo_focus_keyword' => 'Фокусне ключове слово',
         'og_title' => 'OG заголовок',
-        'og_title_placeholder' => 'За замовчуванням — мета-заголовок',
         'og_description' => 'OG опис',
-        'og_description_placeholder' => 'За замовчуванням — мета-опис',
         'og_image' => 'OG зображення',
+        'seo_canonical' => 'Перевизначення canonical URL',
+        'seo_canonical_hint' => 'Лише для досвідчених — перевизначає обчислений canonical URL цієї сторінки в цій мові.',
         'image' => 'Зображення',
     ],
     'actions' => [

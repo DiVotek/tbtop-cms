@@ -19,14 +19,45 @@ return [
     'seo' => [
         'title' => 'SEO-налаштування',
         'subtitle' => 'Метадані за замовчуванням для всього сайту, якщо сторінка їх не перевизначає.',
+        'sections' => [
+            'verification' => 'Верифікація в пошукових консолях',
+            'identity' => 'Ідентичність',
+        ],
         'fields' => [
             'title_suffix' => 'Суфікс заголовка',
+            'title_template' => 'Шаблон заголовка',
+            'title_separator' => 'Роздільник заголовка',
             'default_description' => 'Опис за замовчуванням',
             'default_og_image' => 'OG-зображення за замовчуванням',
             'indexing_enabled' => 'Дозволити пошуковим системам індексувати сайт',
+            'twitter_card' => 'Тип Twitter-картки',
+            'verification_google' => 'Google Search Console',
+            'verification_bing' => 'Bing Webmaster Tools',
+            'verification_yandex' => 'Yandex Webmaster',
+            'identity_type' => 'Тип ідентичності',
+            'identity_name' => 'Назва',
+            'identity_logo' => 'Логотип',
+            'identity_same_as' => 'Посилання на профілі',
         ],
         'placeholders' => [
             'title_suffix' => ' — Назва сайту',
+            'title_template' => '{title} {sep} {site_name}',
+            'identity_name' => 'За замовчуванням — назва сайту',
+        ],
+        'helpers' => [
+            'title_template' => 'Доступні плейсхолдери: {title}, {site_name}, {sep}. Залиште порожнім, щоб зберегти попередню поведінку суфікса.',
+            'verification' => 'Вставте код верифікації або повний тег <meta>, наданий сервісом, — підійде будь-який варіант.',
+            'identity_same_as' => 'Введіть URL профілю (соцмережа, Вікіпедія тощо) і натисніть Enter, щоб додати.',
+        ],
+        'twitter_card' => [
+            'auto' => 'Авто (summary з зображенням, інакше звичайний summary)',
+            'summary' => 'Summary',
+            'summary_large_image' => 'Summary з великим зображенням',
+        ],
+        'identity_type' => [
+            'none' => 'Немає',
+            'organization' => 'Організація',
+            'person' => 'Особа',
         ],
     ],
     'notifications' => [
