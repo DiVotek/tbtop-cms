@@ -43,6 +43,30 @@ it('injects nothing into Inertia XHR navigation responses', function (): void {
         ->not->toContain('googletagmanager');
 });
 
+it('leaves non-HTML responses on the same route group untouched', function (): void {
+    app(Settings::class)->set('seo.gtm_container_id', 'GTM-ABC1234');
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    expect($this->get('/robots.txt')->assertOk()->getContent())->not->toContain('googletagmanager')
+        ->and($this->get('/sitemap.xml')->assertOk()->getContent())->not->toContain('googletagmanager');
+});
+
+it('does not rewrite page content that merely contains head-like markup', function (): void {
+    app(Settings::class)->set('seo.gtm_container_id', 'GTM-ABC1234');
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        // A page whose own body text talks about HTML must not gain a second
+        // injected snippet: injection is capped at one replacement each.
+        'summary' => ['en' => '<head> and <body> explained'],
+    ]);
+
+    $html = $this->get('/about')->assertOk()->getContent();
+
+    expect(substr_count((string) $html, 'gtm.js?id='))->toBe(1)
+        ->and(substr_count((string) $html, 'ns.html?id='))->toBe(1);
+});
+
 it('extracts the id from a stored full install snippet and drops malformed values', function (): void {
     app(Settings::class)->set('seo.gtm_container_id', "<!-- Google Tag Manager -->\n<script>j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;...('GTM-XYZ987');</script>");
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);

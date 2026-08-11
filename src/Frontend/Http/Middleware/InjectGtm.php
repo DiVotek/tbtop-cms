@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Frontend\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
 use Tbtop\Cms\Settings\Settings;
@@ -21,9 +22,11 @@ use Tbtop\Cms\Settings\Settings;
  * blade partial so a fresh install works with zero root-view wiring beyond
  * the existing `tbtop-cms::head` include, and only frontend routes ever get
  * the snippet (this middleware is registered in Cms::frontendRoutes(); the
- * admin panel never passes through it). Inertia's XHR navigation responses
- * are JSON without a <head> to match, so injection naturally applies only to
- * full page loads — where GTM belongs: the tags survive SPA navigation, and
+ * admin panel never passes through it). Eligibility is gated on an HTML
+ * content type and a non-Inertia/non-XHR request — see isInjectable() — so
+ * the sitemap XML, robots.txt, and form-submit JSON sharing this route group
+ * are never rewritten. That also means only full page loads carry the
+ * snippet, which is where GTM belongs: the tags survive SPA navigation, and
  * GTM tracks route changes via its own history triggers.
  *
  * The container id is validated to ^GTM-[A-Z0-9]+$ (GtmContainerId::valid()
@@ -37,6 +40,10 @@ class InjectGtm
     {
         $response = $next($request);
 
+        if (! $this->isInjectable($request, $response)) {
+            return $response;
+        }
+
         $id = GtmContainerId::fromSettings($this->settings);
 
         if ($id === null) {
@@ -45,7 +52,7 @@ class InjectGtm
 
         $content = $response->getContent();
 
-        if (! is_string($content) || $content === '') {
+        if (! is_string($content) || ! str_starts_with(ltrim($content), '<')) {
             return $response;
         }
 
@@ -71,6 +78,33 @@ class InjectGtm
         $response->setContent($injected);
 
         return $response;
+    }
+
+    /**
+     * Only full-page HTML responses to ordinary GET navigations are eligible.
+     * The same route group also serves robots.txt, the sitemap XML, and the
+     * form-submit JSON endpoint — none of which may be rewritten just because
+     * user-authored content happens to contain a "<head…>"-looking string.
+     * Streamed and binary responses are skipped too: their content is not a
+     * string to rewrite.
+     */
+    private function isInjectable(Request $request, Response $response): bool
+    {
+        if ($request->inertia() || $request->ajax() || $request->wantsJson()) {
+            return false;
+        }
+
+        if (! $response instanceof HttpResponse) {
+            return false;
+        }
+
+        if ($response->isRedirection()) {
+            return false;
+        }
+
+        $contentType = (string) $response->headers->get('Content-Type', '');
+
+        return str_contains(strtolower($contentType), 'text/html');
     }
 
     /** Google's stock loader snippet, verbatim except for the injected id. */
