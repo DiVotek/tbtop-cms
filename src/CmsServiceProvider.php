@@ -56,6 +56,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $package
             ->name('tbtop-cms')
             ->hasConfigFile()
+            ->hasViews()
             ->hasMigration('2026_01_01_000000_update_tables_add_tbtop_prefix_table')
             ->hasMigration('2026_01_01_000001_create_languages_table')
             ->hasMigration('2026_01_01_000002_create_pages_table')

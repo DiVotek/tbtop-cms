@@ -203,3 +203,119 @@ it('uses the default-locale title fallback for a non-default-locale page', funct
         ->assertJsonPath('props.page.title', 'About Page')
         ->assertJsonPath('props.seo.title', 'About Page — Acme');
 });
+
+it('resolves siteName from settings, defaulting to an empty string when unset', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.siteName', '');
+
+    app(Settings::class)->set('site.name', 'Acme Co');
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.siteName', 'Acme Co');
+});
+
+it('resolves ogType/ogUrl/ogLocale as a constant, the canonical, and the current locale', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogType', 'website')
+        ->assertJsonPath('props.seo.ogUrl', url($page->pathFor('en')))
+        ->assertJsonPath('props.seo.ogLocale', 'en');
+});
+
+it('lists ogLocaleAlternates as the other locales the page has a slug in, excluding the current one', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogLocaleAlternates', ['uk']);
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogLocaleAlternates', ['en']);
+});
+
+it('sets twitterCard to summary_large_image only when an ogImage resolves', function (): void {
+    // beforeEach seeds a global seo.default_og_image fallback; forget it here
+    // so the "no image resolves" branch is actually reachable.
+    app(Settings::class)->forget('seo.default_og_image');
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'No image']]);
+
+    $this->get('/no-image', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.ogImage', null)
+        ->assertJsonPath('props.seo.twitterCard', 'summary');
+
+    $withImage = media('with-image.jpg');
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'With image'],
+        'image' => (string) $withImage->getKey(),
+    ]);
+
+    $this->get('/with-image', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.twitterCard', 'summary_large_image');
+});
+
+it('excludes a locale from alternates when the page has no slug there, and nulls xDefault without a default-locale slug', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+    ]);
+
+    // Both locales have a slug: full alternates list, xDefault present (en is default).
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonCount(2, 'props.seo.alternates')
+        ->assertJsonPath('props.seo.xDefault', url($page->pathFor('en')));
+
+    // Remove the default-locale (en) slug: alternates excludes it, xDefault is null.
+    $page->slugs()->where('locale', 'en')->delete();
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonCount(1, 'props.seo.alternates')
+        ->assertJsonPath('props.seo.alternates.0.locale', 'uk')
+        ->assertJsonPath('props.seo.xDefault', null);
+});
+
+it('resolves favicon from site.favicon, null when unset', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.favicon', null);
+
+    $favicon = media('favicon.png');
+    app(Settings::class)->set('site.favicon', (string) $favicon->getKey());
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.favicon', Storage::disk('public')->url('media/favicon.png'));
+});
+
+it('emits alternates/xDefault even for a noindex page', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        'is_indexable' => false,
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.noindex', true)
+        ->assertJsonCount(2, 'props.seo.alternates')
+        ->assertJsonPath('props.seo.xDefault', fn (string $url): bool => $url !== '');
+});
