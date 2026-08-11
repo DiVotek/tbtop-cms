@@ -46,6 +46,15 @@ to also create and edit users — see Added below); it no longer assigns roles.
   **Host action required:** delete `public/robots.txt` if it exists — Laravel's
   default scaffold ships one, and as a static file it shadows this package's
   dynamic `/robots.txt` route.
+- Server-side rendering for the cms frontend (opt-in): set
+  `tbtop-cms.ssr.enabled` to `true` and the full page — head and body — is
+  rendered server-side via Inertia SSR for cms frontend responses only; the
+  admin panel is never routed through SSR, regardless of this flag. See the
+  README's "Server-side rendering" section for the host recipe (`ssr.tsx`
+  entry point, Vite `ssr` build input, `inertia:start-ssr`). Falls back to the
+  existing blade head and client-rendered body when the flag is off or the
+  SSR process is unreachable — a broken SSR process never means a missing
+  `<head>`.
 - `SeoResolver::resolve()` gained `siteName`, `ogType`, `ogUrl`, `ogLocale`,
   `ogLocaleAlternates`, `twitterCard`, `alternates`, `xDefault`, `favicon`,
   and `jsonLd` — additive; existing keys are unchanged.

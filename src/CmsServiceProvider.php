@@ -112,6 +112,7 @@ class CmsServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
+        $this->forceSsrOffByDefault();
         $this->wireAdminLoginRedirect();
         $this->wireAdminLogout();
         $this->wireLocaleSlugBackfill();
@@ -152,6 +153,45 @@ class CmsServiceProvider extends PackageServiceProvider
             $panels[] = CmsPanel::class;
             config(['tbtop-admin.panels' => $panels]);
         }
+    }
+
+    /**
+     * inertia-laravel's own config defaults `inertia.ssr.enabled` to true
+     * (`config/inertia.php`: `env('INERTIA_SSR_ENABLED', true)`), and hosts
+     * built against this package typically don't publish their own
+     * `config/inertia.php`, so that vendor default is what's actually in
+     * effect. Left alone, that means the admin panel — which shares this
+     * same Inertia app — would be dispatched to SSR too the moment a real
+     * SSR bundle/process exists, with no way to opt it out. Forcing the
+     * effective default to false here, and letting EnableSsr raise it back
+     * per-request only on cms frontend routes when `tbtop-cms.ssr.enabled`
+     * is on, is what makes SSR an opt-in cms-only capability rather than an
+     * ambient one.
+     *
+     * Applied unconditionally — a published `config/inertia.php` is NOT
+     * treated as an opt-out, because the vendor stub it is copied from
+     * defaults `enabled` to true: a host publishing the file for an
+     * unrelated tweak (ssr port, bundle path) would silently route the
+     * admin through SSR. A host that genuinely wants global SSR keeps the
+     * standard escape hatch: set `config(['inertia.ssr.enabled' => true])`
+     * in its own service provider's boot() — application providers boot
+     * after discovered package providers, so that assignment wins.
+     *
+     * In console the flag mirrors `tbtop-cms.ssr.enabled` instead of being
+     * forced false: `inertia:start-ssr` refuses to boot the SSR process when
+     * `inertia.ssr.enabled` is false (StartSsr::handle()'s first check), and
+     * no admin HTTP response can render in a console process — so an
+     * unconditional false would make the SSR process unstartable, while
+     * mirroring keeps start-ssr working exactly when cms SSR is on.
+     * (Tests run in console too, but they set both flags explicitly after
+     * boot, so this only affects the pre-configuration default.)
+     */
+    private function forceSsrOffByDefault(): void
+    {
+        config(['inertia.ssr.enabled' => $this->app->runningInConsole()
+            ? (bool) config('tbtop-cms.ssr.enabled', false)
+            : false,
+        ]);
     }
 
     private function wireAdminLoginRedirect(): void

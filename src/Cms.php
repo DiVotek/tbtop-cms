@@ -10,6 +10,7 @@ use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
 use Tbtop\Cms\Frontend\Http\Controllers\RobotsController;
 use Tbtop\Cms\Frontend\Http\Controllers\SitemapController;
+use Tbtop\Cms\Frontend\Http\Middleware\EnableSsr;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
@@ -33,7 +34,7 @@ class Cms
         /** @var list<class-string> $middleware */
         $middleware = (array) config('tbtop-cms.frontend.middleware', [SetLanguage::class]);
 
-        Route::middleware([...$middleware, ShareCmsProps::class])->group(function (): void {
+        Route::middleware([...$middleware, EnableSsr::class, ShareCmsProps::class])->group(function (): void {
             Route::post('_cms/forms/{locale}/{page}/{block}', FormSubmitController::class)
                 ->where('page', '[0-9]+')
                 ->middleware('throttle:' . config('tbtop-cms.forms.throttle', '10,1'))

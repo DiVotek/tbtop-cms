@@ -79,6 +79,14 @@ return [
             SetLanguage::class,
         ],
     ],
+    'ssr' => [
+        // Controls Inertia server-side rendering for cms frontend responses
+        // only. Leave the host's global `inertia.ssr.enabled` at its default
+        // (false) — flipping that instead would route admin responses
+        // through SSR too. See EnableSsr and the README's "Server-side
+        // rendering" section.
+        'enabled' => (bool) env('TBTOP_CMS_SSR', false),
+    ],
     'forms' => [
         'throttle' => '10,1',
         'store' => true,

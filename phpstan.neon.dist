@@ -8,3 +8,10 @@ parameters:
         - config
         - database
     tmpDir: build/phpstan
+    # Larastan's noEnvCallsOutsideOfConfig rule defaults to the booted
+    # application's config_path(), which under Testbench resolves to the
+    # workbench skeleton, not this package's own config/ source directory —
+    # so env() calls here would otherwise be flagged as "outside of config"
+    # even though config/tbtop-cms.php is exactly where they belong.
+    configDirectories:
+        - config
