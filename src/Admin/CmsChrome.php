@@ -8,6 +8,7 @@ use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Color;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Panels\Chrome;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Form\Models\FormSubmission;
 
 /**
@@ -62,8 +63,14 @@ class CmsChrome extends Chrome
             ->icon('inbox')
             ->tooltip(__('tbtop-cms::chrome.inbox.tooltip'))
             ->size('sm')
-            ->visit('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions')
-            ->authorize('tbtop-cms.submissions');
+            ->visit('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions');
+
+        // authorize() takes a non-null string and an undefined gate denies —
+        // with roles off, calling it unconditionally would hide the inbox
+        // for everyone, since the package defines no gates itself.
+        if (CmsAbilities::enabled()) {
+            $action->authorize('tbtop-cms.submissions');
+        }
 
         if ($unread > 0) {
             $action->badge($unread, Color::Danger);

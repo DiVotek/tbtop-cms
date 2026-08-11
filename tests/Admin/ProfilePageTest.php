@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -23,7 +22,7 @@ beforeEach(function (): void {
         'email' => 'admin@example.com',
         'password' => PROFILE_PASSWORD,
     ]);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
     test()->actingAs($user, 'web');
 });
 

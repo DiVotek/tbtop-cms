@@ -8,6 +8,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Layout\Slots;
 
 class LayoutPage extends AdminPage
@@ -31,7 +32,7 @@ class LayoutPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.design';
+        return CmsAbilities::for('tbtop-cms.design');
     }
 
     #[\Override]

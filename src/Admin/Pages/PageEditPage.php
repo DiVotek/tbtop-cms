@@ -17,6 +17,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditRevisionsAction;
 use Tbtop\Cms\Admin\Pages\Support\PageEditSidebar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Events\PageDeleted;
@@ -51,7 +52,7 @@ class PageEditPage extends AdminPage
     #[\Override]
     public static function can(): ?string
     {
-        return 'tbtop-cms.pages';
+        return CmsAbilities::for('tbtop-cms.pages');
     }
 
     #[\Override]

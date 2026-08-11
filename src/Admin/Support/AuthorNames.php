@@ -82,7 +82,7 @@ final class AuthorNames
      * email, or null when $ownerColumn is null or the user no longer exists —
      * the same name-then-email-then-null resolution as label(), expressed as
      * SQL instead of PHP so a list table's query stays one query (mirrors
-     * UsersPage::query()'s cms_role correlated subselect over
+     * UsersPage::query()'s has_access correlated subselect over
      * cms_user_profiles: same "compute it in the query, project it as a
      * plain column" shape, just against the host user table instead).
      *

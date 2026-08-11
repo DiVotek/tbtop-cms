@@ -6,7 +6,6 @@ namespace Tbtop\Cms\Tests\Admin;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
-use Tbtop\Cms\Admin\Enums\CmsRole;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -36,7 +35,7 @@ class DashboardWithoutPagesRouteTest extends TestCase
         Language::factory()->default()->create(['locale' => 'en']);
 
         $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-        CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'role' => CmsRole::SuperAdministrator]);
+        CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
         $this->actingAs($user, 'web');
 
         $this->assertFalse(Route::has('tbtop.cms.pages-page'));
