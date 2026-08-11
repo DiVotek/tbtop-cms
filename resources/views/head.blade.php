@@ -36,19 +36,6 @@
     $ssrOwnsHead = (bool) config('inertia.ssr.enabled')
         && app(\Inertia\Ssr\SsrState::class)->dispatch() !== null;
 @endphp
-{{-- Google's stock GTM head snippet, verbatim except for the injected
-     container id (validated to ^GTM-[A-Z0-9]+$ in SeoResolver::gtmId()).
-     Deliberately OUTSIDE the $ssrOwnsHead guard: the SSR head renders only
-     Inertia-managed tags, never this script — and it carries no data-inertia
-     attribute, so hydration leaves it alone and it loads exactly once per
-     real page load, SSR or not. The noscript half lives in body.blade.php. --}}
-@if (is_array($seo) && ! empty($seo['gtmId']))
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','{{ $seo['gtmId'] }}');</script>
-@endif
 @if (is_array($seo) && ! $ssrOwnsHead)
     <title data-inertia="">{{ $seo['title'] ?? '' }}</title>
     @if (! empty($seo['description']))

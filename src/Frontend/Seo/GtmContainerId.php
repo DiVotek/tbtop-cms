@@ -4,12 +4,34 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo;
 
+use Tbtop\Cms\Settings\Settings;
+
 /**
  * Google Tag Manager container id, extracted from whatever the admin pasted —
  * the bare "GTM-XXXXXXX" or the full two-part install snippet Google shows.
  */
 class GtmContainerId
 {
+    /**
+     * The one read path for rendering (used by the InjectGtm middleware):
+     * extracts at read time too — not only on save in SeoSettingsPage — so a
+     * value written programmatically or as the full pasted snippet still
+     * resolves; anything that doesn't normalize to a well-formed GTM-… id is
+     * dropped rather than interpolated into the markup.
+     */
+    public static function fromSettings(Settings $settings): ?string
+    {
+        $raw = $settings->get('seo.gtm_container_id', '');
+
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        $id = self::extract($raw);
+
+        return self::valid($id) ? $id : null;
+    }
+
     /**
      * Accepts exactly two shapes: a bare container id (anchored match), or
      * Google's install snippet — recognized by its googletagmanager.com

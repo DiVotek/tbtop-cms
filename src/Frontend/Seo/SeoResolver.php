@@ -34,7 +34,6 @@ class SeoResolver
      *     ogType: string, ogUrl: string, ogLocale: string, ogLocaleAlternates: list<string>,
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
-     *     gtmId: string|null,
      * }
      */
     public function resolve(Page $page, string $locale, array $breadcrumbs = []): array
@@ -70,7 +69,6 @@ class SeoResolver
             'xDefault' => $this->xDefault($alternates),
             'favicon' => $this->favicon(),
             'jsonLd' => $this->jsonLd($page, $locale, $siteName, $ogTitle, $canonical, $breadcrumbs),
-            'gtmId' => $this->gtmId(),
         ];
     }
 
@@ -96,25 +94,6 @@ class SeoResolver
             'summary', 'summary_large_image' => $choice,
             default => $ogImage !== null ? 'summary_large_image' : 'summary',
         };
-    }
-
-    /**
-     * Extracted at read time too (not only on save in SeoSettingsPage), so a
-     * value written programmatically or as the full pasted snippet still
-     * resolves; anything that doesn't normalize to a well-formed GTM-… id is
-     * dropped rather than interpolated into the script/iframe URLs.
-     */
-    private function gtmId(): ?string
-    {
-        $raw = $this->settings->get('seo.gtm_container_id', '');
-
-        if (! is_string($raw)) {
-            return null;
-        }
-
-        $id = GtmContainerId::extract($raw);
-
-        return GtmContainerId::valid($id) ? $id : null;
     }
 
     /**

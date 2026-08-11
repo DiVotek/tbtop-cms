@@ -39,7 +39,6 @@ interface Seo {
     xDefault: string | null;
     favicon: string | null;
     jsonLd: Record<string, unknown>[];
-    gtmId: string | null;
 }
 
 interface CmsPageProps {
@@ -71,9 +70,9 @@ export default function CmsPage() {
                 {seo.canonical ? <link head-key="link-canonical" rel="canonical" href={seo.canonical} /> : null}
                 {seo.noindex ? <meta head-key="meta-robots" name="robots" content="noindex" /> : null}
                 {seo.favicon ? <link head-key="link-icon" rel="icon" href={seo.favicon} /> : null}
-                {/* GTM is not rendered here: the blade head/body partials emit Google's
-                    snippet outside Inertia's head manager, so it survives hydration and
-                    SPA navigations without ever being re-inserted. */}
+                {/* GTM is not rendered here: the InjectGtm middleware inserts Google's
+                    snippet into the full-page HTML outside Inertia's head manager, so it
+                    survives hydration and SPA navigations without being re-inserted. */}
                 {showAlternates
                     ? seo.alternates.map((alternate) => (
                           <AlternateLink

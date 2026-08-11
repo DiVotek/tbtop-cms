@@ -12,42 +12,48 @@ use Tbtop\Cms\Settings\Settings;
 
 uses(RefreshDatabase::class);
 
+// Plain GETs render through the @vite-free root view — see
+// workbench/resources/views/server-head-test.blade.php's docblock.
 beforeEach(function (): void {
-    config(['cache.default' => 'array']);
+    config(['cache.default' => 'array', 'tbtop-cms.render.root_view' => 'server-head-test']);
     Language::factory()->default()->create(['locale' => 'en']);
     app(Cms::class)->frontendRoutes();
 });
 
-it('resolves the container id into the seo props', function (): void {
+it('injects the loader script right after <head> and the noscript right after <body>', function (): void {
+    app(Settings::class)->set('seo.gtm_container_id', 'GTM-ABC1234');
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)
+        ->toMatch('/<head[^>]*>\n<script>.*googletagmanager\.com\/gtm\.js.*GTM-ABC1234.*<\/script>/s')
+        ->toMatch('/<body[^>]*>\n<noscript><iframe src="https:\/\/www\.googletagmanager\.com\/ns\.html\?id=GTM-ABC1234"/');
+});
+
+it('injects nothing into Inertia XHR navigation responses', function (): void {
     app(Settings::class)->set('seo.gtm_container_id', 'GTM-ABC1234');
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.seo.gtmId', 'GTM-ABC1234');
-});
+        ->assertHeader('Content-Type', 'application/json');
 
-it('resolves a null gtmId when the setting is unset', function (): void {
-    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
-
-    $this->get('/about', ['X-Inertia' => 'true'])
-        ->assertOk()
-        ->assertJsonPath('props.seo.gtmId', null);
+    expect($this->get('/about', ['X-Inertia' => 'true'])->getContent())
+        ->not->toContain('googletagmanager');
 });
 
 it('extracts the id from a stored full install snippet and drops malformed values', function (): void {
     app(Settings::class)->set('seo.gtm_container_id', "<!-- Google Tag Manager -->\n<script>j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;...('GTM-XYZ987');</script>");
-    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $this->get('/about', ['X-Inertia' => 'true'])
-        ->assertOk()
-        ->assertJsonPath('props.seo.gtmId', 'GTM-XYZ987');
+    expect($this->get($page->pathFor('en'))->assertOk()->getContent())
+        ->toContain("'GTM-XYZ987'");
 
     app(Settings::class)->set('seo.gtm_container_id', 'not-a-container-id');
 
-    $this->get('/about', ['X-Inertia' => 'true'])
-        ->assertOk()
-        ->assertJsonPath('props.seo.gtmId', null);
+    expect($this->get($page->pathFor('en'))->assertOk()->getContent())
+        ->not->toContain('googletagmanager');
 });
 
 it('extracts and validates container ids', function (): void {

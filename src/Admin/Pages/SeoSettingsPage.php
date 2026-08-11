@@ -141,8 +141,8 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * Both cleanups also happen on read (SeoResolver::gtmId() extracts and
-     * validates, sameAs() filters), but normalizing here as well means a
+     * Both cleanups also happen on read (GtmContainerId::fromSettings()
+     * extracts and validates, sameAs() filters), but normalizing here as well means a
      * re-opened settings page shows the cleaned value — the bare "GTM-…" id
      * instead of the pasted install snippet, and only the profile links that
      * will actually be published (the tags field can't express a per-element
