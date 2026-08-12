@@ -136,9 +136,7 @@ class PageForm
             ->helperText(__('tbtop-cms::pages.fields.seo_canonical_hint'));
         self::applyCanonicalLocaleRules($canonical);
 
-        return [
-            ...SerpPreview::build($s, $page, app(Languages::class)->defaultLocale()),
-            ...self::seoChecklistSection($s, $page),
+        $fields = [
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))
                 ->translatable()->placeholder($placeholders['title'])
                 ->helperText(__('tbtop-cms::pages.fields.seo_title_hint')),
@@ -154,16 +152,33 @@ class PageForm
                 // title()), so their placeholders show ogTitle/ogDescription
                 // rather than the templated outputs.
                 $s->text('og_title')->label(__('tbtop-cms::pages.fields.og_title'))
-                    ->translatable()->placeholder($placeholders['og_title'])
-                    ->helperText(__('tbtop-cms::pages.fields.og_title_hint')),
+                    ->translatable()->placeholder($placeholders['og_title']),
                 $s->textarea('og_description')->label(__('tbtop-cms::pages.fields.og_description'))
-                    ->translatable()->set('placeholder', $placeholders['og_description'])
-                    ->helperText(__('tbtop-cms::pages.fields.og_description_hint')),
+                    ->translatable()->set('placeholder', $placeholders['og_description']),
                 $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))
-                    ->helperText(__('tbtop-cms::pages.fields.og_image_hint'))
                     ->variant('preview'),
             ]),
             $canonical,
+        ];
+
+        $checklist = self::seoChecklistSection($s, $page);
+
+        return [
+            // The preview spans the row: its card is as wide as the result
+            // column it measures (600px plus padding) and cannot be narrowed
+            // without the pixel meter describing a box nobody can see. It
+            // renders collapsed, so what actually sits above the fields is one
+            // line carrying both numbers.
+            ...SerpPreview::build($s, $page, app(Languages::class)->defaultLocale()),
+            // Fields left, checks right — the report about the work stops
+            // standing between the editor and the work. The checklist reads as
+            // short labelled rows, so a third of the row is enough for it, and
+            // one column below `lg` puts it back under the fields rather than
+            // squeezing both.
+            $s->grid(['cols' => ['sm' => 1, 'lg' => 3], 'gap' => 6], [
+                $s->stack($fields, ['colSpan' => ['sm' => 1, 'lg' => 2]]),
+                ...$checklist,
+            ]),
         ];
     }
 
@@ -188,18 +203,20 @@ class PageForm
     }
 
     /**
-     * Read-only checklist rendered above the editable SEO fields. Computed
-     * for the default locale only, same as computedPlaceholders() above —
-     * a per-locale live version belongs to the (not-yet-built) preview work.
-     * Absent for the create modal ($page null/unsaved): there is nothing to
-     * check yet, and duplicate-title comparison needs a persisted id to
-     * exclude itself from the query.
+     * Read-only checklist, rendered beside the SEO fields. Computed for the
+     * default locale only, same as computedPlaceholders() above. Absent for
+     * the create modal ($page null/unsaved): there is nothing to check yet,
+     * and duplicate-title comparison needs a persisted id to exclude itself
+     * from the query.
      *
-     * Structured as a single displayValue()/displayText() pair per check —
-     * never displayHtml(), which is unsanitized on both sides and every
-     * value here is ultimately editor-authored (title/description/focus
-     * keyword) — so a pixel-width preview block can be dropped in above this
-     * section later without reshaping it.
+     * A custom node kind rather than display blocks: displayValue() and
+     * displayText() are separate blocks stacked vertically, so every check
+     * cost two rows — 24 lines for 12 checks, most of the tab's height. The
+     * client block puts the status and the label on one line and groups them
+     * by whether the check is required.
+     *
+     * Values travel as data, not markup, so nothing here needs escaping:
+     * React renders them as text nodes.
      *
      * @return list<Node>
      */
@@ -210,31 +227,23 @@ class PageForm
         }
 
         $locale = app(Languages::class)->defaultLocale();
-        $checks = app(SeoChecklist::class)->for($page, $locale);
 
-        // The badge value is what the operator reads, so it carries the
-        // translated status label; the colour map is keyed by that same label
-        // because DisplayValueBlock matches the rendered value, not the raw
-        // status.
-        $labels = [
-            'pass' => __('tbtop-cms::pages.seo_checklist.status.pass'),
-            'warn' => __('tbtop-cms::pages.seo_checklist.status.warn'),
-            'fail' => __('tbtop-cms::pages.seo_checklist.status.fail'),
-        ];
-        $colors = [
-            $labels['pass'] => 'success',
-            $labels['warn'] => 'warning',
-            $labels['fail'] => 'danger',
-        ];
-
-        $rows = [];
-        foreach ($checks as $check) {
-            $rows[] = $s->displayValue($labels[$check['status']])->badge($colors);
-            $rows[] = $s->displayText($check['label'] . ': ' . $check['detail'])->variant('muted');
-        }
+        $checks = array_map(
+            static fn (array $check): array => [
+                ...$check,
+                'statusWord' => __('tbtop-cms::pages.seo_checklist.status.' . $check['status']),
+            ],
+            app(SeoChecklist::class)->for($page, $locale),
+        );
 
         return [
-            $s->section(['title' => __('tbtop-cms::pages.seo_checklist.section_title'), 'variant' => 'card'], $rows),
+            new Node('cms:seoChecklist', [
+                'checks' => $checks,
+                'labels' => [
+                    'required' => __('tbtop-cms::pages.seo_checklist.groups.required'),
+                    'optional' => __('tbtop-cms::pages.seo_checklist.groups.optional'),
+                ],
+            ]),
         ];
     }
 

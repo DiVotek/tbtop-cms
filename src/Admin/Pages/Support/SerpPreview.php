@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Admin\Dsl\LiveRegionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -22,41 +24,69 @@ use Tbtop\Cms\Page\Models\Page;
 final class SerpPreview
 {
     /**
-     * The preview depends on the SEO overrides for the previewed locale only.
-     * og_* are deliberately absent: they drive the social card, not the search
-     * result, and a dependency that never changes the output would just cost
-     * an extra round-trip per keystroke.
+     * The card is resolved for every content locale at once and the client
+     * picks the one whose tab is active, the same way a translatable field
+     * holds its whole locale map and shows one key of it.
      *
-     * $locale is fixed at render time, so the card keeps showing that locale
-     * while the editor switches the locale tabs above it — which locale tab is
-     * active is client state and never reaches the deps bag. The hint names
-     * the locale so the mismatch reads as scope, not as a stale preview.
+     * A single-locale card would have to be recomputed on the server every
+     * time the editor switches tabs, and that switch never reaches the server:
+     * the active tab is form state in the browser and is not a form value, so
+     * it cannot appear in the deps bag. Resolving all of them costs one extra
+     * pass per locale over data already loaded, and buys a preview that
+     * follows the tabs.
      *
-     * @return list<Node>
+     * og_* are deliberately absent from the deps: they drive the social card,
+     * not the search result, and a dependency that never changes the output
+     * would just cost an extra round-trip per keystroke.
+     *
+     * @return list<LiveRegionBuilder>
      */
-    public static function build(S $s, ?Page $page, string $locale): array
+    public static function build(S $s, ?Page $page, string $defaultLocale): array
     {
         if ($page === null || ! $page->exists) {
             return [];
         }
 
-        $region = $s->liveRegion('serpPreview')
-            ->dependsOn(["seo_title.{$locale}", "seo_description.{$locale}", "seo_canonical.{$locale}"])
-            ->render(static fn (array $deps): Node => self::card($page, $locale, $deps));
+        $locales = self::locales($defaultLocale);
 
-        return [
-            $s->section(['title' => __('tbtop-cms::pages.serp_preview.section_title'), 'variant' => 'card'], [
-                $s->displayText(__('tbtop-cms::pages.serp_preview.hint', [
-                    'locale' => mb_strtoupper($locale),
-                ]))->variant('muted'),
-                // The builder itself, not ->toNode(): the live-region endpoint
-                // resolves the region by walking the form tree for a
-                // LiveRegionBuilder (FormBuilder::searchLiveRegion), so a
-                // pre-serialized node renders once and then 404s on every
-                // subsequent dependency change.
-                $region,
-            ]),
-        ];
+        $deps = [];
+        foreach ($locales as $locale) {
+            $deps[] = "seo_title.{$locale}";
+            $deps[] = "seo_description.{$locale}";
+            $deps[] = "seo_canonical.{$locale}";
+        }
+
+        $region = $s->liveRegion('serpPreview')
+            ->dependsOn($deps)
+            ->render(static fn (array $bag): Node => self::card($page, $locales, $defaultLocale, $bag));
+
+        // No wrapping section: the block draws its own header row, because the
+        // collapsed state has to show the meters, and those are measured in the
+        // browser. A section title above it would repeat the same words the
+        // block's own toggle carries.
+        //
+        // The builder itself, not ->toNode(): the live-region endpoint resolves
+        // the region by walking the form tree for a LiveRegionBuilder
+        // (FormBuilder::searchLiveRegion), so a pre-serialized node renders
+        // once and then 404s on every subsequent dependency change.
+        return [$region];
+    }
+
+    /**
+     * Locales the editor can switch between, default first — seeding the list
+     * with the default is also what keeps it non-empty when the language table
+     * has no admin-active rows, so the card always has something to render.
+     *
+     * @return list<string>
+     */
+    private static function locales(string $defaultLocale): array
+    {
+        $active = array_map(
+            static fn (array $row): string => $row['locale'],
+            app(Languages::class)->adminActive(),
+        );
+
+        return array_values(array_unique([$defaultLocale, ...$active]));
     }
 
     /**
@@ -70,16 +100,27 @@ final class SerpPreview
      * Values travel as data, not markup, so nothing here needs escaping: React
      * renders them as text nodes.
      *
-     * @param  array<string, string>  $deps
+     * @param  list<string>  $locales
+     * @param  array<string, string>  $bag
      */
-    private static function card(Page $page, string $locale, array $deps): Node
+    private static function card(Page $page, array $locales, string $defaultLocale, array $bag): Node
     {
-        $resolved = app(SeoResolver::class)->resolve(self::draftOf($page, $locale, $deps), $locale);
+        $resolver = app(SeoResolver::class);
+
+        $byLocale = [];
+        foreach ($locales as $locale) {
+            $resolved = $resolver->resolve(self::draftOf($page, $locale, $bag), $locale);
+
+            $byLocale[$locale] = [
+                'url' => self::displayUrl($resolved['canonical']),
+                'title' => $resolved['title'],
+                'description' => $resolved['description'],
+            ];
+        }
 
         return new Node('cms:serpPreview', [
-            'url' => self::displayUrl($resolved['canonical']),
-            'title' => $resolved['title'],
-            'description' => $resolved['description'],
+            'byLocale' => $byLocale,
+            'defaultLocale' => $defaultLocale,
             'emptyTitle' => __('tbtop-cms::pages.serp_preview.empty_title'),
             'emptyDescription' => __('tbtop-cms::pages.serp_preview.empty_description'),
             'labels' => [
@@ -88,6 +129,10 @@ final class SerpPreview
                 'titleWidth' => __('tbtop-cms::pages.serp_preview.meter.title_width'),
                 'descriptionLength' => __('tbtop-cms::pages.serp_preview.meter.description_length'),
                 'truncated' => __('tbtop-cms::pages.serp_preview.meter.truncated'),
+                'sectionTitle' => __('tbtop-cms::pages.serp_preview.section_title'),
+                'summary' => __('tbtop-cms::pages.serp_preview.summary'),
+                'expand' => __('tbtop-cms::pages.serp_preview.expand'),
+                'collapse' => __('tbtop-cms::pages.serp_preview.collapse'),
             ],
         ]);
     }

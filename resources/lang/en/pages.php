@@ -78,20 +78,25 @@ return [
         'unpublish_at_hint' => 'Leave empty to keep published indefinitely.',
         'sort_order' => 'Sort order',
         'is_indexable' => 'Indexable in search',
+        // Hints are deliberately short: a field left empty shows the value it
+        // will actually resolve to as its placeholder (see
+        // PageForm::computedPlaceholders()). "Falls back to Title, then Name"
+        // restated in words what the field already shows, and cost three
+        // lines under every input.
         'seo_title' => 'Meta title',
-        'seo_title_hint' => 'The clickable headline in search results. Falls back to Title, then Name; the title template from SEO settings is applied on top.',
+        'seo_title_hint' => 'The clickable headline in search results.',
         'seo_description' => 'Meta description',
-        'seo_description_hint' => 'The snippet under the headline in search results. Falls back to Summary, then the default description from SEO settings.',
+        'seo_description_hint' => 'The snippet under the headline in search results.',
         'seo_focus_keyword' => 'Focus keyword',
-        'seo_focus_keyword_hint' => 'The search query this page should answer. Never rendered on the site — used to judge and improve the page content.',
+        'seo_focus_keyword_hint' => 'The query this page should answer. Never shown on the site.',
+        // The OG fields carry no hint: their placeholders show what they
+        // inherit from the SEO fields above, and the "Social networks"
+        // heading already says what they are for.
         'og_title' => 'OG title',
-        'og_title_hint' => 'Headline when this page is shared on social networks. Falls back to the meta title, without the title template.',
         'og_description' => 'OG description',
-        'og_description_hint' => 'Text under the headline when shared. Falls back to the meta description, without the description template.',
         'og_image' => 'OG image',
-        'og_image_hint' => 'Preview image when shared. Falls back to the page Image, then the default OG image from SEO settings.',
         'seo_canonical' => 'Canonical URL override',
-        'seo_canonical_hint' => 'Advanced use only — overrides the computed canonical URL for this page in this locale.',
+        'seo_canonical_hint' => 'Advanced use only.',
         'image' => 'Image',
     ],
     'actions' => [
@@ -176,7 +181,12 @@ return [
     ],
     'serp_preview' => [
         'section_title' => 'Search preview',
-        'hint' => 'How this page can appear in search results for :locale, with the title template applied.',
+        // The collapsed header. Both numbers ride along so an overflowing
+        // title is visible without opening the card — :width/:length are
+        // filled in by the block, same as the meters below.
+        'summary' => ':width/:widthLimit px · :length/:lengthLimit',
+        'expand' => 'Show the snippet',
+        'collapse' => 'Hide the snippet',
         'empty_title' => 'No title yet',
         'empty_description' => 'No description yet — search engines will pick their own text from the page.',
         'device' => [
@@ -194,6 +204,12 @@ return [
     ],
     'seo_checklist' => [
         'section_title' => 'SEO checklist',
+        // Required = the page reads badly in a result list without it.
+        // Optional = an improvement to a page already fit to publish.
+        'groups' => [
+            'required' => 'Required',
+            'optional' => 'Worth doing',
+        ],
         'status' => [
             'pass' => 'OK',
             'warn' => 'Check',
@@ -213,15 +229,15 @@ return [
             'focus_keyword_in_slug' => 'Keyword in slug',
             'duplicate_title' => 'Unique title',
         ],
+        // Length is reported by the preview meters, which measure the title in
+        // pixels — these say only whether the value exists.
         'title' => [
             'fail' => 'The meta title is empty.',
-            'warn' => 'Title is :length characters — longer than the recommended 60.',
-            'pass' => 'Title is :length characters.',
+            'pass' => 'Set.',
         ],
         'description' => [
             'fail' => 'The meta description is empty.',
-            'warn' => 'Description is :length characters — outside the recommended 50–160.',
-            'pass' => 'Description is :length characters.',
+            'pass' => 'Set.',
         ],
         'og_image' => [
             'warn' => 'No OG image resolved — set one here, on the page image, or as the site default.',
