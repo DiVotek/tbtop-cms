@@ -166,6 +166,12 @@ const segmenter =
  * Counts what an editor sees as one character. String.length counts UTF-16
  * code units, so an emoji reads as two and a flag as four; a grapheme count
  * matches the glyphs on screen, which is what the number claims to describe.
+ *
+ * The code-point fallback is for environments with no Intl at all — SSR and
+ * test DOMs — rather than for real browsers: every engine in the build's
+ * baseline ships Segmenter. It still splits flags and ZWJ sequences, so a
+ * count taken there can read high; that is preferable to shipping a grapheme
+ * segmentation table for a path the admin's own browsers never take.
  */
 function countCharacters(text: string): number {
 	if (segmenter) {
@@ -176,7 +182,6 @@ function countCharacters(text: string): number {
 		return count;
 	}
 
-	// Code points still beat code units where Segmenter is unavailable.
 	return Array.from(text).length;
 }
 
