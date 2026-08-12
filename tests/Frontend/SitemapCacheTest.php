@@ -9,6 +9,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 
 uses(RefreshDatabase::class);
@@ -58,6 +59,26 @@ it('invalidates the cached sitemap when a page is saved', function (): void {
 
     expect($second)->toContain(url($newPage->pathFor('en')))
         ->and($first)->not->toContain(url($newPage->pathFor('en')));
+});
+
+it('reshapes the cached sitemap when the chunk size setting changes', function (): void {
+    foreach (['One', 'Two', 'Three'] as $name) {
+        Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => $name], 'is_indexable' => true]);
+    }
+
+    // Warm both documents at the default size, then change the budget through
+    // the same path the settings form uses.
+    expect($this->get('/sitemap.xml')->assertOk()->getContent())->not->toContain(url('sitemap-2.xml'));
+    $this->get('/sitemap-1.xml')->assertOk();
+
+    app(Settings::class)->set('seo.sitemap_per_chunk', 2);
+    event(new SettingsSaved(['seo.sitemap_per_chunk' => 2]));
+
+    // Chunk boundaries are baked into cached XML, so a settings save has to
+    // reach both the index and every chunk — CmsCache does it by version, not
+    // per key (see its docblock), which is what makes this pass.
+    expect($this->get('/sitemap.xml')->assertOk()->getContent())->toContain(url('sitemap-2.xml'))
+        ->and(substr_count($this->get('/sitemap-1.xml')->assertOk()->getContent(), '<loc>'))->toBe(2);
 });
 
 it('builds per request when the cms cache is disabled', function (): void {

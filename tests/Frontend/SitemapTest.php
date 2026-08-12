@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Cms;
+use Tbtop\Cms\Frontend\Seo\SitemapEntryBuilder;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -249,6 +250,15 @@ it('lets the admin setting override the config default for chunk size', function
     // setting is what splits them.
     expect($this->get('/sitemap.xml')->assertOk()->getContent())
         ->toContain(url('sitemap-2.xml'));
+});
+
+it('clamps a stored chunk size above the protocol ceiling', function (): void {
+    // The settings form caps this at 50 000, but the value can also arrive
+    // from a host config or a row written straight to the database, and a
+    // chunk past the limit is rejected wholesale by the crawler reading it.
+    app(Settings::class)->set('seo.sitemap_per_chunk', 999999);
+
+    expect(app(SitemapEntryBuilder::class)->defaultPerChunk())->toBe(50000);
 });
 
 it('404s a chunk beyond the last one', function (): void {

@@ -87,10 +87,21 @@ class SitemapEntryBuilder
      */
     private function pagesPerChunk(?int $perChunk, int $localeCount): int
     {
-        $budget = $perChunk ?? $this->defaultPerChunk();
+        $budget = $perChunk === null
+            ? $this->defaultPerChunk()
+            : max(1, min($perChunk, self::MAX_PER_CHUNK));
 
         return max(1, (int) floor($budget / max(1, $localeCount)));
     }
+
+    /**
+     * The sitemap protocol's own ceiling. Clamped here rather than trusted
+     * from the settings form: the form validates what an editor types, but
+     * the value can also arrive from a host's config or from a row written
+     * straight to the database, and a chunk past this limit is rejected
+     * wholesale by the crawler that reads it.
+     */
+    private const int MAX_PER_CHUNK = 50000;
 
     /**
      * The editor's setting wins over the config default: how big a chunk can
@@ -104,10 +115,10 @@ class SitemapEntryBuilder
         $stored = $this->settings->get('seo.sitemap_per_chunk');
 
         if (is_numeric($stored) && (int) $stored >= 1) {
-            return (int) $stored;
+            return min((int) $stored, self::MAX_PER_CHUNK);
         }
 
-        return max(1, (int) config('tbtop-cms.seo.sitemap.per_chunk', 1000));
+        return max(1, min((int) config('tbtop-cms.seo.sitemap.per_chunk', 1000), self::MAX_PER_CHUNK));
     }
 
     /** @return Builder<Page> */
