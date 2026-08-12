@@ -6,9 +6,9 @@ namespace Tbtop\Cms\Frontend\Http\Controllers;
 
 use Illuminate\Http\Response;
 use Tbtop\Cms\Cache\CmsCache;
+use Tbtop\Cms\Frontend\Seo\IndexingSetting;
 use Tbtop\Cms\Frontend\Seo\SitemapEntryBuilder;
 use Tbtop\Cms\Frontend\Seo\SitemapXmlRenderer;
-use Tbtop\Cms\Settings\Settings;
 
 class SitemapController
 {
@@ -17,7 +17,7 @@ class SitemapController
     public function __construct(
         private readonly SitemapEntryBuilder $entries,
         private readonly SitemapXmlRenderer $renderer,
-        private readonly Settings $settings,
+        private readonly IndexingSetting $indexing,
         private readonly CmsCache $cache,
     ) {}
 
@@ -25,7 +25,7 @@ class SitemapController
     {
         // Checked per-request, outside the cache: a 404 here must never be
         // served from (or written to) a still-warm cache entry.
-        if (! (bool) $this->settings->get('seo.indexing_enabled', true)) {
+        if (! $this->indexing->enabled()) {
             abort(404);
         }
 

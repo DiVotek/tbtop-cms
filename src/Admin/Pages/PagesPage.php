@@ -24,6 +24,7 @@ use Tbtop\Cms\Admin\Support\EnumLabel;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Enums\SeoState;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PageRestored;
 use Tbtop\Cms\Page\Models\Page;
@@ -102,8 +103,13 @@ class PagesPage extends AdminPage
                         __('tbtop-cms::pages.status.scheduled') => 'gray',
                         __('tbtop-cms::pages.status.expired') => 'gray',
                     ]),
+                // Sortable ascending = worst first, which is the sweep this
+                // badge exists for ("show me what needs work"). That ordering
+                // is why the query selects SeoState's rank rather than its
+                // name — see seoStateSql().
                 Column::make('seo_state')->label(__('tbtop-cms::pages.columns.seo'))
                     ->formatUsing($this->seoStateLabel(...))
+                    ->sortable()
                     ->badge([
                         __('tbtop-cms::pages.seo_state.fail') => 'danger',
                         __('tbtop-cms::pages.seo_state.warn') => 'warning',
@@ -243,6 +249,11 @@ class PagesPage extends AdminPage
      * fail, which is the safer direction for a list-page hint whose
      * authoritative detail lives in the per-page SEO checklist
      * (SeoChecklist::for()).
+     *
+     * Selected as SeoState's numeric rank, not its name, so the column sorts
+     * worst-first (see the enum). The ranks are interpolated from the enum
+     * rather than bound: they are its own integer cases, never user input, and
+     * a CASE arm cannot take a placeholder on every driver alike.
      */
     private function seoStateSql(string $table): string
     {
@@ -250,11 +261,15 @@ class PagesPage extends AdminPage
         $emptyName = $this->emptyTranslatableSql($table, 'name');
         $emptySummary = $this->emptyTranslatableSql($table, 'summary');
 
+        $fail = SeoState::Fail->value;
+        $warn = SeoState::Warn->value;
+        $pass = SeoState::Pass->value;
+
         return <<<SQL
             CASE
-                WHEN {$emptyName} AND {$emptyTitle} THEN 'fail'
-                WHEN {$emptySummary} OR NOT {$table}.is_indexable THEN 'warn'
-                ELSE 'pass'
+                WHEN {$emptyName} AND {$emptyTitle} THEN {$fail}
+                WHEN {$emptySummary} OR NOT {$table}.is_indexable THEN {$warn}
+                ELSE {$pass}
             END as seo_state
             SQL;
     }
@@ -424,9 +439,14 @@ class PagesPage extends AdminPage
         return EnumLabel::make('tbtop-cms::pages.status', $value);
     }
 
+    /**
+     * Not EnumLabel::make() like its neighbours: those columns carry names,
+     * this one carries a sortable rank, so the enum owns the rank-to-words
+     * step (SeoState::labelFor()).
+     */
     private function seoStateLabel(mixed $value): string
     {
-        return EnumLabel::make('tbtop-cms::pages.seo_state', $value);
+        return SeoState::labelFor($value);
     }
 
     private function create(ActionCtx $ctx): Effects

@@ -16,13 +16,22 @@ use Tbtop\Cms\Settings\Settings;
  */
 class SeoResolver
 {
+    private readonly IndexingSetting $indexing;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
         private readonly Languages $languages,
         private readonly JsonLd $jsonLd,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
-    ) {}
+        ?IndexingSetting $indexing = null,
+    ) {
+        // Built from the same Settings instance rather than resolved from the
+        // container: this resolver is constructed directly in places that pass
+        // a purpose-built Settings, and a container-resolved reader there would
+        // consult a different one.
+        $this->indexing = $indexing ?? new IndexingSetting($settings);
+    }
 
     /**
      * @param  list<Breadcrumb>  $breadcrumbs  Ancestors only (Breadcrumbs::forPage() shape), reused
@@ -58,7 +67,7 @@ class SeoResolver
             'ogImage' => $ogImage,
             'ogTitle' => $ogTitle,
             'ogDescription' => $ogDescription,
-            'noindex' => ! $page->is_indexable || ! $this->indexingEnabled(),
+            'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),
             'siteName' => $siteName,
             'ogType' => 'website',
             'ogUrl' => $canonical,
@@ -70,20 +79,6 @@ class SeoResolver
             'favicon' => $this->favicon(),
             'jsonLd' => $this->jsonLd($page, $locale, $siteName, $ogTitle, $canonical, $breadcrumbs),
         ];
-    }
-
-    /**
-     * `seo.indexing_enabled` stores a plain boolean, but a setting row can
-     * exist with a literally-stored JSON null (Settings::get() only applies
-     * its $default when the KEY is absent, not when it decodes to null) — an
-     * unset boolean must read as "indexing on", not silently flip every page
-     * to noindex, so null is treated the same as a missing key here.
-     */
-    private function indexingEnabled(): bool
-    {
-        $value = $this->settings->get('seo.indexing_enabled', true);
-
-        return $value === null || (bool) $value;
     }
 
     private function twitterCard(?string $ogImage): string
