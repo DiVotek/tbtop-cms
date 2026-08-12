@@ -24,8 +24,15 @@ interface SerpPreviewOptions {
  * are the widths of its own result column, so they differ per device. The
  * description is cut by characters instead, which is why only the title gets
  * a pixel meter. Both numbers come from Yoast's published measurements.
+ *
+ * Mobile's larger budget is two lines' worth, not one wide line, so the card
+ * lays it out over `lines` and each line gets limit/lines of room. Keeping the
+ * card's own column tied to the same numbers is what stops the meter and the
+ * card from disagreeing — a title the meter passes has to fit the box drawn
+ * above it, and one it rejects has to visibly overflow.
  */
 const TITLE_WIDTH_LIMIT: Record<Device, number> = { desktop: 600, mobile: 920 };
+const TITLE_LINES: Record<Device, number> = { desktop: 1, mobile: 2 };
 const DESCRIPTION_LIMIT: Record<Device, number> = { desktop: 155, mobile: 120 };
 
 /**
@@ -54,6 +61,14 @@ function titleStyle(device: Device): CSSProperties {
 	return { fontSize: `${size}px`, fontWeight: weight, fontFamily: TITLE_FAMILY };
 }
 
+/** One line's worth of the device's width budget. */
+function columnWidth(device: Device): number {
+	return Math.round(TITLE_WIDTH_LIMIT[device] / TITLE_LINES[device]);
+}
+
+/** The card's own px-4 on both sides, so its box wraps the column exactly. */
+const CARD_PADDING = 32;
+
 export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const [device, setDevice] = useState<Device>("desktop");
 
@@ -74,22 +89,25 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 			<DeviceSwitch device={device} onChange={setDevice} labels={options.labels} />
 
 			<div
-				className={
-					device === "mobile"
-						? "max-w-[420px] rounded-lg border bg-card px-4 py-3.5"
-						: "rounded-lg border bg-card px-4 py-3.5"
-				}
+				className="w-fit rounded-lg border bg-card px-4 py-3.5"
+				style={{ maxWidth: `${columnWidth(device) + CARD_PADDING}px` }}
 			>
 				<div className="truncate text-[13px] leading-tight text-muted-foreground">
 					{options.url}
 				</div>
 				<div
-					className={
-						device === "mobile"
-							? "mt-1 line-clamp-2 leading-snug text-foreground"
-							: "mt-1 truncate leading-snug text-foreground"
-					}
-					style={titleStyle(device)}
+					className="mt-1 overflow-hidden text-ellipsis leading-snug text-foreground"
+					style={{
+						...titleStyle(device),
+						// The box the meter's verdict describes: as wide as one
+						// line of the budget, as tall as the lines it is spread
+						// over. A title that overflows here is the same title the
+						// meter reports as over the limit.
+						width: `${columnWidth(device)}px`,
+						display: "-webkit-box",
+						WebkitBoxOrient: "vertical",
+						WebkitLineClamp: TITLE_LINES[device],
+					}}
 				>
 					{title}
 				</div>
