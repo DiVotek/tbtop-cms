@@ -72,8 +72,11 @@ const CARD_PADDING = 32;
 export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const [device, setDevice] = useState<Device>("desktop");
 
-	const title = options.title || options.emptyTitle;
-	const description = options.description || options.emptyDescription;
+	// The placeholders are what an empty field looks like, not what it sends:
+	// the meters read the real values, so a page with no title reports zero
+	// rather than the width of "No title yet".
+	const title = options.title;
+	const description = options.description;
 
 	const column = columnWidth(device);
 	const layout = useTitleLayout(title, titleFont(device), column);
@@ -85,7 +88,7 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	// unknown until the measuring effect has run once; treating that first
 	// paint as overflow would flash a red meter on every mount.
 	const titleOver = layout !== null && layout.lines > TITLE_LINES[device];
-	const descriptionOver = description.length > descriptionLimit;
+	const descriptionOver = countCharacters(description) > descriptionLimit;
 
 	// Reported as the budget the wrapped title consumes: every line but the
 	// last one fills the column, the last one takes what it needs. An
@@ -121,10 +124,10 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 						overflowWrap: "anywhere",
 					}}
 				>
-					{title}
+					{title || options.emptyTitle}
 				</div>
 				<div className="mt-1.5 line-clamp-2 text-sm leading-normal text-muted-foreground">
-					{description}
+					{description || options.emptyDescription}
 				</div>
 			</div>
 
@@ -135,7 +138,7 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 					// because it is what the editor is actually typing against.
 					width: titleWidth === null ? "—" : Math.round(titleWidth),
 					limit: widthLimit,
-					length: title.length,
+					length: countCharacters(title),
 				})}
 				value={titleWidth ?? 0}
 				limit={widthLimit}
@@ -144,16 +147,37 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 			/>
 			<Meter
 				label={fill(options.labels.descriptionLength, {
-					length: description.length,
+					length: countCharacters(description),
 					limit: descriptionLimit,
 				})}
-				value={description.length}
+				value={countCharacters(description)}
 				limit={descriptionLimit}
 				over={descriptionOver}
 				note={descriptionOver ? options.labels.truncated : null}
 			/>
 		</div>
 	);
+}
+
+const segmenter =
+	typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter() : null;
+
+/**
+ * Counts what an editor sees as one character. String.length counts UTF-16
+ * code units, so an emoji reads as two and a flag as four; a grapheme count
+ * matches the glyphs on screen, which is what the number claims to describe.
+ */
+function countCharacters(text: string): number {
+	if (segmenter) {
+		let count = 0;
+		for (const _ of segmenter.segment(text)) {
+			count++;
+		}
+		return count;
+	}
+
+	// Code points still beat code units where Segmenter is unavailable.
+	return Array.from(text).length;
 }
 
 /**
