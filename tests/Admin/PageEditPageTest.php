@@ -98,33 +98,39 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
         ->and($seoFieldNames)->not->toContain('is_indexable');
 });
 
-it('renders the SEO checklist section above the editable SEO fields', function (): void {
+it('sends every check to the checklist block, split into required and optional', function (): void {
     $page = pageWithBlocks([
         ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Hi']],
     ]);
 
     $tabs = editFormTabs($page->id);
-    $seoTabBody = $tabs[1]['body'];
 
-    $displayValues = [];
-    collectNodesByKind($seoTabBody, 'displayValue', $displayValues);
+    $nodes = [];
+    collectNodesByKind($tabs[1]['body'], 'cms:seoChecklist', $nodes);
+    expect($nodes)->toHaveCount(1);
 
-    // One badge per check key — title/description/og_image/indexable/
-    // canonical/hreflang/focus_keyword/duplicate_title, at minimum (focus
-    // keyword is unset here, so its four presence sub-checks don't fire).
-    // The badge carries the translated status label, not the raw status:
-    // it is operator-facing text, and the colour map is keyed by it.
-    $labels = [
+    $checks = $nodes[0]['options']['checks'];
+
+    // Focus keyword is unset on this page, so its four presence sub-checks
+    // don't fire — the rest are always present.
+    expect(array_column($checks, 'key'))->toBe([
+        'title', 'description', 'og_image', 'indexable',
+        'canonical', 'hreflang', 'focus_keyword', 'duplicate_title',
+    ]);
+
+    // The split is what gives the list a reading order; without it the block
+    // renders one flat run and the grouping headings sit over nothing.
+    $required = array_column(array_filter($checks, static fn (array $c): bool => $c['required']), 'key');
+    expect($required)->toBe(['title', 'description', 'indexable', 'canonical', 'duplicate_title']);
+
+    // Status words are translated server-side — the block renders text nodes
+    // and has no locale of its own.
+    $words = [
         __('tbtop-cms::pages.seo_checklist.status.pass'),
         __('tbtop-cms::pages.seo_checklist.status.warn'),
         __('tbtop-cms::pages.seo_checklist.status.fail'),
     ];
-    $statuses = array_column(array_column($displayValues, 'options'), 'value');
-    expect($displayValues)->not->toBeEmpty()
-        ->and($statuses)->each->toBeIn($labels);
-
-    $colors = array_column($displayValues, 'options')[0]['badge']['colors'] ?? [];
-    expect(array_keys($colors))->toBe($labels);
+    expect(array_column($checks, 'statusWord'))->each->toBeIn($words);
 });
 
 it('omits the SEO checklist section for a null or unsaved page', function (): void {
@@ -396,9 +402,8 @@ it('placeholders seo_title/seo_description/og_title/og_description with the comp
     ]);
 
     $tabs = editFormTabs($page->id);
-    $seoChildren = $tabs[1]['body']['options']['children'];
-    $seoTitle = collect($seoChildren)->firstWhere('name', 'seo_title');
-    $seoDescription = collect($seoChildren)->firstWhere('name', 'seo_description');
+    $seoTitle = findFieldByName($tabs[1]['body'], 'seo_title');
+    $seoDescription = findFieldByName($tabs[1]['body'], 'seo_description');
 
     expect($seoTitle['options']['placeholder'] ?? null)->toBe('About Page — Acme')
         ->and($seoDescription['options']['placeholder'] ?? null)->toBe('A short summary.');
@@ -984,6 +989,29 @@ function collectNodesByKind(array $node, string $kind, array &$out): void
             collectNodesByKind($tab['body'], $kind, $out);
         }
     }
+}
+
+/**
+ * The first field with this `name` at any depth. Fields sit inside layout
+ * wrappers (the SEO tab lays them out in a grid beside the checklist), so a
+ * firstWhere() over the top-level children finds nothing.
+ *
+ * @param  array<string, mixed>  $node
+ * @return array<string, mixed>|null
+ */
+function findFieldByName(array $node, string $name): ?array
+{
+    if (($node['name'] ?? null) === $name) {
+        return $node;
+    }
+
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (is_array($child) && ($found = findFieldByName($child, $name)) !== null) {
+            return $found;
+        }
+    }
+
+    return null;
 }
 
 /**

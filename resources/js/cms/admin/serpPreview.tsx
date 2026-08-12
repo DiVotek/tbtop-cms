@@ -1,5 +1,5 @@
 import { defineBlock, type RenderProps } from "@tbtop/inertia-admin";
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { layOutText, type TextLayout } from "./measureText";
 
 type Device = "desktop" | "mobile";
@@ -16,6 +16,10 @@ interface SerpPreviewOptions {
 		titleWidth: string;
 		descriptionLength: string;
 		truncated: string;
+		sectionTitle: string;
+		summary: string;
+		expand: string;
+		collapse: string;
 	};
 }
 
@@ -69,8 +73,46 @@ function columnWidth(device: Device): number {
 /** The card's own px-4 on both sides, so its box wraps the column exactly. */
 const CARD_PADDING = 32;
 
+const OPEN_KEY = "tbtop-cms.serpPreview.open";
+
+/**
+ * The card starts collapsed so the fields it describes are the first thing on
+ * the tab — the meters stay in the header either way, so an overflowing title
+ * is visible without opening anything.
+ *
+ * The choice is remembered because it is a working preference, not a per-page
+ * one: an editor who wants the snippet in view wants it on every page, and
+ * re-opening it on each navigation is the kind of small tax that makes a panel
+ * feel hostile. Storage failures (private mode, disabled storage) fall back to
+ * the default rather than breaking the block.
+ */
+function useRememberedOpen(): [boolean, () => void] {
+	const [open, setOpen] = useState<boolean>(() => {
+		try {
+			return localStorage.getItem(OPEN_KEY) === "1";
+		} catch {
+			return false;
+		}
+	});
+
+	const toggle = useCallback(() => {
+		setOpen((prev) => {
+			const next = !prev;
+			try {
+				localStorage.setItem(OPEN_KEY, next ? "1" : "0");
+			} catch {
+				// Preference is a nicety; the panel still works without it.
+			}
+			return next;
+		});
+	}, []);
+
+	return [open, toggle];
+}
+
 export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const [device, setDevice] = useState<Device>("desktop");
+	const [open, toggle] = useRememberedOpen();
 
 	// The placeholders are what an empty field looks like, not what it sends:
 	// the meters read the real values, so a page with no title reports zero
@@ -95,12 +137,54 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	// overflowing title reports past the limit, which is what the bar shows.
 	const titleWidth = layout === null ? null : column * (layout.lines - 1) + layout.width;
 
+	const titleText = titleWidth === null ? "—" : Math.round(titleWidth);
+	const descriptionLength = countCharacters(description);
+	const anyOver = titleOver || descriptionOver;
+
 	return (
+		<div className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3">
+			{/* The header carries the verdict on its own: collapsed is the
+			    default, so the numbers have to be readable without opening the
+			    card, or an overflowing title would hide behind a chevron. */}
+			<button
+				type="button"
+				onClick={toggle}
+				aria-expanded={open}
+				className="flex w-full items-center justify-between gap-3 text-left"
+			>
+				<span className="text-sm font-medium text-foreground">
+					{options.labels.sectionTitle}
+				</span>
+				<span className="flex items-center gap-2">
+					<span
+						className={
+							anyOver
+								? "text-xs tabular-nums text-destructive"
+								: "text-xs tabular-nums text-muted-foreground"
+						}
+					>
+						{fill(options.labels.summary, {
+							width: titleText,
+							widthLimit,
+							length: descriptionLength,
+							lengthLimit: descriptionLimit,
+						})}
+					</span>
+					<span aria-hidden className="text-xs text-muted-foreground">
+						{open ? "▾" : "▸"}
+					</span>
+					<span className="sr-only">
+						{open ? options.labels.collapse : options.labels.expand}
+					</span>
+				</span>
+			</button>
+
+			{open ? (
 		<div className="flex flex-col gap-3">
 			<DeviceSwitch device={device} onChange={setDevice} labels={options.labels} />
 
 			<div
-				className="w-fit rounded-lg border bg-card px-4 py-3.5"
+				className="w-fit rounded-lg border bg-background px-4 py-3.5"
 				style={{ maxWidth: `${column + CARD_PADDING}px` }}
 			>
 				<div className="truncate text-[13px] leading-tight text-muted-foreground">
@@ -131,30 +215,32 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 				</div>
 			</div>
 
-			<Meter
-				label={fill(options.labels.titleWidth, {
-					// Only the width has a limit — a title is cut by how wide it
-					// renders, never by its character count. The count rides along
-					// because it is what the editor is actually typing against.
-					width: titleWidth === null ? "—" : Math.round(titleWidth),
-					limit: widthLimit,
-					length: countCharacters(title),
-				})}
-				value={titleWidth ?? 0}
-				limit={widthLimit}
-				over={titleOver}
-				note={titleOver ? options.labels.truncated : null}
-			/>
-			<Meter
-				label={fill(options.labels.descriptionLength, {
-					length: countCharacters(description),
-					limit: descriptionLimit,
-				})}
-				value={countCharacters(description)}
-				limit={descriptionLimit}
-				over={descriptionOver}
-				note={descriptionOver ? options.labels.truncated : null}
-			/>
+				<Meter
+					label={fill(options.labels.titleWidth, {
+						// Only the width has a limit — a title is cut by how wide it
+						// renders, never by its character count. The count rides along
+						// because it is what the editor is actually typing against.
+						width: titleText,
+						limit: widthLimit,
+						length: countCharacters(title),
+					})}
+					value={titleWidth ?? 0}
+					limit={widthLimit}
+					over={titleOver}
+					note={titleOver ? options.labels.truncated : null}
+				/>
+				<Meter
+					label={fill(options.labels.descriptionLength, {
+						length: descriptionLength,
+						limit: descriptionLimit,
+					})}
+					value={descriptionLength}
+					limit={descriptionLimit}
+					over={descriptionOver}
+					note={descriptionOver ? options.labels.truncated : null}
+				/>
+				</div>
+			) : null}
 		</div>
 	);
 }
@@ -191,10 +277,12 @@ function countCharacters(text: string): number {
  * on text measured in the browser, neither of which the server knows.
  */
 function fill(template: string, values: Record<string, string | number>): string {
-	return Object.entries(values).reduce(
-		(text, [key, value]) => text.replaceAll(`:${key}`, String(value)),
-		template,
-	);
+	// Longest key first: `:width` is a prefix of `:widthLimit`, so substituting
+	// in declaration order would consume the shorter name and leave "Limit"
+	// stranded in the output.
+	return Object.entries(values)
+		.sort(([a], [b]) => b.length - a.length)
+		.reduce((text, [key, value]) => text.replaceAll(`:${key}`, String(value)), template);
 }
 
 function DeviceSwitch({

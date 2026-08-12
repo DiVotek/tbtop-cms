@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Tbtop\Admin\Dsl\LiveRegionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -29,10 +30,9 @@ final class SerpPreview
      *
      * $locale is fixed at render time, so the card keeps showing that locale
      * while the editor switches the locale tabs above it — which locale tab is
-     * active is client state and never reaches the deps bag. The hint names
-     * the locale so the mismatch reads as scope, not as a stale preview.
+     * active is client state and never reaches the deps bag.
      *
-     * @return list<Node>
+     * @return list<LiveRegionBuilder>
      */
     public static function build(S $s, ?Page $page, string $locale): array
     {
@@ -44,19 +44,16 @@ final class SerpPreview
             ->dependsOn(["seo_title.{$locale}", "seo_description.{$locale}", "seo_canonical.{$locale}"])
             ->render(static fn (array $deps): Node => self::card($page, $locale, $deps));
 
-        return [
-            $s->section(['title' => __('tbtop-cms::pages.serp_preview.section_title'), 'variant' => 'card'], [
-                $s->displayText(__('tbtop-cms::pages.serp_preview.hint', [
-                    'locale' => mb_strtoupper($locale),
-                ]))->variant('muted'),
-                // The builder itself, not ->toNode(): the live-region endpoint
-                // resolves the region by walking the form tree for a
-                // LiveRegionBuilder (FormBuilder::searchLiveRegion), so a
-                // pre-serialized node renders once and then 404s on every
-                // subsequent dependency change.
-                $region,
-            ]),
-        ];
+        // No wrapping section: the block draws its own header row, because the
+        // collapsed state has to show the meters, and those are measured in the
+        // browser. A section title above it would repeat the same words the
+        // block's own toggle carries.
+        //
+        // The builder itself, not ->toNode(): the live-region endpoint resolves
+        // the region by walking the form tree for a LiveRegionBuilder
+        // (FormBuilder::searchLiveRegion), so a pre-serialized node renders
+        // once and then 404s on every subsequent dependency change.
+        return [$region];
     }
 
     /**
@@ -88,6 +85,10 @@ final class SerpPreview
                 'titleWidth' => __('tbtop-cms::pages.serp_preview.meter.title_width'),
                 'descriptionLength' => __('tbtop-cms::pages.serp_preview.meter.description_length'),
                 'truncated' => __('tbtop-cms::pages.serp_preview.meter.truncated'),
+                'sectionTitle' => __('tbtop-cms::pages.serp_preview.section_title'),
+                'summary' => __('tbtop-cms::pages.serp_preview.summary'),
+                'expand' => __('tbtop-cms::pages.serp_preview.expand'),
+                'collapse' => __('tbtop-cms::pages.serp_preview.collapse'),
             ],
         ]);
     }
