@@ -1,6 +1,6 @@
 import { defineBlock, type RenderProps } from "@tbtop/inertia-admin";
 import { type CSSProperties, useEffect, useState } from "react";
-import { measureTextWidth } from "./measureText";
+import { layOutText, type TextLayout } from "./measureText";
 
 type Device = "desktop" | "mobile";
 
@@ -75,14 +75,22 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const title = options.title || options.emptyTitle;
 	const description = options.description || options.emptyDescription;
 
-	const titleWidth = useMeasuredWidth(title, titleFont(device));
+	const column = columnWidth(device);
+	const layout = useTitleLayout(title, titleFont(device), column);
 	const widthLimit = TITLE_WIDTH_LIMIT[device];
 	const descriptionLimit = DESCRIPTION_LIMIT[device];
 
-	// Width is unknown until the measuring effect has run once; treating that
-	// first paint as "over the limit" would flash a red meter on every mount.
-	const titleOver = titleWidth !== null && titleWidth > widthLimit;
+	// The title overflows when its wrapped form needs more lines than the
+	// device shows — the same thing the card's clamp does to it. Layout is
+	// unknown until the measuring effect has run once; treating that first
+	// paint as overflow would flash a red meter on every mount.
+	const titleOver = layout !== null && layout.lines > TITLE_LINES[device];
 	const descriptionOver = description.length > descriptionLimit;
+
+	// Reported as the budget the wrapped title consumes: every line but the
+	// last one fills the column, the last one takes what it needs. An
+	// overflowing title reports past the limit, which is what the bar shows.
+	const titleWidth = layout === null ? null : column * (layout.lines - 1) + layout.width;
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -90,7 +98,7 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 
 			<div
 				className="w-fit rounded-lg border bg-card px-4 py-3.5"
-				style={{ maxWidth: `${columnWidth(device) + CARD_PADDING}px` }}
+				style={{ maxWidth: `${column + CARD_PADDING}px` }}
 			>
 				<div className="truncate text-[13px] leading-tight text-muted-foreground">
 					{options.url}
@@ -103,10 +111,14 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 						// line of the budget, as tall as the lines it is spread
 						// over. A title that overflows here is the same title the
 						// meter reports as over the limit.
-						width: `${columnWidth(device)}px`,
+						width: `${column}px`,
 						display: "-webkit-box",
 						WebkitBoxOrient: "vertical",
 						WebkitLineClamp: TITLE_LINES[device],
+						// Matches how layOutText() breaks a word wider than the
+						// column; without it the card would overflow where the
+						// measurement wrapped.
+						overflowWrap: "anywhere",
 					}}
 				>
 					{title}
@@ -222,15 +234,15 @@ function Meter({
 	);
 }
 
-/** Remeasures whenever the text or the font changes; null until the first measure lands. */
-function useMeasuredWidth(text: string, font: string): number | null {
-	const [width, setWidth] = useState<number | null>(null);
+/** Re-lays out on any text, font or column change; null until the first pass lands. */
+function useTitleLayout(text: string, font: string, column: number): TextLayout | null {
+	const [layout, setLayout] = useState<TextLayout | null>(null);
 
 	useEffect(() => {
-		setWidth(measureTextWidth(text, font));
-	}, [text, font]);
+		setLayout(layOutText(text, font, column));
+	}, [text, font, column]);
 
-	return width;
+	return layout;
 }
 
 export const serpPreviewBlock = defineBlock<"cms:serpPreview", SerpPreviewOptions>(
