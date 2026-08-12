@@ -82,10 +82,17 @@ class SeoChecklist
         return $this->check('description', 'pass', __('tbtop-cms::pages.seo_checklist.description.pass', ['length' => $length]));
     }
 
-    /** @return array{key: string, status: 'pass'|'warn'|'fail', label: string, detail: string} */
+    /**
+     * Blank counts as missing, not just null — reporting an empty string as a
+     * configured image is exactly the false reassurance this checklist exists
+     * to prevent. MediaUrlResolver is what keeps a pathless media row from
+     * reaching here as a bare directory URL.
+     *
+     * @return array{key: string, status: 'pass'|'warn'|'fail', label: string, detail: string}
+     */
     private function ogImageCheck(?string $ogImage): array
     {
-        return $ogImage === null
+        return trim((string) $ogImage) === ''
             ? $this->check('og_image', 'warn', __('tbtop-cms::pages.seo_checklist.og_image.warn'))
             : $this->check('og_image', 'pass', __('tbtop-cms::pages.seo_checklist.og_image.pass'));
     }
@@ -106,11 +113,20 @@ class SeoChecklist
         return $this->check('indexable', 'pass', __('tbtop-cms::pages.seo_checklist.indexable.pass'));
     }
 
-    /** @return array{key: string, status: 'pass'|'warn'|'fail', label: string, detail: string} */
+    /**
+     * Hostnames are case-insensitive but parse_url() preserves the casing it
+     * was given, so `HTTPS://EXAMPLE.COM/` would otherwise warn against
+     * `example.com` — a false alarm on the same host.
+     *
+     * @return array{key: string, status: 'pass'|'warn'|'fail', label: string, detail: string}
+     */
     private function canonicalCheck(string $canonical): array
     {
         $canonicalHost = parse_url($canonical, PHP_URL_HOST);
         $siteHost = parse_url(url('/'), PHP_URL_HOST);
+
+        $canonicalHost = is_string($canonicalHost) ? mb_strtolower($canonicalHost) : $canonicalHost;
+        $siteHost = is_string($siteHost) ? mb_strtolower($siteHost) : $siteHost;
 
         if (is_string($canonicalHost) && is_string($siteHost) && $canonicalHost !== '' && $canonicalHost !== $siteHost) {
             return $this->check('canonical', 'warn', __('tbtop-cms::pages.seo_checklist.canonical.warn', ['host' => $canonicalHost]));

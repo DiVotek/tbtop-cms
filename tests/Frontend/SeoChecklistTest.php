@@ -65,6 +65,47 @@ it('has no fail checks for a page with a good title, description, and og image',
     expect($statuses)->not->toContain('fail');
 });
 
+it('warns on the og image check when the media row has no path', function (): void {
+    // UploadUrl::make() would build a bare "/storage/" from an empty path,
+    // which is a directory, not an image — passing that as "an OG image is
+    // set" is the false reassurance this checklist exists to prevent.
+    $pathless = Media::create([
+        'name' => 'broken.jpg',
+        'disk' => 'public',
+        'path' => '',
+        'mime' => 'image/jpeg',
+        'size' => 0,
+    ]);
+
+    $page = Page::factory()->create([
+        'name' => ['en' => 'A page'],
+        'seo' => ['og_image' => (string) $pathless->getKey()],
+    ]);
+
+    expect(checkByKey(checklistFor($page), 'og_image')['status'])->toBe('warn');
+});
+
+it('passes the canonical check when the override differs only by host casing', function (): void {
+    // Hostnames are case-insensitive; parse_url() preserves whatever casing
+    // it was handed, so this must not be reported as pointing off-site.
+    $host = parse_url((string) url('/'), PHP_URL_HOST);
+    $page = Page::factory()->create([
+        'name' => ['en' => 'A page'],
+        'seo' => ['canonical' => ['en' => 'https://' . mb_strtoupper((string) $host) . '/some-path']],
+    ]);
+
+    expect(checkByKey(checklistFor($page), 'canonical')['status'])->toBe('pass');
+});
+
+it('warns on the canonical check when the override points at another host', function (): void {
+    $page = Page::factory()->create([
+        'name' => ['en' => 'A page'],
+        'seo' => ['canonical' => ['en' => 'https://somewhere-else.example/some-path']],
+    ]);
+
+    expect(checkByKey(checklistFor($page), 'canonical')['status'])->toBe('warn');
+});
+
 it('passes focus_keyword_in_title when the keyword is present in the title', function (): void {
     $page = Page::factory()->create([
         'name' => ['en' => 'Widgets'],
