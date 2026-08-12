@@ -1,5 +1,5 @@
 import { defineBlock, type RenderProps } from "@tbtop/inertia-admin";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { measureTextWidth } from "./measureText";
 
 type Device = "desktop" | "mobile";
@@ -28,11 +28,31 @@ interface SerpPreviewOptions {
 const TITLE_WIDTH_LIMIT: Record<Device, number> = { desktop: 600, mobile: 920 };
 const DESCRIPTION_LIMIT: Record<Device, number> = { desktop: 155, mobile: 120 };
 
-/** Matches what Google renders a result title in, closely enough to measure against. */
-const TITLE_FONT: Record<Device, string> = {
-	desktop: '400 20px Arial, "Helvetica Neue", Helvetica, sans-serif',
-	mobile: '400 18px Arial, "Helvetica Neue", Helvetica, sans-serif',
+/**
+ * The typography a result title is rendered in, which is what the width limits
+ * above were measured against — not the admin's own font stack.
+ *
+ * The card and the meter both read from here, as a CSS declaration and as a
+ * canvas font string, so the number under the card always describes the text
+ * above it. Styling the title with the admin's `text-lg font-medium` instead
+ * would measure one font against another font's limit.
+ */
+const TITLE_TYPE: Record<Device, { size: number; weight: number }> = {
+	desktop: { size: 20, weight: 400 },
+	mobile: { size: 18, weight: 400 },
 };
+
+const TITLE_FAMILY = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
+
+function titleFont(device: Device): string {
+	const { size, weight } = TITLE_TYPE[device];
+	return `${weight} ${size}px ${TITLE_FAMILY}`;
+}
+
+function titleStyle(device: Device): CSSProperties {
+	const { size, weight } = TITLE_TYPE[device];
+	return { fontSize: `${size}px`, fontWeight: weight, fontFamily: TITLE_FAMILY };
+}
 
 export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const [device, setDevice] = useState<Device>("desktop");
@@ -40,7 +60,7 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const title = options.title || options.emptyTitle;
 	const description = options.description || options.emptyDescription;
 
-	const titleWidth = useMeasuredWidth(title, TITLE_FONT[device]);
+	const titleWidth = useMeasuredWidth(title, titleFont(device));
 	const widthLimit = TITLE_WIDTH_LIMIT[device];
 	const descriptionLimit = DESCRIPTION_LIMIT[device];
 
@@ -66,9 +86,10 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 				<div
 					className={
 						device === "mobile"
-							? "mt-1 line-clamp-2 text-base font-medium leading-snug text-foreground"
-							: "mt-1 truncate text-lg font-medium leading-snug text-foreground"
+							? "mt-1 line-clamp-2 leading-snug text-foreground"
+							: "mt-1 truncate leading-snug text-foreground"
 					}
+					style={titleStyle(device)}
 				>
 					{title}
 				</div>
