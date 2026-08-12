@@ -1,13 +1,20 @@
 import { defineBlock, type RenderProps } from "@tbtop/inertia-admin";
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { layOutText, type TextLayout } from "./measureText";
+import { useContentLocale } from "./useContentLocale";
 
 type Device = "desktop" | "mobile";
 
-interface SerpPreviewOptions {
+interface LocaleCard {
 	url: string;
 	title: string;
 	description: string;
+}
+
+interface SerpPreviewOptions {
+	/** One resolved card per content locale — the client picks by active tab. */
+	byLocale: Record<string, LocaleCard>;
+	defaultLocale: string;
 	emptyTitle: string;
 	emptyDescription: string;
 	labels: {
@@ -114,11 +121,19 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	const [device, setDevice] = useState<Device>("desktop");
 	const [open, toggle] = useRememberedOpen();
 
+	// Follows the form's locale tabs. A single-locale form renders no tab strip,
+	// and a locale the server did not resolve (added mid-session) falls back to
+	// the default rather than blanking the card.
+	const activeLocale = useContentLocale();
+	const card =
+		(activeLocale === null ? undefined : options.byLocale[activeLocale]) ??
+		options.byLocale[options.defaultLocale];
+
 	// The placeholders are what an empty field looks like, not what it sends:
 	// the meters read the real values, so a page with no title reports zero
 	// rather than the width of "No title yet".
-	const title = options.title;
-	const description = options.description;
+	const title = card?.title ?? "";
+	const description = card?.description ?? "";
 
 	const column = columnWidth(device);
 	const layout = useTitleLayout(title, titleFont(device), column);
@@ -188,7 +203,7 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 				style={{ maxWidth: `${column + CARD_PADDING}px` }}
 			>
 				<div className="truncate text-[13px] leading-tight text-muted-foreground">
-					{options.url}
+					{card?.url ?? ""}
 				</div>
 				<div
 					className="mt-1 overflow-hidden text-ellipsis leading-snug text-foreground"
