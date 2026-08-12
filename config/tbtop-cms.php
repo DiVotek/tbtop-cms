@@ -10,6 +10,7 @@ use Tbtop\Cms\Admin\Pages\LayoutEditPage;
 use Tbtop\Cms\Admin\Pages\LayoutPage;
 use Tbtop\Cms\Admin\Pages\LoginPage;
 use Tbtop\Cms\Admin\Pages\MediaLibraryPage;
+use Tbtop\Cms\Admin\Pages\NotFoundLogPage;
 use Tbtop\Cms\Admin\Pages\NotificationSettingsPage;
 use Tbtop\Cms\Admin\Pages\PageEditPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
@@ -22,6 +23,7 @@ use Tbtop\Cms\Admin\Pages\TemplateEditPage;
 use Tbtop\Cms\Admin\Pages\TemplatesPage;
 use Tbtop\Cms\Admin\Pages\UsersPage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
+use Tbtop\Cms\NotFound\Support\NotFoundNoise;
 
 return [
     'languages' => [
@@ -102,6 +104,15 @@ return [
         // Exact, case-insensitive match only — listing "example.com" does NOT allow "sub.example.com".
         'allowed_external_hosts' => [],
     ],
+    'not_found' => [
+        // Case-insensitive substring match against the requested path; a hit
+        // is dropped before it reaches the counter. Read with an inline
+        // default (Tbtop\Cms\NotFound\Support\NotFoundNoise::DEFAULT_IGNORE)
+        // — published host configs override whole sections and won't have
+        // this key. The on/off switch itself lives in Settings
+        // (seo.not_found.enabled), not here — see RecordsNotFoundHit.
+        'ignore' => NotFoundNoise::DEFAULT_IGNORE,
+    ],
     'revisions' => [
         // Number of content-revision snapshots kept per page (oldest pruned
         // past this). Read with an inline default
@@ -137,6 +148,7 @@ return [
             'pages' => PagesPage::class,
             'page_edit' => PageEditPage::class,
             'redirects' => RedirectsPage::class,
+            'not_found' => NotFoundLogPage::class,
             'media_library' => MediaLibraryPage::class,
             'site_settings' => SiteSettingsPage::class,
             'seo_settings' => SeoSettingsPage::class,

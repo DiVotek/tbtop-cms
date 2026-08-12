@@ -227,6 +227,31 @@ Delete it:
 rm public/robots.txt
 ```
 
+### 404 log
+
+Every frontend path that resolves to neither a page nor a redirect is
+recorded (deduplicated per locale+path, with a hit counter) and browsable from
+the "404 log" admin page. Recording is on by default; turn it off from the SEO
+settings page, or narrow the noise filter it applies before writing
+(`config/tbtop-cms.php`):
+
+```php
+'not_found' => [
+    'ignore' => ['.php', '.env', 'wp-', '.git', '.well-known', 'xmlrpc', '.aspx', '.cgi'],
+],
+```
+
+**The package does not prune old rows on its own.** Schedule the cleanup
+command yourself, in your app's console kernel/routes:
+
+```php
+// routes/console.php
+Schedule::command('cms:not-found:prune')->daily();
+```
+
+`cms:not-found:prune` deletes rows whose `last_seen_at` is older than the
+retention window set on the SEO settings page (default 90 days).
+
 ## Admin access and roles
 
 Access to the admin panel is binary and owned by this package: a user has it if

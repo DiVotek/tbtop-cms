@@ -102,6 +102,14 @@ class PagesPage extends AdminPage
                         __('tbtop-cms::pages.status.scheduled') => 'gray',
                         __('tbtop-cms::pages.status.expired') => 'gray',
                     ]),
+                Column::make('seo_state')->label(__('tbtop-cms::pages.columns.seo'))
+                    ->formatUsing($this->seoStateLabel(...))
+                    ->badge([
+                        __('tbtop-cms::pages.seo_state.fail') => 'danger',
+                        __('tbtop-cms::pages.seo_state.warn') => 'warning',
+                        __('tbtop-cms::pages.seo_state.pass') => 'success',
+                    ])
+                    ->toggleable(),
                 Column::make('updated_at')->label(__('tbtop-cms::pages.columns.updated'))
                     ->date(__('tbtop-cms::pages.date_format'))->muted(),
                 // Off by default — the compact status bar / revisions panel
@@ -171,7 +179,8 @@ class PagesPage extends AdminPage
                 'parent_name',
             )
             ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name')
-            ->selectRaw($this->displayStateSql($table), $this->displayStateBindings());
+            ->selectRaw($this->displayStateSql($table), $this->displayStateBindings())
+            ->selectRaw($this->seoStateSql($table));
 
         return PageSortKey::apply($query);
     }
@@ -212,6 +221,89 @@ class PagesPage extends AdminPage
             $now, PageDisplayState::Expired->value,
             PageDisplayState::Published->value,
         ];
+    }
+
+    /**
+     * `name`/`title`/`summary`/`seo` are all translatable JSON-map columns
+     * (`{"en": "...", "uk": "..."}`, see Page::$translatable and
+     * LocalizedSeo's docblock) — checking whether a given LOCALE's value
+     * inside that JSON is empty needs per-driver JSON extraction:
+     * `JSON_EXTRACT`/`->>'$.en'` on MySQL, `->>'en'` on Postgres, a third
+     * shape on sqlite. Three divergent syntaxes for one column is exactly
+     * the "ugly or unreliable" case this column is meant to avoid (see the
+     * class docblock precedent: AuthorNames::subselect() and
+     * displayStateSql() above both stay on plain ANSI SQL for the same
+     * reason), so this narrows to what a plain CASE can express reliably
+     * everywhere: `is_indexable` (a real boolean column) plus whether
+     * `name`/`title`/`summary` hold any content in ANY locale (see
+     * emptyTranslatableSql()), not whether the resolved value for one
+     * particular locale is empty. A page with content
+     * only in a non-default locale reads as "has a title source" here even
+     * if the default locale's slice is blank — a false pass, not a false
+     * fail, which is the safer direction for a list-page hint whose
+     * authoritative detail lives in the per-page SEO checklist
+     * (SeoChecklist::for()).
+     */
+    private function seoStateSql(string $table): string
+    {
+        $emptyTitle = $this->emptyTranslatableSql($table, 'title');
+        $emptyName = $this->emptyTranslatableSql($table, 'name');
+        $emptySummary = $this->emptyTranslatableSql($table, 'summary');
+
+        return <<<SQL
+            CASE
+                WHEN {$emptyName} AND {$emptyTitle} THEN 'fail'
+                WHEN {$emptySummary} OR NOT {$table}.is_indexable THEN 'warn'
+                ELSE 'pass'
+            END as seo_state
+            SQL;
+    }
+
+    /**
+     * True when a translatable column holds no content in any locale.
+     *
+     * An unset translatable column is not NULL — the cast writes `[]` for an
+     * empty map, so emptiness cannot be tested with IS NULL. Clearing a field
+     * that HAD content is the harsher case: the locale key survives with a
+     * blank value, so the column stores `{"en":""}`, which a comparison
+     * against `[]`/`{}` reads as populated and badges Good.
+     *
+     * Distinguishing "no keys" from "keys with blank values" means asking the
+     * JSON itself, and the three drivers spell that differently — hence the
+     * per-driver branch, following PageSortKey::padId()'s precedent for the
+     * cases where portable SQL genuinely cannot express the question. Each
+     * branch concatenates every value in the map and asks whether the result
+     * is empty, so one non-blank locale is enough to count as content.
+     *
+     * Whitespace-only values still read as content; that imprecision is a
+     * false pass, the safe direction for a list hint whose authoritative view
+     * is the per-page checklist (SeoChecklist::for()).
+     */
+    private function emptyTranslatableSql(string $table, string $column): string
+    {
+        $col = "{$table}.{$column}";
+
+        return match (DB::connection()->getDriverName()) {
+            // json_each tolerates arrays and scalars, so `[]` and `""` need no
+            // type guard; `type = 'text'` keeps the test to string values.
+            'sqlite' => "NOT EXISTS (SELECT 1 FROM json_each({$col}) WHERE type = 'text' AND value <> '')",
+            // JSON_SEARCH matches string scalars only and returns NULL when
+            // nothing matches. The pattern is '_%', not '%': `%` matches zero
+            // characters, so it would match `""` and read blank as content.
+            // The JSON_TYPE guard keeps `[]`/`""` off the search, and short-
+            // circuits before JSON_SEARCH sees a non-object.
+            'mysql', 'mariadb' => "({$col} IS NULL OR JSON_TYPE({$col}) <> 'OBJECT' OR JSON_SEARCH({$col}, 'one', '_%') IS NULL)",
+            // jsonb_each_text() raises a hard ERROR on `[]` — CASE branch
+            // order does not reliably protect a subquery from evaluation, so
+            // this uses jsonpath instead: lax mode (the default) converts the
+            // structural error on a non-object into an empty sequence.
+            // COALESCE is load-bearing — on a SQL NULL the function returns
+            // NULL, and `NOT NULL` is NULL rather than true.
+            'pgsql' => "NOT jsonb_path_exists(COALESCE({$col}, 'null')::jsonb, 'lax \$.* ? (@.type() == \"string\" && @ <> \"\")')",
+            // Unknown driver: the literal test. It misses blank locale entries,
+            // which is a false pass — never a false fail.
+            default => "COALESCE({$col}, '[]') IN ('[]', '{}', '\"\"')",
+        };
     }
 
     /**
@@ -330,6 +422,11 @@ class PagesPage extends AdminPage
     private function statusLabel(mixed $value): string
     {
         return EnumLabel::make('tbtop-cms::pages.status', $value);
+    }
+
+    private function seoStateLabel(mixed $value): string
+    {
+        return EnumLabel::make('tbtop-cms::pages.seo_state', $value);
     }
 
     private function create(ActionCtx $ctx): Effects

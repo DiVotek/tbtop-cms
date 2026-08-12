@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -136,6 +137,7 @@ class PageForm
         self::applyCanonicalLocaleRules($canonical);
 
         return [
+            ...self::seoChecklistSection($s, $page),
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))
                 ->translatable()->placeholder($placeholders['title'])
                 ->helperText(__('tbtop-cms::pages.fields.seo_title_hint')),
@@ -182,6 +184,57 @@ class PageForm
                 $field->rulesForLocale($row['locale'], ['nullable', 'url']);
             }
         }
+    }
+
+    /**
+     * Read-only checklist rendered above the editable SEO fields. Computed
+     * for the default locale only, same as computedPlaceholders() above —
+     * a per-locale live version belongs to the (not-yet-built) preview work.
+     * Absent for the create modal ($page null/unsaved): there is nothing to
+     * check yet, and duplicate-title comparison needs a persisted id to
+     * exclude itself from the query.
+     *
+     * Structured as a single displayValue()/displayText() pair per check —
+     * never displayHtml(), which is unsanitized on both sides and every
+     * value here is ultimately editor-authored (title/description/focus
+     * keyword) — so a pixel-width preview block can be dropped in above this
+     * section later without reshaping it.
+     *
+     * @return list<Node>
+     */
+    private static function seoChecklistSection(S $s, ?Page $page): array
+    {
+        if ($page === null || ! $page->exists) {
+            return [];
+        }
+
+        $locale = app(Languages::class)->defaultLocale();
+        $checks = app(SeoChecklist::class)->for($page, $locale);
+
+        // The badge value is what the operator reads, so it carries the
+        // translated status label; the colour map is keyed by that same label
+        // because DisplayValueBlock matches the rendered value, not the raw
+        // status.
+        $labels = [
+            'pass' => __('tbtop-cms::pages.seo_checklist.status.pass'),
+            'warn' => __('tbtop-cms::pages.seo_checklist.status.warn'),
+            'fail' => __('tbtop-cms::pages.seo_checklist.status.fail'),
+        ];
+        $colors = [
+            $labels['pass'] => 'success',
+            $labels['warn'] => 'warning',
+            $labels['fail'] => 'danger',
+        ];
+
+        $rows = [];
+        foreach ($checks as $check) {
+            $rows[] = $s->displayValue($labels[$check['status']])->badge($colors);
+            $rows[] = $s->displayText($check['label'] . ': ' . $check['detail'])->variant('muted');
+        }
+
+        return [
+            $s->section(['title' => __('tbtop-cms::pages.seo_checklist.section_title'), 'variant' => 'card'], $rows),
+        ];
     }
 
     /**

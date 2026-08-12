@@ -76,6 +76,8 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_identity_logo' => 'seo.identity.logo',
             'seo_identity_same_as' => 'seo.identity.same_as',
             'seo_twitter_card' => 'seo.twitter_card',
+            'seo_not_found_enabled' => 'seo.not_found.enabled',
+            'seo_not_found_retention_days' => 'seo.not_found.retention_days',
         ];
     }
 
@@ -137,6 +139,13 @@ class SeoSettingsPage extends SettingsPageBase
                 ->variant('preview'),
             $s->tags('seo_identity_same_as')->label(__('tbtop-cms::settings.seo.fields.identity_same_as'))
                 ->rules('nullable|array')->helperText(__('tbtop-cms::settings.seo.helpers.identity_same_as')),
+            $s->displayDivider(),
+            $s->displayText(__('tbtop-cms::settings.seo.sections.not_found'))->variant('subheading'),
+            $s->boolean('seo_not_found_enabled')->label(__('tbtop-cms::settings.seo.fields.not_found_enabled'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.not_found_enabled')),
+            $s->number('seo_not_found_retention_days')->label(__('tbtop-cms::settings.seo.fields.not_found_retention_days'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.not_found_retention_days'))
+                ->rules('nullable|integer|min:1'),
         ];
     }
 

@@ -22,6 +22,7 @@ return [
         'sections' => [
             'gtm' => 'Google Tag Manager',
             'identity' => 'Identity',
+            'not_found' => '404 log',
         ],
         'fields' => [
             'title_suffix' => 'Title suffix',
@@ -37,6 +38,8 @@ return [
             'identity_name' => 'Name',
             'identity_logo' => 'Logo',
             'identity_same_as' => 'Profile links',
+            'not_found_enabled' => 'Record missed paths',
+            'not_found_retention_days' => 'Retention (days)',
         ],
         'placeholders' => [
             'title_suffix' => ' — Site Name',
@@ -56,6 +59,8 @@ return [
             'identity_type' => 'Adds an Organization/Person structured-data object to every page — search engines may use it for the knowledge panel.',
             'identity_logo' => 'Logo for the knowledge panel (organizations only).',
             'identity_same_as' => 'Type a profile URL (e.g. social media, Wikipedia) and press Enter to add it.',
+            'not_found_enabled' => 'When off, requests that resolve to nothing are still 404s — they just stop being recorded in the 404 log.',
+            'not_found_retention_days' => 'Rows not seen within this many days are deleted by the cms:not-found:prune command. The host must schedule it; it does not run on its own.',
         ],
         'twitter_card' => [
             'auto' => 'Auto (summary with image, otherwise plain summary)',

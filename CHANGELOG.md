@@ -120,6 +120,44 @@ to also create and edit users — see Added below); it no longer assigns roles.
   password edited by anyone but themselves. This is a protection only — the
   owner gets no extra section rights; that axis is still entirely the host's
   business via `tbtop-cms.roles`.
+- **404 log**: a new "404 log" admin page (nav: Content, shares the
+  `tbtop-cms.redirects` ability — the operator working it is the same one who
+  manages redirects) records every frontend path that resolves to neither a
+  page nor a redirect, deduplicated per (locale, path) with a hit counter,
+  last referer/user agent, and first/last-seen timestamps. Recording is
+  deferred to `app()->terminating()` (same pattern as the submission-notify
+  listener) so a visitor hitting a dead URL never waits on the write, and
+  obvious scanner noise (`.php`, `.env`, `wp-*`, `.git*`, `.well-known`
+  probes, `xmlrpc`, `.aspx`, `.cgi`, configurable via
+  `tbtop-cms.not_found.ignore`) is dropped before it reaches the counter. A
+  row action creates a redirect straight from a logged path (writing through
+  the same form `RedirectsPage` uses) and marks the hit handled. New setting
+  on the SEO settings page: **Record missed paths** (on/off) and
+  **Retention (days)**. Hosts that want automatic cleanup must schedule the
+  new `cms:not-found:prune` command themselves — it is not scheduled by the
+  package. **Host action required for package-config hosts:** none, the page
+  registers automatically. **Hosts with a published `config/tbtop-cms.php`**
+  must add `NotFoundLogPage::class` to `admin.pages` themselves, same as any
+  other new page.
+- **SEO checklist**: a read-only card of deterministic checks (meta title
+  length, description length, OG image presence, indexable-but-published,
+  canonical host mismatch, hreflang coverage, focus-keyword presence in
+  title/description/heading/slug, duplicate title against other pages) now
+  renders above the editable fields in the page editor's SEO tab, computed
+  for the default locale. No scoring, no readability analysis — every line is
+  a plain pass/warn/fail fact. A pixel-width live preview is intentionally
+  not part of this: it needs `liveRegion` from an unreleased admin client
+  version and is left for a later pass.
+- **SEO column** in the Pages list: a `seo_state` badge (Missing / Needs work
+  / Good) placed after the status column, computed in SQL via `selectRaw` so
+  it costs nothing extra per row. Deliberately narrower than the editor's
+  checklist: `name`/`title`/`summary` are translatable JSON-map columns, and
+  checking one locale's slice of that JSON portably across sqlite/MySQL/
+  Postgres would mean three divergent per-driver expressions — so the column
+  reads only `is_indexable` plus whether `name`/`title`/`summary` were ever
+  written to at all (SQL-NULL), not whether a specific locale's value is
+  empty. See `PagesPage::seoStateSql()`'s docblock for the full reasoning;
+  the per-page checklist above is the authoritative, locale-aware detail.
 
 ### Changed
 

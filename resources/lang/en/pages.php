@@ -18,6 +18,7 @@ return [
         'type' => 'Type',
         'parent' => 'Parent',
         'status' => 'Status',
+        'seo' => 'SEO',
         'updated' => 'Updated',
         'updated_by' => 'Updated by',
         'deleted_at' => 'Deleted',
@@ -27,6 +28,11 @@ return [
         'draft' => 'Draft',
         'scheduled' => 'Scheduled',
         'expired' => 'Expired',
+    ],
+    'seo_state' => [
+        'fail' => 'Missing',
+        'warn' => 'Needs work',
+        'pass' => 'Good',
     ],
     'types' => [
         'page' => 'Page',
@@ -167,5 +173,76 @@ return [
         'status_change_system' => 'The status of a system page cannot be changed.',
         'restore_parent_trashed' => 'Restore the parent page first.',
         'unpublish_before_published' => 'Unpublish date must be after the publish date.',
+    ],
+    'seo_checklist' => [
+        'section_title' => 'SEO checklist',
+        'status' => [
+            'pass' => 'OK',
+            'warn' => 'Check',
+            'fail' => 'Missing',
+        ],
+        'labels' => [
+            'title' => 'Meta title',
+            'description' => 'Meta description',
+            'og_image' => 'OG image',
+            'indexable' => 'Indexable',
+            'canonical' => 'Canonical URL',
+            'hreflang' => 'Hreflang coverage',
+            'focus_keyword' => 'Focus keyword',
+            'focus_keyword_in_title' => 'Keyword in title',
+            'focus_keyword_in_description' => 'Keyword in description',
+            'focus_keyword_in_heading' => 'Keyword in heading (H1)',
+            'focus_keyword_in_slug' => 'Keyword in slug',
+            'duplicate_title' => 'Unique title',
+        ],
+        'title' => [
+            'fail' => 'The meta title is empty.',
+            'warn' => 'Title is :length characters — longer than the recommended 60.',
+            'pass' => 'Title is :length characters.',
+        ],
+        'description' => [
+            'fail' => 'The meta description is empty.',
+            'warn' => 'Description is :length characters — outside the recommended 50–160.',
+            'pass' => 'Description is :length characters.',
+        ],
+        'og_image' => [
+            'warn' => 'No OG image resolved — set one here, on the page image, or as the site default.',
+            'pass' => 'An OG image is set.',
+        ],
+        'indexable' => [
+            'warn' => 'This published page is set to noindex — make sure that is intentional.',
+            'pass' => 'The page is indexable.',
+        ],
+        'canonical' => [
+            'warn' => 'Canonical override points to a different host (:host) than this site.',
+            'pass' => 'Canonical URL points to this site.',
+        ],
+        'hreflang' => [
+            'warn' => 'Present in :present but missing in :missing — visitors in those locales won\'t see an alternate.',
+            'pass' => 'Present in every active locale (or intentionally locale-specific).',
+        ],
+        'focus_keyword' => [
+            'empty' => 'No focus keyword set — the checks below are skipped.',
+        ],
+        'focus_keyword_in_title' => [
+            'pass' => 'Found in the meta title.',
+            'fail' => 'Not found in the meta title.',
+        ],
+        'focus_keyword_in_description' => [
+            'pass' => 'Found in the meta description.',
+            'fail' => 'Not found in the meta description.',
+        ],
+        'focus_keyword_in_heading' => [
+            'pass' => 'Found in the heading (H1).',
+            'fail' => 'Not found in the heading (H1).',
+        ],
+        'focus_keyword_in_slug' => [
+            'pass' => 'Found in the slug.',
+            'fail' => 'Not found in the slug.',
+        ],
+        'duplicate_title' => [
+            'warn' => 'Another page resolves to the same meta title in this locale.',
+            'pass' => 'No other page shares this meta title in this locale.',
+        ],
     ],
 ];

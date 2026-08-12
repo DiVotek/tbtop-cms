@@ -11,6 +11,7 @@ return [
     'items' => [
         'pages' => 'Сторінки',
         'redirects' => 'Перенаправлення',
+        'not_found' => 'Журнал 404',
         'media_library' => 'Медіатека',
         'templates' => 'Шаблони',
         'layout' => 'Макети',

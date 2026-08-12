@@ -17,6 +17,7 @@ use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
+use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\RedirectResolver;
 
@@ -42,8 +43,15 @@ class PageController
         $page = $this->resolver->resolve($path, $locale, $previewAccess);
 
         if (! $page instanceof Page) {
-            return $this->redirects->resolve($path, $locale, $request)
-                ?? throw new NotFoundHttpException;
+            $redirect = $this->redirects->resolve($path, $locale, $request);
+
+            if ($redirect !== null) {
+                return $redirect;
+            }
+
+            event(new PageNotFound($path, $locale, $request->headers->get('referer'), $request->userAgent()));
+
+            throw new NotFoundHttpException;
         }
 
         return Inertia::render($this->component(), $this->props($page, $locale, $path));
