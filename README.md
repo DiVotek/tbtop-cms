@@ -25,9 +25,10 @@ php artisan vendor:publish --tag="tbtop-cms-config"
 
 ## Host application requirements
 
-The admin panel (`tbtop/admin`) renders through the host's own Inertia setup. Two
-host-side files are required and are not created by this package; skipping either
-produces a blank page or an Inertia resolution error.
+The admin panel (`tbtop/admin`) renders through the host's own Inertia setup.
+The host-side wiring below is not created by this package; skipping a piece
+produces a blank page, an Inertia resolution error, unstyled admin markup, or
+placeholder boxes where this package's own blocks should render.
 
 ### Root Blade view (`app`)
 
@@ -48,6 +49,39 @@ delegate to the client package's page component:
 import { AdminPage } from "@tbtop/inertia-admin";
 export default AdminPage;
 ```
+
+### Admin stylesheet (`@source` over this package)
+
+The client package ships a Tailwind v4 **source** file, so the host pipeline
+compiles it. The `@source` lines are what make Tailwind scan this package for
+the class names it authors itself — PHP for the admin DSL (`->class()`, section
+`class` options), TSX for the admin blocks below. Without them those classes
+silently compile to nothing and the affected blocks render unstyled:
+
+```css
+/* resources/css/admin.css */
+@import '@tbtop/inertia-admin/styles.css';
+
+@source '../../vendor/tbtop/cms/src/**/*.php';
+@source '../../vendor/tbtop/cms/resources/js/cms/admin/**/*.tsx';
+```
+
+### Admin blocks
+
+A few admin pages render through custom node kinds whose renderers live in this
+package — the search preview measures the rendered pixel width of a title and
+switches between desktop and mobile layouts, neither of which a server-rendered
+display block can do. Importing the barrel registers them; without the import
+the client falls back to its unknown-kind placeholder for those nodes:
+
+```tsx
+// resources/js/app.tsx — side-effect import, before createInertiaApp()
+import '@cms/admin/blocks';
+```
+
+This assumes the `@cms` alias the frontend setup already uses (`vite.config.js`
+`resolve.alias` plus `tsconfig.json` `paths`), pointing at
+`vendor/tbtop/cms/resources/js/cms`.
 
 ### Frontend props (`ShareCmsProps`)
 
