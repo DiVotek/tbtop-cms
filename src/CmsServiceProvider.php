@@ -31,6 +31,9 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Mail\CmsMailer;
+use Tbtop\Cms\NotFound\Commands\PruneNotFoundHitsCommand;
+use Tbtop\Cms\NotFound\Events\PageNotFound;
+use Tbtop\Cms\NotFound\Listeners\RecordsNotFoundHit;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PagePublished;
 use Tbtop\Cms\Page\Events\PageRestored;
@@ -80,11 +83,13 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_11_000000_drop_cms_menus_table')
             ->hasMigration('2026_08_11_000001_update_cms_user_profiles_drop_role_table')
             ->hasMigration('2026_08_11_000002_update_cms_user_profiles_add_is_owner_table')
+            ->hasMigration('2026_08_12_000001_create_not_found_hits_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
                 GrantAdminCommand::class,
                 RevokeAdminCommand::class,
+                PruneNotFoundHitsCommand::class,
             ])
             ->runsMigrations();
     }
@@ -121,6 +126,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireContentCacheInvalidation();
         $this->wireLocaleSeeding();
         $this->wireSubmissionNotifications();
+        $this->wireNotFoundLogging();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -299,5 +305,10 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireSubmissionNotifications(): void
     {
         Event::listen(SubmissionReceived::class, NotifiesAdminsOfSubmission::class);
+    }
+
+    private function wireNotFoundLogging(): void
+    {
+        Event::listen(PageNotFound::class, RecordsNotFoundHit::class);
     }
 }

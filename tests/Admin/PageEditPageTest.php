@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -94,6 +96,51 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
     collectFieldNames($tabs[1]['body'], $seoFieldNames);
     expect($seoFieldNames)->toContain('seo_title', 'seo_description', 'seo_focus_keyword', 'og_title', 'og_description', 'og_image')
         ->and($seoFieldNames)->not->toContain('is_indexable');
+});
+
+it('renders the SEO checklist section above the editable SEO fields', function (): void {
+    $page = pageWithBlocks([
+        ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Hi']],
+    ]);
+
+    $tabs = editFormTabs($page->id);
+    $seoTabBody = $tabs[1]['body'];
+
+    $displayValues = [];
+    collectNodesByKind($seoTabBody, 'displayValue', $displayValues);
+
+    // One badge per check key — title/description/og_image/indexable/
+    // canonical/hreflang/focus_keyword/duplicate_title, at minimum (focus
+    // keyword is unset here, so its four presence sub-checks don't fire).
+    // The badge carries the translated status label, not the raw status:
+    // it is operator-facing text, and the colour map is keyed by it.
+    $labels = [
+        __('tbtop-cms::pages.seo_checklist.status.pass'),
+        __('tbtop-cms::pages.seo_checklist.status.warn'),
+        __('tbtop-cms::pages.seo_checklist.status.fail'),
+    ];
+    $statuses = array_column(array_column($displayValues, 'options'), 'value');
+    expect($displayValues)->not->toBeEmpty()
+        ->and($statuses)->each->toBeIn($labels);
+
+    $colors = array_column($displayValues, 'options')[0]['badge']['colors'] ?? [];
+    expect(array_keys($colors))->toBe($labels);
+});
+
+it('omits the SEO checklist section for a null or unsaved page', function (): void {
+    $s = app(S::class);
+
+    $wireForNull = json_decode(json_encode($s->stack(PageForm::seoFields($s, null))), true);
+    $wireForUnsaved = json_decode(json_encode($s->stack(PageForm::seoFields($s, new Page))), true);
+
+    $displayValuesForNull = [];
+    collectNodesByKind($wireForNull, 'displayValue', $displayValuesForNull);
+
+    $displayValuesForUnsaved = [];
+    collectNodesByKind($wireForUnsaved, 'displayValue', $displayValuesForUnsaved);
+
+    expect($displayValuesForNull)->toBeEmpty()
+        ->and($displayValuesForUnsaved)->toBeEmpty();
 });
 
 it('prefixes block fields with block_{id}_ inside the block tab', function (): void {

@@ -11,6 +11,7 @@ return [
     'items' => [
         'pages' => 'Pages',
         'redirects' => 'Redirects',
+        'not_found' => '404 log',
         'media_library' => 'Media library',
         'templates' => 'Templates',
         'layout' => 'Layouts',

@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tbtop\Cms\NotFound\Commands;
+
+use Illuminate\Console\Command;
+use Tbtop\Cms\NotFound\Models\NotFoundHit;
+use Tbtop\Cms\Settings\Settings;
+
+/**
+ * Not scheduled automatically — the host owns its scheduler and decides the
+ * cadence (see the README's "404 log" section).
+ */
+class PruneNotFoundHitsCommand extends Command
+{
+    protected $signature = 'cms:not-found:prune';
+
+    protected $description = 'Delete 404 log rows not seen within the configured retention window.';
+
+    public function handle(): int
+    {
+        $days = (int) app(Settings::class)->get('seo.not_found.retention_days', 90);
+        $cutoff = now()->subDays($days);
+
+        $deleted = NotFoundHit::query()->where('last_seen_at', '<', $cutoff)->delete();
+
+        $this->info("Deleted {$deleted} 404 log " . ($deleted === 1 ? 'row' : 'rows') . " older than {$days} days.");
+
+        return self::SUCCESS;
+    }
+}

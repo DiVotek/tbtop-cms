@@ -60,9 +60,9 @@ it('renders the divotek-style pages list wire shape', function (): void {
         'deleted' => 'Deleted',
     ])->and(array_column($opts['tabs'], 'description'))->toHaveCount(5);
 
-    // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge (computed display_state) / Updated date / Updated by (hidden) / deleted_at (hidden helper).
+    // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge (computed display_state) / SEO badge (computed seo_state) / Updated date / Updated by (hidden) / deleted_at (hidden helper).
     $cols = array_column($opts['columns'], null, 'name');
-    expect(array_keys($cols))->toBe(['name', 'type', 'parent_name', 'display_state', 'updated_at', 'updated_by_name', 'deleted_at'])
+    expect(array_keys($cols))->toBe(['name', 'type', 'parent_name', 'display_state', 'seo_state', 'updated_at', 'updated_by_name', 'deleted_at'])
         ->and($cols['name']['emphasized'] ?? null)->toBeTrue()
         ->and($cols['type']['muted'] ?? null)->toBeTrue()
         ->and($cols['type']['uppercase'] ?? null)->toBeTrue()
@@ -72,6 +72,12 @@ it('renders the divotek-style pages list wire shape', function (): void {
             'Draft' => 'warning',
             'Scheduled' => 'gray',
             'Expired' => 'gray',
+        ])
+        ->and($cols['seo_state']['kind'] ?? null)->toBe('badge')
+        ->and($cols['seo_state']['badge']['colors'])->toBe([
+            'Missing' => 'danger',
+            'Needs work' => 'warning',
+            'Good' => 'success',
         ])
         ->and($cols['updated_at']['kind'] ?? null)->toBe('date')
         ->and($cols['updated_by_name']['hiddenByDefault'] ?? null)->toBeTrue()
@@ -367,4 +373,60 @@ it('sorts the list as a tree: each child directly after its parent, siblings by 
         $news->id,
         $newsSub->id,
     ]);
+});
+
+it('renders seo_state = fail (label: Missing) for a page missing every title source', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => 'draft']);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Missing');
+});
+
+it('treats an emptied translatable column as missing, not as content', function (): void {
+    // Clearing a translatable field in the form does not null the column —
+    // the cast stores `[]`, which a plain IS NULL test would read as "has a
+    // title source" and wrongly badge Good.
+    $page = Page::create(['type' => 'page', 'status' => 'draft', 'name' => [], 'title' => []]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect(collect($rows)->firstWhere('id', $page->id)['seo_state'])->toBe('Missing');
+});
+
+it('warns when a page has a title source but its summary was emptied', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'published',
+        'name' => ['en' => 'About'],
+        'summary' => [],
+        'is_indexable' => true,
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect(collect($rows)->firstWhere('id', $page->id)['seo_state'])->toBe('Needs work');
+});
+
+it('renders seo_state = pass (label: Good) for a fully-populated page', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'published',
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About us'],
+        'summary' => ['en' => 'A short summary of who we are.'],
+        'is_indexable' => true,
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Good');
+});
+
+it('runs the seo_state query without error on the test driver', function (): void {
+    Page::factory()->count(3)->create();
+
+    $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk();
 });
