@@ -174,6 +174,24 @@ return [
         'restore_parent_trashed' => 'Restore the parent page first.',
         'unpublish_before_published' => 'Unpublish date must be after the publish date.',
     ],
+    'serp_preview' => [
+        'section_title' => 'Search preview',
+        'hint' => 'How this page can appear in search results for :locale, with the title template applied.',
+        'empty_title' => 'No title yet',
+        'empty_description' => 'No description yet — search engines will pick their own text from the page.',
+        'device' => [
+            'desktop' => 'Desktop',
+            'mobile' => 'Mobile',
+        ],
+        // :width/:length/:limit are filled in by the preview block itself —
+        // the numbers depend on the selected device and, for the title, on
+        // text measured in the browser.
+        'meter' => [
+            'title_width' => 'Title: :width / :limit px · :length characters',
+            'description_length' => 'Description: :length / :limit characters',
+            'truncated' => 'Will be cut off',
+        ],
+    ],
     'seo_checklist' => [
         'section_title' => 'SEO checklist',
         'status' => [

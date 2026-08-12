@@ -137,6 +137,7 @@ class PageForm
         self::applyCanonicalLocaleRules($canonical);
 
         return [
+            ...SerpPreview::build($s, $page, app(Languages::class)->defaultLocale()),
             ...self::seoChecklistSection($s, $page),
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))
                 ->translatable()->placeholder($placeholders['title'])
