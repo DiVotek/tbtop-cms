@@ -64,10 +64,17 @@ final readonly class RobotsTxt
     }
 
     /**
-     * The editor's lines, minus anything claiming an owned directive.
+     * The editor's lines, minus anything claiming an owned directive, and
+     * minus the blank lines between them.
      *
-     * Comments and blank lines pass through — they are how an editor explains
-     * a rule to the next person, and neither can contradict anything.
+     * Blanks are dropped rather than preserved because these lines are spliced
+     * into the `User-agent: *` group, and a blank line ends a robots record —
+     * an editor spacing out their rules would silently orphan everything below
+     * the gap. Spacing is a formatting habit, so it is discarded rather than
+     * rejected: nothing the editor meant is lost.
+     *
+     * Comments stay. They do not terminate a record, and they are how one
+     * editor explains a rule to the next.
      *
      * @return list<string>
      */
@@ -78,21 +85,13 @@ final readonly class RobotsTxt
         foreach (preg_split('/\R/', trim($raw)) ?: [] as $line) {
             $line = rtrim($line);
 
-            if (trim($line) === '' || str_starts_with(trim($line), '#')) {
-                $lines[] = $line;
-
+            if (trim($line) === '') {
                 continue;
             }
 
-            if (! self::claimsOwnedDirective($line)) {
+            if (str_starts_with(trim($line), '#') || ! self::claimsOwnedDirective($line)) {
                 $lines[] = $line;
             }
-        }
-
-        // A block that was nothing but rejected lines leaves trailing blanks
-        // behind; an empty tail would print a stray newline for no content.
-        while ($lines !== [] && trim(end($lines)) === '') {
-            array_pop($lines);
         }
 
         return $lines;

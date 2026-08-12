@@ -82,8 +82,17 @@ class SitemapEntryBuilder
     /**
      * Rows per chunk, derived from the URL budget: every page contributes up
      * to one URL per active locale, so a 1000-URL budget on a two-locale site
-     * is 500 pages. At least one page per chunk, or a site with more locales
-     * than the budget would divide to zero and paginate forever.
+     * is 500 pages.
+     *
+     * The floor of one page per chunk means a budget smaller than the locale
+     * count is exceeded rather than honoured — a 1-URL budget on a two-locale
+     * site still emits two URLs, because a page's locales are never split
+     * across files and a chunk of zero pages would paginate forever. The
+     * budget is a target for tuning build time, and overshooting it by one
+     * page is the lesser fault against not serving the page at all.
+     *
+     * The protocol's 50 000 ceiling is not at risk from this: reaching it
+     * would take a site with more than 50 000 active locales.
      */
     private function pagesPerChunk(?int $perChunk, int $localeCount): int
     {

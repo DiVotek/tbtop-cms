@@ -168,6 +168,36 @@ it('puts custom robots rules inside the user-agent group, with sitemap last', fu
         ->and($body)->toContain('Sitemap: ' . url('sitemap.xml'));
 });
 
+it('drops blank lines inside the custom block so nothing falls out of the group', function (): void {
+    app(Cms::class)->frontendRoutes();
+    app(Settings::class)->set('seo.robots_extra', "Crawl-delay: 10\n\nClean-param: utm_source");
+
+    $body = $this->get('/robots.txt')->assertOk()->getContent();
+    $group = explode("\n\n", $body)[0];
+
+    // An editor spacing out their rules would otherwise end the record, and
+    // everything below the gap would be ignored by the crawler.
+    expect($group)->toContain('Crawl-delay: 10')
+        ->and($group)->toContain('Clean-param: utm_source');
+});
+
+it('keeps a chunk whole when the locale count exceeds the budget', function (): void {
+    // A 1-URL budget cannot be honoured on a two-locale site: the page's
+    // locales are never split across files, so the chunk overshoots by design
+    // rather than emitting an empty one.
+    config(['tbtop-cms.seo.sitemap.per_chunk' => 1]);
+    Language::factory()->create(['locale' => 'uk']);
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        'is_indexable' => true,
+    ]);
+
+    expect(substr_count($this->get('/sitemap-1.xml')->assertOk()->getContent(), '<loc>'))->toBe(2);
+});
+
 it('drops a custom line that claims a directive the site owns', function (): void {
     app(Cms::class)->frontendRoutes();
     // Stored directly rather than through the settings form, which rejects
