@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
@@ -393,6 +394,38 @@ it('treats an emptied translatable column as missing, not as content', function 
     $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
 
     expect(collect($rows)->firstWhere('id', $page->id)['seo_state'])->toBe('Missing');
+});
+
+it('treats a translatable column holding only blank locale values as missing', function (): void {
+    // Clearing a field that HAD content is the harsher case: the locale key
+    // survives with a blank value, so the column stores `{"en":""}` — which a
+    // comparison against `[]`/`{}` reads as populated and wrongly badges Good.
+    $page = Page::create(['type' => 'page', 'status' => 'draft']);
+    // Written past the model: the translatable cast would re-encode a JSON
+    // string into `{"en":"{...}"}`, which is real content, not the blank map
+    // this test is about.
+    DB::table('tbtop_pages')->where('id', $page->id)->update([
+        'name' => '{"en":""}',
+        'title' => '{"en":"","uk":""}',
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect(collect($rows)->firstWhere('id', $page->id)['seo_state'])->toBe('Missing');
+});
+
+it('counts content in a non-default locale as a title source', function (): void {
+    // The mirror of the check above: erasing the locale keys must not erase
+    // the values next to them.
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'draft',
+        'name' => ['en' => '', 'uk' => 'Про нас'],
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect(collect($rows)->firstWhere('id', $page->id)['seo_state'])->not->toBe('Missing');
 });
 
 it('warns when a page has a title source but its summary was emptied', function (): void {
