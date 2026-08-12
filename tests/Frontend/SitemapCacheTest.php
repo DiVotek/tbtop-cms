@@ -39,7 +39,8 @@ it('does not re-query pages on a second request when the cache is warm', functio
 it('invalidates the cached sitemap when a page is saved', function (): void {
     $existing = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
 
-    $first = $this->get('/sitemap.xml')->assertOk()->getContent();
+    // The URLs live in the chunk; sitemap.xml is the index above it.
+    $first = $this->get('/sitemap-1.xml')->assertOk()->getContent();
     expect($first)->toContain(url($existing->pathFor('en')));
 
     // A page created after the first request could not possibly be in a
@@ -53,7 +54,7 @@ it('invalidates the cached sitemap when a page is saved', function (): void {
     $newPage = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Pricing'], 'is_indexable' => true]);
     event(new PageSaved($newPage, wasCreated: true));
 
-    $second = $this->get('/sitemap.xml')->assertOk()->getContent();
+    $second = $this->get('/sitemap-1.xml')->assertOk()->getContent();
 
     expect($second)->toContain(url($newPage->pathFor('en')))
         ->and($first)->not->toContain(url($newPage->pathFor('en')));
