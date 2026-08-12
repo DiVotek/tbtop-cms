@@ -6,19 +6,17 @@ namespace Tbtop\Cms\Frontend\Http\Controllers;
 
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\URL;
-use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Frontend\Seo\IndexingSetting;
 
 class RobotsController
 {
     public function __construct(
-        private readonly Settings $settings,
+        private readonly IndexingSetting $indexing,
     ) {}
 
     public function __invoke(): Response
     {
-        $indexingEnabled = (bool) $this->settings->get('seo.indexing_enabled', true);
-
-        $lines = $indexingEnabled
+        $lines = $this->indexing->enabled()
             ? $this->allowLines()
             : ['User-agent: *', 'Disallow: /'];
 
