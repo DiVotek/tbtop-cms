@@ -146,18 +146,26 @@ it('allows indexing by default when the setting is absent', function (): void {
     $this->get('/sitemap.xml')->assertOk();
 });
 
-it('appends custom robots rules below the ones it writes itself', function (): void {
+it('puts custom robots rules inside the user-agent group, with sitemap last', function (): void {
     app(Cms::class)->frontendRoutes();
     app(Settings::class)->set('seo.robots_extra', "# our own note\nCrawl-delay: 10");
 
     $body = $this->get('/robots.txt')->assertOk()->getContent();
 
-    // Order matters: a crawler reads top to bottom, and the owned rules are
-    // the ones the rest of the admin decided.
-    expect($body)->toContain('User-agent: *')
-        ->and($body)->toContain('Crawl-delay: 10')
-        ->and($body)->toContain('# our own note')
-        ->and(mb_strpos($body, 'Allow: /'))->toBeLessThan(mb_strpos($body, 'Crawl-delay: 10'));
+    // A blank line ends a robots group, so a custom block separated from
+    // "User-agent: *" would parse as a record with no agent and be discarded —
+    // present in the file, ignored by the crawler. The group has to stay
+    // unbroken from the agent line down to the last custom rule.
+    $group = explode("\n\n", $body)[0];
+
+    expect($group)->toContain('User-agent: *')
+        ->and($group)->toContain('Allow: /')
+        ->and($group)->toContain('# our own note')
+        ->and($group)->toContain('Crawl-delay: 10')
+        // Sitemap is a top-level directive belonging to no agent, so it trails
+        // the group rather than sitting inside it.
+        ->and($group)->not->toContain('Sitemap:')
+        ->and($body)->toContain('Sitemap: ' . url('sitemap.xml'));
 });
 
 it('drops a custom line that claims a directive the site owns', function (): void {

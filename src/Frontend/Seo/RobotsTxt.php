@@ -40,17 +40,25 @@ final readonly class RobotsTxt
         private IndexingSetting $indexing,
     ) {}
 
+    /**
+     * The custom lines go *inside* the `User-agent: *` group, not after it.
+     *
+     * robots.txt binds a directive to the agent line above it, and a blank
+     * line ends that group — so a custom block separated by one would parse as
+     * a record with no agent and be discarded. The rules would be present in
+     * the file and have no effect, which is the worst of both.
+     *
+     * Sitemap is the exception and trails the group: it is a top-level
+     * directive belonging to no agent, so keeping it last leaves the group
+     * contiguous.
+     */
     public function render(): string
     {
-        $lines = $this->indexing->enabled()
-            ? $this->allowLines()
-            : ['User-agent: *', 'Disallow: /'];
+        $group = ['User-agent: *', $this->indexing->enabled() ? 'Allow: /' : 'Disallow: /'];
 
         $custom = self::customLines((string) $this->settings->get('seo.robots_extra', ''));
 
-        if ($custom !== []) {
-            $lines = [...$lines, '', ...$custom];
-        }
+        $lines = [...$group, ...$custom, ...$this->sitemapLines()];
 
         return implode("\n", [...$lines, '']);
     }
@@ -98,15 +106,19 @@ final readonly class RobotsTxt
         return in_array($directive, self::OWNED_DIRECTIVES, true);
     }
 
-    /** @return list<string> */
-    private function allowLines(): array
+    /**
+     * Absent when indexing is off: a site telling crawlers to stay out has no
+     * business advertising a sitemap they are not meant to fetch, and the
+     * route serving it 404s in that state anyway.
+     *
+     * @return list<string>
+     */
+    private function sitemapLines(): array
     {
-        $lines = ['User-agent: *', 'Allow: /'];
-
-        if (config('tbtop-cms.seo.sitemap.enabled', true)) {
-            $lines[] = 'Sitemap: ' . URL::to('sitemap.xml');
+        if (! $this->indexing->enabled() || ! config('tbtop-cms.seo.sitemap.enabled', true)) {
+            return [];
         }
 
-        return $lines;
+        return ['', 'Sitemap: ' . URL::to('sitemap.xml')];
     }
 }
