@@ -9,9 +9,12 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
+use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\RobotsTxt;
+use Tbtop\Cms\Frontend\Seo\SeoTemplates;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 class SeoSettingsPage extends SettingsPageBase
 {
@@ -65,6 +68,7 @@ class SeoSettingsPage extends SettingsPageBase
     protected function map(): array
     {
         return [
+            ...self::typeTemplateMap(),
             'seo_title_suffix' => 'seo.title_suffix',
             'seo_title_template' => 'seo.title_template',
             'seo_title_separator' => 'seo.title_separator',
@@ -83,6 +87,65 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_not_found_enabled' => 'seo.not_found.enabled',
             'seo_not_found_retention_days' => 'seo.not_found.retention_days',
         ];
+    }
+
+    /**
+     * Per-type template fields, keyed exactly as SeoTemplates reads them.
+     *
+     * Built from the page-type registry rather than listed by hand, so a
+     * host that registers its own page type gets template fields for it
+     * without touching this package.
+     *
+     * @return array<string, string>
+     */
+    private static function typeTemplateMap(): array
+    {
+        $map = [];
+
+        foreach (app(PageTypeRegistry::class)->keys() as $type) {
+            foreach (['title', 'description'] as $slot) {
+                $map[self::typeField($type, $slot)] = SeoTemplates::key($type, $slot);
+            }
+        }
+
+        return $map;
+    }
+
+    private static function typeField(string $type, string $slot): string
+    {
+        return "seo_type_{$type}_{$slot}";
+    }
+
+    /**
+     * One subsection per page type, each with a title and a description
+     * template. Left blank, a type falls back to the site-wide templates
+     * above — which is why none of these carry a placeholder suggesting a
+     * shape: an empty field here means "same as the site", not "empty title".
+     *
+     * @return list<Field|Node|TextBlock>
+     */
+    private function typeTemplateFields(S $s): array
+    {
+        $fields = [
+            $s->displayDivider(),
+            $s->displayText(__('tbtop-cms::settings.seo.sections.type_templates'))->variant('subheading'),
+            $s->displayText(__('tbtop-cms::settings.seo.helpers.type_templates'))->variant('muted'),
+        ];
+
+        foreach (app(PageTypeRegistry::class)->all() as $type) {
+            $label = PageFormOptions::typeLabelFor($type->key(), $type->label());
+
+            $fields[] = $s->text(self::typeField($type->key(), 'title'))
+                ->label(__('tbtop-cms::settings.seo.fields.type_title_template', ['type' => $label]))
+                ->translatable()
+                ->rules('nullable|max:255');
+            $fields[] = $s->text(self::typeField($type->key(), 'description'))
+                ->label(__('tbtop-cms::settings.seo.fields.type_description_template', ['type' => $label]))
+                ->translatable()
+                ->rules('nullable|max:500');
+        }
+
+        return $fields;
     }
 
     /** @return list<Field|Node|TextBlock> */
@@ -132,6 +195,7 @@ class SeoSettingsPage extends SettingsPageBase
                 ->helperText(__('tbtop-cms::settings.seo.helpers.robots_extra'))
                 ->placeholder(__('tbtop-cms::settings.seo.placeholders.robots_extra'))
                 ->rules(['nullable', 'string', 'max:4000']),
+            ...$this->typeTemplateFields($s),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::settings.seo.sections.gtm'))->variant('subheading'),
             $s->text('seo_gtm_container_id')->label(__('tbtop-cms::settings.seo.fields.gtm_container_id'))

@@ -46,7 +46,15 @@ class PageFormOptions
      * Registry labels aren't guaranteed to be translated; fall back through
      * pages.types.* (already used for the list's type column) before the
      * raw registry label.
+     *
+     * Public alias below: the SEO settings page labels its per-type template
+     * fields by the same rule, and a second copy of this fallback would drift.
      */
+    public static function typeLabelFor(string $key, string $fallback): string
+    {
+        return self::typeLabel($key, $fallback);
+    }
+
     private static function typeLabel(string $key, string $fallback): string
     {
         $translationKey = 'tbtop-cms::pages.types.' . $key;

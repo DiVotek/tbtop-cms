@@ -23,6 +23,7 @@ return [
             'gtm' => 'Google Tag Manager',
             'identity' => 'Identity',
             'not_found' => '404 log',
+            'type_templates' => 'Templates per page type',
         ],
         'fields' => [
             'title_suffix' => 'Title suffix',
@@ -42,6 +43,8 @@ return [
             'identity_same_as' => 'Profile links',
             'not_found_enabled' => 'Record missed paths',
             'not_found_retention_days' => 'Retention (days)',
+            'type_title_template' => 'Title: :type',
+            'type_description_template' => 'Description: :type',
         ],
         'placeholders' => [
             'title_suffix' => ' — Site Name',
@@ -57,9 +60,10 @@ return [
             'robots_owned' => 'The line ":line" sets a directive this site writes itself. Remove it — User-agent, Allow, Disallow and Sitemap come from the indexing switch and the sitemap setting.',
         ],
         'helpers' => [
-            'title_template' => 'Available placeholders: {title}, {site_name}, {sep}. Leave empty to keep the legacy title suffix behavior.',
+            'title_template' => 'Placeholders: {title}, {site_name}, {sep}, {parent}, {date}. Leave empty to keep the legacy title suffix behavior.',
             'title_separator' => 'Substituted for {sep} in the title and description templates.',
-            'description_template' => 'Available placeholders: {description}, {site_name}, {sep}. Applied to every page\'s meta description; leave empty to use descriptions as they are.',
+            'description_template' => 'Placeholders: {description}, {site_name}, {sep}, {parent}, {date}. Applied to every page\'s meta description; leave empty to use descriptions as they are.',
+            'type_templates' => 'A type\'s template overrides the site-wide one above. An empty field means "same as the site", not an empty title. {parent} is the parent category\'s name and {date} the publication date; when a page has neither, the stray separator is removed for you.',
             'default_description' => 'Used when a page has neither its own meta description nor a summary.',
             'default_og_image' => 'Shown when a shared page has no OG image of its own and no page image.',
             'twitter_card' => 'How links to this site are presented when shared on X (Twitter).',

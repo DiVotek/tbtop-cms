@@ -20,6 +20,8 @@ class SeoResolver
 
     private readonly PageSchema $pageSchema;
 
+    private readonly SeoTemplates $templates;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
@@ -28,6 +30,7 @@ class SeoResolver
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
         ?IndexingSetting $indexing = null,
         ?PageSchema $pageSchema = null,
+        ?SeoTemplates $templates = null,
     ) {
         // Built from the same Settings instance rather than resolved from the
         // container: this resolver is constructed directly in places that pass
@@ -38,6 +41,9 @@ class SeoResolver
         // was handed so hasPart URLs are prefixed by the same rule canonical
         // and alternates use.
         $this->pageSchema = $pageSchema ?? new PageSchema($url);
+        // Same Settings instance again: a container-resolved reader would
+        // consult a different one wherever this resolver is built by hand.
+        $this->templates = $templates ?? new SeoTemplates($settings);
     }
 
     /**
@@ -68,8 +74,8 @@ class SeoResolver
         $alternates = $this->alternates($page);
 
         return [
-            'title' => $this->title($metaTitle, $locale),
-            'description' => $this->descriptionWithTemplate($metaDescription, $locale),
+            'title' => $this->title($page, $metaTitle, $locale, $breadcrumbs),
+            'description' => $this->descriptionWithTemplate($page, $metaDescription, $locale, $breadcrumbs),
             'canonical' => $canonical,
             'ogImage' => $ogImage,
             'ogTitle' => $ogTitle,
@@ -296,38 +302,43 @@ class SeoResolver
     }
 
     /**
-     * `seo.title_template` (translatable) supersedes the legacy single-space
-     * suffix when set for this locale — existing sites that never touch the
-     * new setting must see byte-identical titles, so an empty template falls
-     * straight back to append-suffix.
+     * The template comes from SeoTemplates: the page type's own template if
+     * one is set for this locale, otherwise the site-wide `seo.title_template`
+     * (translatable). Either one supersedes the legacy single-space suffix —
+     * existing sites that never touch these settings must see byte-identical
+     * titles, so an empty template falls straight back to append-suffix.
+     *
+     * @param  list<Breadcrumb>  $breadcrumbs
      */
-    private function title(string $base, string $locale): string
+    private function title(Page $page, string $base, string $locale, array $breadcrumbs): string
     {
-        $template = LocalizedSeo::value($this->settings->get('seo.title_template'), $locale);
+        $template = $this->templates->title($page->type, $locale);
 
         if ($template === '') {
             return $this->titleWithSuffix($base);
         }
 
-        return $this->renderTemplate($template, ['{title}' => $base], $locale);
+        return $this->renderTemplate($template, ['{title}' => $base], $locale, $page, $breadcrumbs);
     }
 
     /**
-     * `seo.description_template` (translatable) mirrors the title template:
-     * applied on top of whatever the description cascade resolved to, with an
-     * empty template meaning "use the description as is" — existing sites
-     * keep byte-identical descriptions until they opt in. Shares
+     * Mirrors the title template, per-type fallback included: applied on top
+     * of whatever the description cascade resolved to, with an empty template
+     * meaning "use the description as is" — existing sites keep
+     * byte-identical descriptions until they opt in. Shares
      * `seo.title_separator` for {sep}.
+     *
+     * @param  list<Breadcrumb>  $breadcrumbs
      */
-    private function descriptionWithTemplate(string $base, string $locale): string
+    private function descriptionWithTemplate(Page $page, string $base, string $locale, array $breadcrumbs): string
     {
-        $template = LocalizedSeo::value($this->settings->get('seo.description_template'), $locale);
+        $template = $this->templates->description($page->type, $locale);
 
         if ($template === '') {
             return $base;
         }
 
-        return $this->renderTemplate($template, ['{description}' => $base], $locale);
+        return $this->renderTemplate($template, ['{description}' => $base], $locale, $page, $breadcrumbs);
     }
 
     private function titleWithSuffix(string $base): string
@@ -341,8 +352,20 @@ class SeoResolver
         return $base === '' ? $suffix : $base . ' ' . $suffix;
     }
 
-    /** @param  array<string, string>  $vars  Template-specific substitutions ({title} or {description}). */
-    private function renderTemplate(string $template, array $vars, string $locale): string
+    /**
+     * {parent} and {date} exist for the per-type templates: an article title
+     * reads better as "Post — Blog — Site" than as the site-wide shape, and
+     * only a template that knows it is rendering an article can say so.
+     *
+     * Both resolve to an empty string when the page has no parent or no
+     * publication date — cleanupRendered() then removes the separator that
+     * would have been left stranded, so one template serves both a nested
+     * page and a top-level one.
+     *
+     * @param  array<string, string>  $vars  Template-specific substitutions ({title} or {description}).
+     * @param  list<Breadcrumb>  $breadcrumbs
+     */
+    private function renderTemplate(string $template, array $vars, string $locale, Page $page, array $breadcrumbs): string
     {
         $siteName = (string) $this->settings->get('site.name', '');
         $separator = LocalizedSeo::value($this->settings->get('seo.title_separator', '—'), $locale) ?: '—';
@@ -350,24 +373,58 @@ class SeoResolver
         $rendered = strtr($template, $vars + [
             '{site_name}' => $siteName,
             '{sep}' => $separator,
+            '{parent}' => self::parentLabel($breadcrumbs),
+            '{date}' => self::publishedDate($page),
         ]);
 
         return $this->cleanupRendered($rendered, $separator);
     }
 
     /**
-     * An empty {title}/{description}/{site_name} substitution leaves a
-     * dangling separator and/or run of whitespace behind (e.g.
-     * "{title} {sep} {site_name}" with an empty site_name renders
-     * "My Page — "). Collapses whitespace runs first, then strips any
-     * separator left stranded at either edge, so the result never opens or
-     * closes on a bare separator.
+     * The direct parent's label — the last ancestor in the trail, which the
+     * caller already built for the breadcrumbs prop, so this costs no query.
+     *
+     * @param  list<Breadcrumb>  $breadcrumbs
+     */
+    private static function parentLabel(array $breadcrumbs): string
+    {
+        if ($breadcrumbs === []) {
+            return '';
+        }
+
+        return $breadcrumbs[count($breadcrumbs) - 1]['label'];
+    }
+
+    /**
+     * Gated on isLive() rather than on published_at alone, same rule
+     * PageSchema::dates() applies: a draft or expired page reached through
+     * admin preview must not stamp a publication date into its title.
+     */
+    private static function publishedDate(Page $page): string
+    {
+        return $page->published_at !== null && $page->isLive()
+            ? $page->published_at->isoFormat('LL')
+            : '';
+    }
+
+    /**
+     * An empty substitution leaves a dangling separator and/or a run of
+     * whitespace behind (e.g. "{title} {sep} {site_name}" with an empty
+     * site_name renders "My Page — ").
+     *
+     * Three passes: collapse whitespace runs, collapse a run of separators
+     * left adjacent in the MIDDLE down to one, then strip any separator
+     * stranded at either edge. The middle pass is what lets {parent} and
+     * {date} sit between two other placeholders — a top-level page rendering
+     * "{title} {sep} {parent} {sep} {site_name}" would otherwise read
+     * "About — — Acme", which is worse than either edge case.
      */
     private function cleanupRendered(string $rendered, string $separator): string
     {
         $collapsed = trim((string) preg_replace('/\s+/u', ' ', $rendered));
         $quotedSep = preg_quote($separator, '/');
-        $trimmed = preg_replace("/^(?:{$quotedSep}\\s*)+|(?:\\s*{$quotedSep})+\$/u", '', $collapsed);
+        $deduped = preg_replace("/{$quotedSep}(?:\\s*{$quotedSep})+/u", $separator, $collapsed);
+        $trimmed = preg_replace("/^(?:{$quotedSep}\\s*)+|(?:\\s*{$quotedSep})+\$/u", '', (string) $deduped);
 
         return trim((string) $trimmed);
     }
