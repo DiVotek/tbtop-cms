@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo;
 
+use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -30,12 +31,16 @@ class SeoChecklist
     public function __construct(
         private readonly SeoResolver $resolver,
         private readonly Languages $languages,
+        private readonly Breadcrumbs $breadcrumbs,
     ) {}
 
     /** @return list<Check> */
     public function for(Page $page, string $locale): array
     {
-        $resolved = $this->resolver->resolve($page, $locale);
+        // With breadcrumbs, so the title this checklist measures is the one
+        // the frontend renders — a {parent} template would otherwise be
+        // measured a segment short (see SerpPreview::card()).
+        $resolved = $this->resolver->resolve($page, $locale, $this->breadcrumbs->forPage($page, $locale));
         $seo = is_array($page->seo) ? $page->seo : [];
 
         return [

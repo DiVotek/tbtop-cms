@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 use Tbtop\Admin\Dsl\LiveRegionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
@@ -106,10 +107,18 @@ final class SerpPreview
     private static function card(Page $page, array $locales, string $defaultLocale, array $bag): Node
     {
         $resolver = app(SeoResolver::class);
+        $breadcrumbs = app(Breadcrumbs::class);
 
         $byLocale = [];
         foreach ($locales as $locale) {
-            $resolved = $resolver->resolve(self::draftOf($page, $locale, $bag), $locale);
+            // Passed through so a {parent} template resolves here exactly as
+            // it does on the frontend — a preview that silently drops a
+            // segment the live page shows is worse than no preview.
+            $resolved = $resolver->resolve(
+                self::draftOf($page, $locale, $bag),
+                $locale,
+                $breadcrumbs->forPage($page, $locale),
+            );
 
             $byLocale[$locale] = [
                 'url' => self::displayUrl($resolved['canonical']),
