@@ -467,7 +467,17 @@ class PagesPage extends AdminPage
     {
         $reasons = [];
 
-        if (self::allTranslationsBlank($row, 'name') && self::allTranslationsBlank($row, 'title')) {
+        // seo.title is checked here but NOT in seoStateSql(): reaching a
+        // nested JSON key needs a different dialect per driver, two of which
+        // CI cannot exercise (see that method's docblock). So a page carrying
+        // only a meta title still badges red — but it must not be TOLD it has
+        // no title when it has one. Skipping the line leaves the badge
+        // unexplained, which is the honest reading: the badge is being
+        // conservative, and the page's own SEO tab has the real verdict.
+        if (self::allTranslationsBlank($row, 'name')
+            && self::allTranslationsBlank($row, 'title')
+            && ! self::hasSeoTitle($row)
+        ) {
             $reasons[] = __('tbtop-cms::pages.seo_state_reasons.title');
         }
 
@@ -483,14 +493,44 @@ class PagesPage extends AdminPage
     }
 
     /**
+     * True when the page carries a hand-written meta title in any locale.
+     * The `seo` bag is already on the loaded row, so this reads it directly
+     * — see the note in seoStateTooltip() for why the badge's SQL cannot.
+     */
+    private static function hasSeoTitle(Page $row): bool
+    {
+        $seo = is_array($row->seo) ? $row->seo : [];
+        $title = $seo['title'] ?? null;
+
+        if (is_string($title)) {
+            return $title !== '';
+        }
+
+        foreach ((array) $title as $value) {
+            if (is_string($value) && $value !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The PHP counterpart of emptyTranslatableSql(): true when a translatable
-     * column holds no non-blank value in any locale. Reads the already-loaded
+     * column holds no non-empty value in any locale. Reads the already-loaded
      * attribute, so it costs nothing per row.
+     *
+     * Compared against '' and NOT trimmed, deliberately: the SQL counts a
+     * whitespace-only value as content (`value <> ''`, documented there as a
+     * false pass in the safe direction). Trimming here would be the stricter
+     * rule, which sounds better in isolation but makes the tooltip contradict
+     * the badge it explains — a page with a single-space summary would badge
+     * Good and be told "No summary".
      */
     private static function allTranslationsBlank(Page $row, string $attribute): bool
     {
         foreach ($row->getTranslations($attribute) as $value) {
-            if (trim((string) $value) !== '') {
+            if ((string) $value !== '') {
                 return false;
             }
         }

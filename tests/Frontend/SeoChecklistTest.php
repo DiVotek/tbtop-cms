@@ -99,10 +99,10 @@ it('passes title and description the page supplies itself', function (): void {
         ->and(checkByKey($checks, 'description')['status'])->toBe('pass');
 });
 
-it('does not find a focus keyword that only the template supplies', function (): void {
-    // The keyword sits in the site name the template appends, nowhere in the
-    // page itself. Searching the rendered title would report it as present on
-    // every page of the site.
+it('finds a focus keyword the rendered title carries, wherever it came from', function (): void {
+    // Deliberately the opposite rule from the presence checks above: "is this
+    // filled in?" is about the page, but "does the title carry the keyword?"
+    // is about what a crawler reads — and it reads the rendered string.
     app(Settings::class)->set('site.name', 'Widgets Inc');
     app(Settings::class)->set('seo.title_template', '{title} — {site_name}');
 
@@ -112,7 +112,8 @@ it('does not find a focus keyword that only the template supplies', function ():
         'seo' => ['focus_keyword' => ['en' => 'Widgets']],
     ]);
 
-    expect(checkByKey(checklistFor($page), 'focus_keyword_in_title')['status'])->toBe('fail');
+    expect(app(SeoResolver::class)->resolve($page, 'en')['title'])->toBe('About — Widgets Inc')
+        ->and(checkByKey(checklistFor($page), 'focus_keyword_in_title')['status'])->toBe('pass');
 });
 
 it('has no fail checks for a page with a good title, description, and og image', function (): void {

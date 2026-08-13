@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\Breadcrumbs;
+use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
 use Tbtop\Cms\Language\Models\Language;
@@ -177,6 +178,22 @@ it('resolves the same title the frontend renders when given breadcrumbs', functi
         // Proves the assertion above is not vacuous: the parent segment is
         // exactly what the breadcrumbs carry.
         ->and($withoutCrumbs['title'])->toBe('Post — Acme Co');
+});
+
+it('finds a focus keyword that reaches the title through the parent segment', function (): void {
+    // An article filed under a category named for its keyword genuinely has
+    // that keyword in its <title>. The checklist has to pass breadcrumbs to
+    // see it — this is why focusKeywordChecks() reads the rendered title
+    // while the presence checks read the page's own values.
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set(SeoTemplates::key('article', 'title'), '{title} {sep} {parent} {sep} {site_name}');
+
+    $article = publishedArticle();
+    $article->update(['seo' => ['focus_keyword' => ['en' => 'Blog']]]);
+
+    $checks = app(SeoChecklist::class)->for($article->fresh(), 'en');
+
+    expect(collect($checks)->firstWhere('key', 'focus_keyword_in_title')['status'])->toBe('pass');
 });
 
 it('keeps the page own meta title above every template', function (): void {
