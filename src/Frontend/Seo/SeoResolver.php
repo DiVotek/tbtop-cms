@@ -18,6 +18,8 @@ class SeoResolver
 {
     private readonly IndexingSetting $indexing;
 
+    private readonly PageSchema $pageSchema;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
@@ -25,13 +27,17 @@ class SeoResolver
         private readonly JsonLd $jsonLd,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
         ?IndexingSetting $indexing = null,
-        private readonly PageSchema $pageSchema = new PageSchema,
+        ?PageSchema $pageSchema = null,
     ) {
         // Built from the same Settings instance rather than resolved from the
         // container: this resolver is constructed directly in places that pass
         // a purpose-built Settings, and a container-resolved reader there would
         // consult a different one.
         $this->indexing = $indexing ?? new IndexingSetting($settings);
+        // Same reasoning, one field over: built from the PageUrl this resolver
+        // was handed so hasPart URLs are prefixed by the same rule canonical
+        // and alternates use.
+        $this->pageSchema = $pageSchema ?? new PageSchema($url);
     }
 
     /**

@@ -7,6 +7,7 @@ use Tbtop\Cms\Frontend\Seo\PageSchema;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageUrl;
 
 uses(RefreshDatabase::class);
 
@@ -30,7 +31,7 @@ function schemaInput(array $overrides = []): array
 it('publishes a plain WebPage when no subtype was chosen', function (): void {
     $page = Page::factory()->create(['type' => 'page', 'seo' => []]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
 
     expect($object['@type'])->toBe('WebPage')
         ->and($object['name'])->toBe('About us')
@@ -46,7 +47,7 @@ it('falls back to WebPage when a ProfilePage has no name to describe', function 
         'seo' => ['schema' => ['type' => 'ProfilePage', 'profile_name' => ['en' => '']]],
     ]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
 
     expect($object['@type'])->toBe('WebPage')
         ->and($object)->not->toHaveKey('mainEntity');
@@ -62,7 +63,7 @@ it('builds a ProfilePage whose entity falls back to the page description and ima
         ]],
     ]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput([
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput([
         'image' => 'https://example.com/page.png',
     ]));
 
@@ -82,7 +83,7 @@ it('prefers the profile photo over the page image for the entity', function (): 
         'seo' => ['schema' => ['type' => 'ProfilePage', 'profile_name' => ['en' => 'Jane Doe']]],
     ]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput([
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput([
         'image' => 'https://example.com/page.png',
         'profileImage' => 'https://example.com/jane.png',
     ]));
@@ -102,7 +103,7 @@ it('drops profile links that are not absolute http urls', function (): void {
         ]],
     ]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
 
     expect($object['mainEntity']['sameAs'])->toBe(['https://example.com/jane']);
 });
@@ -120,7 +121,7 @@ it('publishes an Article with the chosen flavour, its author and its dates', fun
         ]],
     ]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
 
     expect($object['@type'])->toBe('NewsArticle')
         ->and($object['author'])->toBe(['@type' => 'Person', 'name' => 'Dmytro Ivanov'])
@@ -143,7 +144,7 @@ it('omits datePublished while an article is unpublished', function (): void {
         'seo' => [],
     ]);
 
-    $object = (new PageSchema)->build($page, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
 
     expect($object['@type'])->toBe('Article')
         ->and($object)->not->toHaveKey('datePublished')
@@ -184,7 +185,7 @@ it('lists only live indexable children in a category hasPart', function (): void
         'name' => ['en' => 'Hidden post'],
     ]);
 
-    $object = (new PageSchema)->build($category, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($category, 'en', schemaInput());
 
     // Compared against the child's own stored path rather than $live->pathFor()
     // — the slugs relation is not loaded on this instance, so pathFor() here
@@ -195,6 +196,80 @@ it('lists only live indexable children in a category hasPart', function (): void
             'name' => 'Live post',
             'url' => url((string) $live->slugs()->where('locale', 'en')->value('path')),
         ]]);
+});
+
+it('omits datePublished for a page unpublished after it had been published', function (): void {
+    // Unpublishing keeps the historical timestamp, and admin preview renders
+    // pages that are not live — neither may advertise a publication date for
+    // content the public cannot reach.
+    $blog = Page::factory()->create(['type' => 'category', 'name' => ['en' => 'Blog']]);
+    $page = Page::factory()->create([
+        'type' => 'article',
+        'parent_id' => $blog->getKey(),
+        'status' => PageStatus::Draft,
+        'published_at' => now()->subMonth(),
+    ]);
+
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
+
+    expect($page->published_at)->not->toBeNull()
+        ->and($object)->not->toHaveKey('datePublished')
+        ->and($object)->toHaveKey('dateModified');
+});
+
+it('omits datePublished for a page whose unpublish_at has passed', function (): void {
+    $blog = Page::factory()->create(['type' => 'category', 'name' => ['en' => 'Blog']]);
+    $page = Page::factory()->create([
+        'type' => 'article',
+        'parent_id' => $blog->getKey(),
+        'status' => PageStatus::Published,
+        'published_at' => now()->subMonth(),
+        'unpublish_at' => now()->subDay(),
+    ]);
+
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
+
+    expect($object)->not->toHaveKey('datePublished');
+});
+
+it('states dates on every static page, not only on profiles', function (): void {
+    $page = Page::factory()->create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'published_at' => now()->subDay(),
+        'seo' => ['schema' => ['type' => 'ContactPage']],
+    ]);
+
+    $object = (new PageSchema(app(PageUrl::class)))->build($page, 'en', schemaInput());
+
+    expect($object['@type'])->toBe('ContactPage')
+        ->and($object['datePublished'])->toBe($page->published_at->toIso8601String())
+        ->and($object['dateModified'])->toBe($page->updated_at->toIso8601String());
+});
+
+it('prefixes hasPart urls with the locale the page is rendered in', function (): void {
+    // A bare url($path) would advertise the default-locale address — a 404 for
+    // any child that has no default-locale slug. Same rule as canonical.
+    Language::factory()->create(['locale' => 'uk', 'is_default' => false]);
+
+    $category = Page::factory()->create([
+        'type' => 'category',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Blog', 'uk' => 'Блог'],
+    ]);
+
+    Page::factory()->create([
+        'type' => 'article',
+        'parent_id' => $category->getKey(),
+        'status' => PageStatus::Published,
+        'is_indexable' => true,
+        'name' => ['en' => 'Post', 'uk' => 'Допис'],
+        'title' => ['en' => 'Post', 'uk' => 'Допис'],
+    ]);
+
+    $object = (new PageSchema(app(PageUrl::class)))->build($category, 'uk', schemaInput());
+
+    expect($object['hasPart'][0]['url'])->toStartWith(url('/uk/'));
 });
 
 it('caps hasPart so a large category does not inline its whole subtree', function (): void {
@@ -211,7 +286,7 @@ it('caps hasPart so a large category does not inline its whole subtree', functio
         'is_indexable' => true,
     ]);
 
-    $object = (new PageSchema)->build($category, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($category, 'en', schemaInput());
 
     expect($object['hasPart'])->toHaveCount(100);
 });
@@ -223,7 +298,7 @@ it('omits hasPart entirely for a category with nothing live under it', function 
         'name' => ['en' => 'Empty'],
     ]);
 
-    $object = (new PageSchema)->build($category, 'en', schemaInput());
+    $object = (new PageSchema(app(PageUrl::class)))->build($category, 'en', schemaInput());
 
     expect($object['@type'])->toBe('CollectionPage')
         ->and($object)->not->toHaveKey('hasPart');

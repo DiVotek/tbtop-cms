@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Frontend\Seo;
 use Tbtop\Cms\Page\Enums\ArticleSchemaType;
 use Tbtop\Cms\Page\Enums\SchemaType;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageUrl;
 
 /**
  * Builds the schema.org object describing the page itself — the counterpart
@@ -40,6 +41,8 @@ class PageSchema
      * subtree into every response.
      */
     private const int MAX_PARTS = 100;
+
+    public function __construct(private readonly PageUrl $url) {}
 
     /**
      * @param  SchemaInput  $input
@@ -77,15 +80,8 @@ class PageSchema
             // "this URL is where this article primarily lives", which is what
             // distinguishes an original from a syndicated copy.
             'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $input['url']],
+            ...$this->dates($page),
         ];
-
-        if ($page->published_at !== null) {
-            $object['datePublished'] = $page->published_at->toIso8601String();
-        }
-
-        if ($page->updated_at !== null) {
-            $object['dateModified'] = $page->updated_at->toIso8601String();
-        }
 
         $author = LocalizedSeo::value($schema['author'] ?? null, $locale);
 
@@ -127,27 +123,53 @@ class PageSchema
         // A ProfilePage without mainEntity is invalid — Search Console reports
         // it as a missing required field. With no name to describe, the page
         // falls back to a plain WebPage rather than publishing a broken type.
-        if ($type === SchemaType::ProfilePage && $entity === null) {
-            return $this->base($input, SchemaType::WebPage->value);
-        }
+        $effective = $type === SchemaType::ProfilePage && $entity === null
+            ? SchemaType::WebPage
+            : $type;
 
-        $object = $this->base($input, $type->value);
+        $object = [
+            ...$this->base($input, $effective->value),
+            // Dates belong to every page, not only to profiles: they are
+            // CreativeWork properties WebPage inherits, and "when was this
+            // last touched" is what a crawler asks of any page.
+            ...$this->dates($page),
+        ];
 
-        if ($entity === null) {
-            return $object;
-        }
-
-        $object['mainEntity'] = $entity;
-
-        if ($page->created_at !== null) {
-            $object['dateCreated'] = $page->created_at->toIso8601String();
-        }
-
-        if ($page->updated_at !== null) {
-            $object['dateModified'] = $page->updated_at->toIso8601String();
+        if ($entity !== null) {
+            $object['mainEntity'] = $entity;
         }
 
         return $object;
+    }
+
+    /**
+     * The dates a page can state about itself.
+     *
+     * datePublished is gated on isLive(), not merely on published_at being
+     * set: unpublishing a page keeps its historical timestamp, and a draft or
+     * expired page reached through admin preview would otherwise advertise a
+     * publication date for something the public cannot see. isLive() is the
+     * same visibility rule scopeLive() enforces in queries, schedule included.
+     *
+     * dateCreated is deliberately not emitted — created_at records when the
+     * row was inserted in this CMS, which for imported or migrated content is
+     * not when the work was created, and a wrong date is worse than none.
+     *
+     * @return array<string, string>
+     */
+    private function dates(Page $page): array
+    {
+        $dates = [];
+
+        if ($page->published_at !== null && $page->isLive()) {
+            $dates['datePublished'] = $page->published_at->toIso8601String();
+        }
+
+        if ($page->updated_at !== null) {
+            $dates['dateModified'] = $page->updated_at->toIso8601String();
+        }
+
+        return $dates;
     }
 
     /**
@@ -282,7 +304,15 @@ class PageSchema
                 continue;
             }
 
-            $parts[] = ['@type' => 'WebPage', 'name' => $name, 'url' => url($path)];
+            // Through PageUrl, same as canonical/alternates/breadcrumbs and
+            // the sitemap: a bare url($path) drops the locale prefix, so a
+            // /uk category would advertise its children at their default-locale
+            // addresses — 404s for any child that has no default-locale slug.
+            $parts[] = [
+                '@type' => 'WebPage',
+                'name' => $name,
+                'url' => url($this->url->build($path, $locale)),
+            ];
         }
 
         return $parts;

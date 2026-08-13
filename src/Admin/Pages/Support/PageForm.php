@@ -137,7 +137,7 @@ class PageForm
         $canonical = $s->text('seo_canonical')->label(__('tbtop-cms::pages.fields.seo_canonical'))
             ->translatable()->rules(['nullable', 'url'])
             ->helperText(__('tbtop-cms::pages.fields.seo_canonical_hint'));
-        self::applyCanonicalLocaleRules($canonical);
+        self::applyLocaleRules($canonical, ['nullable', 'url']);
 
         $fields = [
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))
@@ -242,9 +242,12 @@ class PageForm
             $s->select('schema_article_type')->label(__('tbtop-cms::pages.fields.schema_article_type'))
                 ->options(ArticleSchemaType::options())
                 ->helperText(__('tbtop-cms::pages.fields.schema_article_type_hint')),
-            $s->text('schema_author')->label(__('tbtop-cms::pages.fields.schema_author'))
-                ->translatable()->rules(['nullable', 'string', 'max:255'])
-                ->helperText(__('tbtop-cms::pages.fields.schema_author_hint')),
+            self::applyLocaleRules(
+                $s->text('schema_author')->label(__('tbtop-cms::pages.fields.schema_author'))
+                    ->translatable()->rules(['nullable', 'string', 'max:255'])
+                    ->helperText(__('tbtop-cms::pages.fields.schema_author_hint')),
+                ['nullable', 'string', 'max:255'],
+            ),
         ];
     }
 
@@ -269,20 +272,29 @@ class PageForm
             $s->select('schema_type')->label(__('tbtop-cms::pages.fields.schema_type'))
                 ->options(SchemaType::options())
                 ->helperText(__('tbtop-cms::pages.fields.schema_type_hint')),
-            $s->text('schema_profile_name')->label(__('tbtop-cms::pages.fields.schema_profile_name'))
-                ->translatable()->rules(['nullable', 'string', 'max:255'])
-                ->helperText(__('tbtop-cms::pages.fields.schema_profile_name_hint'))
-                ->hiddenIf($profileOnly),
-            $s->text('schema_profile_alternate_name')
-                ->label(__('tbtop-cms::pages.fields.schema_profile_alternate_name'))
-                ->translatable()->rules(['nullable', 'string', 'max:255'])
-                ->helperText(__('tbtop-cms::pages.fields.schema_profile_alternate_name_hint'))
-                ->hiddenIf($profileOnly),
-            $s->textarea('schema_profile_description')
-                ->label(__('tbtop-cms::pages.fields.schema_profile_description'))
-                ->translatable()->rules(['nullable', 'string', 'max:1000'])
-                ->helperText(__('tbtop-cms::pages.fields.schema_profile_description_hint'))
-                ->hiddenIf($profileOnly),
+            self::applyLocaleRules(
+                $s->text('schema_profile_name')->label(__('tbtop-cms::pages.fields.schema_profile_name'))
+                    ->translatable()->rules(['nullable', 'string', 'max:255'])
+                    ->helperText(__('tbtop-cms::pages.fields.schema_profile_name_hint'))
+                    ->hiddenIf($profileOnly),
+                ['nullable', 'string', 'max:255'],
+            ),
+            self::applyLocaleRules(
+                $s->text('schema_profile_alternate_name')
+                    ->label(__('tbtop-cms::pages.fields.schema_profile_alternate_name'))
+                    ->translatable()->rules(['nullable', 'string', 'max:255'])
+                    ->helperText(__('tbtop-cms::pages.fields.schema_profile_alternate_name_hint'))
+                    ->hiddenIf($profileOnly),
+                ['nullable', 'string', 'max:255'],
+            ),
+            self::applyLocaleRules(
+                $s->textarea('schema_profile_description')
+                    ->label(__('tbtop-cms::pages.fields.schema_profile_description'))
+                    ->translatable()->rules(['nullable', 'string', 'max:1000'])
+                    ->helperText(__('tbtop-cms::pages.fields.schema_profile_description_hint'))
+                    ->hiddenIf($profileOnly),
+                ['nullable', 'string', 'max:1000'],
+            ),
             $s->media('schema_profile_image')->label(__('tbtop-cms::pages.fields.schema_profile_image'))
                 ->variant('preview')
                 ->helperText(__('tbtop-cms::pages.fields.schema_profile_image_hint'))
@@ -297,21 +309,25 @@ class PageForm
     /**
      * RuleWalker applies a translatable field's own ->rules() to the default
      * locale only (see RuleWalker::fromTranslatableField()); every other
-     * active locale needs the same "nullable|url" via ->rulesForLocale()
-     * explicitly, or it would validate as bare 'nullable' and accept
-     * anything. Locales come from the same Languages source ContentLocales
-     * syncs into config('tbtop-admin.content_locales') for this request.
+     * active locale needs the same rules via ->rulesForLocale() explicitly,
+     * or it would validate as bare 'nullable' and accept anything. Locales
+     * come from the same Languages source ContentLocales syncs into
+     * config('tbtop-admin.content_locales') for this request.
+     *
+     * @param  list<string>  $rules
      */
-    private static function applyCanonicalLocaleRules(Field $field): void
+    private static function applyLocaleRules(Field $field, array $rules): Field
     {
         $languages = app(Languages::class);
         $default = $languages->defaultLocale();
 
         foreach ($languages->adminActive() as $row) {
             if ($row['locale'] !== $default) {
-                $field->rulesForLocale($row['locale'], ['nullable', 'url']);
+                $field->rulesForLocale($row['locale'], $rules);
             }
         }
+
+        return $field;
     }
 
     /**
