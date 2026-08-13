@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
+use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -108,6 +109,24 @@ it('substitutes the publication date', function (): void {
     $this->get('/' . $article->pathFor('en'), ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.seo.title', $expected);
+});
+
+it('formats {date} in the locale being resolved, not the ambient one', function (): void {
+    // SerpPreview resolves every locale inside ONE request, so the app locale
+    // stays put while the loop walks the others. Resolving uk while the app
+    // is en is exactly that situation, and an ambient-locale format would
+    // return the English month name here.
+    Language::factory()->create(['locale' => 'uk', 'is_default' => false]);
+    app()->setLocale('en');
+
+    app(Settings::class)->set(SeoTemplates::key('article', 'title'), ['en' => '{date}', 'uk' => '{date}']);
+
+    $article = publishedArticle();
+    $resolved = app(SeoResolver::class)->resolve($article->fresh(), 'uk');
+
+    expect(app()->getLocale())->toBe('en')
+        ->and($resolved['title'])->toBe($article->published_at->locale('uk')->isoFormat('LL'))
+        ->and($resolved['title'])->not->toBe($article->published_at->locale('en')->isoFormat('LL'));
 });
 
 it('applies a per-type description template too', function (): void {

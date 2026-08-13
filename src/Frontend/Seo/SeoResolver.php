@@ -374,7 +374,7 @@ class SeoResolver
             '{site_name}' => $siteName,
             '{sep}' => $separator,
             '{parent}' => self::parentLabel($breadcrumbs),
-            '{date}' => self::publishedDate($page),
+            '{date}' => self::publishedDate($page, $locale),
         ]);
 
         return $this->cleanupRendered($rendered, $separator);
@@ -399,11 +399,17 @@ class SeoResolver
      * Gated on isLive() rather than on published_at alone, same rule
      * PageSchema::dates() applies: a draft or expired page reached through
      * admin preview must not stamp a publication date into its title.
+     *
+     * Formatted through ->locale($locale) rather than Carbon's ambient locale.
+     * On the frontend the two agree, but SerpPreview resolves every locale
+     * inside ONE request with a single app locale — leaving it ambient made
+     * the Ukrainian preview card carry an English date. The locale being
+     * resolved is the only one that describes the string being built.
      */
-    private static function publishedDate(Page $page): string
+    private static function publishedDate(Page $page, string $locale): string
     {
         return $page->published_at !== null && $page->isLive()
-            ? $page->published_at->isoFormat('LL')
+            ? $page->published_at->locale($locale)->isoFormat('LL')
             : '';
     }
 
