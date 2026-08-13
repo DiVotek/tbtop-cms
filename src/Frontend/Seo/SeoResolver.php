@@ -200,7 +200,9 @@ class SeoResolver
         }
 
         $logoId = $this->settings->get('seo.identity.logo');
-        $logo = is_string($logoId) && $logoId !== '' ? $this->mediaUrlResolver->resolve($logoId) : null;
+        $logo = AbsoluteUrl::make(
+            is_string($logoId) && $logoId !== '' ? $this->mediaUrlResolver->resolve($logoId) : null,
+        );
 
         return $this->jsonLd->identity($type, $name, url('/'), $logo, $this->sameAs());
     }
@@ -355,19 +357,54 @@ class SeoResolver
      */
     private function ogImage(Page $page, array $seo): ?string
     {
-        $override = $seo['og_image'] ?? null;
-
-        if (is_string($override) && $override !== '') {
-            return $this->mediaUrlResolver->resolve($override);
-        }
-
-        if ($page->image !== null && $page->image !== '') {
-            return $this->mediaUrlResolver->resolve($page->image);
+        // A page that named an image has made its choice, and a broken id is
+        // still that choice — falling through to the site default here would
+        // quietly publish a different image than the one the editor picked,
+        // which is worse than publishing none.
+        if (self::namesAnImage($page, $seo)) {
+            return $this->ownImage($page, $seo);
         }
 
         $global = $this->settings->get('seo.default_og_image');
 
-        return is_string($global) && $global !== '' ? $this->mediaUrlResolver->resolve($global) : null;
+        return AbsoluteUrl::make(
+            is_string($global) && $global !== '' ? $this->mediaUrlResolver->resolve($global) : null,
+        );
+    }
+
+    /** @param  array<string, mixed>  $seo */
+    private static function namesAnImage(Page $page, array $seo): bool
+    {
+        $override = $seo['og_image'] ?? null;
+
+        return (is_string($override) && $override !== '')
+            || ($page->image !== null && $page->image !== '');
+    }
+
+    /**
+     * The image this page carries itself, with no site-wide fallback.
+     *
+     * Public because the sitemap needs exactly this and not ogImage(): the
+     * global default exists so a share card is never blank, but listing it
+     * against every URL in the sitemap would tell a crawler the same image
+     * belongs to the whole site. A page with no image of its own is better
+     * listed with none.
+     *
+     * @param  array<string, mixed>  $seo
+     */
+    public function ownImage(Page $page, array $seo): ?string
+    {
+        $override = $seo['og_image'] ?? null;
+
+        if (is_string($override) && $override !== '') {
+            return AbsoluteUrl::make($this->mediaUrlResolver->resolve($override));
+        }
+
+        if ($page->image !== null && $page->image !== '') {
+            return AbsoluteUrl::make($this->mediaUrlResolver->resolve($page->image));
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $seo */

@@ -164,6 +164,22 @@ it('round-trips recipients and chat ids between the stored string and tag chips'
         ->and(app(Settings::class)->get('notifications.telegram.chat_ids'))->toBe("333 # Olena\n444");
 });
 
+it('rejects an extra robots rule that claims a directive the site writes itself', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_robots_extra' => "Crawl-delay: 10\nDisallow: /",
+    ])->assertSessionHasErrors('seo_robots_extra');
+
+    expect(app(Settings::class)->get('seo.robots_extra'))->toBeNull();
+});
+
+it('accepts extra robots rules that stay clear of the owned directives', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_robots_extra' => "# slow the bots down\nCrawl-delay: 10",
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(app(Settings::class)->get('seo.robots_extra'))->toBe("# slow the bots down\nCrawl-delay: 10");
+});
+
 it('normalizes a pasted full GTM install snippet down to the bare container id on save', function (): void {
     test()->post('/admin/seo-settings/forms/seo-settings', [
         'seo_gtm_container_id' => "<!-- Google Tag Manager -->\n<script>j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;(function(w,d,s,l,i){...})(window,document,'script','dataLayer','GTM-AB12CD3');</script>",

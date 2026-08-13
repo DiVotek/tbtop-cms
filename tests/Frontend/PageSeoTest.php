@@ -53,7 +53,7 @@ it('lets page SEO overrides win over global defaults', function (): void {
         ->assertOk()
         ->assertJsonPath('props.seo.title', 'About Page — Acme')
         ->assertJsonPath('props.seo.description', 'Page description')
-        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page.jpg'))
+        ->assertJsonPath('props.seo.ogImage', url(Storage::disk('public')->url('media/page.jpg')))
         ->assertJsonPath('props.seo.noindex', false);
 });
 
@@ -70,7 +70,7 @@ it('falls back to global SEO defaults when page fields are empty', function (): 
         ->assertOk()
         ->assertJsonPath('props.seo.title', 'About Page — Acme')
         ->assertJsonPath('props.seo.description', 'Global description')
-        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/global.jpg'))
+        ->assertJsonPath('props.seo.ogImage', url(Storage::disk('public')->url('media/global.jpg')))
         ->assertJsonPath('props.seo.canonical', url('/about'))
         ->assertJsonPath('props.seo.noindex', true);
 });
@@ -87,7 +87,7 @@ it('falls back og:image to the page image when no og_image override is set', fun
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page-body.jpg'));
+        ->assertJsonPath('props.seo.ogImage', url(Storage::disk('public')->url('media/page-body.jpg')));
 });
 
 it('resolves og_image to null when the stored media id no longer exists', function (): void {
@@ -172,7 +172,7 @@ it('ships ogTitle/ogDescription/ogImage props for the CmsPage <Head> to render a
         ->assertOk()
         ->assertJsonPath('props.seo.ogTitle', 'Custom OG title')
         ->assertJsonPath('props.seo.ogDescription', 'Custom OG description')
-        ->assertJsonPath('props.seo.ogImage', Storage::disk('public')->url('media/page.jpg'));
+        ->assertJsonPath('props.seo.ogImage', url(Storage::disk('public')->url('media/page.jpg')));
 });
 
 it('falls back the meta title to the page name when title and seo.title are empty', function (): void {
@@ -302,6 +302,10 @@ it('resolves favicon from site.favicon, null when unset', function (): void {
     $favicon = media('favicon.png');
     app(Settings::class)->set('site.favicon', (string) $favicon->getKey());
 
+    // Root-relative, unlike og:image and the identity logo: a favicon is only
+    // ever a <link> the browser resolves against the page it is already
+    // showing, so it has no reader that needs the full address (see
+    // AbsoluteUrl).
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.seo.favicon', Storage::disk('public')->url('media/favicon.png'));
@@ -414,7 +418,7 @@ it('resolves seo.identity.logo to a public url on the Organization object', func
     $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
     $identity = collect($jsonLd)->firstWhere('@type', 'Organization');
 
-    expect($identity['logo'])->toBe(Storage::disk('public')->url('media/org-logo.png'));
+    expect($identity['logo'])->toBe(url(Storage::disk('public')->url('media/org-logo.png')));
 });
 
 it('resolves seo correctly after restoring a revision snapshot that carries a legacy scalar-shaped seo payload', function (): void {

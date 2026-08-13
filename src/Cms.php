@@ -55,7 +55,13 @@ class Cms
             return;
         }
 
-        Route::get('sitemap.xml', SitemapController::class)->name('tbtop-cms.sitemap');
+        Route::get('sitemap.xml', [SitemapController::class, 'index'])->name('tbtop-cms.sitemap');
+        // Declared before the catch-all page route (frontendRoutes() calls this
+        // first), so a page whose slug happens to be "sitemap-1.xml" cannot
+        // shadow a chunk.
+        Route::get('sitemap-{chunk}.xml', [SitemapController::class, 'chunk'])
+            ->where('chunk', '[0-9]+')
+            ->name('tbtop-cms.sitemap.chunk');
     }
 
     public function resolve(string $path, ?string $locale = null): ?Page

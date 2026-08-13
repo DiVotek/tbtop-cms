@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
+use Tbtop\Cms\Frontend\Seo\RobotsTxt;
 
 class SeoSettingsPage extends SettingsPageBase
 {
@@ -70,6 +72,8 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_default_description' => 'seo.default_description',
             'seo_default_og_image' => 'seo.default_og_image',
             'seo_indexing_enabled' => 'seo.indexing_enabled',
+            'seo_robots_extra' => 'seo.robots_extra',
+            'seo_sitemap_per_chunk' => 'seo.sitemap_per_chunk',
             'seo_gtm_container_id' => 'seo.gtm_container_id',
             'seo_identity_type' => 'seo.identity.type',
             'seo_identity_name' => 'seo.identity.name',
@@ -116,6 +120,18 @@ class SeoSettingsPage extends SettingsPageBase
                 ->rules('nullable|in:auto,summary,summary_large_image'),
             $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled'))
                 ->helperText(__('tbtop-cms::settings.seo.helpers.indexing_enabled')),
+            // Capped at the spec's own 50 000 ceiling; the useful value is far
+            // below it — see the helper text and SitemapEntryBuilder.
+            $s->number('seo_sitemap_per_chunk')->label(__('tbtop-cms::settings.seo.fields.sitemap_per_chunk'))
+                ->placeholder((string) config('tbtop-cms.seo.sitemap.per_chunk', 1000))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.sitemap_per_chunk'))
+                ->rules('nullable|integer|min:1|max:50000'),
+            // The owned-directive check lives in normalizeForm(), not here —
+            // see guardRobotsExtra().
+            $s->textarea('seo_robots_extra')->label(__('tbtop-cms::settings.seo.fields.robots_extra'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.robots_extra'))
+                ->placeholder(__('tbtop-cms::settings.seo.placeholders.robots_extra'))
+                ->rules(['nullable', 'string', 'max:4000']),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::settings.seo.sections.gtm'))->variant('subheading'),
             $s->text('seo_gtm_container_id')->label(__('tbtop-cms::settings.seo.fields.gtm_container_id'))
@@ -150,6 +166,42 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
+     * Rejects lines that would fight the directives the CMS writes itself.
+     *
+     * Thrown from the save path rather than declared as a field rule: the DSL
+     * collects rules as strings (CollectsRules::appendRules runs array_unique
+     * over them), so a closure rule cannot be expressed there, and the check
+     * reads the same OWNED_DIRECTIVES list the renderer uses — a regex spelled
+     * out here would be a second copy free to drift.
+     *
+     * Rejecting rather than stripping: RobotsTxt drops these lines when it
+     * renders either way, and an editor who wrote one deserves to be told why
+     * it will not appear instead of finding it missing later.
+     *
+     * @param  array<string, mixed>  $form
+     */
+    private static function guardRobotsExtra(array $form): void
+    {
+        $value = $form['seo_robots_extra'] ?? null;
+
+        if (! is_string($value)) {
+            return;
+        }
+
+        foreach (preg_split('/\R/', $value) ?: [] as $line) {
+            if (trim($line) === '' || str_starts_with(trim($line), '#')) {
+                continue;
+            }
+
+            if (RobotsTxt::claimsOwnedDirective($line)) {
+                throw ValidationException::withMessages([
+                    'seo_robots_extra' => __('tbtop-cms::settings.seo.validation.robots_owned', ['line' => trim($line)]),
+                ]);
+            }
+        }
+    }
+
+    /**
      * Both cleanups also happen on read (GtmContainerId::fromSettings()
      * extracts and validates, sameAs() filters), but normalizing here as well means a
      * re-opened settings page shows the cleaned value — the bare "GTM-…" id
@@ -163,6 +215,8 @@ class SeoSettingsPage extends SettingsPageBase
     #[\Override]
     protected function normalizeForm(array $form): array
     {
+        self::guardRobotsExtra($form);
+
         if (isset($form['seo_gtm_container_id']) && is_string($form['seo_gtm_container_id'])) {
             $form['seo_gtm_container_id'] = GtmContainerId::extract($form['seo_gtm_container_id']);
         }

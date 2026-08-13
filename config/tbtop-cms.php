@@ -52,6 +52,13 @@ return [
     'seo' => [
         'sitemap' => [
             'enabled' => true,
+            // URLs per chunk file. The spec's ceiling is 50 000, but the real
+            // limit on a CMS is the request that builds the file: every page
+            // in a chunk is loaded with its slugs and resolved to one URL per
+            // locale, so a large chunk times out long before it is rejected
+            // for being oversized. Read with an inline default — published
+            // host configs override whole sections and won't have this key.
+            'per_chunk' => 1000,
         ],
     ],
     'preview' => [

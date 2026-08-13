@@ -32,6 +32,8 @@ return [
             'default_description' => 'Default description',
             'default_og_image' => 'Default OG image',
             'indexing_enabled' => 'Allow search engines to index this site',
+            'sitemap_per_chunk' => 'URLs per sitemap file',
+            'robots_extra' => 'Extra robots.txt rules',
             'twitter_card' => 'Twitter card type',
             'gtm_container_id' => 'Container ID',
             'identity_type' => 'Identity type',
@@ -46,6 +48,13 @@ return [
             'title_template' => '{title} {sep} {site_name}',
             'description_template' => '{description} {sep} {site_name}',
             'identity_name' => 'Defaults to the site name',
+            // The example has to use directives the field accepts — Disallow
+            // is rejected here, and showing it as the sample would suggest
+            // something the form will not save.
+            'robots_extra' => "Crawl-delay: 10\nClean-param: utm_source&utm_medium",
+        ],
+        'validation' => [
+            'robots_owned' => 'The line ":line" sets a directive this site writes itself. Remove it — User-agent, Allow, Disallow and Sitemap come from the indexing switch and the sitemap setting.',
         ],
         'helpers' => [
             'title_template' => 'Available placeholders: {title}, {site_name}, {sep}. Leave empty to keep the legacy title suffix behavior.',
@@ -55,6 +64,8 @@ return [
             'default_og_image' => 'Shown when a shared page has no OG image of its own and no page image.',
             'twitter_card' => 'How links to this site are presented when shared on X (Twitter).',
             'indexing_enabled' => 'When off, robots.txt disallows crawling, the sitemap is disabled, and every page gets a noindex meta tag.',
+            'sitemap_per_chunk' => 'sitemap.xml links to numbered files holding this many URLs each. Lower it if building one file takes too long — a page counts once per language, so 1000 URLs is 500 pages on a two-language site.',
+            'robots_extra' => 'Appended to robots.txt below the rules this site writes itself. User-agent, Allow, Disallow and Sitemap are not accepted here — they follow the indexing switch above.',
             'gtm_container_id' => 'Paste the container ID (GTM-XXXXXXX) or the full install code from Google Tag Manager — either works. Both parts of the GTM snippet are inserted on every site page per Google\'s rules; leave empty and nothing is inserted.',
             'identity_type' => 'Adds an Organization/Person structured-data object to every page — search engines may use it for the knowledge panel.',
             'identity_logo' => 'Logo for the knowledge panel (organizations only).',
