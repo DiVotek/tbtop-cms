@@ -62,12 +62,6 @@ class PageSchema
     }
 
     /**
-     * datePublished uses published_at rather than created_at: a page drafted
-     * in March and published in June was published in June, and that is the
-     * date a crawler is asking about. It stays absent while unpublished —
-     * announcing a publication date for something not yet public would be
-     * plainly false, and Article tolerates its absence.
-     *
      * @param  SchemaInput  $input
      * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
@@ -98,7 +92,7 @@ class PageSchema
      */
     private function collection(Page $page, string $locale, array $input): array
     {
-        $object = $this->base($input, 'CollectionPage');
+        $object = [...$this->base($input, 'CollectionPage'), ...$this->dates($page)];
         $parts = $this->parts($page, $locale);
 
         if ($parts !== []) {

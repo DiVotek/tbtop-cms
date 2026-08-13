@@ -291,6 +291,22 @@ it('caps hasPart so a large category does not inline its whole subtree', functio
     expect($object['hasPart'])->toHaveCount(100);
 });
 
+it('states dates on a category too', function (): void {
+    // All three branches — article, category, page — read the same dates()
+    // helper; this pins the one that is easiest to forget.
+    $category = Page::factory()->create([
+        'type' => 'category',
+        'status' => PageStatus::Published,
+        'published_at' => now()->subDay(),
+        'name' => ['en' => 'Blog'],
+    ]);
+
+    $object = (new PageSchema(app(PageUrl::class)))->build($category, 'en', schemaInput());
+
+    expect($object['datePublished'])->toBe($category->published_at->toIso8601String())
+        ->and($object)->toHaveKey('dateModified');
+});
+
 it('omits hasPart entirely for a category with nothing live under it', function (): void {
     $category = Page::factory()->create([
         'type' => 'category',
