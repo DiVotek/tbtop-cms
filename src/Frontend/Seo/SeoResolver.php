@@ -25,6 +25,7 @@ class SeoResolver
         private readonly JsonLd $jsonLd,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
         ?IndexingSetting $indexing = null,
+        private readonly PageSchema $pageSchema = new PageSchema,
     ) {
         // Built from the same Settings instance rather than resolved from the
         // container: this resolver is constructed directly in places that pass
@@ -77,7 +78,16 @@ class SeoResolver
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
             'favicon' => $this->favicon(),
-            'jsonLd' => $this->jsonLd($page, $locale, $siteName, $ogTitle, $canonical, $breadcrumbs),
+            'jsonLd' => $this->jsonLd(
+                $page,
+                $locale,
+                $siteName,
+                $ogTitle,
+                $ogDescription,
+                $canonical,
+                $ogImage,
+                $breadcrumbs,
+            ),
         ];
     }
 
@@ -154,8 +164,16 @@ class SeoResolver
      * @param  list<Breadcrumb>  $breadcrumbs
      * @return list<array<string, mixed>>
      */
-    private function jsonLd(Page $page, string $locale, string $siteName, string $ogTitle, string $canonical, array $breadcrumbs): array
-    {
+    private function jsonLd(
+        Page $page,
+        string $locale,
+        string $siteName,
+        string $ogTitle,
+        string $ogDescription,
+        string $canonical,
+        ?string $ogImage,
+        array $breadcrumbs,
+    ): array {
         $objects = [];
 
         $website = $this->jsonLd->website($siteName);
@@ -178,6 +196,21 @@ class SeoResolver
 
         if ($breadcrumbList !== null) {
             $objects[] = $breadcrumbList;
+        }
+
+        // The page's own object uses the UNtemplated title/description (the
+        // same base og: falls back to): a schema `name` should be the thing's
+        // name, not the browser-tab string with the site name appended.
+        $pageSchema = $this->pageSchema->build($page, $locale, [
+            'name' => $currentLabel !== '' ? $currentLabel : $ogTitle,
+            'description' => $ogDescription,
+            'url' => $canonical,
+            'image' => $ogImage,
+            'profileImage' => $this->profileImage($page),
+        ]);
+
+        if ($pageSchema !== null) {
+            $objects[] = $pageSchema;
         }
 
         $identity = $this->identity();
@@ -370,6 +403,27 @@ class SeoResolver
         return AbsoluteUrl::make(
             is_string($global) && $global !== '' ? $this->mediaUrlResolver->resolve($global) : null,
         );
+    }
+
+    /**
+     * The photo of a profile page's subject, when one was picked. Absolute
+     * for the same reason og:image is: structured data is read with no page
+     * context to resolve a root-relative path against (see AbsoluteUrl).
+     *
+     * null means "no profile photo was chosen" — PageSchema then falls back
+     * to the page's own image.
+     */
+    private function profileImage(Page $page): ?string
+    {
+        $seo = is_array($page->seo) ? $page->seo : [];
+        $schema = is_array($seo['schema'] ?? null) ? $seo['schema'] : [];
+        $id = $schema['profile_image'] ?? null;
+
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return AbsoluteUrl::make($this->mediaUrlResolver->resolve($id));
     }
 
     /** @param  array<string, mixed>  $seo */

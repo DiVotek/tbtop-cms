@@ -13,10 +13,13 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Enums\ArticleSchemaType;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Enums\SchemaType;
 use Tbtop\Cms\Page\Events\PagePublished;
 use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Events\PageUnpublished;
@@ -159,6 +162,7 @@ class PageForm
                     ->variant('preview'),
             ]),
             $canonical,
+            ...self::schemaSection($s, $page),
         ];
 
         $checklist = self::seoChecklistSection($s, $page);
@@ -179,6 +183,114 @@ class PageForm
                 $s->stack($fields, ['colSpan' => ['sm' => 1, 'lg' => 2]]),
                 ...$checklist,
             ]),
+        ];
+    }
+
+    /**
+     * The structured-data section. What it offers is decided by the page
+     * type, which the server already knows — an article is always an Article
+     * and a category always a CollectionPage, so neither gets a type picker,
+     * and a category needs no fields at all (its hasPart listing comes from
+     * the child pages). Only static pages carry a subtype select, because
+     * only there is "what kind of page is this" an editorial question.
+     *
+     * Fields exist only for facts the page itself cannot supply. Everything
+     * derivable — name, description, image, dates, url — is derived at emit
+     * time by PageSchema, so a page where this whole section is left blank
+     * still publishes correct structured data.
+     *
+     * Absent for the create modal ($page null/unsaved) for the same reason
+     * the checklist is: it renders no SEO tab today.
+     *
+     * @return list<Node|Field>
+     */
+    private static function schemaSection(S $s, ?Page $page): array
+    {
+        if ($page === null || ! $page->exists) {
+            return [];
+        }
+
+        $fields = match ($page->type) {
+            'article' => self::articleSchemaFields($s),
+            'category' => [],
+            default => self::webPageSchemaFields($s),
+        };
+
+        if ($fields === []) {
+            return [];
+        }
+
+        return [
+            $s->section(['title' => __('tbtop-cms::pages.sections.schema')], $fields),
+        ];
+    }
+
+    /**
+     * The author is the one Article property the model cannot supply:
+     * created_by is a nullable id into a host-configurable user table with no
+     * FK (see TracksAuthors), and the person who wrote the text is in any
+     * case not necessarily the account that last pressed Save.
+     *
+     * Translatable because a name can be spelled differently per locale
+     * (transliteration), which is exactly what hreflang variants need.
+     *
+     * @return list<Node|Field>
+     */
+    private static function articleSchemaFields(S $s): array
+    {
+        return [
+            $s->select('schema_article_type')->label(__('tbtop-cms::pages.fields.schema_article_type'))
+                ->options(ArticleSchemaType::options())
+                ->helperText(__('tbtop-cms::pages.fields.schema_article_type_hint')),
+            $s->text('schema_author')->label(__('tbtop-cms::pages.fields.schema_author'))
+                ->translatable()->rules(['nullable', 'string', 'max:255'])
+                ->helperText(__('tbtop-cms::pages.fields.schema_author_hint')),
+        ];
+    }
+
+    /**
+     * Subtype plus the fields that subtype needs. Only ProfilePage adds any:
+     * AboutPage/ContactPage/ItemPage have no required properties of their own
+     * — they label what the page is, and the facts a contact or about page
+     * states about the company belong to the site-wide identity settings, not
+     * to a second copy on the page.
+     *
+     * The profile fields are hidden client-side rather than omitted server-
+     * side: the subtype is chosen in this same form, so the fields have to
+     * appear the moment it changes, without a save-and-reload round trip.
+     *
+     * @return list<Node|Field>
+     */
+    private static function webPageSchemaFields(S $s): array
+    {
+        $profileOnly = Cond::neq('schema_type', SchemaType::ProfilePage->value);
+
+        return [
+            $s->select('schema_type')->label(__('tbtop-cms::pages.fields.schema_type'))
+                ->options(SchemaType::options())
+                ->helperText(__('tbtop-cms::pages.fields.schema_type_hint')),
+            $s->text('schema_profile_name')->label(__('tbtop-cms::pages.fields.schema_profile_name'))
+                ->translatable()->rules(['nullable', 'string', 'max:255'])
+                ->helperText(__('tbtop-cms::pages.fields.schema_profile_name_hint'))
+                ->hiddenIf($profileOnly),
+            $s->text('schema_profile_alternate_name')
+                ->label(__('tbtop-cms::pages.fields.schema_profile_alternate_name'))
+                ->translatable()->rules(['nullable', 'string', 'max:255'])
+                ->helperText(__('tbtop-cms::pages.fields.schema_profile_alternate_name_hint'))
+                ->hiddenIf($profileOnly),
+            $s->textarea('schema_profile_description')
+                ->label(__('tbtop-cms::pages.fields.schema_profile_description'))
+                ->translatable()->rules(['nullable', 'string', 'max:1000'])
+                ->helperText(__('tbtop-cms::pages.fields.schema_profile_description_hint'))
+                ->hiddenIf($profileOnly),
+            $s->media('schema_profile_image')->label(__('tbtop-cms::pages.fields.schema_profile_image'))
+                ->variant('preview')
+                ->helperText(__('tbtop-cms::pages.fields.schema_profile_image_hint'))
+                ->hiddenIf($profileOnly),
+            $s->tags('schema_profile_same_as')->label(__('tbtop-cms::pages.fields.schema_profile_same_as'))
+                ->rules(['nullable', 'array'])
+                ->helperText(__('tbtop-cms::pages.fields.schema_profile_same_as_hint'))
+                ->hiddenIf($profileOnly),
         ];
     }
 
@@ -452,11 +564,19 @@ class PageForm
      * canonical follow the same shapes as their form fields (scalar and
      * translatable respectively).
      *
+     * `schema` is omitted entirely when the form carried no structured-data
+     * fields (a category, or any caller submitting only the classic SEO
+     * keys) rather than written as an empty array — PageSchema reads a
+     * missing key and an empty bag identically, so an empty one would only
+     * add noise to every row's JSON.
+     *
      * @param  array<string, mixed>  $form
-     * @return array{title: array<string, string>, description: array<string, string>, focus_keyword: array<string, string>, og_title: array<string, string>, og_description: array<string, string>, og_image: string, canonical: array<string, string>}
+     * @return array{title: array<string, string>, description: array<string, string>, focus_keyword: array<string, string>, og_title: array<string, string>, og_description: array<string, string>, og_image: string, canonical: array<string, string>, schema?: array<string, mixed>}
      */
     private static function seoAttribute(array $form): array
     {
+        $schema = self::schemaAttribute($form);
+
         return [
             'title' => self::stringMap($form['seo_title'] ?? null),
             'description' => self::stringMap($form['seo_description'] ?? null),
@@ -465,7 +585,77 @@ class PageForm
             'og_description' => self::stringMap($form['og_description'] ?? null),
             'og_image' => (string) ($form['og_image'] ?? ''),
             'canonical' => self::stringMap($form['seo_canonical'] ?? null),
+            ...($schema === [] ? [] : ['schema' => $schema]),
         ];
+    }
+
+    /**
+     * The structured-data bag, nested under `schema` inside `seo`.
+     *
+     * Only the keys the submitted form actually carried are written. The
+     * fields are type-dependent (see schemaSection()), so an article's form
+     * never submits schema_type and a category's submits none of them —
+     * writing a default for an absent key would let saving an article erase
+     * the subtype of nothing, but would also silently seed rows with keys
+     * their page type has no field for. Absent key means "not set", which is
+     * exactly what PageSchema's fallbacks already handle.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    private static function schemaAttribute(array $form): array
+    {
+        $schema = [];
+
+        if (array_key_exists('schema_type', $form)) {
+            $schema['type'] = SchemaType::fromValue($form['schema_type'])->value;
+        }
+
+        if (array_key_exists('schema_article_type', $form)) {
+            $schema['article_type'] = ArticleSchemaType::fromValue($form['schema_article_type'])->value;
+        }
+
+        $translatable = [
+            'author' => 'schema_author',
+            'profile_name' => 'schema_profile_name',
+            'profile_alternate_name' => 'schema_profile_alternate_name',
+            'profile_description' => 'schema_profile_description',
+        ];
+
+        foreach ($translatable as $key => $field) {
+            if (array_key_exists($field, $form)) {
+                $schema[$key] = self::stringMap($form[$field]);
+            }
+        }
+
+        if (array_key_exists('schema_profile_image', $form)) {
+            $schema['profile_image'] = (string) $form['schema_profile_image'];
+        }
+
+        if (array_key_exists('schema_profile_same_as', $form)) {
+            $schema['profile_same_as'] = self::profileSameAs($form['schema_profile_same_as']);
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Same rule the identity setting applies (see SeoSettingsPage): the tags
+     * field can only enforce "array", so non-URL entries are dropped on save
+     * rather than stored and silently skipped at emit time.
+     *
+     * @return list<string>
+     */
+    private static function profileSameAs(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $value,
+            static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
+        ));
     }
 
     /** @return array<string, mixed> */
@@ -507,6 +697,7 @@ class PageForm
             'og_description' => $seo['og_description'] ?? '',
             'og_image' => (string) ($seo['og_image'] ?? ''),
             'seo_canonical' => $seo['canonical'] ?? '',
+            ...self::schemaRow(is_array($seo['schema'] ?? null) ? $seo['schema'] : []),
             // Seeds the pageEditor form's hidden lock_version field (see
             // PageEditPage::view()). The client would round-trip an
             // undeclared record key on its own, but FormSubmitController's
@@ -514,6 +705,37 @@ class PageForm
             // for — the value only survives the forms endpoint because a
             // real (hidden) field exists for it in the tree.
             'lock_version' => $page->lock_version,
+        ];
+    }
+
+    /**
+     * Seeds the structured-data fields from the stored `schema` bag.
+     *
+     * Both selects resolve through their enum rather than being passed
+     * through raw, so a page saved before this section existed (no `schema`
+     * key at all) opens showing WebPage/Article instead of an empty select —
+     * which also matters for the ProfilePage condition: `hiddenIf` compares
+     * against the submitted value, and a blank one would never match.
+     *
+     * The translatable keys are passed through raw (scalar or locale map) for
+     * the same reason the seo_* keys above are.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private static function schemaRow(array $schema): array
+    {
+        return [
+            'schema_type' => SchemaType::fromValue($schema['type'] ?? null)->value,
+            'schema_article_type' => ArticleSchemaType::fromValue($schema['article_type'] ?? null)->value,
+            'schema_author' => $schema['author'] ?? '',
+            'schema_profile_name' => $schema['profile_name'] ?? '',
+            'schema_profile_alternate_name' => $schema['profile_alternate_name'] ?? '',
+            'schema_profile_description' => $schema['profile_description'] ?? '',
+            'schema_profile_image' => (string) ($schema['profile_image'] ?? ''),
+            'schema_profile_same_as' => is_array($schema['profile_same_as'] ?? null)
+                ? array_values($schema['profile_same_as'])
+                : [],
         ];
     }
 

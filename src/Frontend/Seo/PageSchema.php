@@ -1,0 +1,275 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tbtop\Cms\Frontend\Seo;
+
+use Tbtop\Cms\Page\Enums\ArticleSchemaType;
+use Tbtop\Cms\Page\Enums\SchemaType;
+use Tbtop\Cms\Page\Models\Page;
+
+/**
+ * Builds the schema.org object describing the page itself — the counterpart
+ * to JsonLd's site-wide objects (WebSite, the identity Organization/Person)
+ * and to BreadcrumbList, which describes the trail rather than the page.
+ *
+ * Which type a page gets is decided by its page type, not by the editor:
+ * an article is an Article, a category is a CollectionPage. Only static
+ * pages carry a picker, because only there is "what kind of page is this"
+ * a genuine editorial question rather than a fact already in the `type`
+ * column.
+ *
+ * Everything derivable is derived — name, description, image, dates and url
+ * all come from the resolved SEO values the caller already computed, so a
+ * page that fills in nothing still gets correct structured data. The extra
+ * fields on the SEO tab exist only for facts the model genuinely cannot
+ * supply: an article's author (created_by is an id into a host-configurable
+ * user table with no FK — see TracksAuthors) and a profile page's subject.
+ *
+ * @phpstan-type SchemaInput array{
+ *     name: string, description: string, url: string,
+ *     image: string|null, profileImage: string|null,
+ * }
+ */
+class PageSchema
+{
+    /**
+     * @param  SchemaInput  $input
+     * @return array<string, mixed>|null
+     */
+    public function build(Page $page, string $locale, array $input): ?array
+    {
+        $seo = is_array($page->seo) ? $page->seo : [];
+        /** @var array<string, mixed> $schema */
+        $schema = is_array($seo['schema'] ?? null) ? $seo['schema'] : [];
+
+        return match ($page->type) {
+            'article' => $this->article($page, $locale, $input, $schema),
+            'category' => $this->collection($page, $locale, $input),
+            default => $this->webPage($page, $locale, $input, $schema),
+        };
+    }
+
+    /**
+     * datePublished uses published_at rather than created_at: a page drafted
+     * in March and published in June was published in June, and that is the
+     * date a crawler is asking about. It stays absent while unpublished —
+     * announcing a publication date for something not yet public would be
+     * plainly false, and Article tolerates its absence.
+     *
+     * @param  SchemaInput  $input
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private function article(Page $page, string $locale, array $input, array $schema): array
+    {
+        $object = [
+            ...$this->base($input, ArticleSchemaType::fromValue($schema['article_type'] ?? null)->value),
+            // The canonical URL identifies the article; mainEntityOfPage says
+            // "this URL is where this article primarily lives", which is what
+            // distinguishes an original from a syndicated copy.
+            'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $input['url']],
+        ];
+
+        if ($page->published_at !== null) {
+            $object['datePublished'] = $page->published_at->toIso8601String();
+        }
+
+        if ($page->updated_at !== null) {
+            $object['dateModified'] = $page->updated_at->toIso8601String();
+        }
+
+        $author = LocalizedSeo::value($schema['author'] ?? null, $locale);
+
+        if ($author !== '') {
+            $object['author'] = ['@type' => 'Person', 'name' => $author];
+        }
+
+        return $object;
+    }
+
+    /**
+     * @param  SchemaInput  $input
+     * @return array<string, mixed>
+     */
+    private function collection(Page $page, string $locale, array $input): array
+    {
+        $object = $this->base($input, 'CollectionPage');
+        $parts = $this->parts($page, $locale);
+
+        if ($parts !== []) {
+            $object['hasPart'] = $parts;
+        }
+
+        return $object;
+    }
+
+    /**
+     * @param  SchemaInput  $input
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private function webPage(Page $page, string $locale, array $input, array $schema): array
+    {
+        $type = SchemaType::fromValue($schema['type'] ?? null);
+        $entity = $type === SchemaType::ProfilePage
+            ? $this->profileEntity($locale, $input, $schema)
+            : null;
+
+        // A ProfilePage without mainEntity is invalid — Search Console reports
+        // it as a missing required field. With no name to describe, the page
+        // falls back to a plain WebPage rather than publishing a broken type.
+        if ($type === SchemaType::ProfilePage && $entity === null) {
+            return $this->base($input, SchemaType::WebPage->value);
+        }
+
+        $object = $this->base($input, $type->value);
+
+        if ($entity === null) {
+            return $object;
+        }
+
+        $object['mainEntity'] = $entity;
+
+        if ($page->created_at !== null) {
+            $object['dateCreated'] = $page->created_at->toIso8601String();
+        }
+
+        if ($page->updated_at !== null) {
+            $object['dateModified'] = $page->updated_at->toIso8601String();
+        }
+
+        return $object;
+    }
+
+    /**
+     * The profile's subject. Description and image fall back to the page's
+     * own: on a profile page they are, in practice, the person's — asking an
+     * editor to type them twice would only create two places to keep in sync.
+     *
+     * @param  SchemaInput  $input
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>|null
+     */
+    private function profileEntity(string $locale, array $input, array $schema): ?array
+    {
+        $name = LocalizedSeo::value($schema['profile_name'] ?? null, $locale);
+
+        if ($name === '') {
+            return null;
+        }
+
+        $entity = ['@type' => 'Person', 'name' => $name];
+
+        $alternateName = LocalizedSeo::value($schema['profile_alternate_name'] ?? null, $locale);
+
+        if ($alternateName !== '') {
+            $entity['alternateName'] = $alternateName;
+        }
+
+        $description = LocalizedSeo::value($schema['profile_description'] ?? null, $locale)
+            ?: $input['description'];
+
+        if ($description !== '') {
+            $entity['description'] = $description;
+        }
+
+        $image = $input['profileImage'] ?? $input['image'];
+
+        if ($image !== null && $image !== '') {
+            $entity['image'] = $image;
+        }
+
+        $sameAs = $this->sameAs($schema['profile_same_as'] ?? null);
+
+        if ($sameAs !== []) {
+            $entity['sameAs'] = $sameAs;
+        }
+
+        return $entity;
+    }
+
+    /**
+     * Validated at emit time rather than trusted from storage, same reasoning
+     * as SeoResolver::sameAs(): the tags field only enforces "array".
+     *
+     * @return list<string>
+     */
+    private function sameAs(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $raw,
+            static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
+        ));
+    }
+
+    /**
+     * @param  SchemaInput  $input
+     * @return array<string, mixed>
+     */
+    private function base(array $input, string $type): array
+    {
+        $object = [
+            '@context' => 'https://schema.org',
+            '@type' => $type,
+            'name' => $input['name'],
+            'url' => $input['url'],
+        ];
+
+        if ($input['description'] !== '') {
+            $object['description'] = $input['description'];
+        }
+
+        if ($input['image'] !== null && $input['image'] !== '') {
+            $object['image'] = $input['image'];
+        }
+
+        return $object;
+    }
+
+    /**
+     * hasPart lists the category's live children — the listing a
+     * CollectionPage exists to describe. Filtered through scopeLive() (the
+     * single source of frontend visibility, schedule included) so a draft or
+     * expired child is never advertised, and eager-loads slugs because
+     * pathFor() reads the loaded relation.
+     *
+     * The children are not otherwise loaded by the frontend, so this is the
+     * one place a schema costs a query; it is spent only for categories.
+     *
+     * @return list<array{'@type': string, name: string, url: string}>
+     */
+    private function parts(Page $page, string $locale): array
+    {
+        $children = $page->children()
+            ->live()
+            ->where('is_indexable', true)
+            ->with('slugs')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        $parts = [];
+
+        foreach ($children as $child) {
+            $name = (string) $child->getTranslation('title', $locale, false)
+                ?: (string) $child->getTranslation('name', $locale, false);
+            $path = $child->pathFor($locale);
+
+            // No slug in this locale means the child has no URL here; a
+            // hasPart entry pointing at the site root would be worse than
+            // omitting it.
+            if ($name === '' || $path === null) {
+                continue;
+            }
+
+            $parts[] = ['@type' => 'WebPage', 'name' => $name, 'url' => url($path)];
+        }
+
+        return $parts;
+    }
+}
