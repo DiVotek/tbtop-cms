@@ -49,10 +49,15 @@ class SeoResolver
     /**
      * `ownTitle`/`ownDescription` carry what the PAGE itself supplies, before
      * any site-wide filler — no template, no suffix, no default description.
-     * They exist for the SEO checklist: a template that appends the site name
-     * makes every rendered title non-empty, so "is this filled in?" asked
-     * against the rendered string is answered for the site rather than for
-     * the page (see SeoChecklist::titleCheck()). Rendering never uses them.
+     * They answer "is this filled in?", which is a question about the page: a
+     * template appending the site name makes every rendered title non-empty,
+     * so asking it of the rendered string answers for the site instead (see
+     * SeoChecklist::titleCheck()).
+     *
+     * They are NOT the right input for every check — "does the title carry
+     * the keyword?" is about what a crawler reads, so that one stays on the
+     * rendered value (see SeoChecklist::focusKeywordChecks()). Rendering
+     * itself never uses these two.
      *
      * @param  list<Breadcrumb>  $breadcrumbs  Ancestors only (Breadcrumbs::forPage() shape), reused
      *                                         as-is from the caller's own `breadcrumbs` prop build so

@@ -413,11 +413,56 @@ it('names only the reason that actually applies', function (): void {
         ->and($row['_tooltips']['seo_state'])->toBe('No summary');
 });
 
+it('does not claim a page has no title when it carries a meta title', function (): void {
+    // The badge's SQL cannot reach seo.title (nested JSON, three dialects —
+    // see seoStateSql()), so such a page still badges red. The tooltip must
+    // not compound that by asserting something false: no reason is honest
+    // here, a wrong reason is not.
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'published',
+        'name' => [],
+        'title' => [],
+        'summary' => ['en' => 'A summary.'],
+        'seo' => ['title' => ['en' => 'A hand-written meta title']],
+        'is_indexable' => true,
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Missing')
+        ->and($row['_tooltips']['seo_state'] ?? null)->toBeNull();
+});
+
+it('counts a whitespace-only value as content, exactly as the badge does', function (): void {
+    // The SQL treats `value <> ''` as content and documents that as a
+    // deliberate false pass. Trimming in PHP would badge this page Good while
+    // telling it "No summary" — the tooltip contradicting the badge.
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'published',
+        'name' => ['en' => 'About'],
+        'summary' => ['en' => '   '],
+        'is_indexable' => true,
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Good')
+        ->and($row['_tooltips']['seo_state'] ?? null)->toBeNull();
+});
+
 it('keeps the tooltip and the badge in step across every badge state', function (): void {
     // The tooltip is derived in PHP while the badge comes from SQL — two
     // codepaths answering one question, which is what makes them able to
     // drift. This pins the rule rather than the wording: a green badge means
     // no reasons, anything else means at least one.
+    //
+    // The one documented exception is a page carrying only seo.title, which
+    // the badge's SQL cannot see — covered by its own test above, and not
+    // created here.
     Page::create(['type' => 'page', 'status' => 'draft']);
     Page::create(['type' => 'page', 'status' => 'draft', 'name' => ['en' => 'Warn me']]);
     Page::create([

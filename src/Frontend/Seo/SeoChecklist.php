@@ -37,9 +37,10 @@ class SeoChecklist
     /** @return list<Check> */
     public function for(Page $page, string $locale): array
     {
-        // With breadcrumbs, so the title this checklist measures is the one
-        // the frontend renders — a {parent} template would otherwise be
-        // measured a segment short (see SerpPreview::card()).
+        // With breadcrumbs: the focus-keyword checks read the RENDERED title,
+        // and a {parent} segment is part of what a crawler sees — resolving
+        // without them would hide a keyword the page genuinely carries (see
+        // focusKeywordChecks()).
         $resolved = $this->resolver->resolve($page, $locale, $this->breadcrumbs->forPage($page, $locale));
         $seo = is_array($page->seo) ? $page->seo : [];
 
@@ -167,13 +168,19 @@ class SeoChecklist
     }
 
     /**
-     * Searched in the page's OWN title and description, not the rendered
-     * ones: a template carrying the site name would otherwise report the
-     * keyword as present on every page whose keyword happens to appear in
-     * that name, which says nothing about the page.
+     * Searched in the RENDERED title and description, unlike the presence
+     * checks above.
+     *
+     * The two ask different questions. "Is this filled in?" is about the
+     * page, so site-wide filler must not answer it. "Does the title carry the
+     * keyword?" is about what a crawler reads — and a crawler reads the
+     * rendered string, template segments included. An article under a
+     * category named for its keyword genuinely has that keyword in its
+     * <title>, and reporting otherwise would send the editor chasing a
+     * problem that does not exist.
      *
      * @param  array<string, mixed>  $seo
-     * @param  array{ownTitle: string, ownDescription: string}  $resolved
+     * @param  array{title: string, description: string}  $resolved
      * @return list<Check>
      */
     private function focusKeywordChecks(Page $page, array $seo, string $locale, array $resolved): array
@@ -188,8 +195,8 @@ class SeoChecklist
         $slug = (string) $page->pathFor($locale);
 
         return [
-            $this->keywordPresence('focus_keyword_in_title', $keyword, $resolved['ownTitle']),
-            $this->keywordPresence('focus_keyword_in_description', $keyword, $resolved['ownDescription']),
+            $this->keywordPresence('focus_keyword_in_title', $keyword, $resolved['title']),
+            $this->keywordPresence('focus_keyword_in_description', $keyword, $resolved['description']),
             $this->keywordPresence('focus_keyword_in_heading', $keyword, $heading),
             $this->keywordPresence('focus_keyword_in_slug', $keyword, $slug),
         ];
