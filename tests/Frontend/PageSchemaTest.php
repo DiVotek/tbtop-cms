@@ -197,6 +197,25 @@ it('lists only live indexable children in a category hasPart', function (): void
         ]]);
 });
 
+it('caps hasPart so a large category does not inline its whole subtree', function (): void {
+    $category = Page::factory()->create([
+        'type' => 'category',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Big'],
+    ]);
+
+    Page::factory()->count(105)->create([
+        'type' => 'article',
+        'parent_id' => $category->getKey(),
+        'status' => PageStatus::Published,
+        'is_indexable' => true,
+    ]);
+
+    $object = (new PageSchema)->build($category, 'en', schemaInput());
+
+    expect($object['hasPart'])->toHaveCount(100);
+});
+
 it('omits hasPart entirely for a category with nothing live under it', function (): void {
     $category = Page::factory()->create([
         'type' => 'category',

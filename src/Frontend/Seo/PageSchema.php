@@ -34,6 +34,14 @@ use Tbtop\Cms\Page\Models\Page;
 class PageSchema
 {
     /**
+     * How many children a CollectionPage advertises in hasPart. Sized to a
+     * typical listing page rather than to the category: the point of the
+     * property is to describe what this page holds, not to mirror the whole
+     * subtree into every response.
+     */
+    private const int MAX_PARTS = 100;
+
+    /**
      * @param  SchemaInput  $input
      * @return array<string, mixed>|null
      */
@@ -241,6 +249,12 @@ class PageSchema
      * The children are not otherwise loaded by the frontend, so this is the
      * one place a schema costs a query; it is spent only for categories.
      *
+     * Capped at MAX_PARTS. A category with thousands of articles would
+     * otherwise load every one of them on every render and inline them into
+     * the page's HTML — the listing itself is paginated, and a crawler
+     * discovers the rest by following it, so an unbounded hasPart buys
+     * nothing for the weight it costs.
+     *
      * @return list<array{'@type': string, name: string, url: string}>
      */
     private function parts(Page $page, string $locale): array
@@ -251,6 +265,7 @@ class PageSchema
             ->with('slugs')
             ->orderBy('sort_order')
             ->orderBy('id')
+            ->limit(self::MAX_PARTS)
             ->get();
 
         $parts = [];
