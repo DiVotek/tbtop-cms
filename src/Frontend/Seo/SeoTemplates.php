@@ -11,10 +11,13 @@ use Tbtop\Cms\Settings\Settings;
  *
  * Two rungs, most specific first: a template stored for the page's own type
  * (`seo.type_templates.article.title`), then the site-wide one
- * (`seo.title_template`). A page's own meta title is a third, higher rung,
- * but it lives outside a template entirely — SeoResolver resolves it before
- * asking for one, and a filled-in meta title means no template is applied at
- * all.
+ * (`seo.title_template`).
+ *
+ * A page's own meta title is not a third rung here: it feeds the {title} the
+ * chosen template wraps, rather than replacing the template. An editor who
+ * types "Hand written" on an article still gets "Hand written — Blog — Site"
+ * — the branding a template exists to apply should not vanish because a
+ * title was written by hand.
  *
  * A blank per-type template is not a value: it means "nothing was set for
  * this type", so the site-wide one applies. That is what lets an editor

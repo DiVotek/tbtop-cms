@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -390,7 +391,14 @@ class PageForm
         }
 
         $locale = app(Languages::class)->defaultLocale();
-        $resolved = app(SeoResolver::class)->resolve($page, $locale);
+        // Breadcrumbs passed for the same reason SerpPreview and SeoChecklist
+        // pass them: a placeholder promising what an empty field resolves to
+        // must not drop a {parent} segment the frontend renders.
+        $resolved = app(SeoResolver::class)->resolve(
+            $page,
+            $locale,
+            app(Breadcrumbs::class)->forPage($page, $locale),
+        );
 
         return [
             'title' => $resolved['title'],
