@@ -109,6 +109,7 @@ class PagesPage extends AdminPage
                 // name — see seoStateSql().
                 Column::make('seo_state')->label(__('tbtop-cms::pages.columns.seo'))
                     ->formatUsing($this->seoStateLabel(...))
+                    ->tooltip($this->seoStateTooltip(...))
                     ->sortable()
                     ->badge([
                         __('tbtop-cms::pages.seo_state.fail') => 'danger',
@@ -447,6 +448,54 @@ class PagesPage extends AdminPage
     private function seoStateLabel(mixed $value): string
     {
         return SeoState::labelFor($value);
+    }
+
+    /**
+     * What the badge is actually complaining about, as a hover line.
+     *
+     * Derived from the row the table already loaded — no SeoChecklist::for()
+     * call, which costs several queries per page and would turn a 50-row list
+     * into hundreds of them. That means this reads the same three facts
+     * seoStateSql() does and phrases them; the two must stay in step, so the
+     * conditions below mirror that CASE arm for arm rather than asking a
+     * richer question the badge cannot answer.
+     *
+     * A page with nothing wrong gets no tooltip: attachTooltips() drops empty
+     * strings, so the badge simply has none.
+     */
+    private function seoStateTooltip(Page $row): string
+    {
+        $reasons = [];
+
+        if (self::allTranslationsBlank($row, 'name') && self::allTranslationsBlank($row, 'title')) {
+            $reasons[] = __('tbtop-cms::pages.seo_state_reasons.title');
+        }
+
+        if (self::allTranslationsBlank($row, 'summary')) {
+            $reasons[] = __('tbtop-cms::pages.seo_state_reasons.summary');
+        }
+
+        if (! $row->is_indexable) {
+            $reasons[] = __('tbtop-cms::pages.seo_state_reasons.not_indexable');
+        }
+
+        return implode("\n", $reasons);
+    }
+
+    /**
+     * The PHP counterpart of emptyTranslatableSql(): true when a translatable
+     * column holds no non-blank value in any locale. Reads the already-loaded
+     * attribute, so it costs nothing per row.
+     */
+    private static function allTranslationsBlank(Page $row, string $attribute): bool
+    {
+        foreach ($row->getTranslations($attribute) as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function create(ActionCtx $ctx): Effects

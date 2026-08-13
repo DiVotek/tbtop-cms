@@ -44,14 +44,18 @@ class SeoChecklist
         $seo = is_array($page->seo) ? $page->seo : [];
 
         return [
-            $this->titleCheck($resolved['title']),
-            $this->descriptionCheck($resolved['description']),
+            // Own values, not rendered ones: a title template appending the
+            // site name makes every rendered title non-empty, so a page with
+            // nothing filled in reported two greens (see resolve()'s docblock
+            // for ownTitle/ownDescription).
+            $this->titleCheck($resolved['ownTitle']),
+            $this->descriptionCheck($resolved['ownDescription']),
             $this->ogImageCheck($resolved['ogImage']),
             $this->indexableCheck($page),
             $this->canonicalCheck($resolved['canonical']),
             $this->hreflangCheck($page),
             ...$this->focusKeywordChecks($page, $seo, $locale, $resolved),
-            $this->duplicateTitleCheck($page, $resolved['title'], $locale),
+            $this->duplicateTitleCheck($page, $resolved['ownTitle'], $locale),
         ];
     }
 
@@ -163,8 +167,13 @@ class SeoChecklist
     }
 
     /**
+     * Searched in the page's OWN title and description, not the rendered
+     * ones: a template carrying the site name would otherwise report the
+     * keyword as present on every page whose keyword happens to appear in
+     * that name, which says nothing about the page.
+     *
      * @param  array<string, mixed>  $seo
-     * @param  array{title: string, description: string}  $resolved
+     * @param  array{ownTitle: string, ownDescription: string}  $resolved
      * @return list<Check>
      */
     private function focusKeywordChecks(Page $page, array $seo, string $locale, array $resolved): array
@@ -179,8 +188,8 @@ class SeoChecklist
         $slug = (string) $page->pathFor($locale);
 
         return [
-            $this->keywordPresence('focus_keyword_in_title', $keyword, $resolved['title']),
-            $this->keywordPresence('focus_keyword_in_description', $keyword, $resolved['description']),
+            $this->keywordPresence('focus_keyword_in_title', $keyword, $resolved['ownTitle']),
+            $this->keywordPresence('focus_keyword_in_description', $keyword, $resolved['ownDescription']),
             $this->keywordPresence('focus_keyword_in_heading', $keyword, $heading),
             $this->keywordPresence('focus_keyword_in_slug', $keyword, $slug),
         ];

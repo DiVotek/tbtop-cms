@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
-use Tbtop\Cms\Frontend\Seo\SeoChecklist;
+use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
 use Tbtop\Cms\Language\Models\Language;
@@ -153,11 +153,11 @@ it('applies a per-type description template too', function (): void {
         ->assertJsonPath('props.seo.description', 'A short summary. — Blog');
 });
 
-it('measures the same title the frontend renders, parent segment included', function (): void {
+it('resolves the same title the frontend renders when given breadcrumbs', function (): void {
     // The admin-side readers (SERP preview, checklist, computed placeholders)
-    // call resolve() themselves; without breadcrumbs they would resolve a
-    // {parent} template a segment short and quietly report a different title
-    // than the page actually serves.
+    // call resolve() themselves; without breadcrumbs a {parent} template
+    // resolves a segment short and the preview shows a different title than
+    // the page actually serves.
     app(Settings::class)->set('site.name', 'Acme Co');
     app(Settings::class)->set(SeoTemplates::key('article', 'title'), '{title} {sep} {parent} {sep} {site_name}');
 
@@ -167,16 +167,16 @@ it('measures the same title the frontend renders, parent segment included', func
         ->assertOk()
         ->json('props.seo.title');
 
-    // A keyword that only appears in the {parent} segment: the checklist can
-    // only find it if it resolved the same title the frontend served.
-    $article->update(['seo' => ['focus_keyword' => ['en' => 'Blog']]]);
-
-    $checks = app(SeoChecklist::class)->for($article->fresh(), 'en');
-    $keywordInTitle = collect($checks)->firstWhere('key', 'focus_keyword_in_title');
+    $page = $article->fresh();
+    $withCrumbs = app(SeoResolver::class)
+        ->resolve($page, 'en', app(Breadcrumbs::class)->forPage($page, 'en'));
+    $withoutCrumbs = app(SeoResolver::class)->resolve($page, 'en');
 
     expect($frontendTitle)->toBe('Post — Blog — Acme Co')
-        ->and($keywordInTitle)->not->toBeNull()
-        ->and($keywordInTitle['status'])->toBe('pass');
+        ->and($withCrumbs['title'])->toBe($frontendTitle)
+        // Proves the assertion above is not vacuous: the parent segment is
+        // exactly what the breadcrumbs carry.
+        ->and($withoutCrumbs['title'])->toBe('Post — Acme Co');
 });
 
 it('keeps the page own meta title above every template', function (): void {

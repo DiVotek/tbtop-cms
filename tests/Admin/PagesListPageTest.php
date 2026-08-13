@@ -385,6 +385,50 @@ it('renders seo_state = fail (label: Missing) for a page missing every title sou
     expect($row['seo_state'])->toBe('Missing');
 });
 
+it('explains the badge in a tooltip listing what the page is short of', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => 'draft', 'is_indexable' => false]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Missing')
+        ->and($row['_tooltips']['seo_state'])
+        ->toBe("No name and no title\nNo summary\nExcluded from indexing");
+});
+
+it('names only the reason that actually applies', function (): void {
+    // A page with a name but no summary is the common warn case; the tooltip
+    // must not also claim the title is missing.
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'draft',
+        'name' => ['en' => 'About'],
+        'is_indexable' => true,
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Needs work')
+        ->and($row['_tooltips']['seo_state'])->toBe('No summary');
+});
+
+it('carries no tooltip on a page with nothing wrong', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => 'published',
+        'name' => ['en' => 'About'],
+        'summary' => ['en' => 'What we do.'],
+        'is_indexable' => true,
+    ]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+    $row = collect($rows)->firstWhere('id', $page->id);
+
+    expect($row['seo_state'])->toBe('Good')
+        ->and($row['_tooltips']['seo_state'] ?? null)->toBeNull();
+});
+
 it('treats an emptied translatable column as missing, not as content', function (): void {
     // Clearing a translatable field in the form does not null the column —
     // the cast stores `[]`, which a plain IS NULL test would read as "has a
