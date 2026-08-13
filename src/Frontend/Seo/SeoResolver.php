@@ -47,6 +47,13 @@ class SeoResolver
     }
 
     /**
+     * `ownTitle`/`ownDescription` carry what the PAGE itself supplies, before
+     * any site-wide filler — no template, no suffix, no default description.
+     * They exist for the SEO checklist: a template that appends the site name
+     * makes every rendered title non-empty, so "is this filled in?" asked
+     * against the rendered string is answered for the site rather than for
+     * the page (see SeoChecklist::titleCheck()). Rendering never uses them.
+     *
      * @param  list<Breadcrumb>  $breadcrumbs  Ancestors only (Breadcrumbs::forPage() shape), reused
      *                                         as-is from the caller's own `breadcrumbs` prop build so
      *                                         this stays a single query per request.
@@ -56,6 +63,7 @@ class SeoResolver
      *     ogType: string, ogUrl: string, ogLocale: string, ogLocaleAlternates: list<string>,
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
+     *     ownTitle: string, ownDescription: string,
      * }
      */
     public function resolve(Page $page, string $locale, array $breadcrumbs = []): array
@@ -89,6 +97,11 @@ class SeoResolver
             'twitterCard' => $this->twitterCard($ogImage),
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
+            // metaTitle is already the page's own cascade (seo.title → title →
+            // name) with no site-wide filler in it; the description cascade
+            // has one more rung, so it is asked for separately below.
+            'ownTitle' => $metaTitle,
+            'ownDescription' => $this->ownDescription($page, $seo, $locale),
             'favicon' => $this->favicon(),
             'jsonLd' => $this->jsonLd(
                 $page,
@@ -546,5 +559,21 @@ class SeoResolver
         }
 
         return LocalizedSeo::value($this->settings->get('seo.default_description', ''), $locale);
+    }
+
+    /**
+     * The description cascade without its last rung.
+     *
+     * seo.default_description is a single string served on every page that
+     * has none of its own — for a search engine that is the same duplicate
+     * content a template is, so a page falling back to it has nothing of its
+     * own to say and must not be reported as filled in.
+     *
+     * @param  array<string, mixed>  $seo
+     */
+    private function ownDescription(Page $page, array $seo, string $locale): string
+    {
+        return LocalizedSeo::value($seo['description'] ?? null, $locale)
+            ?: (string) $page->getTranslation('summary', $locale);
     }
 }

@@ -34,6 +34,13 @@ return [
         'warn' => 'Needs work',
         'pass' => 'Good',
     ],
+    // Badge tooltip lines: what this particular page is short of. The full
+    // list of checks lives on the page's own SEO tab.
+    'seo_state_reasons' => [
+        'title' => 'No name and no title',
+        'summary' => 'No summary',
+        'not_indexable' => 'Excluded from indexing',
+    ],
     'types' => [
         'page' => 'Page',
         'category' => 'Category',

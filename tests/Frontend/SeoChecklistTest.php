@@ -50,6 +50,71 @@ it('fails the title check when the resolved meta title is empty', function (): v
     expect(checkByKey(checklistFor($page), 'title')['status'])->toBe('fail');
 });
 
+it('fails a description a template filled in for a page that has none', function (): void {
+    // The bug this pins: a template appends the site name, so the RENDERED
+    // description is never empty and the page reported green while having
+    // nothing of its own. What renders is " — Acme Co" — filler, not content.
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.description_template', '{description} — {site_name}');
+
+    $page = Page::factory()->create([
+        'name' => ['en' => 'About'],
+        'summary' => ['en' => ''],
+        'seo' => [],
+    ]);
+
+    expect(app(SeoResolver::class)->resolve($page, 'en')['description'])->toBe('Acme Co')
+        ->and(checkByKey(checklistFor($page), 'description')['status'])->toBe('fail');
+});
+
+it('fails a description that only comes from the site-wide default', function (): void {
+    // seo.default_description is one string served on every page that has
+    // none of its own — for a crawler that is the same duplicate content a
+    // template is, so it cannot count as the page having something to say.
+    app(Settings::class)->set('seo.default_description', 'A default for the whole site.');
+
+    $page = Page::factory()->create([
+        'name' => ['en' => 'About'],
+        'summary' => ['en' => ''],
+        'seo' => [],
+    ]);
+
+    expect(app(SeoResolver::class)->resolve($page, 'en')['description'])
+        ->toBe('A default for the whole site.')
+        ->and(checkByKey(checklistFor($page), 'description')['status'])->toBe('fail');
+});
+
+it('passes title and description the page supplies itself', function (): void {
+    app(Settings::class)->set('seo.title_template', '{title} — Acme Co');
+
+    $page = Page::factory()->create([
+        'name' => ['en' => 'About'],
+        'summary' => ['en' => 'What we do.'],
+        'seo' => ['title' => ['en' => 'About our team']],
+    ]);
+
+    $checks = checklistFor($page);
+
+    expect(checkByKey($checks, 'title')['status'])->toBe('pass')
+        ->and(checkByKey($checks, 'description')['status'])->toBe('pass');
+});
+
+it('does not find a focus keyword that only the template supplies', function (): void {
+    // The keyword sits in the site name the template appends, nowhere in the
+    // page itself. Searching the rendered title would report it as present on
+    // every page of the site.
+    app(Settings::class)->set('site.name', 'Widgets Inc');
+    app(Settings::class)->set('seo.title_template', '{title} — {site_name}');
+
+    $page = Page::factory()->create([
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About'],
+        'seo' => ['focus_keyword' => ['en' => 'Widgets']],
+    ]);
+
+    expect(checkByKey(checklistFor($page), 'focus_keyword_in_title')['status'])->toBe('fail');
+});
+
 it('has no fail checks for a page with a good title, description, and og image', function (): void {
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
