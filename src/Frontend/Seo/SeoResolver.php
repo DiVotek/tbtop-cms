@@ -69,6 +69,7 @@ class SeoResolver
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
      *     ownTitle: string, ownDescription: string,
+     *     verificationGoogle: string|null, verificationBing: string|null,
      * }
      */
     public function resolve(Page $page, string $locale, array $breadcrumbs = []): array
@@ -108,6 +109,8 @@ class SeoResolver
             'ownTitle' => $metaTitle,
             'ownDescription' => $this->ownDescription($page, $seo, $locale),
             'favicon' => $this->favicon(),
+            'verificationGoogle' => VerificationToken::google()->fromSettings($this->settings, 'seo.verification.google'),
+            'verificationBing' => VerificationToken::bing()->fromSettings($this->settings, 'seo.verification.bing'),
             'jsonLd' => $this->jsonLd(
                 $page,
                 $locale,

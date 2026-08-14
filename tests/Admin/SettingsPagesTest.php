@@ -127,6 +127,8 @@ it('keeps every settings field reachable after the regrouping', function (): voi
         'seo_identity_logo',
         'seo_identity_same_as',
         'seo_gtm_container_id',
+        'seo_verification_google',
+        'seo_verification_bing',
         'seo_not_found_enabled',
         'seo_not_found_retention_days',
         'seo_type_page_title',
@@ -166,11 +168,19 @@ it('labels SEO identity/GTM fields from translations', function (): void {
     $labels = settingsFieldLabels($structure);
 
     expect($labels['seo_gtm_container_id'])->toBe(__('tbtop-cms::settings.seo.fields.gtm_container_id'))
+        ->and($labels['seo_verification_google'])->toBe(__('tbtop-cms::settings.seo.fields.verification_google'))
+        ->and($labels['seo_verification_bing'])->toBe(__('tbtop-cms::settings.seo.fields.verification_bing'))
         ->and($labels['seo_identity_type'])->toBe(__('tbtop-cms::settings.seo.fields.identity_type'))
         ->and($labels['seo_identity_name'])->toBe(__('tbtop-cms::settings.seo.fields.identity_name'))
         ->and($labels['seo_identity_logo'])->toBe(__('tbtop-cms::settings.seo.fields.identity_logo'))
         ->and($labels['seo_identity_same_as'])->toBe(__('tbtop-cms::settings.seo.fields.identity_same_as'))
         ->and($labels['seo_twitter_card'])->toBe(__('tbtop-cms::settings.seo.fields.twitter_card'));
+
+    $verificationGoogle = settingsFindFieldByName($structure, 'seo_verification_google');
+    expect($verificationGoogle['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.seo.helpers.verification_google'));
+
+    $verificationBing = settingsFindFieldByName($structure, 'seo_verification_bing');
+    expect($verificationBing['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.seo.helpers.verification_bing'));
 });
 
 it('labels notification settings fields and helper text from translations', function (): void {
@@ -244,6 +254,22 @@ it('normalizes a pasted full GTM install snippet down to the bare container id o
         ->assertOk()->json('props.data.seo-settings');
 
     expect($record['seo_gtm_container_id'])->toBe('GTM-AB12CD3');
+});
+
+it('normalizes pasted verification meta tags down to their bare tokens on save', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_verification_google' => '<meta name="google-site-verification" content="google-token-123" />',
+        'seo_verification_bing' => '<meta name="msvalidate.01" content="bing-token-456" />',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(app(Settings::class)->get('seo.verification.google'))->toBe('google-token-123')
+        ->and(app(Settings::class)->get('seo.verification.bing'))->toBe('bing-token-456');
+
+    $record = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.seo-settings');
+
+    expect($record['seo_verification_google'])->toBe('google-token-123')
+        ->and($record['seo_verification_bing'])->toBe('bing-token-456');
 });
 
 it('drops non-URL profile links from seo.identity.same_as on save', function (): void {
