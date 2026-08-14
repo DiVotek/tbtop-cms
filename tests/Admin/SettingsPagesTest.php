@@ -130,6 +130,10 @@ it('keeps every settings field reachable after the regrouping', function (): voi
         'seo_not_found_enabled',
         'seo_not_found_retention_days',
         'seo_type_page_title',
+        'seo_type_page_description',
+        'seo_type_category_title',
+        'seo_type_category_description',
+        'seo_type_article_title',
         'seo_type_article_description',
     );
 });
