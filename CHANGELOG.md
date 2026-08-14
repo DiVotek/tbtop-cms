@@ -174,6 +174,9 @@ to also create and edit users — see Added below); it no longer assigns roles.
   written to at all (SQL-NULL), not whether a specific locale's value is
   empty. See `PagesPage::seoStateSql()`'s docblock for the full reasoning;
   the per-page checklist above is the authoritative, locale-aware detail.
+- Project passport files for the public repo: `SECURITY.md`,
+  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and GitHub issue forms, plus
+  README sections on versioning/releases and contributing/security.
 
 ### Changed
 
