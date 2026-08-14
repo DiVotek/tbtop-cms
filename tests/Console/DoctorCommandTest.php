@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthCheckRunner;
@@ -65,6 +66,9 @@ it('exits 0 and lists check labels when nothing is at error level', function ():
 });
 
 it('exits 1 and surfaces the failing check label when an error-level check fails', function (): void {
+    // The workbench skeleton has no public/ until `composer serve` builds it
+    // — locally it usually exists, in CI it does not.
+    File::ensureDirectoryExists(public_path());
     file_put_contents(public_path('robots.txt'), "User-agent: *\n");
 
     $this->artisan('cms:doctor')
