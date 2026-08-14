@@ -70,7 +70,7 @@ it('renders the full head tag set server-side for a plain GET on a published nes
         ->toContain('data-inertia="link-canonical" rel="canonical" href="' . url($page->pathFor('en')) . '"')
         ->toContain('data-inertia="og-title" property="og:title" content="Setup Guide"')
         ->toContain('data-inertia="og-site-name" property="og:site_name" content="Acme Co"')
-        ->toContain('data-inertia="og-type" property="og:type" content="website"')
+        ->toContain('data-inertia="og-type" property="og:type" content="article"')
         ->toContain('data-inertia="twitter-card" name="twitter:card" content="summary_large_image"')
         ->toContain('data-inertia="alternate-en" rel="alternate" hreflang="en"')
         ->toContain('data-inertia="alternate-uk" rel="alternate" hreflang="uk"')

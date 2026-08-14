@@ -64,8 +64,10 @@ class SeoResolver
      *                                         this stays a single query per request.
      * @return array{
      *     title: string, description: string, canonical: string, ogImage: string|null,
+     *     ogImageAlt: string|null, ogImageType: string|null,
      *     ogTitle: string, ogDescription: string, noindex: bool, siteName: string,
      *     ogType: string, ogUrl: string, ogLocale: string, ogLocaleAlternates: list<string>,
+     *     articlePublishedTime: string|null, articleModifiedTime: string|null, articleAuthor: string|null,
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
      *     ownTitle: string, ownDescription: string,
@@ -78,7 +80,8 @@ class SeoResolver
         $metaTitle = $this->metaTitle($page, $seo, $locale);
         $metaDescription = $this->description($page, $seo, $locale);
         $canonical = $this->canonical($page, $seo, $locale);
-        $ogImage = $this->ogImage($page, $seo);
+        $image = $this->ogImageDetails($page, $seo);
+        $ogImage = $image['url'] ?? null;
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
         // og:description falls back to the UNtemplated base, same as og:title
         // falls back to the untemplated metaTitle — social snippets should not
@@ -86,20 +89,26 @@ class SeoResolver
         $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale) ?: $metaDescription;
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
+        $isArticle = $page->type === 'article';
 
         return [
             'title' => $this->title($page, $metaTitle, $locale, $breadcrumbs),
             'description' => $this->descriptionWithTemplate($page, $metaDescription, $locale, $breadcrumbs),
             'canonical' => $canonical,
             'ogImage' => $ogImage,
+            'ogImageAlt' => $image['alt'] ?? null,
+            'ogImageType' => $image['mime'] ?? null,
             'ogTitle' => $ogTitle,
             'ogDescription' => $ogDescription,
             'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),
             'siteName' => $siteName,
-            'ogType' => 'website',
+            'ogType' => $isArticle ? 'article' : 'website',
             'ogUrl' => $canonical,
             'ogLocale' => $locale,
             'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
+            'articlePublishedTime' => $isArticle ? $this->articlePublishedTime($page) : null,
+            'articleModifiedTime' => $isArticle ? $this->articleModifiedTime($page) : null,
+            'articleAuthor' => $isArticle ? $this->articleAuthor($seo, $locale) : null,
             'twitterCard' => $this->twitterCard($ogImage),
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
@@ -122,6 +131,34 @@ class SeoResolver
                 $breadcrumbs,
             ),
         ];
+    }
+
+    /**
+     * Mirrors PageSchema::dates()'s datePublished gate exactly: a draft or
+     * expired page reached through admin preview must not advertise a
+     * publication date via article:published_time either. Keep the two in
+     * sync if this rule ever changes.
+     */
+    private function articlePublishedTime(Page $page): ?string
+    {
+        return $page->published_at !== null && $page->isLive()
+            ? $page->published_at->toIso8601String()
+            : null;
+    }
+
+    /** Mirrors PageSchema::dates()'s dateModified — unconditional, unlike published. */
+    private function articleModifiedTime(Page $page): ?string
+    {
+        return $page->updated_at?->toIso8601String();
+    }
+
+    /** @param  array<string, mixed>  $seo */
+    private function articleAuthor(array $seo, string $locale): ?string
+    {
+        $schema = is_array($seo['schema'] ?? null) ? $seo['schema'] : [];
+        $author = LocalizedSeo::value($schema['author'] ?? null, $locale);
+
+        return $author !== '' ? $author : null;
     }
 
     private function twitterCard(?string $ogImage): string
@@ -518,23 +555,27 @@ class SeoResolver
      * og_image itself is NOT translatable (see PageForm::seoFields()) — an
      * image isn't per-locale, so it's read as a plain scalar.
      *
+     * Returns alt/mime alongside the URL — og:image:alt and og:image:type
+     * must follow whichever image actually resolved (override, own, or
+     * global default), and MediaUrlResolver::details() is the one query that
+     * already has both on hand.
+     *
      * @param  array<string, mixed>  $seo
+     * @return array{url: string, alt: string|null, mime: string|null}|null
      */
-    private function ogImage(Page $page, array $seo): ?string
+    private function ogImageDetails(Page $page, array $seo): ?array
     {
         // A page that named an image has made its choice, and a broken id is
         // still that choice — falling through to the site default here would
         // quietly publish a different image than the one the editor picked,
         // which is worse than publishing none.
         if (self::namesAnImage($page, $seo)) {
-            return $this->ownImage($page, $seo);
+            return $this->ownImageDetails($page, $seo);
         }
 
         $global = $this->settings->get('seo.default_og_image');
 
-        return AbsoluteUrl::make(
-            is_string($global) && $global !== '' ? $this->mediaUrlResolver->resolve($global) : null,
-        );
+        return is_string($global) && $global !== '' ? $this->imageDetails($global) : null;
     }
 
     /**
@@ -570,27 +611,65 @@ class SeoResolver
     /**
      * The image this page carries itself, with no site-wide fallback.
      *
-     * Public because the sitemap needs exactly this and not ogImage(): the
-     * global default exists so a share card is never blank, but listing it
-     * against every URL in the sitemap would tell a crawler the same image
-     * belongs to the whole site. A page with no image of its own is better
-     * listed with none.
+     * Public because the sitemap needs exactly this and not ogImageDetails():
+     * the global default exists so a share card is never blank, but listing
+     * it against every URL in the sitemap would tell a crawler the same
+     * image belongs to the whole site. A page with no image of its own is
+     * better listed with none.
      *
      * @param  array<string, mixed>  $seo
      */
     public function ownImage(Page $page, array $seo): ?string
     {
+        return $this->ownImageDetails($page, $seo)['url'] ?? null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $seo
+     * @return array{url: string, alt: string|null, mime: string|null}|null
+     */
+    private function ownImageDetails(Page $page, array $seo): ?array
+    {
         $override = $seo['og_image'] ?? null;
 
         if (is_string($override) && $override !== '') {
-            return AbsoluteUrl::make($this->mediaUrlResolver->resolve($override));
+            return $this->imageDetails($override);
         }
 
         if ($page->image !== null && $page->image !== '') {
-            return AbsoluteUrl::make($this->mediaUrlResolver->resolve($page->image));
+            return $this->imageDetails($page->image);
         }
 
         return null;
+    }
+
+    /**
+     * The one place a media id becomes an og:image URL + alt + mime. Mime is
+     * dropped (not merely nulled) unless it starts with `image/` — the
+     * library also stores PDFs and similar, and a non-image mime published
+     * as og:image:type is worse than omitting the tag entirely.
+     *
+     * @return array{url: string, alt: string|null, mime: string|null}|null
+     */
+    private function imageDetails(string $id): ?array
+    {
+        $details = $this->mediaUrlResolver->details($id);
+
+        if ($details === null) {
+            return null;
+        }
+
+        $url = AbsoluteUrl::make($details['url']);
+
+        if ($url === null) {
+            return null;
+        }
+
+        return [
+            'url' => $url,
+            'alt' => $details['alt'] !== null && $details['alt'] !== '' ? $details['alt'] : null,
+            'mime' => str_starts_with($details['mime'], 'image/') ? $details['mime'] : null,
+        ];
     }
 
     /** @param array<string, mixed> $seo */

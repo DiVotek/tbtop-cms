@@ -87,6 +87,23 @@
     @endif
     @if (! empty($seo['ogImage']))
         <meta data-inertia="og-image" property="og:image" content="{{ $seo['ogImage'] }}">
+        @if (! empty($seo['ogImageAlt']))
+            <meta data-inertia="og-image-alt" property="og:image:alt" content="{{ $seo['ogImageAlt'] }}">
+        @endif
+        @if (! empty($seo['ogImageType']))
+            <meta data-inertia="og-image-type" property="og:image:type" content="{{ $seo['ogImageType'] }}">
+        @endif
+    @endif
+    @if (($seo['ogType'] ?? 'website') === 'article')
+        @if (! empty($seo['articlePublishedTime']))
+            <meta data-inertia="article-published-time" property="article:published_time" content="{{ $seo['articlePublishedTime'] }}">
+        @endif
+        @if (! empty($seo['articleModifiedTime']))
+            <meta data-inertia="article-modified-time" property="article:modified_time" content="{{ $seo['articleModifiedTime'] }}">
+        @endif
+        @if (! empty($seo['articleAuthor']))
+            <meta data-inertia="article-author" property="article:author" content="{{ $seo['articleAuthor'] }}">
+        @endif
     @endif
     <meta data-inertia="twitter-card" name="twitter:card" content="{{ $seo['twitterCard'] ?? 'summary' }}">
     @if (! empty($seo['ogTitle']))
@@ -97,6 +114,9 @@
     @endif
     @if (! empty($seo['ogImage']))
         <meta data-inertia="twitter-image" name="twitter:image" content="{{ $seo['ogImage'] }}">
+        @if (! empty($seo['ogImageAlt']))
+            <meta data-inertia="twitter-image-alt" name="twitter:image:alt" content="{{ $seo['ogImageAlt'] }}">
+        @endif
     @endif
     @php
         /** @var list<array<string, mixed>> $jsonLdObjects */

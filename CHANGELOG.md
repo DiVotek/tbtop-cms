@@ -106,6 +106,15 @@ to also create and edit users — see Added below); it no longer assigns roles.
 - `SeoResolver::resolve()` gained `siteName`, `ogType`, `ogUrl`, `ogLocale`,
   `ogLocaleAlternates`, `twitterCard`, `alternates`, `xDefault`, `favicon`,
   and `jsonLd` — additive; existing keys are unchanged.
+- Article pages (`type = 'article'`) now render `og:type=article` plus
+  `article:published_time`/`article:modified_time`/`article:author`, gated
+  the same way as the matching JSON-LD dates/author (`PageSchema`) — a draft
+  or expired article never advertises a publication date. `og:image:alt` and
+  `og:image:type` are rendered for every page whose resolved og:image came
+  from the media library and has an alt text / image mime respectively,
+  alongside a matching `twitter:image:alt`. `SeoResolver::resolve()` gained
+  `ogImageAlt`, `ogImageType`, `articlePublishedTime`, `articleModifiedTime`,
+  `articleAuthor` — additive.
 - The sitemap's built XML is now cached (respecting `tbtop-cms.cache.enabled`)
   with a TTL capped to the next page schedule transition
   (`published_at`/`unpublish_at`), reusing the same content-cache
