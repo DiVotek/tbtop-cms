@@ -42,7 +42,10 @@ return [
         'save' => 'Save',
         'saved' => 'User updated',
     ],
-    'empty' => 'No users found.',
+    'empty' => [
+        'title' => 'No users found',
+        'description' => 'This table lists your host app users. Once one exists, grant it CMS access to let it sign in to the admin.',
+    ],
     'validation' => [
         'cannot_manage_self' => 'You cannot change your own access.',
         'already_has_access' => 'This user already has CMS access.',

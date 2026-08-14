@@ -37,6 +37,42 @@ function makeTargetUser(string $email, bool $withAccess = false): AdminUser
     return $user;
 }
 
+/** @return array<string, mixed> First node of the given kind in the page structure. */
+function usersTableNode(): array
+{
+    $structure = test()->get('/admin/users', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.structure');
+
+    $found = null;
+    $walk = function (array $node) use (&$walk, &$found): void {
+        if (($node['kind'] ?? null) === 'table') {
+            $found ??= $node;
+
+            return;
+        }
+        foreach ((array) ($node['options']['children'] ?? []) as $child) {
+            $walk($child);
+        }
+    };
+    $walk($structure);
+
+    expect($found)->not->toBeNull();
+
+    return $found;
+}
+
+// Without a description, the admin client falls back to its own built-in
+// English empty-state hint, mixing locales under a non-English admin.
+it('carries a localized heading and description in the empty state', function (): void {
+    makeUsersPageActor('actor@example.com');
+
+    $node = usersTableNode();
+
+    expect($node['options']['emptyState']['heading'] ?? null)->toBe(__('tbtop-cms::users.empty.title'))
+        ->and($node['options']['emptyState']['description'] ?? null)->toBe(__('tbtop-cms::users.empty.description'));
+});
+
 it('grants access to a user who has none', function (): void {
     makeUsersPageActor('actor@example.com');
     $target = makeTargetUser('target@example.com');

@@ -181,6 +181,14 @@ it('labels SEO identity/GTM fields from translations', function (): void {
 
     $verificationBing = settingsFindFieldByName($structure, 'seo_verification_bing');
     expect($verificationBing['options']['helperText'] ?? null)->toBe(__('tbtop-cms::settings.seo.helpers.verification_bing'));
+
+    // The cms frontend is an Inertia SPA: internal navigation never reloads
+    // the page, so the helper must tell admins to add a History Change
+    // trigger or GTM pageview tags only fire once per session.
+    $gtmContainerId = settingsFindFieldByName($structure, 'seo_gtm_container_id');
+    expect($gtmContainerId['options']['helperText'] ?? null)
+        ->toBe(__('tbtop-cms::settings.seo.helpers.gtm_container_id'))
+        ->and($gtmContainerId['options']['helperText'])->toContain('History Change');
 });
 
 it('labels notification settings fields and helper text from translations', function (): void {
