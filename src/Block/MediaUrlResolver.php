@@ -11,6 +11,18 @@ class MediaUrlResolver
 {
     public function resolve(string | int $id): ?string
     {
+        return $this->details($id)['url'] ?? null;
+    }
+
+    /**
+     * Same lookup as resolve(), plus the row's alt/mime — for callers that
+     * need og:image:alt / og:image:type from the exact media the URL came
+     * from without a second query for the same id.
+     *
+     * @return array{url: string, alt: string|null, mime: string}|null
+     */
+    public function details(string | int $id): ?array
+    {
         $media = Media::query()->find($id);
 
         if ($media === null) {
@@ -24,6 +36,10 @@ class MediaUrlResolver
             return null;
         }
 
-        return UploadUrl::make((string) $media->disk, (string) $media->path);
+        return [
+            'url' => UploadUrl::make((string) $media->disk, (string) $media->path),
+            'alt' => $media->alt,
+            'mime' => (string) $media->mime,
+        ];
     }
 }

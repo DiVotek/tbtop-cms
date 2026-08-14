@@ -26,6 +26,8 @@ interface Seo {
     description: string;
     canonical: string;
     ogImage: string | null;
+    ogImageAlt: string | null;
+    ogImageType: string | null;
     ogTitle: string;
     ogDescription: string;
     noindex: boolean;
@@ -34,6 +36,9 @@ interface Seo {
     ogUrl: string;
     ogLocale: string;
     ogLocaleAlternates: string[];
+    articlePublishedTime: string | null;
+    articleModifiedTime: string | null;
+    articleAuthor: string | null;
     twitterCard: string;
     alternates: SeoAlternate[];
     xDefault: string | null;
@@ -102,13 +107,34 @@ export default function CmsPage() {
                 ))}
                 {seo.ogTitle ? <meta head-key="og-title" property="og:title" content={seo.ogTitle} /> : null}
                 {seo.ogDescription ? <meta head-key="og-description" property="og:description" content={seo.ogDescription} /> : null}
+                {/* Children of <Head> must stay flat elements: Inertia's head manager renders
+                    each child itself and does not unwrap fragments — a <>…</> group comes out
+                    of SSR as a literal "<Symbol(react.fragment)>" tag and loses its head-keys. */}
                 {seo.ogImage ? <meta head-key="og-image" property="og:image" content={seo.ogImage} /> : null}
+                {seo.ogImage && seo.ogImageAlt ? (
+                    <meta head-key="og-image-alt" property="og:image:alt" content={seo.ogImageAlt} />
+                ) : null}
+                {seo.ogImage && seo.ogImageType ? (
+                    <meta head-key="og-image-type" property="og:image:type" content={seo.ogImageType} />
+                ) : null}
+                {seo.ogType === "article" && seo.articlePublishedTime ? (
+                    <meta head-key="article-published-time" property="article:published_time" content={seo.articlePublishedTime} />
+                ) : null}
+                {seo.ogType === "article" && seo.articleModifiedTime ? (
+                    <meta head-key="article-modified-time" property="article:modified_time" content={seo.articleModifiedTime} />
+                ) : null}
+                {seo.ogType === "article" && seo.articleAuthor ? (
+                    <meta head-key="article-author" property="article:author" content={seo.articleAuthor} />
+                ) : null}
                 <meta head-key="twitter-card" name="twitter:card" content={seo.twitterCard} />
                 {seo.ogTitle ? <meta head-key="twitter-title" name="twitter:title" content={seo.ogTitle} /> : null}
                 {seo.ogDescription ? (
                     <meta head-key="twitter-description" name="twitter:description" content={seo.ogDescription} />
                 ) : null}
                 {seo.ogImage ? <meta head-key="twitter-image" name="twitter:image" content={seo.ogImage} /> : null}
+                {seo.ogImage && seo.ogImageAlt ? (
+                    <meta head-key="twitter-image-alt" name="twitter:image:alt" content={seo.ogImageAlt} />
+                ) : null}
                 {seo.jsonLd.map((object, index) => (
                     // index is the stable identity here (see head.blade.php's matching comment), not a list-reorder key.
                     <script key={index} head-key={`jsonld-${index}`} type="application/ld+json">
