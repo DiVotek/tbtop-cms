@@ -120,7 +120,10 @@ class UsersPage extends AdminPage
             ])
             ->searchable(['name', 'email'])
             ->defaultSort('name', 'asc')
-            ->emptyState(__('tbtop-cms::users.empty'))
+            ->emptyState(
+                __('tbtop-cms::users.empty.title'),
+                __('tbtop-cms::users.empty.description'),
+            )
             ->rowActions([
                 $this->grantAction($s),
                 $this->revokeAction($s),

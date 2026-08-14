@@ -186,3 +186,9 @@ to also create and edit users — see Added below); it no longer assigns roles.
 - Self-revoke on the Users page is no longer bypassable on hosts whose user
   model has a non-integer key: identifiers are compared as strings, where an
   `(int)` cast previously collapsed every uuid/ulid to `0`.
+- The Users page's empty state now carries a localized description instead of
+  falling back to the admin client's built-in English hint, which mixed
+  locales under a non-English admin.
+- The GTM container ID helper now notes that the cms frontend is a
+  single-page app, so pageview tags need a History Change trigger in GTM to
+  count client-side navigation.
