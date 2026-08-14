@@ -440,6 +440,26 @@ it('accepts a valid seo_canonical URL for a non-default locale', function (): vo
     expect($page->refresh()->seo['canonical'])->toBe(['en' => '', 'uk' => 'https://example.com/uk-canonical']);
 });
 
+it('rejects a seo_canonical URL with a non-http(s) scheme', function (): void {
+    // The bare 'url' rule accepts any scheme a browser tolerates; ftp:// is a
+    // scheme that parses as a valid URL but is never a legitimate canonical.
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...baseEditPayload(), 'seo_canonical' => ['en' => 'ftp://example.com/file']],
+    )->assertSessionHasErrors('seo_canonical.en');
+});
+
+it('rejects a seo_canonical URL with a javascript scheme', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    test()->actingAs(makePageEditAdmin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...baseEditPayload(), 'seo_canonical' => ['en' => 'javascript:alert(1)']],
+    )->assertSessionHasErrors('seo_canonical.en');
+});
+
 it('round-trips the new SEO keys back into the edit form via loadRow', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
     $session = test()->actingAs(makePageEditAdmin(), 'web');
