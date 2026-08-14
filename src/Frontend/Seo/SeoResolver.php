@@ -456,13 +456,45 @@ class SeoResolver
     /** @param array<string, mixed> $seo */
     private function canonical(Page $page, array $seo, string $locale): string
     {
-        $override = LocalizedSeo::value($seo['canonical'] ?? null, $locale);
+        $override = $this->validCanonicalOverride($seo, $locale);
 
-        if ($override !== '') {
+        if ($override !== null) {
             return $override;
         }
 
         return url($this->url->build((string) $page->pathFor($locale), $locale));
+    }
+
+    /**
+     * The stored override for this locale, or null when there isn't one or it
+     * doesn't survive validation. Public because SitemapEntryBuilder needs the
+     * exact same "is this a usable override" answer to decide whether a locale
+     * has a non-self canonical pointing elsewhere — duplicating the check
+     * there would let the two drift.
+     *
+     * Re-validated here rather than trusted from the stored value: the form
+     * rule only covers what an editor types going forward (see
+     * PageForm::seoFields()), but a row can carry a value written before the
+     * rule existed, saved via a legacy scalar format, or written straight to
+     * the database. A scheme other than http/https (a stray `javascript:` or
+     * `mailto:`) is worse than no override at all, so it is treated as absent
+     * rather than published as-is.
+     *
+     * @param  array<string, mixed>  $seo
+     */
+    public function validCanonicalOverride(array $seo, string $locale): ?string
+    {
+        $override = LocalizedSeo::value($seo['canonical'] ?? null, $locale);
+
+        if ($override === '') {
+            return null;
+        }
+
+        $scheme = parse_url($override, PHP_URL_SCHEME);
+
+        return is_string($scheme) && in_array(mb_strtolower($scheme), ['http', 'https'], true)
+            ? $override
+            : null;
     }
 
     /**

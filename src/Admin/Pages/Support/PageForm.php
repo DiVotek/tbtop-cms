@@ -135,10 +135,14 @@ class PageForm
     public static function seoFields(S $s, ?Page $page = null): array
     {
         $placeholders = self::computedPlaceholders($page);
+        // url:http,https rather than bare 'url': the bare rule accepts any
+        // scheme a browser tolerates (javascript:, mailto:, ftp:), and one of
+        // those saved as a canonical would either do nothing or do something
+        // actively wrong when a crawler or the head tag reads it back out.
         $canonical = $s->text('seo_canonical')->label(__('tbtop-cms::pages.fields.seo_canonical'))
-            ->translatable()->rules(['nullable', 'url'])
+            ->translatable()->rules(['nullable', 'url:http,https'])
             ->helperText(__('tbtop-cms::pages.fields.seo_canonical_hint'));
-        self::applyLocaleRules($canonical, ['nullable', 'url']);
+        self::applyLocaleRules($canonical, ['nullable', 'url:http,https']);
 
         $fields = [
             $s->text('seo_title')->label(__('tbtop-cms::pages.fields.seo_title'))

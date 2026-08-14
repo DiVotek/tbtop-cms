@@ -384,3 +384,162 @@ it('never lists the site-wide default image', function (): void {
     expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
         ->not->toContain('<image:image>');
 });
+
+it('excludes a locale canonicalized to an external domain', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Syndicated'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => 'https://elsewhere.example/original']],
+    ]);
+
+    // A conflicting canonical is a signal not to index this address at all —
+    // leaving it in the sitemap next to a canonical pointing off-site would
+    // tell the crawler two contradictory things about the same URL.
+    expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
+        ->not->toContain('syndicated');
+});
+
+it('excludes a locale canonicalized to another internal page', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $canonicalPage = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Canonical Target'],
+        'is_indexable' => true,
+    ]);
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Duplicate'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => url($canonicalPage->pathFor('en'))]],
+    ]);
+
+    $xml = new SimpleXMLElement($this->get('/sitemap-1.xml')->assertOk()->getContent());
+    $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+    $locs = array_map(static fn (SimpleXMLElement $node): string => (string) $node, $xml->xpath('//s:url/s:loc'));
+
+    expect($locs)->toContain(url($canonicalPage->pathFor('en')))
+        ->not->toContain(url('duplicate'));
+});
+
+it('keeps a self-canonical entry regardless of trailing slash or host case', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Self Canonical'],
+        'is_indexable' => true,
+    ]);
+    $ownUrl = url($page->pathFor('en'));
+    $host = parse_url($ownUrl, PHP_URL_HOST);
+    $selfCanonical = str_replace((string) $host, mb_strtoupper((string) $host), $ownUrl) . '/';
+    $page->update(['seo' => ['canonical' => ['en' => $selfCanonical]]]);
+
+    $xml = new SimpleXMLElement($this->get('/sitemap-1.xml')->assertOk()->getContent());
+    $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+    $locs = array_map(static fn (SimpleXMLElement $node): string => (string) $node, $xml->xpath('//s:url/s:loc'));
+
+    expect($locs)->toContain($ownUrl);
+});
+
+it('drops the canonicalized-away locale from other locales alternates too, keeping the rest', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    app(Cms::class)->frontendRoutes();
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Partly Canonical', 'uk' => 'Chastkovo Kanonichna'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => 'https://elsewhere.example/original', 'uk' => '']],
+    ]);
+
+    $enUrl = url($page->pathFor('en'));
+    $ukUrl = url('uk/' . $page->pathFor('uk'));
+
+    $xml = new SimpleXMLElement($this->get('/sitemap-1.xml')->assertOk()->getContent());
+    $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+    $xml->registerXPathNamespace('xhtml', 'http://www.w3.org/1999/xhtml');
+
+    $locs = array_map(static fn (SimpleXMLElement $node): string => (string) $node, $xml->xpath('//s:url/s:loc'));
+    // The English URL itself is gone (canonicalized away)...
+    expect($locs)->toContain($ukUrl)->not->toContain($enUrl);
+
+    // ...and so is any hreflang alternate pointing an English visitor at it.
+    $ukAlternates = $xml->xpath("//s:url[s:loc='{$ukUrl}']/xhtml:link");
+    $hreflangs = array_map(
+        static fn (SimpleXMLElement $link): string => (string) $link->attributes()['hreflang'],
+        $ukAlternates,
+    );
+
+    expect($hreflangs)->not->toContain('en')->toContain('uk');
+});
+
+it('gives no entries at all for a page whose every locale is canonicalized away', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Fully Canonical', 'uk' => 'Povnistiu Kanonichna'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => [
+            'en' => 'https://elsewhere.example/en',
+            'uk' => 'https://elsewhere.example/uk',
+        ]],
+    ]);
+
+    $body = $this->get('/sitemap-1.xml')->assertOk()->getContent();
+
+    expect($body)->not->toContain('fully-canonical')
+        ->and(substr_count($body, '<loc>'))->toBe(0);
+});
+
+it('does not let a page with every locale canonicalized away shrink the chunk count', function (): void {
+    // Row-window pagination is by page, not by surviving entry count — a page
+    // contributing zero URLs still consumes one row in the window, same as a
+    // page with no slug in any active locale does today.
+    config(['tbtop-cms.seo.sitemap.per_chunk' => 2]);
+    app(Cms::class)->frontendRoutes();
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Canonical Away'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => 'https://elsewhere.example/away']],
+    ]);
+    foreach (['Two', 'Three'] as $name) {
+        Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => $name], 'is_indexable' => true]);
+    }
+
+    $index = $this->get('/sitemap.xml')->assertOk()->getContent();
+    expect($index)->toContain(url('sitemap-1.xml'))->toContain(url('sitemap-2.xml'));
+
+    $first = $this->get('/sitemap-1.xml')->assertOk()->getContent();
+    $second = $this->get('/sitemap-2.xml')->assertOk()->getContent();
+
+    // Three page rows over a 2-page-per-chunk window: chunk 1 holds the
+    // canonicalized-away page (0 URLs) plus "Two" (1 URL); chunk 2 holds
+    // "Three" alone.
+    expect(substr_count($first, '<loc>'))->toBe(1)
+        ->and(substr_count($second, '<loc>'))->toBe(1);
+});
+
+it('treats a stored canonical with a non-http(s) scheme as absent, keeping the entry', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    // Written straight to the database: the form rule (url:http,https) only
+    // guards what an editor types going forward, but a row can already carry
+    // a scheme the rule now rejects.
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Legacy Scheme'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => 'javascript:alert(1)']],
+    ]);
+
+    expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
+        ->toContain(url('legacy-scheme'));
+});
