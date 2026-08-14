@@ -16,6 +16,11 @@ reporting, not a public issue:
    this repository.
 2. Click **"Report a vulnerability"** and fill in the advisory form.
 
+If the **"Report a vulnerability"** button is not available (for example,
+before the first public release), contact the maintainers
+([@DiVotek](https://github.com/DiVotek)) directly through GitHub instead of
+opening a public issue.
+
 Reports are handled privately by the maintainers. You should expect an
 acknowledgment within a few business days. Please do not open a public issue
 for a suspected vulnerability — it gives potential attackers a head start

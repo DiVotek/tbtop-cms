@@ -53,9 +53,11 @@ macOS setups when the suite is large. If you see this locally, raising the
 open-file limit (`ulimit -n`) for the shell usually resolves it; either way,
 CI is authoritative for frontend tests.
 
-All of the above run in CI (`.github/workflows/ci.yml`): lint, static
-analysis, and the PHP test suite (against each supported `orchestra/testbench`
-version) must pass, and so must the frontend type check and test job.
+CI (`.github/workflows/ci.yml`) runs the check-only variants of these:
+`composer validate --strict`, Pint in check mode (`test:lint`), PHPStan
+(`analyse`), the Pest suite against each supported `orchestra/testbench`
+version, and the frontend type check and tests. Rector is a local aid and is
+not enforced in CI. All CI jobs must pass before merge.
 
 ## Manual review (Workbench)
 
