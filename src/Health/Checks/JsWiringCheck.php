@@ -1,0 +1,151 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tbtop\Cms\Health\Checks;
+
+use Illuminate\Support\Facades\File;
+use Tbtop\Cms\Health\HealthCheck;
+use Tbtop\Cms\Health\HealthCheckResult;
+use Tbtop\Cms\Health\HealthStatus;
+
+/**
+ * Purely file-based heuristics over host source, not a real bundler
+ * resolution — there is no reliable, cheap way to ask Vite "did this import
+ * actually resolve" from PHP. Three independent host files are inspected
+ * (JS entry, admin page component, CSS entry); each is a heuristic in its
+ * own right and a missing file or unmatched pattern degrades that piece to a
+ * warning rather than an error, since a host may legitimately structure
+ * these differently (a monorepo, a renamed entry) without being broken.
+ * Never throws and never escalates past warning — see the class docblock
+ * on HealthCheck for why file-heuristic checks in particular must stay soft.
+ */
+final class JsWiringCheck implements HealthCheck
+{
+    private const string BLOCKS_IMPORT = "import '@cms/admin/blocks'";
+
+    private const string ADMIN_PAGE_IMPORT = '@tbtop/inertia-admin';
+
+    private const string ADMIN_PAGE_RESOLVE = "'admin/page'";
+
+    private const string TAILWIND_SOURCE_NEEDLE = 'vendor/tbtop/cms';
+
+    /** @var list<string> */
+    private const array JS_ENTRY_CANDIDATES = ['resources/js/app.tsx', 'resources/js/app.jsx', 'resources/js/app.ts'];
+
+    /** @var list<string> */
+    private const array ADMIN_PAGE_CANDIDATES = [
+        'resources/js/pages/admin/page.tsx',
+        'resources/js/pages/admin/page.jsx',
+    ];
+
+    /** @var list<string> */
+    private const array CSS_CANDIDATES = ['resources/css/admin.css', 'resources/css/app.css'];
+
+    public function id(): string
+    {
+        return 'js_wiring';
+    }
+
+    public function run(): HealthCheckResult
+    {
+        $problems = [
+            ...$this->checkBlocksImport(),
+            ...$this->checkAdminPageComponent(),
+            ...$this->checkTailwindSource(),
+        ];
+
+        if ($problems === []) {
+            return new HealthCheckResult(
+                checkId: $this->id(),
+                status: HealthStatus::Ok,
+                labelKey: 'tbtop-cms::health.checks.js_wiring.label',
+                messageKey: 'tbtop-cms::health.checks.js_wiring.ok',
+            );
+        }
+
+        return new HealthCheckResult(
+            checkId: $this->id(),
+            status: HealthStatus::Warning,
+            labelKey: 'tbtop-cms::health.checks.js_wiring.label',
+            messageKey: 'tbtop-cms::health.checks.js_wiring.warning',
+            hintKey: 'tbtop-cms::health.checks.js_wiring.hints.combined',
+            hintReplace: ['details' => implode(' ', $problems)],
+        );
+    }
+
+    /** @return list<string> Hint fragments, one per unresolved heuristic. */
+    private function checkBlocksImport(): array
+    {
+        $path = $this->firstExisting(self::JS_ENTRY_CANDIDATES);
+
+        if ($path === null) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.entry_not_found', ['candidates' => implode(', ', self::JS_ENTRY_CANDIDATES)])];
+        }
+
+        if (! str_contains(File::get($path), self::BLOCKS_IMPORT)) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.blocks_import_missing', ['path' => $path])];
+        }
+
+        return [];
+    }
+
+    /** @return list<string> */
+    private function checkAdminPageComponent(): array
+    {
+        // The canonical wiring resolves 'admin/page' inline in the JS entry
+        // (`if (name === 'admin/page') return AdminPage`) — a separate page
+        // component file is the alternative layout, not the primary one, so
+        // the entry is consulted first or every correct install warns.
+        $entry = $this->firstExisting(self::JS_ENTRY_CANDIDATES);
+
+        if ($entry !== null) {
+            $source = File::get($entry);
+
+            if (str_contains($source, self::ADMIN_PAGE_RESOLVE) && str_contains($source, self::ADMIN_PAGE_IMPORT)) {
+                return [];
+            }
+        }
+
+        $path = $this->firstExisting(self::ADMIN_PAGE_CANDIDATES);
+
+        if ($path === null) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.admin_page_not_found', ['candidates' => implode(', ', self::ADMIN_PAGE_CANDIDATES)])];
+        }
+
+        if (! str_contains(File::get($path), self::ADMIN_PAGE_IMPORT)) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.admin_page_import_missing', ['path' => $path])];
+        }
+
+        return [];
+    }
+
+    /** @return list<string> */
+    private function checkTailwindSource(): array
+    {
+        $path = $this->firstExisting(self::CSS_CANDIDATES);
+
+        if ($path === null) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.css_not_found', ['candidates' => implode(', ', self::CSS_CANDIDATES)])];
+        }
+
+        if (! str_contains(File::get($path), self::TAILWIND_SOURCE_NEEDLE)) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.source_missing', ['path' => $path])];
+        }
+
+        return [];
+    }
+
+    /** @param  list<string>  $relativeCandidates */
+    private function firstExisting(array $relativeCandidates): ?string
+    {
+        foreach ($relativeCandidates as $relative) {
+            $path = base_path($relative);
+            if (File::exists($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+}

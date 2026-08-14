@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tbtop\Cms;
 
 use Illuminate\Auth\Events\Login;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Spatie\LaravelPackageTools\Package;
@@ -20,11 +22,13 @@ use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Cache\InvalidatesContentCache;
+use Tbtop\Cms\Console\DoctorCommand;
 use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Form\Events\SubmissionReceived;
 use Tbtop\Cms\Form\Listeners\NotifiesAdminsOfSubmission;
 use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Frontend\PageResolver;
+use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
@@ -90,6 +94,7 @@ class CmsServiceProvider extends PackageServiceProvider
                 GrantAdminCommand::class,
                 RevokeAdminCommand::class,
                 PruneNotFoundHitsCommand::class,
+                DoctorCommand::class,
             ])
             ->runsMigrations();
     }
@@ -127,6 +132,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireLocaleSeeding();
         $this->wireSubmissionNotifications();
         $this->wireNotFoundLogging();
+        $this->wireSchedulerHeartbeat();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -310,5 +316,26 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireNotFoundLogging(): void
     {
         Event::listen(PageNotFound::class, RecordsNotFoundHit::class);
+    }
+
+    /**
+     * Writes a timestamp SchedulerHeartbeatCheck reads back — the only way
+     * to detect "the host's cron never calls schedule:run" from inside the
+     * app itself, since a dead scheduler produces no error, just silence
+     * (see PruneNotFoundHitsCommand and any future scheduled command never
+     * running). Registered directly on the Schedule singleton rather than
+     * requiring host wiring: unlike cms:not-found:prune (an opt-in cadence
+     * the host chooses), the heartbeat must exist unconditionally for the
+     * health check to have anything to read.
+     */
+    private function wireSchedulerHeartbeat(): void
+    {
+        $this->app->booted(function (): void {
+            $schedule = $this->app->make(Schedule::class);
+
+            $schedule->call(static function (): void {
+                Cache::forever(SchedulerHeartbeatCheck::CACHE_KEY, now()->toIso8601String());
+            })->everyMinute()->name('tbtop-cms:health:scheduler-heartbeat');
+        });
     }
 }

@@ -177,6 +177,24 @@ to also create and edit users — see Added below); it no longer assigns roles.
 - Project passport files for the public repo: `SECURITY.md`,
   `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and GitHub issue forms, plus
   README sections on versioning/releases and contributing/security.
+- **Health checks**: `php artisan cms:doctor` and a new "Site health" admin
+  page (Settings) run ten diagnostics for the most common install/config
+  mistakes — missing panel or frontend routes, a root view missing
+  `@include('tbtop-cms::head')`, host JS/CSS wiring heuristics (blocks import,
+  admin page component, Tailwind `@source`), a `tbtop/admin` PHP/JS version
+  mismatch, a static `public/robots.txt` shadowing the dynamic route, an
+  unwritable media disk, notification channels enabled without their required
+  settings, a scheduler heartbeat (new `everyMinute` schedule entry, so hosts
+  whose cron never calls `schedule:run` find out), a suspicious `APP_URL` in
+  production, and the owner/default-frontend-language invariants. Each check
+  is isolated — one throwing does not crash the report — and every
+  message/hint is a translation key resolved at render time, so both surfaces
+  render in their own locale. `cms:doctor` exits non-zero only when a check is
+  at error level; warnings never fail the run. Hosts with a **published**
+  `config/tbtop-cms.php` must add `'site_health' => SiteHealthPage::class` to
+  the `panel.pages` list themselves — a published config shadows the package
+  default, so the page (and its route) does not appear until the entry is
+  added.
 
 ### Changed
 

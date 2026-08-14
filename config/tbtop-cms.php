@@ -17,6 +17,7 @@ use Tbtop\Cms\Admin\Pages\PagesPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Admin\Pages\RedirectsPage;
 use Tbtop\Cms\Admin\Pages\SeoSettingsPage;
+use Tbtop\Cms\Admin\Pages\SiteHealthPage;
 use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
 use Tbtop\Cms\Admin\Pages\TemplateCreatePage;
 use Tbtop\Cms\Admin\Pages\TemplateEditPage;
@@ -160,6 +161,7 @@ return [
             'site_settings' => SiteSettingsPage::class,
             'seo_settings' => SeoSettingsPage::class,
             'notification_settings' => NotificationSettingsPage::class,
+            'site_health' => SiteHealthPage::class,
             'templates' => TemplatesPage::class,
             'template_create' => TemplateCreatePage::class,
             'template_edit' => TemplateEditPage::class,
