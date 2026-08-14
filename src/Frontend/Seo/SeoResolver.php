@@ -490,9 +490,19 @@ class SeoResolver
             return null;
         }
 
-        $scheme = parse_url($override, PHP_URL_SCHEME);
+        // Scheme alone is not enough: parse_url('http:foo') yields a scheme
+        // but no host, and such a value is not an absolute URL a crawler can
+        // follow — require a non-empty host too before trusting the override.
+        $parts = parse_url($override);
 
-        return is_string($scheme) && in_array(mb_strtolower($scheme), ['http', 'https'], true)
+        if ($parts === false) {
+            return null;
+        }
+
+        $scheme = mb_strtolower($parts['scheme'] ?? '');
+        $host = $parts['host'] ?? '';
+
+        return in_array($scheme, ['http', 'https'], true) && $host !== ''
             ? $override
             : null;
     }

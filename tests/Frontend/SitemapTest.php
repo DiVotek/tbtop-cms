@@ -543,3 +543,20 @@ it('treats a stored canonical with a non-http(s) scheme as absent, keeping the e
     expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
         ->toContain(url('legacy-scheme'));
 });
+
+it('treats a stored canonical with an http scheme but no host as absent, keeping the entry', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    // parse_url('http:foo') reports an http scheme, but without a host the
+    // value is not an absolute URL a crawler can follow — it must not count
+    // as a canonical override.
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Hostless Scheme'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => 'http:foo']],
+    ]);
+
+    expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
+        ->toContain(url('hostless-scheme'));
+});
