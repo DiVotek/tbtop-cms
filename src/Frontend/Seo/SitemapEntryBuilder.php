@@ -287,8 +287,16 @@ class SitemapEntryBuilder
         $scheme = isset($parts['scheme']) ? mb_strtolower($parts['scheme']) : '';
         $host = isset($parts['host']) ? mb_strtolower($parts['host']) : '';
         $port = isset($parts['port']) ? ':' . $parts['port'] : '';
-        $path = rtrim($parts['path'] ?? '', '/');
+        $path = $parts['path'] ?? '';
         $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+
+        // At most ONE trailing slash is cosmetic; rtrim would also collapse
+        // "/foo//" into "/foo", turning an override that names a genuinely
+        // different path (repeated slashes are significant on some servers)
+        // into a false self match.
+        if (str_ends_with($path, '/')) {
+            $path = mb_substr($path, 0, -1);
+        }
 
         return "{$scheme}://{$host}{$port}{$path}{$query}";
     }

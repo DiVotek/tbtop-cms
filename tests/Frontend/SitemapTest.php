@@ -560,3 +560,20 @@ it('treats a stored canonical with an http scheme but no host as absent, keeping
     expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
         ->toContain(url('hostless-scheme'));
 });
+
+it('excludes an entry whose canonical differs only by a repeated trailing slash', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    // A single trailing slash is cosmetic, but "/foo//" names a different
+    // path on servers where repeated slashes matter — that override must
+    // count as non-self and drop the entry.
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Double Slash'],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => url('double-slash') . '//']],
+    ]);
+
+    expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
+        ->not->toContain(url('double-slash'));
+});
