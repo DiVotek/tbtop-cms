@@ -269,12 +269,14 @@ class SitemapEntryBuilder
     }
 
     /**
-     * Comparable form for a self-canonical check: scheme and host are
-     * case-insensitive per RFC 3986, a trailing slash is cosmetic (the
-     * sitemap URL and a hand-typed canonical routinely differ only by one),
-     * and the path is kept case-sensitive because on most servers it is —
-     * lower-casing it could turn a genuinely different page into a false
-     * "self" match.
+     * Comparable form for a self-canonical check. The ONLY tolerated
+     * spelling differences are the case-insensitive scheme and host (RFC
+     * 3986) and at most one trailing slash on the path; every other
+     * component parse_url() reports — userinfo, port, query, fragment —
+     * participates verbatim, so an override differing in any of them counts
+     * as non-self. The path also stays case-sensitive: on most servers it
+     * is, and lower-casing it could turn a genuinely different page into a
+     * false "self" match.
      */
     private static function normalizeUrl(string $url): string
     {
@@ -289,6 +291,11 @@ class SitemapEntryBuilder
         $port = isset($parts['port']) ? ':' . $parts['port'] : '';
         $path = $parts['path'] ?? '';
         $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+        $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+
+        $user = $parts['user'] ?? '';
+        $pass = isset($parts['pass']) ? ':' . $parts['pass'] : '';
+        $userinfo = $user !== '' || $pass !== '' ? "{$user}{$pass}@" : '';
 
         // At most ONE trailing slash is cosmetic; rtrim would also collapse
         // "/foo//" into "/foo", turning an override that names a genuinely
@@ -298,7 +305,7 @@ class SitemapEntryBuilder
             $path = mb_substr($path, 0, -1);
         }
 
-        return "{$scheme}://{$host}{$port}{$path}{$query}";
+        return "{$scheme}://{$userinfo}{$host}{$port}{$path}{$query}{$fragment}";
     }
 
     /** @return list<string> */

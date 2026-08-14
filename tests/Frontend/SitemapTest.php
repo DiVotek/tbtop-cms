@@ -577,3 +577,29 @@ it('excludes an entry whose canonical differs only by a repeated trailing slash'
     expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
         ->not->toContain(url('double-slash'));
 });
+
+it('excludes an entry whose canonical differs only by userinfo or fragment', function (string $suffix, string $slug): void {
+    app(Cms::class)->frontendRoutes();
+
+    // Userinfo and fragment are part of what the override names; an address
+    // carrying either is not the entry's own URL even when scheme, host and
+    // path all match.
+    $own = url($slug);
+    $canonical = match ($suffix) {
+        'userinfo' => str_replace('://', '://user:secret@', $own),
+        'fragment' => $own . '#section',
+    };
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => ucfirst($slug)],
+        'is_indexable' => true,
+        'seo' => ['canonical' => ['en' => $canonical]],
+    ]);
+
+    expect($this->get('/sitemap-1.xml')->assertOk()->getContent())
+        ->not->toContain($own);
+})->with([
+    'userinfo' => ['userinfo', 'userinfo-page'],
+    'fragment' => ['fragment', 'fragment-page'],
+]);
