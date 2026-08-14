@@ -71,6 +71,7 @@ return [
         ],
         'validation' => [
             'robots_owned' => 'The line ":line" sets a directive this site writes itself. Remove it — User-agent, Allow, Disallow and Sitemap come from the indexing switch and the sitemap setting.',
+            'verification_unrecognized' => 'This does not look like a verification token or the matching meta tag. Paste the value the search console shows for this exact method — a tag for a different search engine will not work here.',
         ],
         'helpers' => [
             'title_template' => 'Placeholders: {title}, {site_name}, {sep}, {parent}, {date}. Leave empty to keep the legacy title suffix behavior.',

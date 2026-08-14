@@ -272,6 +272,24 @@ it('normalizes pasted verification meta tags down to their bare tokens on save',
         ->and($record['seo_verification_bing'])->toBe('bing-token-456');
 });
 
+it('rejects a verification value that does not normalize to a valid token', function (): void {
+    // A Bing tag pasted into the Google field must produce a form error at
+    // save time, not be stored verbatim as if verification were configured.
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_verification_google' => '<meta name="msvalidate.01" content="bing-token-456" />',
+    ])->assertRedirect()->assertSessionHasErrors([
+        'seo_verification_google' => __('tbtop-cms::settings.seo.validation.verification_unrecognized'),
+    ]);
+
+    expect(app(Settings::class)->get('seo.verification.google'))->toBeNull();
+
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_verification_bing' => 'not a token at all!!',
+    ])->assertRedirect()->assertSessionHasErrors(['seo_verification_bing']);
+
+    expect(app(Settings::class)->get('seo.verification.bing'))->toBeNull();
+});
+
 it('drops non-URL profile links from seo.identity.same_as on save', function (): void {
     test()->post('/admin/seo-settings/forms/seo-settings', [
         'seo_identity_same_as' => ['https://github.com/acme', 'not a url', 'javascript:alert(1)', 'ftp://x.example'],

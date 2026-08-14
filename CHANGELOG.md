@@ -76,8 +76,8 @@ to also create and edit users — see Added below); it no longer assigns roles.
   the `InjectGtm` middleware on frontend routes, so it works with zero host
   wiring and the admin panel never gets the snippet. Malformed ids are
   dropped at render time, never interpolated into the markup.
-- Search-engine site-ownership verification: `seo.verification_google` and
-  `seo.verification_bing` in the SEO settings' Analytics tab (paste the bare
+- Search-engine site-ownership verification: `seo.verification.google` and
+  `seo.verification.bing` in the SEO settings' Analytics tab (paste the bare
   token or the full `<meta name="google-site-verification" …>`/
   `<meta name="msvalidate.01" …>` tag — both normalize to the token) render
   the corresponding meta tag on every frontend page, server-rendered and in
