@@ -85,6 +85,59 @@ it('labels site settings fields from translations', function (): void {
         ->and($labels['site_favicon'])->toBe(__('tbtop-cms::settings.site.fields.favicon'));
 });
 
+it('splits the SEO settings into one tab per topic, indexing first', function (): void {
+    $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $tabs = [];
+    settingsCollectByKind($structure, 'tabs', $tabs);
+
+    expect($tabs)->toHaveCount(1)
+        ->and(array_column($tabs[0]['options']['tabs'], 'label'))->toBe([
+            __('tbtop-cms::settings.seo.tabs.indexing'),
+            __('tbtop-cms::settings.seo.tabs.titles'),
+            __('tbtop-cms::settings.seo.tabs.type_templates'),
+            __('tbtop-cms::settings.seo.tabs.social'),
+            __('tbtop-cms::settings.seo.tabs.identity'),
+            __('tbtop-cms::settings.seo.tabs.analytics'),
+            __('tbtop-cms::settings.seo.tabs.not_found'),
+        ]);
+});
+
+it('keeps every settings field reachable after the regrouping', function (): void {
+    // Regrouping is layout only: a field that fell out of the tree would stop
+    // being validated and stop being saved, silently.
+    $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $names = array_keys(settingsFieldLabels($structure));
+
+    expect($names)->toContain(
+        'seo_indexing_enabled',
+        'seo_sitemap_per_chunk',
+        'seo_robots_extra',
+        'seo_title_template',
+        'seo_title_separator',
+        'seo_description_template',
+        'seo_default_description',
+        'seo_default_og_image',
+        'seo_twitter_card',
+        'seo_identity_type',
+        'seo_identity_name',
+        'seo_identity_logo',
+        'seo_identity_same_as',
+        'seo_gtm_container_id',
+        'seo_not_found_enabled',
+        'seo_not_found_retention_days',
+        'seo_type_page_title',
+        'seo_type_page_description',
+        'seo_type_category_title',
+        'seo_type_category_description',
+        'seo_type_article_title',
+        'seo_type_article_description',
+    );
+});
+
 it('labels SEO settings fields from translations and placeholders the title template', function (): void {
     $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure');
@@ -254,12 +307,10 @@ function settingsFindFieldByName(array $node, string $name): ?array
     if (($node['name'] ?? null) === $name) {
         return $node;
     }
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (is_array($child)) {
-            $found = settingsFindFieldByName($child, $name);
-            if ($found !== null) {
-                return $found;
-            }
+    foreach (settingsChildNodes($node) as $child) {
+        $found = settingsFindFieldByName($child, $name);
+        if ($found !== null) {
+            return $found;
         }
     }
 
@@ -276,10 +327,7 @@ function settingsFindFieldByName(array $node, string $name): ?array
 function settingsFieldLabels(array $node): array
 {
     $labels = [];
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (! is_array($child)) {
-            continue;
-        }
+    foreach (settingsChildNodes($node) as $child) {
         if (isset($child['name'], $child['options']['label'])) {
             $labels[$child['name']] = $child['options']['label'];
         }
@@ -287,6 +335,34 @@ function settingsFieldLabels(array $node): array
     }
 
     return $labels;
+}
+
+/**
+ * Child nodes of a structure node, from either shape a container uses:
+ * `options.children` for stacks and sections, `options.tabs[].body` for a
+ * tabs node. Mirrors Node::nestedChildren() on the PHP side, which is what
+ * lets RuleWalker validate fields nested inside tabs.
+ *
+ * @param  array<string, mixed>  $node
+ * @return list<array<string, mixed>>
+ */
+function settingsChildNodes(array $node): array
+{
+    $out = [];
+
+    foreach ((array) ($node['options']['children'] ?? []) as $child) {
+        if (is_array($child)) {
+            $out[] = $child;
+        }
+    }
+
+    foreach ((array) ($node['options']['tabs'] ?? []) as $tab) {
+        if (is_array($tab) && is_array($tab['body'] ?? null)) {
+            $out[] = $tab['body'];
+        }
+    }
+
+    return $out;
 }
 
 /**
@@ -298,9 +374,7 @@ function settingsCollectByKind(array $node, string $kind, array &$out): void
     if (($node['kind'] ?? null) === $kind) {
         $out[] = $node;
     }
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (is_array($child)) {
-            settingsCollectByKind($child, $kind, $out);
-        }
+    foreach (settingsChildNodes($node) as $child) {
+        settingsCollectByKind($child, $kind, $out);
     }
 }

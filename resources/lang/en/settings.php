@@ -25,6 +25,17 @@ return [
             'not_found' => '404 log',
             'type_templates' => 'Templates per page type',
         ],
+        // Tabs: each fits on one screen. Indexing comes first — it is the
+        // master switch robots.txt and the sitemap both answer to.
+        'tabs' => [
+            'indexing' => 'Indexing',
+            'titles' => 'Titles and descriptions',
+            'type_templates' => 'Per page type',
+            'social' => 'Social networks',
+            'identity' => 'Identity',
+            'analytics' => 'Analytics',
+            'not_found' => '404 log',
+        ],
         'fields' => [
             'title_suffix' => 'Title suffix',
             'title_template' => 'Title template',
