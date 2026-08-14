@@ -345,6 +345,28 @@ composer serve       # Boot the Workbench host app for manual review
 
 See `CLAUDE.md` for the full command reference and testing policy.
 
+## Versioning and releases
+
+This package follows [semver](https://semver.org/), with the standard pre-1.0
+caveat: while the version stays `0.x`, a minor release may contain breaking
+changes. Once tagged `1.0.0`, breaking changes only ship in a major bump.
+Changes are documented in `CHANGELOG.md`.
+
+Each `tbtop/cms` release declares the range of `tbtop/admin` it supports in
+`composer.json` (`require.tbtop/admin`) — that constraint is the source of
+truth for compatibility, not this README. Supported Laravel and PHP versions
+are as listed under Requirements above.
+
+## Contributing and security
+
+Bug reports, feature requests, and pull requests are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, the checks a change needs to
+pass, and PR guidelines. Participation in this project is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+To report a security vulnerability, see [SECURITY.md](SECURITY.md) — please
+do not open a public issue.
+
 ## License
 
 MIT. See `LICENSE.md`.
