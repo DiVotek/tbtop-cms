@@ -50,6 +50,12 @@
     @if (! empty($seo['favicon']))
         <link data-inertia="link-icon" rel="icon" href="{{ $seo['favicon'] }}">
     @endif
+    @if (! empty($seo['verificationGoogle']))
+        <meta data-inertia="verification-google" name="google-site-verification" content="{{ $seo['verificationGoogle'] }}">
+    @endif
+    @if (! empty($seo['verificationBing']))
+        <meta data-inertia="verification-bing" name="msvalidate.01" content="{{ $seo['verificationBing'] }}">
+    @endif
     @php
         /** @var list<array{locale: string, url: string}> $alternates */
         $alternates = $seo['alternates'] ?? [];

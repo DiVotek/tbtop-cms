@@ -14,6 +14,7 @@ use Tbtop\Cms\Frontend\Seo\GtmContainerId;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\RobotsTxt;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
+use Tbtop\Cms\Frontend\Seo\VerificationToken;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 class SeoSettingsPage extends SettingsPageBase
@@ -79,6 +80,8 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_robots_extra' => 'seo.robots_extra',
             'seo_sitemap_per_chunk' => 'seo.sitemap_per_chunk',
             'seo_gtm_container_id' => 'seo.gtm_container_id',
+            'seo_verification_google' => 'seo.verification.google',
+            'seo_verification_bing' => 'seo.verification.bing',
             'seo_identity_type' => 'seo.identity.type',
             'seo_identity_name' => 'seo.identity.name',
             'seo_identity_logo' => 'seo.identity.logo',
@@ -284,6 +287,12 @@ class SeoSettingsPage extends SettingsPageBase
                 ->placeholder('GTM-XXXXXXX')
                 ->helperText(__('tbtop-cms::settings.seo.helpers.gtm_container_id'))
                 ->rules('nullable|max:2000'),
+            $s->text('seo_verification_google')->label(__('tbtop-cms::settings.seo.fields.verification_google'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.verification_google'))
+                ->rules('nullable|max:2000'),
+            $s->text('seo_verification_bing')->label(__('tbtop-cms::settings.seo.fields.verification_bing'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.verification_bing'))
+                ->rules('nullable|max:2000'),
         ];
     }
 
@@ -336,12 +345,34 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * Both cleanups also happen on read (GtmContainerId::fromSettings()
-     * extracts and validates, sameAs() filters), but normalizing here as well means a
-     * re-opened settings page shows the cleaned value — the bare "GTM-…" id
-     * instead of the pasted install snippet, and only the profile links that
-     * will actually be published (the tags field can't express a per-element
-     * url rule, so non-URL entries are dropped rather than rejected).
+     * Same save-path guard shape as guardRobotsExtra (a closure rule cannot
+     * live in the DSL's string rules). Rejecting rather than storing: an
+     * input that extract() could not turn into a valid token — a meta tag
+     * for the OTHER verification method, or plain garbage — would be stored
+     * verbatim and shown back as if it were configured, while the renderer
+     * silently drops it; the admin deserves the error at save time instead.
+     */
+    private static function guardVerification(VerificationToken $method, string $field, string $raw): string
+    {
+        $token = $method->extract($raw);
+
+        if ($token !== '' && ! $method->valid($token)) {
+            throw ValidationException::withMessages([
+                $field => __('tbtop-cms::settings.seo.validation.verification_unrecognized'),
+            ]);
+        }
+
+        return $token;
+    }
+
+    /**
+     * Both cleanups also happen on read (GtmContainerId::fromSettings()/
+     * VerificationToken::fromSettings() extract and validate, sameAs()
+     * filters), but normalizing here as well means a re-opened settings page
+     * shows the cleaned value — the bare "GTM-…" id or verification token
+     * instead of the pasted snippet, and only the profile links that will
+     * actually be published (the tags field can't express a per-element url
+     * rule, so non-URL entries are dropped rather than rejected).
      *
      * @param  array<string, mixed>  $form
      * @return array<string, mixed>
@@ -353,6 +384,14 @@ class SeoSettingsPage extends SettingsPageBase
 
         if (isset($form['seo_gtm_container_id']) && is_string($form['seo_gtm_container_id'])) {
             $form['seo_gtm_container_id'] = GtmContainerId::extract($form['seo_gtm_container_id']);
+        }
+
+        if (isset($form['seo_verification_google']) && is_string($form['seo_verification_google'])) {
+            $form['seo_verification_google'] = self::guardVerification(VerificationToken::google(), 'seo_verification_google', $form['seo_verification_google']);
+        }
+
+        if (isset($form['seo_verification_bing']) && is_string($form['seo_verification_bing'])) {
+            $form['seo_verification_bing'] = self::guardVerification(VerificationToken::bing(), 'seo_verification_bing', $form['seo_verification_bing']);
         }
 
         if (isset($form['seo_identity_same_as']) && is_array($form['seo_identity_same_as'])) {

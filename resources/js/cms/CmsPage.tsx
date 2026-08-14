@@ -38,6 +38,8 @@ interface Seo {
     alternates: SeoAlternate[];
     xDefault: string | null;
     favicon: string | null;
+    verificationGoogle: string | null;
+    verificationBing: string | null;
     jsonLd: Record<string, unknown>[];
 }
 
@@ -70,6 +72,10 @@ export default function CmsPage() {
                 {seo.canonical ? <link head-key="link-canonical" rel="canonical" href={seo.canonical} /> : null}
                 {seo.noindex ? <meta head-key="meta-robots" name="robots" content="noindex" /> : null}
                 {seo.favicon ? <link head-key="link-icon" rel="icon" href={seo.favicon} /> : null}
+                {seo.verificationGoogle ? (
+                    <meta head-key="verification-google" name="google-site-verification" content={seo.verificationGoogle} />
+                ) : null}
+                {seo.verificationBing ? <meta head-key="verification-bing" name="msvalidate.01" content={seo.verificationBing} /> : null}
                 {/* GTM is not rendered here: the InjectGtm middleware inserts Google's
                     snippet into the full-page HTML outside Inertia's head manager, so it
                     survives hydration and SPA navigations without being re-inserted. */}
