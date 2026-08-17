@@ -21,5 +21,6 @@ return [
         'seo_settings' => 'SEO settings',
         'notification_settings' => 'Notifications',
         'users' => 'Users',
+        'site_health' => 'Site health',
     ],
 ];

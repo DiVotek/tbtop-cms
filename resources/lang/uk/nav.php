@@ -21,5 +21,6 @@ return [
         'seo_settings' => 'SEO-налаштування',
         'notification_settings' => 'Сповіщення',
         'users' => 'Користувачі',
+        'site_health' => 'Стан сайту',
     ],
 ];
