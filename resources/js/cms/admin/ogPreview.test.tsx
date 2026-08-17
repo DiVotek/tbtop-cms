@@ -1,9 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "bun:test";
+import { fireEvent, render } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "bun:test";
 import type { RenderProps } from "@tbtop/inertia-admin";
 import { OgPreviewBlock } from "./ogPreview";
-
-afterEach(() => cleanup());
 
 interface LocaleCard {
 	title: string;
@@ -29,6 +27,10 @@ interface OgPreviewOptions {
 	};
 }
 
+// The block remembers its open state in localStorage; a toggle left behind by
+// one test would flip the next test's click from "expand" to "collapse".
+beforeEach(() => localStorage.clear());
+
 function baseOptions(overrides: Partial<OgPreviewOptions> = {}): OgPreviewOptions {
 	return {
 		byLocale: { en: { title: "A great page", description: "A great description." } },
@@ -53,42 +55,44 @@ function renderBlock(options: OgPreviewOptions) {
 }
 
 describe("OgPreviewBlock", () => {
-	it("expands to show the default locale's title, description and image", async () => {
-		renderBlock(baseOptions());
+	it("expands to show the default locale's title, description and image", () => {
+		const { getByText, container } = renderBlock(baseOptions());
 
-		await screen.findByText("Social preview").then((button) => button.click());
+		fireEvent.click(getByText("Social preview"));
 
-		expect(screen.getByText("A great page")).toBeDefined();
-		expect(screen.getByText("A great description.")).toBeDefined();
-		expect(screen.getByRole("img").getAttribute("src")).toBe("https://example.test/og.jpg");
+		expect(getByText("A great page")).toBeDefined();
+		expect(getByText("A great description.")).toBeDefined();
+		expect(container.querySelector("img")?.getAttribute("src")).toBe("https://example.test/og.jpg");
 	});
 
-	it("falls back to the empty-state copy when the active locale's card has no title or description", async () => {
-		renderBlock(baseOptions({ byLocale: { en: { title: "", description: "" } } }));
+	it("falls back to the empty-state copy when the active locale's card has no title or description", () => {
+		const { getByText } = renderBlock(baseOptions({ byLocale: { en: { title: "", description: "" } } }));
 
-		await screen.findByText("Social preview").then((button) => button.click());
+		fireEvent.click(getByText("Social preview"));
 
-		expect(screen.getByText("No title yet")).toBeDefined();
-		expect(screen.getByText("No description yet.")).toBeDefined();
+		expect(getByText("No title yet")).toBeDefined();
+		expect(getByText("No description yet.")).toBeDefined();
 	});
 
-	it("shows the no-image hint instead of an <img> when image is null", async () => {
-		renderBlock(baseOptions({ image: null }));
+	it("shows the no-image hint instead of an <img> when image is null", () => {
+		const { getByText, container } = renderBlock(baseOptions({ image: null }));
 
-		await screen.findByText("Social preview").then((button) => button.click());
+		fireEvent.click(getByText("Social preview"));
 
-		expect(screen.getByText("No image resolved.")).toBeDefined();
-		expect(screen.queryByRole("img")).toBeNull();
+		expect(getByText("No image resolved.")).toBeDefined();
+		expect(container.querySelector("img")).toBeNull();
 	});
 
-	it("falls back to the default locale's card when byLocale has no entry for it", async () => {
+	it("falls back to the default locale's card when byLocale has no entry for it", () => {
 		// useContentLocale() returns null with no locale tab bar in the DOM
 		// (single-locale forms render none), so the block must resolve via
 		// defaultLocale rather than leaving the card blank.
-		renderBlock(baseOptions({ defaultLocale: "en", byLocale: { en: { title: "Fallback title", description: "Fallback description." } } }));
+		const { getByText } = renderBlock(
+			baseOptions({ defaultLocale: "en", byLocale: { en: { title: "Fallback title", description: "Fallback description." } } }),
+		);
 
-		await screen.findByText("Social preview").then((button) => button.click());
+		fireEvent.click(getByText("Social preview"));
 
-		expect(screen.getByText("Fallback title")).toBeDefined();
+		expect(getByText("Fallback title")).toBeDefined();
 	});
 });

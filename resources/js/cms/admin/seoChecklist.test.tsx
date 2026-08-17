@@ -1,9 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "bun:test";
+import { render } from "@testing-library/react";
+import { describe, expect, it } from "bun:test";
 import type { RenderProps } from "@tbtop/inertia-admin";
 import { SeoChecklistBlock } from "./seoChecklist";
-
-afterEach(() => cleanup());
 
 type Status = "pass" | "warn" | "fail";
 
@@ -45,7 +43,7 @@ function renderBlock(options: SeoChecklistOptions) {
 
 describe("SeoChecklistBlock", () => {
 	it("renders the default locale's checks when byLocale has no active-tab entry", () => {
-		renderBlock({
+		const { getByText } = renderBlock({
 			byLocale: {
 				en: [check({ key: "title", label: "Meta title" })],
 			},
@@ -53,11 +51,11 @@ describe("SeoChecklistBlock", () => {
 			labels: { required: "Required", optional: "Worth doing" },
 		});
 
-		expect(screen.getByText("Meta title")).toBeDefined();
+		expect(getByText("Meta title")).toBeDefined();
 	});
 
 	it("splits required and optional checks into their own groups", () => {
-		renderBlock({
+		const { getByText } = renderBlock({
 			byLocale: {
 				en: [
 					check({ key: "title", label: "Meta title", required: true }),
@@ -68,20 +66,20 @@ describe("SeoChecklistBlock", () => {
 			labels: { required: "Required", optional: "Worth doing" },
 		});
 
-		expect(screen.getByText("Required")).toBeDefined();
-		expect(screen.getByText("Worth doing")).toBeDefined();
-		expect(screen.getByText("Meta title")).toBeDefined();
-		expect(screen.getByText("OG image")).toBeDefined();
+		expect(getByText("Required")).toBeDefined();
+		expect(getByText("Worth doing")).toBeDefined();
+		expect(getByText("Meta title")).toBeDefined();
+		expect(getByText("OG image")).toBeDefined();
 	});
 
 	it("renders nothing for a locale with an empty check list rather than crashing", () => {
-		renderBlock({
+		const { queryByText } = renderBlock({
 			byLocale: { en: [] },
 			defaultLocale: "en",
 			labels: { required: "Required", optional: "Worth doing" },
 		});
 
-		expect(screen.queryByText("Required")).toBeNull();
-		expect(screen.queryByText("Worth doing")).toBeNull();
+		expect(queryByText("Required")).toBeNull();
+		expect(queryByText("Worth doing")).toBeNull();
 	});
 });
