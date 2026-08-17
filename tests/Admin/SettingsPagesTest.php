@@ -316,7 +316,7 @@ it('does not return mail.password on the notification settings record', function
 
 /**
  * Action names inside the form's footer flex node (cancel/save) — the only
- * flex node in a settings form tree, mirroring TemplateFormPage's footer.
+ * flex node in a settings form tree.
  *
  * @param  array<string, mixed>  $node
  * @return list<string>

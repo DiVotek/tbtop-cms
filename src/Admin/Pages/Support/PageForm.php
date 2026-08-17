@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Block\BlockEnvelope;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
@@ -27,6 +28,7 @@ use Tbtop\Cms\Page\Events\PageUnpublished;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Support\StarterBlocks;
 
 class PageForm
 {
@@ -459,7 +461,14 @@ class PageForm
         self::guardTypeAndStatus($page, $form);
         self::guardScheduling($form);
 
+        // Read before fill() overwrites it — content's tpl_id provenance
+        // (see fillContent()'s docblock) is carried over from THIS, the
+        // pre-save envelope, by matching block id.
+        $contentBefore = $isCreate ? [] : BlockEnvelope::blocksOf($page->content);
+
         $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
+        $page->content = self::fillContent($page, $form, $contentBefore, $isCreate);
+        $page->starter_blocks = self::fillStarterBlocks($page, $form);
 
         // Left unconditional rather than gated on ! $page->is_system: the
         // edit form never submits a 'slug' key for the root system page
@@ -494,6 +503,93 @@ class PageForm
         self::eventPublishTransition($page, $statusBefore);
 
         return $page;
+    }
+
+    /**
+     * The `content` envelope, computed separately from fillAttributes()'s
+     * flat mass-assignment because it needs two things fillAttributes()
+     * doesn't have: the page's OWN pre-fill content (for tpl_id carry-over,
+     * update only) and its POST-fill type/parent_id (for starter-block
+     * inheritance, create only) — $page has already been fill()ed with type/
+     * parent_id/etc. by the time this runs (see save()).
+     *
+     * Create with no submitted content (the create-modal form has no block
+     * repeater — see PageForm::fields()) inherits from StarterBlocks
+     * instead of starting empty; a create THAT does submit content (e.g. a
+     * duplicate-via-form flow, if one is ever added) is trusted as-is and
+     * skips inheritance, since the caller already decided what content this
+     * page should start with.
+     *
+     * @param  array<string, mixed>  $form
+     * @param  list<array<string, mixed>>  $contentBefore
+     * @return list<array<string, mixed>>
+     */
+    private static function fillContent(Page $page, array $form, array $contentBefore, bool $isCreate): array
+    {
+        if ($isCreate && ! array_key_exists('content', $form)) {
+            return app(StarterBlocks::class)->contentFor($page);
+        }
+
+        $envelope = BlockContentField::toEnvelope($form['content'] ?? null);
+
+        return $isCreate ? $envelope : self::withCarriedTplIds($envelope, $contentBefore);
+    }
+
+    /**
+     * Re-attaches each block's tpl_id (starter-block provenance — see
+     * StarterBlocks/StarterBlockSync) by matching the persisted 'id'.
+     *
+     * tpl_id is not a declared BlockContentField sub-field, so it carries no
+     * validation rule; Illuminate\Http\Request::validate() (FormSubmit
+     * Controller) drops any form key without one before PageForm::save()
+     * ever sees it — the admin repeater's client state keeps tpl_id on rows
+     * it never touched (plain object spread on edit), but that state never
+     * reaches here. Re-deriving it from the row BEFORE this save, rather
+     * than trusting the submitted form, is the only way it survives an
+     * unrelated edit to the same page.
+     *
+     * @param  list<array<string, mixed>>  $envelope
+     * @param  list<array<string, mixed>>  $contentBefore
+     * @return list<array<string, mixed>>
+     */
+    private static function withCarriedTplIds(array $envelope, array $contentBefore): array
+    {
+        $tplIdById = [];
+        foreach ($contentBefore as $block) {
+            if (isset($block['id'], $block['tpl_id'])) {
+                $tplIdById[(string) $block['id']] = $block['tpl_id'];
+            }
+        }
+
+        return array_map(
+            static function (array $block) use ($tplIdById): array {
+                $tplId = $tplIdById[(string) ($block['id'] ?? '')] ?? null;
+
+                return $tplId === null ? $block : [...$block, 'tpl_id' => $tplId];
+            },
+            $envelope,
+        );
+    }
+
+    /**
+     * `starter_blocks` is never edited through this form's own fields — it
+     * has no repeater or input of its own (see PageEditStarterBlocks: every
+     * change is a dedicated instant-save server action, add/remove/move/
+     * apply, the same shape as PageEditBlockTabs's block actions). Those
+     * actions pass the already-computed, fully-shaped array through under
+     * this raw key; every other caller (the general pageEditor submit,
+     * create) omits the key entirely and the existing value is kept as-is.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array{article?: list<array<string, mixed>>, category?: list<array<string, mixed>>}
+     */
+    private static function fillStarterBlocks(Page $page, array $form): array
+    {
+        if (array_key_exists('starter_blocks', $form) && is_array($form['starter_blocks'])) {
+            return $form['starter_blocks'];
+        }
+
+        return is_array($page->starter_blocks) ? $page->starter_blocks : [];
     }
 
     /**
@@ -534,7 +630,6 @@ class PageForm
             // indexable by default; edits keep the form-submitted value.
             'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
-            'content' => BlockContentField::toEnvelope($form['content'] ?? null),
             'seo' => self::seoAttribute($form),
         ];
 

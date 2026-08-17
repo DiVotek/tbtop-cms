@@ -13,8 +13,7 @@ use Tbtop\Cms\Page\Models\Page;
  * `block_{id}_active`) back into {@see BlockContentField::toEnvelope()}'s
  * expected row shape (`{id, kind, active, ...flatData}`) for PageEditPage,
  * so PageForm::save() folds them through the same tested envelope guard
- * (unregistered kind, id fallback) as the create form and Layout/Template
- * forms use.
+ * (unregistered kind, id fallback) as the create form and Layout forms use.
  *
  * The block list/order/kind is always read from $page->content (the
  * database), never from the form — the form only carries edited field

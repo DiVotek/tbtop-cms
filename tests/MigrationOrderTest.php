@@ -19,7 +19,6 @@ const LEGACY_TABLE_NAMES = [
     'tbtop_redirects' => 'redirects',
     'tbtop_user_profiles' => 'cms_user_profiles',
     'tbtop_settings' => 'cms_settings',
-    'tbtop_templates' => 'cms_templates',
     'tbtop_form_submissions' => 'cms_form_submissions',
     'tbtop_layouts' => 'cms_layouts',
 ];

@@ -14,7 +14,6 @@ return [
         'not_found' => '404 log',
         'seo_report' => 'SEO report',
         'media_library' => 'Media library',
-        'templates' => 'Templates',
         'layout' => 'Layouts',
         'blocks' => 'Blocks',
         'languages' => 'Languages',

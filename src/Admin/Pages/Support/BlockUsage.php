@@ -11,7 +11,7 @@ use Tbtop\Cms\Page\Models\Page;
 /**
  * Builds a "which pages use each block kind" index in a single pass over the
  * pages table, so the showcase can show usage without one query per block.
- * Only Page.content is scanned — templates and layout slots are out of scope.
+ * Only Page.content is scanned — layout slots are out of scope.
  */
 class BlockUsage
 {

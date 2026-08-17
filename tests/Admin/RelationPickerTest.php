@@ -106,36 +106,6 @@ it('parent_id relation-search on the edit page excludes the page itself and its 
         ->and($ids)->not->toContain((string) $child->id);
 });
 
-// --- template picker (TemplatesPage applyAction target_page_id) ---
-
-it('template target_page_id relation-search returns pages of any status', function (): void {
-    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live']]);
-    Page::factory()->create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft']]);
-
-    $response = test()->actingAs(makeRelationPickerAdmin(), 'web')->postJson(
-        '/admin/templates/relation-search/target_page_id',
-        ['search' => ''],
-    );
-
-    $response->assertOk();
-    $labels = array_column($response->json('options'), 'label');
-
-    expect($labels)->toContain('Live')
-        ->and($labels)->toContain('Draft');
-});
-
-it('template target_page_id relation-search resolve mode returns the picked page', function (): void {
-    $page = Page::factory()->create(['type' => 'page', 'name' => ['en' => 'Contact']]);
-
-    $response = test()->actingAs(makeRelationPickerAdmin(), 'web')->postJson(
-        '/admin/templates/relation-search/target_page_id',
-        ['value' => (string) $page->id],
-    );
-
-    $response->assertOk()
-        ->assertExactJson(['option' => ['value' => (string) $page->id, 'label' => 'Contact']]);
-});
-
 // --- PageForm::save() parent_id regression coverage for the new field's clear semantics ---
 
 it('persists a parent set via the relation picker raw id', function (): void {

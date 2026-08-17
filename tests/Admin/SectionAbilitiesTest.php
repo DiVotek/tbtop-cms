@@ -39,7 +39,7 @@ it('opens every section to anyone with admin access when roles are off', functio
     // which has no built manifest on CI) never renders — same as the other
     // admin page tests.
     test()->get('/admin/' . $path, ['X-Inertia' => 'true'])->assertOk();
-})->with(['pages', 'media-library', 'form-submissions', 'redirects', 'not-found', 'templates', 'languages', 'users']);
+})->with(['pages', 'media-library', 'form-submissions', 'redirects', 'not-found', 'languages', 'users']);
 
 it('hands the section ability to the host when roles are on', function (): void {
     config(['tbtop-cms.roles' => true]);

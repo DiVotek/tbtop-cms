@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  * per-row query. Extracted from PageEditRevisionsAction (revisions used to
  * carry the only copy of this lookup) once author_tracking needed the exact
  * same name-then-email-then-null resolution for created_by/updated_by across
- * the status bar and the Pages/Templates/Redirects list tables.
+ * the status bar and the Pages/Redirects list tables.
  *
  * The host user model is read from config('tbtop-cms.admin.model') every
  * call rather than cached — the same pattern CurrentAdmin and UsersPage use,

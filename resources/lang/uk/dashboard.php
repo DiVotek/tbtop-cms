@@ -17,8 +17,8 @@ return [
         'submissions_needs_review' => 'потребують перевірки',
         'media' => 'Медіа',
         'media_description' => ':size на диску',
-        'templates_layouts' => 'Шаблони та макети',
-        'templates_layouts_description' => ':templates шаблонів · :layouts макетів',
+        'layouts' => 'Макети',
+        'layouts_description' => ':layouts макетів',
     ],
     'charts' => [
         'leads_by_status' => 'Заявки за статусом',

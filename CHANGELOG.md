@@ -20,7 +20,7 @@ ability the package does not define denies by default.
 Existing installs have roles in `cms_user_profiles.role`. The included
 migration drops that column. **Under the default `roles => false`, every user
 who had admin access — including editors — gains access to every section**,
-among them form submissions (lead PII), template editing, and global settings.
+among them form submissions (lead PII), layout editing, and global settings.
 
 - To keep a separation of duties, set `tbtop-cms.roles => true` and define the
   eight `tbtop-cms.*` gates in your app **before** upgrading. See the README.
@@ -29,6 +29,28 @@ among them form submissions (lead PII), template editing, and global settings.
 `UsersPage` remains, reduced to granting and revoking access (later restored
 to also create and edit users — see Added below); it no longer assigns roles.
 `cms:admin:create`, `cms:admin:grant`, and `cms:admin:revoke` are unchanged.
+
+### Removed — the Templates section
+
+The Templates admin page, the `Template` model, and `TemplateApplier` are
+gone, replaced by section starter blocks. The `tbtop_templates` table is
+dropped by the included migration (`dropIfExists`, safe on fresh installs
+where the table never existed).
+
+#### Upgrading
+
+Hosts with a published `config/tbtop-cms.php` shadow the package's own
+config, so the removed classes are never picked up automatically. **Before
+upgrading**, edit your published config and remove:
+
+- the `use Tbtop\Cms\Admin\Pages\TemplateCreatePage;`,
+  `use Tbtop\Cms\Admin\Pages\TemplateEditPage;`, and
+  `use Tbtop\Cms\Admin\Pages\TemplatesPage;` imports
+- the `'templates'`, `'template_create'`, and `'template_edit'` entries from
+  `admin.pages`
+
+Skipping this fatals on class-not-found the moment the admin panel boots.
+Hosts that never published the config need no action.
 
 ### Added
 
@@ -226,9 +248,33 @@ to also create and edit users — see Added below); it no longer assigns roles.
   section. **Upgrading:** hosts that already schedule `cms:not-found:prune`
   themselves should either remove their own schedule entry or set
   `auto_prune => false` to avoid running it twice a day.
+- **Section starter blocks**: a category page can define two block
+  *structure* starters — one for new articles, one for new subcategories —
+  in a collapsed "Starter blocks" section on its edit page (category type
+  only). A starter holds no content, only which block kinds exist and in
+  what order; content always belongs to the page. A new child of the
+  matching type gets the nearest ancestor category's non-empty starter of
+  that type turned into empty, active, ordered blocks ready to fill in; a
+  new subcategory with no ancestor starter at all instead copies its
+  immediate parent category's own block structure (not its content). Each
+  "Apply to existing …" action force-syncs a starter's structure onto every
+  already-existing descendant of that type (excluding any subtree whose own
+  subcategory defines its own starter): blocks the starter still defines are
+  left completely alone (including their content), blocks it no longer
+  defines are removed together with their content, new starter blocks are
+  inserted disabled, and blocks added directly on a page are left untouched
+  — replaces the removed Templates feature (see Removed above).
 
 ### Changed
 
+- Block fields inside the page editor no longer carry a hard `required`
+  rule (the asterisk is gone too): every form-scoped action on the page
+  ("+ Add block", "remove block", starter-block buttons) runs the whole
+  form's rules server-side, and the admin client silently drops a failed
+  action response — so one freshly added (empty) required block field used
+  to kill every action on the page with no feedback. Emptiness is handled
+  softly instead: blocks start inactive. Hard required returns once the
+  admin package validates on explicit submit only.
 - `cms:admin:revoke` now refuses to revoke the owner, printing an explicit
   error and exiting with `FAILURE` instead of a false "revoked" success
   message.

@@ -14,7 +14,6 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Template\Models\Template;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -106,7 +105,7 @@ it('renders an empty dashboard without error', function (): void {
     expect($values[__('tbtop-cms::dashboard.stats.pages')])->toBe(0)
         ->and($values[__('tbtop-cms::dashboard.stats.submissions_new')])->toBe(0)
         ->and($values[__('tbtop-cms::dashboard.stats.media')])->toBe(0)
-        ->and($values[__('tbtop-cms::dashboard.stats.templates_layouts')])->toBe(0);
+        ->and($values[__('tbtop-cms::dashboard.stats.layouts')])->toBe(0);
 });
 
 it('counts pages by status for the pages stat', function (): void {
@@ -148,15 +147,14 @@ it('counts media files and total size for the media stat', function (): void {
     expect($values[__('tbtop-cms::dashboard.stats.media')])->toBe(2);
 });
 
-it('sums templates and layouts for the combined stat', function (): void {
+it('counts layouts for the layouts stat', function (): void {
     actingAsDashboardAdmin();
-    Template::query()->create(['name' => 'T1']);
     Layout::query()->create(['slot' => 'header']);
     Layout::query()->create(['slot' => 'footer']);
 
     $values = dashboardStatValues();
 
-    expect($values[__('tbtop-cms::dashboard.stats.templates_layouts')])->toBe(3);
+    expect($values[__('tbtop-cms::dashboard.stats.layouts')])->toBe(2);
 });
 
 it('returns lead status breakdown for the donut chart data endpoint', function (): void {

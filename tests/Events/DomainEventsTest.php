@@ -29,8 +29,6 @@ use Tbtop\Cms\Page\Models\PageRevision;
 use Tbtop\Cms\Page\Support\PageRevisionWriter;
 use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
-use Tbtop\Cms\Template\Models\Template;
-use Tbtop\Cms\Template\TemplateApplier;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -125,16 +123,6 @@ it('does not raise PageSaved when the save fails on a lock_version conflict', fu
 });
 
 // --- Page: other save-adjacent write points ---
-
-it('raises PageSaved(wasCreated: false) when a template is applied to a page', function (): void {
-    $template = Template::create(['name' => 'Landing', 'content' => [['id' => 't1', 'kind' => 'Hero', 'data' => ['title' => 'Hi']]]]);
-    $page = Page::factory()->create(['content' => []]);
-    Event::fake([PageSaved::class]);
-
-    (new TemplateApplier)->applyTo($template, $page);
-
-    Event::assertDispatched(PageSaved::class, fn (PageSaved $e): bool => $e->page->is($page) && $e->wasCreated === false);
-});
 
 it('raises PageSaved(wasCreated: false) when a page revision is restored', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Original']]);
