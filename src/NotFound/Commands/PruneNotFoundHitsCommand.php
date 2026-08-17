@@ -9,8 +9,10 @@ use Tbtop\Cms\NotFound\Models\NotFoundHit;
 use Tbtop\Cms\Settings\Settings;
 
 /**
- * Not scheduled automatically — the host owns its scheduler and decides the
- * cadence (see the README's "404 log" section).
+ * Scheduled daily by the package itself (see
+ * CmsServiceProvider::wireNotFoundPruneSchedule()); opt out with
+ * tbtop-cms.not_found.auto_prune => false and schedule it yourself, or not at
+ * all — see the README's "404 log" section.
  */
 class PruneNotFoundHitsCommand extends Command
 {
@@ -20,7 +22,18 @@ class PruneNotFoundHitsCommand extends Command
 
     public function handle(): int
     {
+        // A stored null/empty value reads as the default, matching the
+        // missing-key case — Settings::get() applies its $default only when
+        // the KEY is absent, and a settings form saved with the field left
+        // blank stores null, which would cast to a 0-day retention and wipe
+        // the whole log on every (now daily, scheduled) run. Same rule as
+        // RecordsNotFoundHit::enabled().
         $days = (int) app(Settings::class)->get('seo.not_found.retention_days', 90);
+
+        if ($days < 1) {
+            $days = 90;
+        }
+
         $cutoff = now()->subDays($days);
 
         $deleted = NotFoundHit::query()->where('last_seen_at', '<', $cutoff)->delete();
