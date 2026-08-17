@@ -17,6 +17,7 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Models\FormSubmissionComment;
@@ -247,7 +248,12 @@ class FormSubmissionPage extends AdminPage
     private function setStatus(LeadStatus $status): Effects
     {
         $submission = $this->submission();
+        $old = $submission->lead_status->value;
         $submission->forceFill(['lead_status' => $status])->save();
+        $this->logSubmission($submission, 'status_changed', [
+            'attributes' => ['lead_status' => $status->value],
+            'old' => ['lead_status' => $old],
+        ]);
 
         // Back to New must leave the page: re-rendering the detail page would
         // immediately mark the submission Read again (markRead on open), so
@@ -274,6 +280,11 @@ class FormSubmissionPage extends AdminPage
         $submission = $this->submission();
         app(SubmissionRetrier::class)->retry($submission);
         $submission->refresh();
+        $this->logSubmission(
+            $submission,
+            'delivery_retried',
+            context: ['result' => $submission->status->value],
+        );
 
         $effects = $submission->status === SubmissionStatus::Handled
             ? Effects::make()->notify(__('tbtop-cms::form-submissions.actions.retried'))
@@ -331,11 +342,12 @@ class FormSubmissionPage extends AdminPage
 
     private function addComment(ActionCtx $ctx, FormSubmission $submission): Effects
     {
-        FormSubmissionComment::query()->create([
+        $comment = FormSubmissionComment::query()->create([
             'submission_id' => $submission->id,
             'user_id' => CurrentAdmin::user()?->getKey(),
             'body' => (string) ($ctx->form['body'] ?? ''),
         ]);
+        $this->logSubmission($submission, 'comment_added', context: ['comment_id' => $comment->getKey()]);
 
         return Effects::make()
             ->notify(__('tbtop-cms::form-submissions.comments.added'))
@@ -355,7 +367,9 @@ class FormSubmissionPage extends AdminPage
 
     private function delete(): Effects
     {
-        $this->submission()->delete();
+        $submission = $this->submission();
+        $submission->delete();
+        $this->logSubmission($submission, 'deleted');
 
         return Effects::make()
             ->notify(__('tbtop-cms::form-submissions.actions.deleted'))
@@ -367,7 +381,35 @@ class FormSubmissionPage extends AdminPage
     {
         if ($submission->lead_status === LeadStatus::New) {
             $submission->forceFill(['lead_status' => LeadStatus::Read])->save();
+            $this->logSubmission($submission, 'status_changed', [
+                'attributes' => ['lead_status' => LeadStatus::Read->value],
+                'old' => ['lead_status' => LeadStatus::New->value],
+            ]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $changes
+     * @param  array<string, mixed>  $context
+     */
+    private function logSubmission(
+        FormSubmission $submission,
+        string $event,
+        array $changes = [],
+        array $context = [],
+    ): void {
+        app(AuditContext::class)->log(
+            $submission,
+            $event,
+            $submission->kind . ' #' . $submission->getKey(),
+            $changes,
+            [
+                'page_id' => $submission->page_id,
+                'kind' => $submission->kind,
+                'locale' => $submission->locale,
+                ...$context,
+            ],
+        );
     }
 
     private function submission(): FormSubmission

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Page\Support;
 
 use Illuminate\Support\Str;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockEnvelope;
 use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
@@ -45,17 +46,41 @@ final class StarterBlockSync
         return count($this->scope($category, $type));
     }
 
+    /**
+     * Audited as one batch — without during()/batch() a bulk apply reads as
+     * N unrelated page edits. The category row makes it greppable by subject.
+     */
     public function apply(Page $category, string $type): int
     {
         $starter = BlockEnvelope::starterOf($category->starter_blocks, $type);
         $pages = $this->scope($category, $type);
+        $audit = app(AuditContext::class);
 
-        foreach ($pages as $page) {
-            $page->content = self::mergeBlocks(BlockEnvelope::blocksOf($page->content), $starter);
-            $page->save();
+        $context = [
+            'category_id' => $category->getKey(),
+            'starter_type' => $type,
+            'affected_pages' => count($pages),
+        ];
 
-            event(new PageSaved($page, false));
-        }
+        $audit->batch(function () use ($audit, $context, $pages, $starter, $category): void {
+            $audit->during('starter_blocks_applied', $context, function () use ($pages, $starter): void {
+                foreach ($pages as $page) {
+                    $page->content = self::mergeBlocks(BlockEnvelope::blocksOf($page->content), $starter);
+                    $page->save();
+
+                    event(new PageSaved($page, false));
+                }
+            });
+
+            $audit->log(
+                $category,
+                'starter_blocks_applied',
+                is_string($category->name) && $category->name !== ''
+                    ? $category->name
+                    : 'Page #' . $category->getKey(),
+                context: $context,
+            );
+        });
 
         return count($pages);
     }

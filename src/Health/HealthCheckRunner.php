@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Health;
 
+use Tbtop\Cms\Health\Checks\ActivityLogTableCheck;
 use Tbtop\Cms\Health\Checks\AppUrlCheck;
 use Tbtop\Cms\Health\Checks\DefaultOwnerAndLanguageCheck;
 use Tbtop\Cms\Health\Checks\InertiaRootViewCheck;
@@ -30,6 +31,7 @@ final class HealthCheckRunner
     {
         return [
             RoutesRegisteredCheck::class,
+            ActivityLogTableCheck::class,
             InertiaRootViewCheck::class,
             JsWiringCheck::class,
             PackageVersionsMatchCheck::class,

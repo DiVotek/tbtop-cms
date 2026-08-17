@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\LocaleCatalog;
 use Tbtop\Cms\Language\Models\Language;
@@ -45,10 +46,14 @@ class LanguageForm
     /** @param array<string, mixed> $form */
     public static function save(array $form, ?int $id = null): Language
     {
+        $previousDefault = Language::query()->where('is_default', true)->first();
+
         if ($id !== null) {
             $language = Language::query()->findOrFail($id);
+            $wasDefault = $language->is_default;
             $language->name = (string) ($form['name'] ?? $language->name);
         } else {
+            $wasDefault = false;
             $locale = (string) ($form['locale'] ?? '');
             $name = self::guardLocale($locale);
             // Soft-deleted rows still hold the unique locale index: re-picking
@@ -68,7 +73,18 @@ class LanguageForm
             'sort_order' => (int) ($form['sort_order'] ?? 0),
         ]);
 
-        $language->save();
+        if ($language->exists && ! $wasDefault && $language->is_default) {
+            app(AuditContext::class)->during(
+                'default_changed',
+                [
+                    'previous_language_id' => $previousDefault?->getKey(),
+                    'previous_locale' => $previousDefault?->locale,
+                ],
+                static fn (): bool => $language->save(),
+            );
+        } else {
+            $language->save();
+        }
 
         event(new LanguagesChanged);
 

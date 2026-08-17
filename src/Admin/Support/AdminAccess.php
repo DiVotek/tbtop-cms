@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Support;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Tbtop\Cms\Admin\Events\CmsAccessGranted;
 use Tbtop\Cms\Admin\Events\CmsAccessRevoked;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Audit\AuditContext;
 
 /**
  * Single write path for granting/revoking cms admin access, shared by
@@ -30,6 +32,7 @@ final class AdminAccess
         self::markFirstOwner($profile);
 
         Event::dispatch(new CmsAccessGranted($userId));
+        self::logAccess($userId, 'access_granted', (bool) $profile->is_owner);
     }
 
     /**
@@ -68,11 +71,48 @@ final class AdminAccess
 
         if ($deleted > 0) {
             Event::dispatch(new CmsAccessRevoked($userId));
+            self::logAccess($userId, 'access_revoked', false);
         }
     }
 
     public static function isOwner(int | string $userId): bool
     {
         return CmsUserProfile::query()->where('user_id', $userId)->where('is_owner', true)->exists();
+    }
+
+    private static function logAccess(int | string $userId, string $event, bool $isOwner): void
+    {
+        $user = self::user($userId);
+        if ($user === null) {
+            return;
+        }
+
+        $hasAccess = $event === 'access_granted';
+        app(AuditContext::class)->log(
+            $user,
+            $event,
+            self::label($user),
+            [
+                'attributes' => ['has_access' => $hasAccess, 'is_owner' => $isOwner],
+                'old' => ['has_access' => ! $hasAccess, 'is_owner' => false],
+            ],
+            ['source' => CurrentAdmin::canAccess() ? 'admin' : 'console'],
+            allowAnonymous: true,
+        );
+    }
+
+    private static function user(int | string $userId): ?Model
+    {
+        /** @var class-string<Model> $model */
+        $model = config('tbtop-cms.admin.model', 'App\\Models\\User');
+
+        return $model::query()->find($userId);
+    }
+
+    private static function label(Model $user): string
+    {
+        $name = (string) $user->getAttribute('name');
+
+        return $name !== '' ? $name : (string) $user->getAttribute('email');
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
+use Spatie\Activitylog\ActivitylogServiceProvider;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Tbtop\Cms\Admin\CmsPanel;
@@ -18,6 +19,7 @@ use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
 use Tbtop\Cms\Admin\Listeners\SeedsLocaleFromProfile;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Cache\CmsCache;
@@ -102,6 +104,7 @@ class CmsServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->app->register(ActivitylogServiceProvider::class);
         $this->loadTranslations();
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
@@ -118,6 +121,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(TelegramInvites::class);
         $this->app->scoped(TelegramSubmissionNotifier::class);
         $this->app->scoped(SubmissionNotifier::class);
+        $this->app->scoped(AuditContext::class);
         $this->registerAdminPanel();
     }
 
@@ -134,6 +138,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireSubmissionNotifications();
         $this->wireNotFoundLogging();
         $this->wireNotFoundPruneSchedule();
+        $this->wireAuditPruneSchedule();
         $this->wireSchedulerHeartbeat();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
@@ -340,6 +345,21 @@ class CmsServiceProvider extends PackageServiceProvider
 
             $schedule->command(PruneNotFoundHitsCommand::class)->daily()
                 ->name('tbtop-cms:not-found:prune');
+        });
+    }
+
+    private function wireAuditPruneSchedule(): void
+    {
+        if (! config('tbtop-cms.audit.auto_prune', true)) {
+            return;
+        }
+
+        $this->app->booted(function (): void {
+            $days = max(1, (int) config('tbtop-cms.audit.retention_days', 365));
+            $this->app->make(Schedule::class)
+                ->command("activitylog:clean tbtop-cms --days={$days} --force")
+                ->daily()
+                ->name('tbtop-cms:audit:prune');
         });
     }
 

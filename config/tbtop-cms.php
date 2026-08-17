@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use Tbtop\Cms\Admin\Pages\AuditActivityPage;
+use Tbtop\Cms\Admin\Pages\AuditLogPage;
 use Tbtop\Cms\Admin\Pages\BlocksPage;
 use Tbtop\Cms\Admin\Pages\DashboardPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionPage;
@@ -134,6 +136,10 @@ return [
         // not even on page creation.
         'keep' => 25,
     ],
+    'audit' => [
+        'retention_days' => 365,
+        'auto_prune' => true,
+    ],
     'profile' => [
         // Disable on hosts where passwords are managed elsewhere (SSO).
         'password_change' => true,
@@ -173,6 +179,8 @@ return [
             'form_submissions' => FormSubmissionsPage::class,
             'form_submission' => FormSubmissionPage::class,
             'users' => UsersPage::class,
+            'audit_log' => AuditLogPage::class,
+            'audit_activity' => AuditActivityPage::class,
         ],
     ],
 ];
