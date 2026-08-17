@@ -176,6 +176,32 @@ return [
         'remove_confirm' => 'This cannot be undone.',
         'removed' => 'Block removed',
     ],
+    'starter_blocks' => [
+        'section_title' => 'Starter blocks',
+        'section_hint' => 'The block structure new pages under this category start with — which block kinds, in which order. Only the structure: each block still starts empty and is filled in on the page itself. New articles and new subcategories each get their own starter — a subcategory\'s own starter overrides this one for everything under it.',
+        'tabs' => [
+            'article' => 'New articles',
+            'category' => 'New subcategories',
+        ],
+        'empty' => 'No blocks yet.',
+        'move_up' => 'Move up',
+        'move_down' => 'Move down',
+        'reordered' => 'Starter block order saved',
+        'added' => 'Block added to the starter',
+        'apply' => [
+            'article' => 'Apply to existing articles',
+            'category' => 'Apply to existing subcategories',
+            'title' => 'Apply starter blocks now?',
+            // :count is substituted by trans_choice() before the confirm
+            // dialog ever renders — it needs the number up front, not as a
+            // live placeholder, so PageEditStarterBlocks resolves it at
+            // form-build time from StarterBlockSync::affectedCount().
+            'confirm_zero' => 'No existing pages belong to this starter yet — nothing to update.',
+            'confirm' => 'This changes the block structure on :count existing page|This changes the block structure on :count existing pages that belong to this starter: blocks the starter still defines are left exactly as they are — their content on those pages is not touched. Removing a block from the starter deletes it (and its content) from those pages — this is the only destructive part. New starter blocks are added disabled, ready to fill in. This cannot be undone.',
+            'applied' => 'Starter blocks applied to :count page|Starter blocks applied to :count pages',
+            'empty' => 'Add at least one block to this starter before applying it.',
+        ],
+    ],
     'status_bar' => [
         'updated' => 'Updated',
         'created' => 'Created',

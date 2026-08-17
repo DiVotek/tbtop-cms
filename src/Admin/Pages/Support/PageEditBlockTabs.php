@@ -84,7 +84,10 @@ final class PageEditBlockTabs
 
         $fields = $registry->has($kind)
             ? array_map(
-                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}"),
+                // stripRequired: an empty required block field would silently
+                // veto every form-scoped action on this page — see
+                // PrefixedField::withoutRequired() and CMS_TASKS.md A7.
+                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", stripRequired: true),
                 $registry->get($kind)->form($s),
             )
             : [];

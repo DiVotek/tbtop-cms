@@ -17,8 +17,8 @@ return [
         'submissions_needs_review' => 'needs review',
         'media' => 'Media',
         'media_description' => ':size on disk',
-        'templates_layouts' => 'Templates & layouts',
-        'templates_layouts_description' => ':templates templates · :layouts layouts',
+        'layouts' => 'Layouts',
+        'layouts_description' => ':layouts layouts',
     ],
     'charts' => [
         'leads_by_status' => 'Submissions by status',

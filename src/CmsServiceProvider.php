@@ -71,7 +71,6 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_01_01_000004_create_cms_user_profiles_table')
             ->hasMigration('2026_01_01_000005_create_redirects_table')
             ->hasMigration('2026_01_01_000006_create_cms_settings_table')
-            ->hasMigration('2026_01_01_000007_create_cms_templates_table')
             ->hasMigration('2026_01_01_000008_create_cms_form_submissions_table')
             ->hasMigration('2026_01_01_000009_update_cms_form_submissions_add_lead_status_table')
             ->hasMigration('2026_01_01_000010_update_pages_add_body_table')
@@ -88,6 +87,8 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_11_000001_update_cms_user_profiles_drop_role_table')
             ->hasMigration('2026_08_11_000002_update_cms_user_profiles_add_is_owner_table')
             ->hasMigration('2026_08_12_000001_create_not_found_hits_table')
+            ->hasMigration('2026_08_17_000000_drop_cms_templates_table')
+            ->hasMigration('2026_08_17_000001_update_pages_add_starter_blocks_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

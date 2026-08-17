@@ -8,13 +8,13 @@ use Tbtop\Cms\Admin\Support\CurrentAdmin;
 
 /**
  * Stamps created_by/updated_by from the signed-in admin on every write,
- * shared by Page, Template, and Redirect (each has its own nullable, FK-less
+ * shared by Page and Redirect (each has its own nullable, FK-less
  * created_by/updated_by pair — see their migrations for why there's no FK:
  * the host user table is configurable, same reasoning as page_revisions'
  * user_id). A model boot-hook trait rather than a shared observer: these
- * three models otherwise have nothing else in common (different domains,
+ * models otherwise have nothing else in common (different domains,
  * different existing observers/none), so a trait each one `use`s is a
- * smaller footprint than wiring a third generic observer per model in
+ * smaller footprint than wiring a generic observer per model in
  * CmsServiceProvider for something this mechanical.
  *
  * Both columns are set directly on the model (`$model->created_by = ...`),

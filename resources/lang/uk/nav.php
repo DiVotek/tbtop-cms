@@ -14,7 +14,6 @@ return [
         'not_found' => 'Журнал 404',
         'seo_report' => 'SEO-звіт',
         'media_library' => 'Медіатека',
-        'templates' => 'Шаблони',
         'layout' => 'Макети',
         'blocks' => 'Блоки',
         'languages' => 'Мови',

@@ -1,0 +1,210 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tbtop\Cms\Page\Support;
+
+use Illuminate\Support\Str;
+use Tbtop\Cms\Block\BlockEnvelope;
+use Tbtop\Cms\Page\Events\PageSaved;
+use Tbtop\Cms\Page\Models\Page;
+
+/**
+ * Force-applies a category's starter blocks (of one type, 'article' or
+ * 'category') to every already-existing descendant page of that type —
+ * the "Apply to existing …" action on PageEditStarterBlocks.
+ *
+ * Scope: every descendant of $category with type=$type, found by a
+ * recursive walk that STOPS descending into a subcategory the moment that
+ * subcategory has its own non-empty starter_blocks[$type] — that subtree is
+ * managed by its own starter instead, so neither the subcategory nor
+ * anything under it is touched here. This mirrors StarterBlocks::contentFor()
+ * picking the nearest ancestor starter on create.
+ *
+ * A starter is structure only, so the sync is structural only (see
+ * mergeBlocks()): a page block tagged with a tpl_id still present in the
+ * starter is left completely alone — kind, data, active, position, all of
+ * it, because the content on that block belongs to the page, not the
+ * starter; a tpl_id no longer in the starter is dropped, taking whatever
+ * content it held with it (the only destructive part of this sync); a page
+ * block with no tpl_id (added directly on the page) is left untouched; a
+ * starter element with no matching page block is inserted inactive (an
+ * empty new block must not go live on a published page), positioned right
+ * after the nearest earlier starter element that IS present on the page (or
+ * at the very start if none is).
+ */
+final class StarterBlockSync
+{
+    /** @return int Number of pages the sync would touch — used for the confirm dialog's count, and by apply() itself. */
+    public function affectedCount(Page $category, string $type): int
+    {
+        return count($this->scope($category, $type));
+    }
+
+    public function apply(Page $category, string $type): int
+    {
+        $starter = BlockEnvelope::starterOf($category->starter_blocks, $type);
+        $pages = $this->scope($category, $type);
+
+        foreach ($pages as $page) {
+            $page->content = self::mergeBlocks(BlockEnvelope::blocksOf($page->content), $starter);
+            $page->save();
+
+            event(new PageSaved($page, false));
+        }
+
+        return count($pages);
+    }
+
+    /** @return list<Page> */
+    private function scope(Page $category, string $type): array
+    {
+        $pages = [];
+        $frontier = self::children($category->getKey());
+
+        while ($frontier !== []) {
+            $next = [];
+
+            foreach ($frontier as $child) {
+                if ($child->type === $type) {
+                    $pages[] = $child;
+                }
+
+                if ($child->type !== 'category') {
+                    continue;
+                }
+
+                // A subcategory that defined its own non-empty starter for
+                // this type owns its subtree from here on — don't recurse
+                // into it, matching StarterBlocks::contentFor()'s nearest-
+                // ancestor-wins rule.
+                if (BlockEnvelope::starterOf($child->starter_blocks, $type) !== []) {
+                    continue;
+                }
+
+                $next = [...$next, ...self::children($child->getKey())];
+            }
+
+            $frontier = $next;
+        }
+
+        return $pages;
+    }
+
+    /** @return list<Page> */
+    private static function children(int $parentId): array
+    {
+        return Page::query()->where('parent_id', $parentId)->get()->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $pageBlocks
+     * @param  list<array<string, mixed>>  $starter
+     * @return list<array<string, mixed>>
+     */
+    private static function mergeBlocks(array $pageBlocks, array $starter): array
+    {
+        $starterIds = [];
+        foreach ($starter as $element) {
+            $starterIds[(string) ($element['id'] ?? '')] = true;
+        }
+
+        $merged = [];
+        $seenTplIds = [];
+
+        foreach ($pageBlocks as $pageBlock) {
+            $tplId = $pageBlock['tpl_id'] ?? null;
+
+            if ($tplId === null) {
+                // Editor-added block: never touched, position preserved.
+                $merged[] = $pageBlock;
+
+                continue;
+            }
+
+            $tplId = (string) $tplId;
+
+            if (! isset($starterIds[$tplId])) {
+                // Starter dropped this element: remove the block (and its
+                // content) from the page.
+                continue;
+            }
+
+            $seenTplIds[$tplId] = true;
+            // Structure only: the block round-trips completely unchanged —
+            // its content belongs to the page, not the starter.
+            $merged[] = $pageBlock;
+        }
+
+        return self::insertNewStarterBlocks($merged, $starter, $seenTplIds);
+    }
+
+    /**
+     * Inserts every starter element the page doesn't have yet, as a fresh,
+     * inactive, empty-data block, each right after the nearest earlier
+     * starter element already present on the page (or at index 0 if none of
+     * the starter elements before it made it onto the page). `sort` is
+     * assigned from the final position so PageEditBlocks::blocks()/its tab
+     * order matches the array order this method just built.
+     *
+     * @param  list<array<string, mixed>>  $merged
+     * @param  list<array<string, mixed>>  $starter
+     * @param  array<string, true>  $seenTplIds
+     * @return list<array<string, mixed>>
+     */
+    private static function insertNewStarterBlocks(array $merged, array $starter, array $seenTplIds): array
+    {
+        $lastInsertedAfter = null;
+
+        foreach ($starter as $element) {
+            $tplId = (string) ($element['id'] ?? '');
+
+            if (isset($seenTplIds[$tplId])) {
+                $lastInsertedAfter = $tplId;
+
+                continue;
+            }
+
+            $fresh = [
+                'id' => (string) Str::ulid(),
+                'kind' => (string) ($element['kind'] ?? ''),
+                'active' => false,
+                'data' => [],
+                'tpl_id' => $tplId,
+            ];
+            $insertAt = $lastInsertedAfter === null
+                ? 0
+                : self::indexOfTplId($merged, $lastInsertedAfter) + 1;
+
+            array_splice($merged, $insertAt, 0, [$fresh]);
+            $lastInsertedAfter = $tplId;
+        }
+
+        return self::withSort($merged);
+    }
+
+    /** @param  list<array<string, mixed>>  $blocks */
+    private static function indexOfTplId(array $blocks, string $tplId): int
+    {
+        foreach ($blocks as $index => $block) {
+            if (($block['tpl_id'] ?? null) === $tplId) {
+                return $index;
+            }
+        }
+
+        return count($blocks) - 1;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $blocks
+     * @return list<array<string, mixed>>
+     */
+    private static function withSort(array $blocks): array
+    {
+        return array_map(
+            static fn (array $block, int $index): array => [...$block, 'sort' => $index],
+            $blocks,
+            array_keys($blocks),
+        );
+    }
+}

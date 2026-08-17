@@ -14,7 +14,6 @@ const USER_KEY_COLUMN_MIGRATIONS = [
     '2026_01_01_000002_create_pages_table',
     '2026_01_01_000004_create_cms_user_profiles_table',
     '2026_01_01_000005_create_redirects_table',
-    '2026_01_01_000007_create_cms_templates_table',
     '2026_01_01_000014_update_user_id_columns_match_host_key_type',
     '2026_01_01_000015_update_cms_user_profiles_add_user_id_foreign_table',
     '2026_01_01_000016_update_cms_user_profiles_add_role_table',
@@ -66,8 +65,6 @@ it('declares every user-id column as string-shaped (not integer) on a HasUuids h
         ->and($connection->getColumnType('tbtop_page_revisions', 'user_id'))->toBe('varchar')
         ->and($connection->getColumnType('tbtop_pages', 'created_by'))->toBe('varchar')
         ->and($connection->getColumnType('tbtop_pages', 'updated_by'))->toBe('varchar')
-        ->and($connection->getColumnType('tbtop_templates', 'created_by'))->toBe('varchar')
-        ->and($connection->getColumnType('tbtop_templates', 'updated_by'))->toBe('varchar')
         ->and($connection->getColumnType('tbtop_redirects', 'created_by'))->toBe('varchar')
         ->and($connection->getColumnType('tbtop_redirects', 'updated_by'))->toBe('varchar');
 });

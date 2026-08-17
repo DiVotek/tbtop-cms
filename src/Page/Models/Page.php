@@ -31,6 +31,7 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
  * @property string|null $heading
  * @property string|null $summary
  * @property array<int, array<string, mixed>>|null $content
+ * @property array{article?: array<int, array<string, mixed>>, category?: array<int, array<string, mixed>>}|null $starter_blocks
  * @property string|null $image
  * @property array<string, mixed>|null $seo
  * @property bool $is_indexable
@@ -76,6 +77,7 @@ class Page extends Model
         'body',
         'image',
         'content',
+        'starter_blocks',
         'seo',
         'is_indexable',
         'is_system',
@@ -116,6 +118,7 @@ class Page extends Model
         'published_at' => 'datetime',
         'unpublish_at' => 'datetime',
         'content' => 'array',
+        'starter_blocks' => 'array',
         'seo' => 'array',
         'is_indexable' => 'boolean',
         'is_system' => 'boolean',

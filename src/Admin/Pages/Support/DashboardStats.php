@@ -17,7 +17,6 @@ use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Template\Models\Template;
 
 /** Row 1 — top-line KPI stat cards, each trended over the last 14 days. */
 class DashboardStats
@@ -31,7 +30,7 @@ class DashboardStats
             self::pagesCard($s),
             self::submissionsCard($s),
             self::mediaCard($s),
-            self::templatesLayoutsCard($s),
+            self::layoutsCard($s),
         ];
     }
 
@@ -80,19 +79,17 @@ class DashboardStats
             ->sparkline(self::dailyCounts(Media::query()), 'bottom');
     }
 
-    private static function templatesLayoutsCard(S $s): Stat
+    private static function layoutsCard(S $s): Stat
     {
-        $templates = Template::query()->count();
         $layouts = Layout::query()->count();
 
-        return $s->stat(__('tbtop-cms::dashboard.stats.templates_layouts'))
-            ->value($templates + $layouts)
-            ->description(__('tbtop-cms::dashboard.stats.templates_layouts_description', [
-                'templates' => $templates,
+        return $s->stat(__('tbtop-cms::dashboard.stats.layouts'))
+            ->value($layouts)
+            ->description(__('tbtop-cms::dashboard.stats.layouts_description', [
                 'layouts' => $layouts,
             ]))
             ->icon('layout-template')
-            ->sparkline(self::combinedDailyCounts(Template::query(), Layout::query()), 'bottom');
+            ->sparkline(self::dailyCounts(Layout::query()), 'bottom');
     }
 
     /**
@@ -120,23 +117,5 @@ class DashboardStats
             ->map(static fn (int $offset): string => $since->copy()->addDays($offset)->toDateString())
             ->map(static fn (string $date): int => (int) ($counts[$date] ?? 0))
             ->all();
-    }
-
-    /**
-     * Two models' per-day counts, summed into a single series.
-     *
-     * @template TModelA of Model
-     * @template TModelB of Model
-     *
-     * @param  Builder<TModelA>  $a
-     * @param  Builder<TModelB>  $b
-     * @return list<int>
-     */
-    private static function combinedDailyCounts(Builder $a, Builder $b): array
-    {
-        $countsA = self::dailyCounts($a);
-        $countsB = self::dailyCounts($b);
-
-        return array_map(static fn (int $x, int $y): int => $x + $y, $countsA, $countsB);
     }
 }

@@ -8,7 +8,6 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\Models\Redirect;
-use Tbtop\Cms\Template\Models\Template;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -101,30 +100,6 @@ it('leaves both author columns null for a programmatic Page::create() with no au
 
     expect($page->created_by)->toBeNull()
         ->and($page->updated_by)->toBeNull();
-});
-
-it('stamps created_by/updated_by on template create and edit via their admin form endpoints', function (): void {
-    $creator = makeAuthorTrackingAdmin('template-creator');
-    $editor = makeAuthorTrackingAdmin('template-editor');
-
-    test()->actingAs($creator, 'web')->post('/admin/templates/create/forms/templateEditor', [
-        'name' => 'Landing',
-        'content' => [],
-    ])->assertRedirect();
-
-    $template = Template::query()->where('name', 'Landing')->firstOrFail();
-    expect($template->created_by)->toBe($creator->id)
-        ->and($template->updated_by)->toBe($creator->id);
-
-    test()->actingAs($editor, 'web')->post("/admin/templates/{$template->id}/edit/forms/templateEditor", [
-        'name' => 'Landing Updated',
-        'content' => [],
-    ])->assertRedirect();
-
-    $template->refresh();
-    expect($template->created_by)->toBe($creator->id)
-        ->and($template->updated_by)->toBe($editor->id)
-        ->and($template->name)->toBe('Landing Updated');
 });
 
 it('stamps created_by/updated_by on a redirect created via its create-modal action', function (): void {

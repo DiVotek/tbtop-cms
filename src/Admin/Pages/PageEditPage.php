@@ -15,6 +15,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditBlocks;
 use Tbtop\Cms\Admin\Pages\Support\PageEditBlockTabs;
 use Tbtop\Cms\Admin\Pages\Support\PageEditRevisionsAction;
 use Tbtop\Cms\Admin\Pages\Support\PageEditSidebar;
+use Tbtop\Cms\Admin\Pages\Support\PageEditStarterBlocks;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
@@ -137,7 +138,13 @@ class PageEditPage extends AdminPage
     private function tabs(S $s, Page $page): array
     {
         return [
-            ['label' => __('tbtop-cms::pages.tabs_edit.general'), 'body' => $s->stack(PageForm::generalFields($s, ! $page->is_system))],
+            [
+                'label' => __('tbtop-cms::pages.tabs_edit.general'),
+                'body' => $s->stack([
+                    ...PageForm::generalFields($s, ! $page->is_system),
+                    ...PageEditStarterBlocks::build($s, $page),
+                ]),
+            ],
             ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s, $page))],
             ...PageEditBlockTabs::build($s, $page),
         ];

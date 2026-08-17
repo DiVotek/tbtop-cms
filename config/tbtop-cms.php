@@ -20,9 +20,6 @@ use Tbtop\Cms\Admin\Pages\SeoReportPage;
 use Tbtop\Cms\Admin\Pages\SeoSettingsPage;
 use Tbtop\Cms\Admin\Pages\SiteHealthPage;
 use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
-use Tbtop\Cms\Admin\Pages\TemplateCreatePage;
-use Tbtop\Cms\Admin\Pages\TemplateEditPage;
-use Tbtop\Cms\Admin\Pages\TemplatesPage;
 use Tbtop\Cms\Admin\Pages\UsersPage;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 use Tbtop\Cms\NotFound\Support\NotFoundNoise;
@@ -170,9 +167,6 @@ return [
             'seo_settings' => SeoSettingsPage::class,
             'notification_settings' => NotificationSettingsPage::class,
             'site_health' => SiteHealthPage::class,
-            'templates' => TemplatesPage::class,
-            'template_create' => TemplateCreatePage::class,
-            'template_edit' => TemplateEditPage::class,
             'layout' => LayoutPage::class,
             'layout_edit' => LayoutEditPage::class,
             'blocks' => BlocksPage::class,
