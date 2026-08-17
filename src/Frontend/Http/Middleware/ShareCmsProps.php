@@ -38,11 +38,31 @@ class ShareCmsProps
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
             'layout' => $this->resolveLayout(),
+            'telemetry' => $this->frontendTelemetry(),
         ]);
 
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));
 
         return $next($request);
+    }
+
+    /** @return array{enabled: bool, events: list<string>} */
+    private function frontendTelemetry(): array
+    {
+        $enabled = (bool) config('tbtop-cms.telemetry.enabled', false)
+            && (bool) config('tbtop-cms.telemetry.frontend.enabled', false);
+
+        if (! $enabled) {
+            return ['enabled' => false, 'events' => []];
+        }
+
+        /** @var list<string> $events */
+        $events = array_values(array_filter(
+            (array) config('tbtop-cms.telemetry.frontend.events', []),
+            static fn (mixed $event): bool => is_string($event) && $event !== '',
+        ));
+
+        return ['enabled' => true, 'events' => $events];
     }
 
     /** @return list<array{locale: string, name: string, is_default: bool}> */

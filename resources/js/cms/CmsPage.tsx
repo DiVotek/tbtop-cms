@@ -1,6 +1,9 @@
 import { Head, usePage } from "@inertiajs/react";
 import { JSONUIProvider, Renderer, type Spec } from "@json-render/react";
+import { useEffect } from "react";
 import type { CSSProperties, DetailedHTMLProps, LinkHTMLAttributes } from "react";
+import { CmsTelemetryContext, emitCmsTelemetry } from "./telemetry";
+import type { CmsSharedProps } from "./telemetry.types";
 import { registry } from "./registry";
 
 // Inertia's <Head> renders children through its own string builder (Head.ts,
@@ -48,12 +51,14 @@ interface Seo {
     jsonLd: Record<string, unknown>[];
 }
 
-interface CmsPageProps {
+type CmsPageProps = {
+    cms?: CmsSharedProps;
+    page: { id: string | number };
     render: Spec;
     seo: Seo;
     isPreview?: boolean;
     [key: string]: unknown;
-}
+};
 
 const bannerStyle: CSSProperties = {
     position: "sticky",
@@ -67,11 +72,18 @@ const bannerStyle: CSSProperties = {
 };
 
 export default function CmsPage() {
-    const { render, seo, isPreview } = usePage<CmsPageProps>().props;
+    const { cms, page, render, seo, isPreview } = usePage<CmsPageProps>().props;
     const showAlternates = seo.alternates.length > 1;
 
+    useEffect(() => {
+        emitCmsTelemetry(cms?.telemetry, "page_view", {
+            path: window.location.pathname,
+            page_id: page.id,
+        });
+    }, [cms?.telemetry, page.id]);
+
     return (
-        <>
+        <CmsTelemetryContext.Provider value={cms?.telemetry}>
             <Head title={seo.title}>
                 {seo.description ? <meta head-key="meta-description" name="description" content={seo.description} /> : null}
                 {seo.canonical ? <link head-key="link-canonical" rel="canonical" href={seo.canonical} /> : null}
@@ -149,6 +161,6 @@ export default function CmsPage() {
             <JSONUIProvider registry={registry}>
                 <Renderer spec={render} registry={registry} />
             </JSONUIProvider>
-        </>
+        </CmsTelemetryContext.Provider>
     );
 }

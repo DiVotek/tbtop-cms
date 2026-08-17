@@ -129,6 +129,42 @@ snippet into every full-page frontend response — the loader `<script>` right
 after the opening `<head>` tag, the `<noscript>` iframe right after `<body>` —
 per Google's install rules. The admin panel never gets the snippet.
 
+### Telemetry
+
+The package does not require or initialize Sentry/OpenTelemetry. Those SDKs
+belong to the host application because the host owns the DSN, consent, sampling,
+and export destination. Install either SDK only when needed.
+
+The CMS can emit browser events for an adapter such as Sentry or OpenTelemetry.
+It is disabled by default:
+
+```php
+// config/tbtop-cms.php
+'telemetry' => [
+    'enabled' => true,
+    'frontend' => [
+        'enabled' => true,
+        'events' => ['page_view', 'form_submit', 'form_success', 'form_error'],
+    ],
+],
+```
+
+The resulting browser `CustomEvent` is named `tbtop:cms:telemetry`; its detail has `name`,
+`properties`, and `timestamp`. The host can bridge it to its chosen SDK:
+
+```ts
+window.addEventListener('tbtop:cms:telemetry', (event) => {
+    const { name, properties } = (event as CustomEvent).detail;
+    Sentry.addBreadcrumb({ category: 'tbtop.cms', message: name, data: properties });
+});
+```
+
+For server-side tracing, use the SDK's Laravel integration. The package's
+existing domain events (`PageSaved`, `PagePublished`, `SubmissionReceived`,
+etc.) are the stable extension points for custom spans and metrics. This keeps
+business audit events separate from operational telemetry and avoids a hard
+coupling to one vendor.
+
 ### Server-side rendering
 
 By default the cms frontend body renders client-side only: Googlebot's

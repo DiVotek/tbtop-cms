@@ -2,10 +2,12 @@ import { useForm } from "@inertiajs/react";
 import { type FormEvent, useState } from "react";
 import type { z } from "zod";
 import type { contactFormProps } from "../catalog";
+import { emitCmsTelemetry, useCmsTelemetry } from "../telemetry";
 
 type ContactFormProps = z.infer<typeof contactFormProps>;
 
 export function ContactForm({ props }: { props: ContactFormProps }) {
+    const telemetry = useCmsTelemetry();
     const initial: Record<string, string> = Object.fromEntries(
         props.fields.map((field): [string, string] => [field.name, ""]),
     );
@@ -14,12 +16,15 @@ export function ContactForm({ props }: { props: ContactFormProps }) {
 
     function submit(event: FormEvent): void {
         event.preventDefault();
+        emitCmsTelemetry(telemetry, "form_submit");
         form.post(props.action, {
             preserveScroll: true,
             onSuccess: () => {
                 setSent(true);
                 form.reset();
+                emitCmsTelemetry(telemetry, "form_success");
             },
+            onError: () => emitCmsTelemetry(telemetry, "form_error"),
         });
     }
 

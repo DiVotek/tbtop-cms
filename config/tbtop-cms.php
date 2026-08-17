@@ -98,6 +98,20 @@ return [
         // rendering" section.
         'enabled' => (bool) env('TBTOP_CMS_SSR', false),
     ],
+    'telemetry' => [
+        // The package emits browser events, but never ships an SDK or sends
+        // data to a vendor. The host application chooses the adapter.
+        'enabled' => (bool) env('TBTOP_CMS_TELEMETRY', false),
+        'frontend' => [
+            'enabled' => (bool) env('TBTOP_CMS_FRONTEND_TELEMETRY', false),
+            'events' => [
+                'page_view',
+                'form_submit',
+                'form_success',
+                'form_error',
+            ],
+        ],
+    ],
     'forms' => [
         'throttle' => '10,1',
         'store' => true,

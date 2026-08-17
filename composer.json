@@ -28,6 +28,10 @@
         "spatie/laravel-translatable": "^6.14",
         "tbtop/admin": "^0.2.32||^0.3.0||^0.4.0"
     },
+    "suggest": {
+        "open-telemetry/sdk": "Optional vendor-neutral tracing and metrics for PHP.",
+        "sentry/sentry-laravel": "Optional error tracking and performance monitoring."
+    },
     "require-dev": {
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.0",

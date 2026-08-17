@@ -19,6 +19,41 @@ beforeEach(function (): void {
     config()->set('cache.default', 'array');
 });
 
+it('shares disabled frontend telemetry without event names by default', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.cms.telemetry.enabled', false)
+        ->assertJsonPath('props.cms.telemetry.events', []);
+});
+
+it('shares configured frontend telemetry events', function (): void {
+    config([
+        'tbtop-cms.telemetry.enabled' => true,
+        'tbtop-cms.telemetry.frontend.enabled' => true,
+        'tbtop-cms.telemetry.frontend.events' => ['page_view', 'form_success'],
+    ]);
+    Language::factory()->default()->create(['locale' => 'en']);
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.cms.telemetry.enabled', true)
+        ->assertJsonPath('props.cms.telemetry.events', ['page_view', 'form_success']);
+});
+
 it('shares the default locale and per-language is_default flags', function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     Language::factory()->create(['locale' => 'uk']);
