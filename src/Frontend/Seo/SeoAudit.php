@@ -22,7 +22,7 @@ use Tbtop\Cms\Settings\Settings;
  * few cascades it needs (own title, own description, own og:image) the same
  * way, straight from one Page query's already-hydrated columns.
  *
- * @phpstan-type Issue array{severity: 'warn'|'fail', issue: string, page: string, locale: string, detail: string, sortKey: string}
+ * @phpstan-type Issue array{severity: 'warn'|'fail', issue: string, pageId: int, page: string, locale: string, detail: string, sortKey: string}
  */
 final class SeoAudit
 {
@@ -69,6 +69,7 @@ final class SeoAudit
                     $issues[] = $this->issue(
                         'fail',
                         'missing_title',
+                        (int) $page->getKey(),
                         $label,
                         $locale,
                         __('tbtop-cms::seo_report.issues.missing_title.detail'),
@@ -79,6 +80,7 @@ final class SeoAudit
                     $issues[] = $this->issue(
                         'fail',
                         'missing_description',
+                        (int) $page->getKey(),
                         $label,
                         $locale,
                         __('tbtop-cms::seo_report.issues.missing_description.detail'),
@@ -98,6 +100,7 @@ final class SeoAudit
                     $issues[] = $this->issue(
                         'warn',
                         'missing_translation',
+                        (int) $page->getKey(),
                         $label,
                         $locale,
                         __('tbtop-cms::seo_report.issues.missing_translation.detail'),
@@ -154,6 +157,7 @@ final class SeoAudit
                     $issues[] = $this->issue(
                         'warn',
                         'duplicate_title',
+                        (int) $page->getKey(),
                         $this->label($page, $locale),
                         $locale,
                         __('tbtop-cms::seo_report.issues.duplicate_title.detail', [
@@ -197,6 +201,7 @@ final class SeoAudit
                 $issues[] = $this->issue(
                     'warn',
                     'missing_og_image',
+                    (int) $page->getKey(),
                     $this->label($page, $this->languages->defaultLocale()),
                     '',
                     __('tbtop-cms::seo_report.issues.missing_og_image.detail'),
@@ -222,6 +227,7 @@ final class SeoAudit
                 $issues[] = $this->issue(
                     'warn',
                     'noindex',
+                    (int) $page->getKey(),
                     $this->label($page, $this->languages->defaultLocale()),
                     '',
                     __('tbtop-cms::seo_report.issues.noindex.detail'),
@@ -283,7 +289,7 @@ final class SeoAudit
     }
 
     /** @return Issue */
-    private function issue(string $severity, string $issueKey, string $page, string $locale, string $detail): array
+    private function issue(string $severity, string $issueKey, int $pageId, string $page, string $locale, string $detail): array
     {
         // fail sorts before warn ('0' < '1'); page label breaks ties so rows
         // for the same page stay together.
@@ -292,6 +298,7 @@ final class SeoAudit
         return [
             'severity' => $severity,
             'issue' => __('tbtop-cms::seo_report.issues.' . $issueKey . '.label'),
+            'pageId' => $pageId,
             'page' => $page,
             'locale' => $locale,
             'detail' => $detail,

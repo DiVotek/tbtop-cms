@@ -71,6 +71,33 @@ it('renders one table row per (page, locale, issue) the audit finds', function (
     }
 });
 
+it('counts distinct pages in the summary, not distinct page labels', function (): void {
+    // Two pages sharing one label: counting unique labels would report a
+    // single affected page.
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Twin'], 'title' => ['en' => 'Twin'], 'seo' => []]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Twin'], 'title' => ['en' => 'Twin'], 'seo' => []]);
+
+    $structure = test()->get('/admin/seo-report', ['X-Inertia' => 'true'])->assertOk()->json('props.structure');
+
+    $alerts = [];
+    $walk = function (array $node) use (&$walk, &$alerts): void {
+        if (($node['kind'] ?? null) === 'displayAlert') {
+            $alerts[] = $node;
+        }
+        foreach ((array) ($node['options']['children'] ?? []) as $child) {
+            $walk($child);
+        }
+    };
+    $walk($structure);
+
+    expect($alerts)->not->toBeEmpty()
+        ->and($alerts[0]['options']['message'] ?? '')
+        ->toBe(__('tbtop-cms::seo_report.summary.problems', [
+            'count' => 6, // per page: missing description (fail), duplicate title, missing og:image (warn)
+            'pages' => 2,
+        ]));
+});
+
 it('carries a localized title and breadcrumbs', function (): void {
     $response = test()->get('/admin/seo-report', ['X-Inertia' => 'true'])->assertOk();
 

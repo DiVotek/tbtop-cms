@@ -34,7 +34,7 @@ final class SeoReportQuery
         return extension_loaded('pdo_sqlite');
     }
 
-    /** @param  list<array{severity: string, issue: string, page: string, locale: string, detail: string, sortKey: string}>  $issues */
+    /** @param  list<array{severity: string, issue: string, pageId: int, page: string, locale: string, detail: string, sortKey: string}>  $issues */
     public static function build(array $issues): Builder
     {
         self::registerConnection();
@@ -55,7 +55,7 @@ final class SeoReportQuery
     /**
      * Re-created every call: request-scoped :memory: database, no stale-row risk — see HealthReportQuery::seed().
      *
-     * @param  list<array{severity: string, issue: string, page: string, locale: string, detail: string, sortKey: string}>  $issues
+     * @param  list<array{severity: string, issue: string, pageId: int, page: string, locale: string, detail: string, sortKey: string}>  $issues
      */
     private static function seed(array $issues): void
     {

@@ -108,7 +108,7 @@ class SeoReportPage extends AdminPage
     }
 
     /**
-     * @param  list<array{severity: 'warn'|'fail', page: string}>  $issues
+     * @param  list<array{severity: 'warn'|'fail', pageId: int}>  $issues
      */
     private function summaryAlert(S $s, array $issues): AlertBlock
     {
@@ -116,7 +116,10 @@ class SeoReportPage extends AdminPage
             return $s->displayAlert(__('tbtop-cms::seo_report.summary.clean'))->color(Color::Success);
         }
 
-        $pageCount = count(array_unique(array_column($issues, 'page')));
+        // Distinct page IDs, not labels: two pages sharing a title would
+        // collapse into one, and one page with different localized labels
+        // would count once per locale.
+        $pageCount = count(array_unique(array_column($issues, 'pageId')));
         $failCount = count(array_filter($issues, static fn (array $issue): bool => $issue['severity'] === 'fail'));
 
         return $s->displayAlert(__('tbtop-cms::seo_report.summary.problems', [
