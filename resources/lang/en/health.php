@@ -45,9 +45,11 @@ return [
             'ok' => 'The root view exists and includes the cms head partial.',
             'missing_view' => 'The configured root view ":view" does not exist.',
             'missing_include' => 'The root view at :path is missing the cms head include.',
+            'unreadable' => 'The root view at :path exists but could not be read.',
             'hints' => [
                 'missing_view' => 'Create resources/views/:view.blade.php (the standard Laravel/Inertia scaffold view), or set tbtop-cms.render.root_view to an existing view.',
                 'missing_include' => "Add @include('tbtop-cms::head') above @inertiaHead in your root Blade view.",
+                'unreadable' => 'Check that :path is a regular file the web server user can read — every page render fails until it is.',
             ],
         ],
         'js_wiring' => [
@@ -57,6 +59,7 @@ return [
             'hints' => [
                 'combined' => ':details',
                 'entry_not_found' => 'No JS entry file found (looked for: :candidates).',
+                'unreadable' => 'The file at :path exists but could not be read (check its permissions).',
                 'blocks_import_missing' => "The JS entry at :path does not import '@cms/admin/blocks' — custom admin blocks will render as unknown-kind placeholders.",
                 'admin_page_not_found' => 'No admin page component found (looked for: :candidates).',
                 'admin_page_import_missing' => "The admin page component at :path does not import from '@tbtop/inertia-admin' — Inertia will fail to resolve the admin/page component.",

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Health\Checks;
 
-use Illuminate\Support\Facades\File;
+use Tbtop\Cms\Health\Checks\Concerns\ReadsFiles;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
@@ -23,6 +23,8 @@ use Tbtop\Cms\Health\HealthStatus;
  */
 final class InertiaRootViewCheck implements HealthCheck
 {
+    use ReadsFiles;
+
     private const string DEFAULT_ROOT_VIEW = 'app';
 
     private const string REQUIRED_INCLUDE = "@include('tbtop-cms::head')";
@@ -49,7 +51,22 @@ final class InertiaRootViewCheck implements HealthCheck
             );
         }
 
-        $contents = File::get($path);
+        $contents = $this->readFile($path);
+
+        // Error is the right severity — an unreadable root view means every
+        // page render fatals — but the message must name the actual problem,
+        // not surface as the runner's generic "check crashed".
+        if ($contents === null) {
+            return new HealthCheckResult(
+                checkId: $this->id(),
+                status: HealthStatus::Error,
+                labelKey: 'tbtop-cms::health.checks.inertia_root_view.label',
+                messageKey: 'tbtop-cms::health.checks.inertia_root_view.unreadable',
+                messageReplace: ['path' => $path],
+                hintKey: 'tbtop-cms::health.checks.inertia_root_view.hints.unreadable',
+                hintReplace: ['path' => $path],
+            );
+        }
 
         if (! str_contains($contents, self::REQUIRED_INCLUDE)) {
             return new HealthCheckResult(

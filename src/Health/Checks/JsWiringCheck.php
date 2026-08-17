@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Health\Checks;
 
 use Illuminate\Support\Facades\File;
+use Tbtop\Cms\Health\Checks\Concerns\ReadsFiles;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
@@ -22,6 +23,8 @@ use Tbtop\Cms\Health\HealthStatus;
  */
 final class JsWiringCheck implements HealthCheck
 {
+    use ReadsFiles;
+
     private const string BLOCKS_IMPORT = "import '@cms/admin/blocks'";
 
     private const string ADMIN_PAGE_IMPORT = '@tbtop/inertia-admin';
@@ -83,7 +86,13 @@ final class JsWiringCheck implements HealthCheck
             return [__('tbtop-cms::health.checks.js_wiring.hints.entry_not_found', ['candidates' => implode(', ', self::JS_ENTRY_CANDIDATES)])];
         }
 
-        if (! str_contains(File::get($path), self::BLOCKS_IMPORT)) {
+        $source = $this->readFile($path);
+
+        if ($source === null) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
+        }
+
+        if (! str_contains($source, self::BLOCKS_IMPORT)) {
             return [__('tbtop-cms::health.checks.js_wiring.hints.blocks_import_missing', ['path' => $path])];
         }
 
@@ -100,9 +109,11 @@ final class JsWiringCheck implements HealthCheck
         $entry = $this->firstExisting(self::JS_ENTRY_CANDIDATES);
 
         if ($entry !== null) {
-            $source = File::get($entry);
+            $source = $this->readFile($entry);
 
-            if (str_contains($source, self::ADMIN_PAGE_RESOLVE) && str_contains($source, self::ADMIN_PAGE_IMPORT)) {
+            // An unreadable entry is reported by checkBlocksImport already;
+            // here it just means the inline resolver cannot be confirmed.
+            if ($source !== null && str_contains($source, self::ADMIN_PAGE_RESOLVE) && str_contains($source, self::ADMIN_PAGE_IMPORT)) {
                 return [];
             }
         }
@@ -113,7 +124,13 @@ final class JsWiringCheck implements HealthCheck
             return [__('tbtop-cms::health.checks.js_wiring.hints.admin_page_not_found', ['candidates' => implode(', ', self::ADMIN_PAGE_CANDIDATES)])];
         }
 
-        if (! str_contains(File::get($path), self::ADMIN_PAGE_IMPORT)) {
+        $source = $this->readFile($path);
+
+        if ($source === null) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
+        }
+
+        if (! str_contains($source, self::ADMIN_PAGE_IMPORT)) {
             return [__('tbtop-cms::health.checks.js_wiring.hints.admin_page_import_missing', ['path' => $path])];
         }
 
@@ -129,7 +146,13 @@ final class JsWiringCheck implements HealthCheck
             return [__('tbtop-cms::health.checks.js_wiring.hints.css_not_found', ['candidates' => implode(', ', self::CSS_CANDIDATES)])];
         }
 
-        if (! str_contains(File::get($path), self::TAILWIND_SOURCE_NEEDLE)) {
+        $source = $this->readFile($path);
+
+        if ($source === null) {
+            return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
+        }
+
+        if (! str_contains($source, self::TAILWIND_SOURCE_NEEDLE)) {
             return [__('tbtop-cms::health.checks.js_wiring.hints.source_missing', ['path' => $path])];
         }
 
@@ -141,7 +164,9 @@ final class JsWiringCheck implements HealthCheck
     {
         foreach ($relativeCandidates as $relative) {
             $path = base_path($relative);
-            if (File::exists($path)) {
+            // isFile, not exists: a directory squatting on a candidate path
+            // is "not found", not a source file to read.
+            if (File::isFile($path)) {
                 return $path;
             }
         }

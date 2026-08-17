@@ -45,9 +45,11 @@ return [
             'ok' => 'Кореневий вигляд існує і містить partial з head для cms.',
             'missing_view' => 'Налаштований кореневий вигляд ":view" не існує.',
             'missing_include' => 'У кореневому вигляді :path немає include для head cms.',
+            'unreadable' => 'Кореневий вигляд за шляхом :path існує, але його не вдалося прочитати.',
             'hints' => [
                 'missing_view' => 'Створіть resources/views/:view.blade.php (стандартний scaffold-вигляд Laravel/Inertia) або вкажіть у tbtop-cms.render.root_view існуючий вигляд.',
                 'missing_include' => "Додайте @include('tbtop-cms::head') над @inertiaHead у кореневому Blade-вигляді.",
+                'unreadable' => 'Перевірте, що :path — звичайний файл, який користувач вебсервера може прочитати; до цього кожен рендер сторінки завершується помилкою.',
             ],
         ],
         'js_wiring' => [
@@ -57,6 +59,7 @@ return [
             'hints' => [
                 'combined' => ':details',
                 'entry_not_found' => 'JS-точку входу не знайдено (шукали: :candidates).',
+                'unreadable' => 'Файл :path існує, але його не вдалося прочитати (перевірте права доступу).',
                 'blocks_import_missing' => "У JS-точці входу :path немає імпорту '@cms/admin/blocks' — власні admin-блоки рендеритимуться як заглушки невідомого типу.",
                 'admin_page_not_found' => 'Компонент admin-сторінки не знайдено (шукали: :candidates).',
                 'admin_page_import_missing' => "Компонент admin-сторінки :path не імпортує з '@tbtop/inertia-admin' — Inertia не зможе розпізнати компонент admin/page.",
