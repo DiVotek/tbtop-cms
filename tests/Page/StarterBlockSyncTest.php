@@ -163,6 +163,33 @@ it('does not touch a subtree whose subcategory defines its own non-empty starter
         ->and($articleUnderSub->content[0]['data'])->toBe(['title' => 'Untouched']);
 });
 
+it('still syncs the subcategory itself when applying a category starter, while sparing its subtree', function (): void {
+    // A subcategory's OWN category starter speaks for its children, not for
+    // the subcategory-as-a-page: at creation the subcategory inherited from
+    // THIS ancestor's starter (its own did not exist yet), so the ancestor's
+    // force-apply keeps governing it — but never anything below it.
+    $root = Page::factory()->category()->create([
+        'starter_blocks' => ['category' => [['id' => 'root-cat-tpl', 'kind' => 'Hero']]],
+    ]);
+    $managedSub = Page::factory()->category()->create([
+        'parent_id' => $root->id,
+        'starter_blocks' => ['category' => [['id' => 'sub-cat-tpl', 'kind' => 'Simple']]],
+        'content' => [['id' => 'stale', 'kind' => 'Simple', 'active' => true, 'data' => [], 'tpl_id' => 'gone-tpl']],
+    ]);
+    $subSub = Page::factory()->category()->create([
+        'parent_id' => $managedSub->id,
+        'content' => [['id' => 'deep', 'kind' => 'Simple', 'active' => true, 'data' => ['title' => 'Untouched'], 'tpl_id' => 'sub-cat-tpl']],
+    ]);
+
+    $count = (new StarterBlockSync)->apply($root, 'category');
+    $managedSub->refresh();
+    $subSub->refresh();
+
+    expect($count)->toBe(1)
+        ->and(array_column($managedSub->content, 'tpl_id'))->toBe(['root-cat-tpl'])
+        ->and($subSub->content[0]['data'])->toBe(['title' => 'Untouched']);
+});
+
 it('does not touch a fallback-copied page (no tpl_id anywhere) even though it sits in scope', function (): void {
     $root = Page::factory()->category()->create([
         'starter_blocks' => ['category' => [['id' => 'root-tpl', 'kind' => 'Hero']]],

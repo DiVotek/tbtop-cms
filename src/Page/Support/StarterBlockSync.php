@@ -14,12 +14,16 @@ use Tbtop\Cms\Page\Models\Page;
  * 'category') to every already-existing descendant page of that type —
  * the "Apply to existing …" action on PageEditStarterBlocks.
  *
- * Scope: every descendant of $category with type=$type, found by a
- * recursive walk that STOPS descending into a subcategory the moment that
- * subcategory has its own non-empty starter_blocks[$type] — that subtree is
- * managed by its own starter instead, so neither the subcategory nor
- * anything under it is touched here. This mirrors StarterBlocks::contentFor()
- * picking the nearest ancestor starter on create.
+ * Scope: exactly the pages that would have inherited from THIS category's
+ * starter at creation time (StarterBlocks::contentFor() picks the nearest
+ * ancestor starter, walking up from the immediate parent). Concretely: a
+ * recursive walk over descendants collecting every page of $type, which
+ * stops DESCENDING into a subcategory the moment that subcategory has its
+ * own non-empty starter_blocks[$type] — everything under it inherits from
+ * the subcategory, so the subcategory's starter governs it. The subcategory
+ * ITSELF, however, stays in scope: its own starter only speaks for its
+ * children, while the subcategory-as-a-page was shaped by this (ancestor)
+ * category's starter — same rule that applied when it was created.
  *
  * A starter is structure only, so the sync is structural only (see
  * mergeBlocks()): a page block tagged with a tpl_id still present in the
@@ -77,7 +81,10 @@ final class StarterBlockSync
                 // A subcategory that defined its own non-empty starter for
                 // this type owns its subtree from here on — don't recurse
                 // into it, matching StarterBlocks::contentFor()'s nearest-
-                // ancestor-wins rule.
+                // ancestor-wins rule. The subcategory itself was already
+                // collected above when $type is 'category': its own starter
+                // governs its children, not the subcategory-as-a-page, which
+                // was shaped by THIS starter at creation (see class docblock).
                 if (BlockEnvelope::starterOf($child->starter_blocks, $type) !== []) {
                     continue;
                 }
