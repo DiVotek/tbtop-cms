@@ -20,6 +20,15 @@ return [
         'threw' => 'The check crashed unexpectedly: :error',
         'threw_hint' => 'This is a bug in the check itself, not your configuration. Please report it.',
     ],
+    'console' => [
+        'ok' => 'OK',
+        'warning' => 'WARN',
+        'error' => 'FAIL',
+        'summary' => ':ok ok, :warnings warning(s), :errors error(s).',
+    ],
+    'page' => [
+        'sqlite_missing' => 'The table view needs the sqlite PHP extension (pdo_sqlite), which this server does not have — showing the plain report instead. Install pdo_sqlite to get the full table, or use `php artisan cms:doctor`.',
+    ],
     'checks' => [
         'routes_registered' => [
             'label' => 'Panel and frontend routes',
@@ -78,8 +87,10 @@ return [
             'label' => 'Media disk writable',
             'ok' => 'The ":disk" disk accepted a write+delete probe file.',
             'failed' => 'Writing to the ":disk" disk failed: :error',
+            'delete_failed' => 'The ":disk" disk accepted the probe write, but the probe file could not be deleted (left at :path).',
             'write_verified_false' => 'the file was written but could not be found afterwards',
             'hints' => [
+                'delete_failed' => 'The credential for the ":disk" disk can write but not delete — media replace and delete will leave files behind. Grant delete permission and remove the leftover probe files under tbtop-cms-health-check/.',
                 'failed' => 'Check the ":disk" disk configuration in config/filesystems.php and the tbtop-admin.media.disk setting — the media library and uploads will fail until this disk is writable.',
             ],
         ],

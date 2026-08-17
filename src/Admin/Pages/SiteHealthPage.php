@@ -11,6 +11,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\HealthReportQuery;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
+use Tbtop\Cms\Health\HealthCheckRunner;
 
 /**
  * Read-only diagnostic page: one row per registered health check, re-run on
@@ -66,6 +67,10 @@ class SiteHealthPage extends AdminPage
 
     public function view(S $s): Node
     {
+        if (! HealthReportQuery::supported()) {
+            return $this->fallbackView($s);
+        }
+
         $table = $s->table('siteHealth')
             ->query(static fn () => HealthReportQuery::build())
             ->columns([
@@ -94,5 +99,29 @@ class SiteHealthPage extends AdminPage
             'error' => __('tbtop-cms::health.statuses.error'),
             default => __('tbtop-cms::health.statuses.ok'),
         };
+    }
+
+    /**
+     * Rendering without pdo_sqlite: the DSL table needs the :memory:
+     * connection (see HealthReportQuery), but the checks themselves don't —
+     * so the report still runs and renders as a plain key/value list behind
+     * an alert explaining the degraded view, rather than the page fataling
+     * on a driver the host never declared it needed.
+     */
+    private function fallbackView(S $s): Node
+    {
+        $report = app(HealthCheckRunner::class)->run();
+
+        $rows = [];
+        foreach ($report->results as $result) {
+            $line = $this->statusLabel($result->status->value) . ' — ' . $result->message();
+            $hint = $result->hint();
+            $rows[$result->label()] = $hint === null ? $line : $line . ' ' . $hint;
+        }
+
+        return $s->stack([
+            $s->displayAlert(__('tbtop-cms::health.page.sqlite_missing')),
+            $s->displayKeyValue($rows),
+        ]);
     }
 }

@@ -34,12 +34,17 @@ class DoctorCommand extends Command
         return $report->exitCode();
     }
 
+    /**
+     * Localized like every other user-facing health string — the check
+     * messages already render in the app locale, and a mixed-language line
+     * ("Пульс планувальника ... [WARN]") reads like a bug in itself.
+     */
     private function statusPrefix(HealthStatus $status): string
     {
         return match ($status) {
-            HealthStatus::Ok => '<fg=green>[OK]</>',
-            HealthStatus::Warning => '<fg=yellow>[WARN]</>',
-            HealthStatus::Error => '<fg=red>[FAIL]</>',
+            HealthStatus::Ok => '<fg=green>[' . __('tbtop-cms::health.console.ok') . ']</>',
+            HealthStatus::Warning => '<fg=yellow>[' . __('tbtop-cms::health.console.warning') . ']</>',
+            HealthStatus::Error => '<fg=red>[' . __('tbtop-cms::health.console.error') . ']</>',
         };
     }
 
@@ -50,7 +55,11 @@ class DoctorCommand extends Command
             $counts[$result->status->value]++;
         }
 
-        $summary = "{$counts['ok']} ok, {$counts['warning']} warning(s), {$counts['error']} error(s).";
+        $summary = __('tbtop-cms::health.console.summary', [
+            'ok' => $counts['ok'],
+            'warnings' => $counts['warning'],
+            'errors' => $counts['error'],
+        ]);
 
         if ($report->hasErrors()) {
             $this->error($summary);

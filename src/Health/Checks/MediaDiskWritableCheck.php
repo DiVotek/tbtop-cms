@@ -33,7 +33,11 @@ final class MediaDiskWritableCheck implements HealthCheck
             $storage = Storage::disk($disk);
             $storage->put($probePath, 'tbtop-cms health check');
             $written = $storage->exists($probePath);
+            // delete() returns false rather than throwing on most adapters,
+            // so a write-only credential (no delete permission) would pass
+            // silently and leave a probe object behind on every run.
             $storage->delete($probePath);
+            $cleaned = ! $storage->exists($probePath);
         } catch (Throwable $e) {
             return new HealthCheckResult(
                 checkId: $this->id(),
@@ -54,6 +58,18 @@ final class MediaDiskWritableCheck implements HealthCheck
                 messageKey: 'tbtop-cms::health.checks.media_disk_writable.failed',
                 messageReplace: ['disk' => $disk, 'error' => __('tbtop-cms::health.checks.media_disk_writable.write_verified_false')],
                 hintKey: 'tbtop-cms::health.checks.media_disk_writable.hints.failed',
+                hintReplace: ['disk' => $disk],
+            );
+        }
+
+        if (! $cleaned) {
+            return new HealthCheckResult(
+                checkId: $this->id(),
+                status: HealthStatus::Warning,
+                labelKey: 'tbtop-cms::health.checks.media_disk_writable.label',
+                messageKey: 'tbtop-cms::health.checks.media_disk_writable.delete_failed',
+                messageReplace: ['disk' => $disk, 'path' => $probePath],
+                hintKey: 'tbtop-cms::health.checks.media_disk_writable.hints.delete_failed',
                 hintReplace: ['disk' => $disk],
             );
         }

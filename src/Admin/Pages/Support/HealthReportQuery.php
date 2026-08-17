@@ -28,6 +28,18 @@ final class HealthReportQuery
 
     private const string TABLE = 'health_checks';
 
+    /**
+     * The table rendering (not the checks themselves) needs the sqlite PDO
+     * driver for the :memory: connection below. Near-universal — Laravel
+     * ships with sqlite as its default database since 11 — but a stripped
+     * MySQL-only PHP build can lack it, and the page must degrade to the
+     * non-table fallback instead of fataling before any result renders.
+     */
+    public static function supported(): bool
+    {
+        return extension_loaded('pdo_sqlite');
+    }
+
     public static function build(): Builder
     {
         self::registerConnection();
