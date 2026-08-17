@@ -1,4 +1,5 @@
 import { defineBlock, type RenderProps } from "@tbtop/inertia-admin";
+import { useContentLocale } from "./useContentLocale";
 
 type Status = "pass" | "warn" | "fail";
 
@@ -13,7 +14,9 @@ interface Check {
 }
 
 interface SeoChecklistOptions {
-	checks: Check[];
+	/** One resolved check list per content locale — the client picks by active tab. */
+	byLocale: Record<string, Check[]>;
+	defaultLocale: string;
 	labels: {
 		required: string;
 		optional: string;
@@ -59,8 +62,17 @@ function ChecklistRow({ check, statusWord }: { check: Check; statusWord: string 
 }
 
 export function SeoChecklistBlock({ options }: RenderProps<SeoChecklistOptions>) {
-	const required = options.checks.filter((c) => c.required);
-	const optional = options.checks.filter((c) => !c.required);
+	// Follows the form's locale tabs, same as the SERP preview block. A locale
+	// the server did not resolve (added mid-session) falls back to the default
+	// rather than blanking the list.
+	const activeLocale = useContentLocale();
+	const checks =
+		(activeLocale === null ? undefined : options.byLocale[activeLocale]) ??
+		options.byLocale[options.defaultLocale] ??
+		[];
+
+	const required = checks.filter((c) => c.required);
+	const optional = checks.filter((c) => !c.required);
 
 	return (
 		<div className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3">

@@ -164,6 +164,17 @@ to also create and edit users — see Added below); it no longer assigns roles.
   a plain pass/warn/fail fact. A pixel-width live preview is intentionally
   not part of this: it needs `liveRegion` from an unreleased admin client
   version and is left for a later pass.
+- **Per-locale SEO checklist and social (OG) preview**: the checklist now
+  resolves every editor-active locale at once (same set the search preview
+  already covers) and the client switches with the locale tabs, instead of
+  only ever showing the default locale's checks. A new social preview card
+  sits above the OG fields, live-rendered the same way the search preview is:
+  image (1.91:1), host, title and description, resolved through the real
+  `og:title`/`og:description` fallback cascade against the editor's unsaved
+  input — so what an editor sees is what a link to the page would actually
+  show when shared, not the raw field values. The checklist itself stays a
+  page-load snapshot rather than a live region: its duplicate-title check
+  runs a database query, and nothing else in it changes mid-keystroke either.
 - **SEO column** in the Pages list: a `seo_state` badge (Missing / Needs work
   / Good) placed after the status column, computed in SQL via `selectRaw` so
   it costs nothing extra per row. Deliberately narrower than the editor's

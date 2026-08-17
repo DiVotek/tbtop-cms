@@ -241,6 +241,12 @@ return [
             'truncated' => 'Will be cut off',
         ],
     ],
+    'og_preview' => [
+        'section_title' => 'Social preview',
+        'empty_title' => 'No title yet',
+        'empty_description' => 'No description yet.',
+        'no_image_hint' => 'No image resolved — set one here, on the page image, or as the site default.',
+    ],
     'seo_checklist' => [
         'section_title' => 'SEO checklist',
         // Required = the page reads badly in a result list without it.
