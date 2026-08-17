@@ -121,7 +121,9 @@ return [
             'ok' => 'APP_URL is set to :url.',
             'not_production' => 'Skipped outside the production environment (currently ":environment").',
             'suspicious' => 'APP_URL is set to ":url", which looks like a local development address.',
+            'malformed' => 'APP_URL is set to ":url", which is not an absolute http(s) URL with a host.',
             'hints' => [
+                'malformed' => 'Set APP_URL in .env to the full production URL (https://example.com) — every absolute URL the site generates (canonical tags, sitemap, Open Graph) is built from it and is currently invalid.',
                 'suspicious' => 'Set APP_URL in .env to the real production URL — it feeds canonical tags, sitemap entries, and Open Graph URLs.',
             ],
         ],

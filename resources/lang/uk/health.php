@@ -121,7 +121,9 @@ return [
             'ok' => 'APP_URL встановлено як :url.',
             'not_production' => 'Пропущено поза production-середовищем (зараз ":environment").',
             'suspicious' => 'APP_URL встановлено як ":url" — схоже на локальну адресу для розробки.',
+            'malformed' => 'APP_URL має значення ":url" — це не абсолютний http(s) URL з хостом.',
             'hints' => [
+                'malformed' => 'Вкажіть у .env повний production-URL (https://example.com) — з APP_URL будується кожен абсолютний URL сайту (canonical, sitemap, Open Graph), і зараз вони некоректні.',
                 'suspicious' => 'Встановіть у .env реальний production URL в APP_URL — він використовується в canonical-тегах, карті сайту та посиланнях Open Graph.',
             ],
         ],

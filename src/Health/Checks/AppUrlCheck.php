@@ -37,7 +37,22 @@ final class AppUrlCheck implements HealthCheck
         $host = parse_url($url, PHP_URL_HOST);
         $scheme = parse_url($url, PHP_URL_SCHEME);
 
-        $isLocalHost = is_string($host) && (str_contains($host, 'localhost') || $host === '127.0.0.1');
+        // Same shape SeoResolver demands of a canonical override: an http(s)
+        // scheme AND a host. An empty, relative, or scheme-less APP_URL is
+        // worse than a localhost one — every absolute URL generated from it
+        // is invalid, not merely pointing at the wrong host.
+        if (! in_array($scheme, ['http', 'https'], true) || ! is_string($host) || $host === '') {
+            return new HealthCheckResult(
+                checkId: $this->id(),
+                status: HealthStatus::Error,
+                labelKey: 'tbtop-cms::health.checks.app_url.label',
+                messageKey: 'tbtop-cms::health.checks.app_url.malformed',
+                messageReplace: ['url' => $url === '' ? '(empty)' : $url],
+                hintKey: 'tbtop-cms::health.checks.app_url.hints.malformed',
+            );
+        }
+
+        $isLocalHost = str_contains($host, 'localhost') || $host === '127.0.0.1';
         $isPlainHttp = $scheme === 'http';
 
         if ($isLocalHost || $isPlainHttp) {
