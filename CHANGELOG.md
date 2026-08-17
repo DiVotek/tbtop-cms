@@ -206,6 +206,26 @@ to also create and edit users — see Added below); it no longer assigns roles.
   the `panel.pages` list themselves — a published config shadows the package
   default, so the page (and its route) does not appear until the entry is
   added.
+- **SEO report**: a new "SEO report" admin page (nav: Content, after the 404
+  log, shares the `tbtop-cms.redirects` ability) lists site-wide SEO problems
+  across every published page and active frontend locale — one row per
+  (page, locale, issue): missing title, missing description (fail); duplicate
+  title, missing OG image, noindex on a published page, missing translation
+  for hreflang (warn). Backed by a new `SeoAudit` class that loads every
+  published page in a single query and re-derives the same "own value"
+  cascades `SeoChecklist` uses, entirely in PHP — deliberately not a
+  per-page `SeoResolver::resolve()` run, which would cost pages × locales
+  resolutions on a report page. A summary alert at the top counts problems
+  and affected pages, or reports a clean site. **Hosts with a published**
+  `config/tbtop-cms.php` must add `'seo_report' => SeoReportPage::class` to
+  the `admin.pages` list themselves, same as `site_health` above.
+- **404 log auto-prune**: `cms:not-found:prune` is now scheduled daily by the
+  package itself (no host wiring needed, as long as `schedule:run` runs every
+  minute). Opt out with `tbtop-cms.not_found.auto_prune => false` and schedule
+  it yourself on whatever cadence you prefer — see the README's "404 log"
+  section. **Upgrading:** hosts that already schedule `cms:not-found:prune`
+  themselves should either remove their own schedule entry or set
+  `auto_prune => false` to avoid running it twice a day.
 
 ### Changed
 

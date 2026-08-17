@@ -16,6 +16,7 @@ use Tbtop\Cms\Admin\Pages\PageEditPage;
 use Tbtop\Cms\Admin\Pages\PagesPage;
 use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Admin\Pages\RedirectsPage;
+use Tbtop\Cms\Admin\Pages\SeoReportPage;
 use Tbtop\Cms\Admin\Pages\SeoSettingsPage;
 use Tbtop\Cms\Admin\Pages\SiteHealthPage;
 use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
@@ -120,6 +121,12 @@ return [
         // this key. The on/off switch itself lives in Settings
         // (seo.not_found.enabled), not here — see RecordsNotFoundHit.
         'ignore' => NotFoundNoise::DEFAULT_IGNORE,
+        // Daily cms:not-found:prune scheduling, wired by the package itself
+        // (see CmsServiceProvider::wireNotFoundPruneSchedule()). Read with an
+        // inline default (config('tbtop-cms.not_found.auto_prune', true)) —
+        // published host configs override whole sections and won't have this
+        // key. Set to false to prune some other way, or not at all.
+        'auto_prune' => true,
     ],
     'revisions' => [
         // Number of content-revision snapshots kept per page (oldest pruned
@@ -157,6 +164,7 @@ return [
             'page_edit' => PageEditPage::class,
             'redirects' => RedirectsPage::class,
             'not_found' => NotFoundLogPage::class,
+            'seo_report' => SeoReportPage::class,
             'media_library' => MediaLibraryPage::class,
             'site_settings' => SiteSettingsPage::class,
             'seo_settings' => SeoSettingsPage::class,

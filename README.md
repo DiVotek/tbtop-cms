@@ -275,16 +275,23 @@ settings page, or narrow the noise filter it applies before writing
 ],
 ```
 
-**The package does not prune old rows on its own.** Schedule the cleanup
-command yourself, in your app's console kernel/routes:
+**The package schedules `cms:not-found:prune` daily on its own** — no console
+kernel/routes wiring needed, as long as your server's cron runs
+`php artisan schedule:run` every minute. It deletes rows whose `last_seen_at`
+is older than the retention window set on the SEO settings page (default 90
+days). To prune on a different cadence, or not at all, turn off the built-in
+schedule and wire it yourself:
+
+```php
+'not_found' => [
+    'auto_prune' => false,
+],
+```
 
 ```php
 // routes/console.php
-Schedule::command('cms:not-found:prune')->daily();
+Schedule::command('cms:not-found:prune')->weekly();
 ```
-
-`cms:not-found:prune` deletes rows whose `last_seen_at` is older than the
-retention window set on the SEO settings page (default 90 days).
 
 ## Admin access and roles
 

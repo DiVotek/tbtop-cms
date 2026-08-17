@@ -132,6 +132,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireLocaleSeeding();
         $this->wireSubmissionNotifications();
         $this->wireNotFoundLogging();
+        $this->wireNotFoundPruneSchedule();
         $this->wireSchedulerHeartbeat();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
@@ -316,6 +317,29 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireNotFoundLogging(): void
     {
         Event::listen(PageNotFound::class, RecordsNotFoundHit::class);
+    }
+
+    /**
+     * Scheduled by the package, opt-out via config: unlike the scheduler
+     * heartbeat (which must exist unconditionally, see below), a host that
+     * prunes the 404 log some other way — or wants to keep every row — needs
+     * a way to turn this off. Read with an inline default (published host
+     * configs won't have the `not_found` key at all, see the config file's
+     * comments), so silence here means "keep the package default", not
+     * "disable it".
+     */
+    private function wireNotFoundPruneSchedule(): void
+    {
+        if (! config('tbtop-cms.not_found.auto_prune', true)) {
+            return;
+        }
+
+        $this->app->booted(function (): void {
+            $schedule = $this->app->make(Schedule::class);
+
+            $schedule->command(PruneNotFoundHitsCommand::class)->daily()
+                ->name('tbtop-cms:not-found:prune');
+        });
     }
 
     /**
