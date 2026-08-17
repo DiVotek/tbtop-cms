@@ -155,6 +155,7 @@ class PageForm
                 ->translatable()
                 ->helperText(__('tbtop-cms::pages.fields.seo_focus_keyword_hint')),
             $s->section(['title' => __('tbtop-cms::pages.sections.social')], [
+                ...OgPreview::build($s, $page, app(Languages::class)->defaultLocale()),
                 // og:title/og:description fall back to the UNtemplated meta
                 // values (see SeoResolver: ogTitle uses metaTitle, not
                 // title()), so their placeholders show ogTitle/ogDescription
@@ -336,11 +337,20 @@ class PageForm
     }
 
     /**
-     * Read-only checklist, rendered beside the SEO fields. Computed for the
-     * default locale only, same as computedPlaceholders() above. Absent for
-     * the create modal ($page null/unsaved): there is nothing to check yet,
-     * and duplicate-title comparison needs a persisted id to exclude itself
-     * from the query.
+     * Read-only checklist, rendered beside the SEO fields. Computed for every
+     * editor locale at once (see EditorLocales::list()), same set SerpPreview
+     * resolves — the client picks the active tab's entry, same reasoning as
+     * that block's docblock. Absent for the create modal ($page null/
+     * unsaved): there is nothing to check yet, and duplicate-title comparison
+     * needs a persisted id to exclude itself from the query.
+     *
+     * Deliberately NOT a liveRegion, unlike SerpPreview/OgPreview: the
+     * duplicate-title check runs a database query (SeoChecklist::
+     * duplicateTitleCheck()), and every other check reads facts that only
+     * change on save (is_indexable, hreflang coverage, the saved og_image) —
+     * recomputing a DB query on every keystroke a live region would trigger
+     * buys nothing an editor would notice mid-edit. The checklist catches up
+     * on save or reload, which is when its facts actually change.
      *
      * A custom node kind rather than display blocks: displayValue() and
      * displayText() are separate blocks stacked vertically, so every check
@@ -359,19 +369,24 @@ class PageForm
             return [];
         }
 
-        $locale = app(Languages::class)->defaultLocale();
+        $defaultLocale = app(Languages::class)->defaultLocale();
+        $checklist = app(SeoChecklist::class);
 
-        $checks = array_map(
-            static fn (array $check): array => [
-                ...$check,
-                'statusWord' => __('tbtop-cms::pages.seo_checklist.status.' . $check['status']),
-            ],
-            app(SeoChecklist::class)->for($page, $locale),
-        );
+        $byLocale = [];
+        foreach (EditorLocales::list($defaultLocale) as $locale) {
+            $byLocale[$locale] = array_map(
+                static fn (array $check): array => [
+                    ...$check,
+                    'statusWord' => __('tbtop-cms::pages.seo_checklist.status.' . $check['status']),
+                ],
+                $checklist->for($page, $locale),
+            );
+        }
 
         return [
             new Node('cms:seoChecklist', [
-                'checks' => $checks,
+                'byLocale' => $byLocale,
+                'defaultLocale' => $defaultLocale,
                 'labels' => [
                     'required' => __('tbtop-cms::pages.seo_checklist.groups.required'),
                     'optional' => __('tbtop-cms::pages.seo_checklist.groups.optional'),

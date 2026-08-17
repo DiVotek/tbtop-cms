@@ -9,7 +9,6 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
-use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -48,7 +47,7 @@ final class SerpPreview
             return [];
         }
 
-        $locales = self::locales($defaultLocale);
+        $locales = EditorLocales::list($defaultLocale);
 
         $deps = [];
         foreach ($locales as $locale) {
@@ -71,23 +70,6 @@ final class SerpPreview
         // (FormBuilder::searchLiveRegion), so a pre-serialized node renders
         // once and then 404s on every subsequent dependency change.
         return [$region];
-    }
-
-    /**
-     * Locales the editor can switch between, default first — seeding the list
-     * with the default is also what keeps it non-empty when the language table
-     * has no admin-active rows, so the card always has something to render.
-     *
-     * @return list<string>
-     */
-    private static function locales(string $defaultLocale): array
-    {
-        $active = array_map(
-            static fn (array $row): string => $row['locale'],
-            app(Languages::class)->adminActive(),
-        );
-
-        return array_values(array_unique([$defaultLocale, ...$active]));
     }
 
     /**

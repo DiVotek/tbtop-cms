@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Admin\Pages\Support\OgPreview;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
@@ -109,7 +110,11 @@ it('sends every check to the checklist block, split into required and optional',
     collectNodesByKind($tabs[1]['body'], 'cms:seoChecklist', $nodes);
     expect($nodes)->toHaveCount(1);
 
-    $checks = $nodes[0]['options']['checks'];
+    $byLocale = $nodes[0]['options']['byLocale'];
+    expect($byLocale)->toHaveKey('en')
+        ->and($nodes[0]['options']['defaultLocale'])->toBe('en');
+
+    $checks = $byLocale['en'];
 
     // Focus keyword is unset on this page, so its four presence sub-checks
     // don't fire — the rest are always present.
@@ -131,6 +136,82 @@ it('sends every check to the checklist block, split into required and optional',
         __('tbtop-cms::pages.seo_checklist.status.fail'),
     ];
     expect(array_column($checks, 'statusWord'))->each->toBeIn($words);
+});
+
+it('resolves the checklist for every admin-active locale, not just the default', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        // en carries nothing at all (name empty too), so its meta-title
+        // cascade bottoms out empty; uk has a name to fall back to. Only a
+        // per-locale resolve tells the two apart — a checklist copying the
+        // default locale's checks would report both the same way.
+        'name' => ['en' => '', 'uk' => 'Про нас'],
+    ]);
+
+    $tabs = editFormTabs($page->id);
+    $nodes = [];
+    collectNodesByKind($tabs[1]['body'], 'cms:seoChecklist', $nodes);
+
+    $byLocale = $nodes[0]['options']['byLocale'];
+    expect(array_keys($byLocale))->toBe(['en', 'uk'])
+        ->and($nodes[0]['options']['defaultLocale'])->toBe('en');
+
+    $enTitle = collect($byLocale['en'])->firstWhere('key', 'title');
+    $ukTitle = collect($byLocale['uk'])->firstWhere('key', 'title');
+    expect($enTitle['status'])->toBe('fail')
+        ->and($ukTitle['status'])->toBe('pass');
+});
+
+it('carries the og deps for every locale and the shared og_image dep on the ogPreview live region', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About', 'uk' => 'Про нас']]);
+
+    $tabs = editFormTabs($page->id);
+    $regions = [];
+    collectNodesByKind($tabs[1]['body'], 'liveRegion', $regions);
+    $ogRegion = collect($regions)->firstWhere('name', 'ogPreview');
+
+    expect($ogRegion)->not->toBeNull()
+        ->and($ogRegion['options']['dependsOn'])->toBe([
+            'og_image',
+            'og_title.en', 'og_description.en', 'seo_title.en', 'seo_description.en',
+            'og_title.uk', 'og_description.uk', 'seo_title.uk', 'seo_description.uk',
+        ]);
+});
+
+it('reflects an unsaved seo_title in the ogPreview card while og_title is empty', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $region = collect(OgPreview::build(app(S::class), $page, 'en'))->first();
+    $node = collect($region->renderWith(['seo_title.en' => 'Draft meta title', 'og_image' => '']))->first();
+
+    // og:title has no override of its own, so it resolves through the meta
+    // title cascade — the card must follow the unsaved meta title, not the
+    // saved fallback ("About" from the page name).
+    expect($node->options['byLocale']['en']['title'])->toBe('Draft meta title');
+});
+
+it('reflects an unsaved og_title override in the ogPreview card, per locale', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $region = collect(OgPreview::build(app(S::class), $page, 'en'))->first();
+    $node = collect($region->renderWith(['og_title.en' => 'Draft OG title', 'og_image' => '']))->first();
+
+    expect($node->options['byLocale']['en']['title'])->toBe('Draft OG title')
+        // The saved page carries no og_title, so without the overlay this
+        // would fall back to the meta title/name cascade ("About") instead.
+        ->not->toBe('About');
+});
+
+it('resolves image=null on the ogPreview card when og_image is empty and the page has no image', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $region = collect(OgPreview::build(app(S::class), $page, 'en'))->first();
+    $node = collect($region->renderWith(['og_image' => '']))->first();
+
+    expect($node->options['image'])->toBeNull();
 });
 
 it('omits the SEO checklist section for a null or unsaved page', function (): void {
@@ -1007,6 +1088,14 @@ function collectNodesByKind(array $node, string $kind, array &$out): void
     foreach ((array) ($node['options']['tabs'] ?? []) as $tab) {
         if (is_array($tab) && isset($tab['body']) && is_array($tab['body'])) {
             collectNodesByKind($tab['body'], $kind, $out);
+        }
+    }
+    // A liveRegion node (SerpPreview/OgPreview) carries its render output
+    // under options.initial rather than options.children — the wire shape
+    // LiveRegionBuilder::toNode() produces for the page's first paint.
+    foreach ((array) ($node['options']['initial'] ?? []) as $initial) {
+        if (is_array($initial)) {
+            collectNodesByKind($initial, $kind, $out);
         }
     }
 }
