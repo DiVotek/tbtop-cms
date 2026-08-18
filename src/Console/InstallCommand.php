@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
+use Spatie\Activitylog\ActivitylogServiceProvider;
 use Tbtop\Cms\Database\Seeders\LanguageSeeder;
 use Tbtop\Cms\Database\Seeders\PageSeeder;
 use Throwable;
@@ -18,6 +20,7 @@ class InstallCommand extends Command
     public function handle(): int
     {
         $this->publishConfig();
+        $this->publishActivitylogMigrations();
 
         if (! $this->runMigrations()) {
             return self::FAILURE;
@@ -42,6 +45,24 @@ class InstallCommand extends Command
 
         $this->callSilently('vendor:publish', $arguments);
         $this->info('Published the CMS config.');
+    }
+
+    private function publishActivitylogMigrations(): void
+    {
+        try {
+            $table = (string) config('activitylog.table_name', 'activity_log');
+            if (Schema::hasTable($table)) {
+                return;
+            }
+        } catch (Throwable) {
+            return;
+        }
+
+        $this->callSilently('vendor:publish', [
+            '--provider' => ActivitylogServiceProvider::class,
+            '--tag' => 'activitylog-migrations',
+        ]);
+        $this->info('Published the activity log migrations.');
     }
 
     private function runMigrations(): bool

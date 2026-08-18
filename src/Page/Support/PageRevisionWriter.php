@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Page\Support;
 
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageRevision;
@@ -107,7 +108,11 @@ class PageRevisionWriter
         $page->pendingRestore = true;
 
         try {
-            $page->save();
+            app(AuditContext::class)->during(
+                'revision_restored',
+                ['revision_id' => $revision->getKey()],
+                static fn (): bool => $page->save(),
+            );
         } finally {
             $page->pendingRestore = false;
         }

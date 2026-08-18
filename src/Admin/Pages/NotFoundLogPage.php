@@ -20,6 +20,7 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
 use Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\NotFound\Models\NotFoundHit;
 
 /**
@@ -180,7 +181,11 @@ class NotFoundLogPage extends AdminPage
             return Effects::make()->haltModal(is_string($first) ? $first : $e->getMessage());
         }
 
-        NotFoundHit::query()->whereKey($ctx->row['id'] ?? null)->update(['is_ignored' => true]);
+        $hit = NotFoundHit::query()->find($ctx->row['id'] ?? null);
+        $hit?->forceFill(['is_ignored' => true])->save();
+        if ($hit !== null) {
+            self::logHit($hit, 'ignored');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::not-found.actions.create_redirect_saved'))
             ->closeModal()->refreshTable();
@@ -194,7 +199,9 @@ class NotFoundLogPage extends AdminPage
     private function ignoreAction(S $s): ActionBuilder
     {
         return RecordAction::server($s, 'notFoundIgnore', static function (ActionCtx $ctx): Effects {
-            NotFoundHit::query()->whereKey($ctx->row['id'] ?? null)->update(['is_ignored' => true]);
+            $hit = NotFoundHit::query()->findOrFail($ctx->row['id'] ?? null);
+            $hit->forceFill(['is_ignored' => true])->save();
+            self::logHit($hit, 'ignored');
 
             return Effects::make()->notify(__('tbtop-cms::not-found.actions.ignored'))->refreshTable();
         })
@@ -205,7 +212,9 @@ class NotFoundLogPage extends AdminPage
     private function unignoreAction(S $s): ActionBuilder
     {
         return RecordAction::server($s, 'notFoundUnignore', static function (ActionCtx $ctx): Effects {
-            NotFoundHit::query()->whereKey($ctx->row['id'] ?? null)->update(['is_ignored' => false]);
+            $hit = NotFoundHit::query()->findOrFail($ctx->row['id'] ?? null);
+            $hit->forceFill(['is_ignored' => false])->save();
+            self::logHit($hit, 'unignored');
 
             return Effects::make()->notify(__('tbtop-cms::not-found.actions.unignored'))->refreshTable();
         })
@@ -218,7 +227,9 @@ class NotFoundLogPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
-                NotFoundHit::query()->whereKey($ctx->row['id'] ?? null)->delete();
+                $hit = NotFoundHit::query()->findOrFail($ctx->row['id'] ?? null);
+                $hit->delete();
+                self::logHit($hit, 'deleted');
 
                 return Effects::make()->notify(__('tbtop-cms::not-found.actions.deleted'))->refreshTable();
             },
@@ -230,7 +241,15 @@ class NotFoundLogPage extends AdminPage
     private function bulkIgnoreAction(S $s): ActionBuilder
     {
         return RecordAction::bulk($s, 'notFoundBulkIgnore', static function (ActionCtx $ctx): Effects {
+            $hits = NotFoundHit::query()->whereIn('id', $ctx->selection)->get();
             NotFoundHit::query()->whereIn('id', $ctx->selection)->update(['is_ignored' => true]);
+            app(AuditContext::class)->batch(static function () use ($hits): void {
+                foreach ($hits as $hit) {
+                    if (! $hit->is_ignored) {
+                        self::logHit($hit, 'ignored');
+                    }
+                }
+            });
 
             return Effects::make()->notify(__('tbtop-cms::not-found.actions.bulk_ignore_done'))->refreshTable();
         })->label(__('tbtop-cms::not-found.actions.bulk_ignore'));
@@ -241,12 +260,28 @@ class NotFoundLogPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
+                $hits = NotFoundHit::query()->whereIn('id', $ctx->selection)->get();
                 NotFoundHit::query()->whereIn('id', $ctx->selection)->delete();
+                app(AuditContext::class)->batch(static function () use ($hits): void {
+                    foreach ($hits as $hit) {
+                        self::logHit($hit, 'deleted');
+                    }
+                });
 
                 return Effects::make()->notify(__('tbtop-cms::not-found.actions.deleted'))->refreshTable();
             },
             'notFoundBulkDelete',
             bulk: true,
+        );
+    }
+
+    private static function logHit(NotFoundHit $hit, string $event): void
+    {
+        app(AuditContext::class)->log(
+            $hit,
+            $event,
+            $hit->path,
+            context: ['path' => $hit->path, 'locale' => $hit->locale],
         );
     }
 }

@@ -19,6 +19,7 @@ use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Models\Language;
 
@@ -217,7 +218,11 @@ class LanguagesPage extends AdminPage
         $language = Language::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
 
         try {
-            $language->forceDelete();
+            app(AuditContext::class)->during(
+                'force_deleted',
+                [],
+                static fn (): ?bool => $language->forceDelete(),
+            );
         } catch (DomainException $e) {
             return Effects::make()->notify($e->getMessage(), 'error');
         }

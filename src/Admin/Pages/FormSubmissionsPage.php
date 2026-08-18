@@ -17,6 +17,7 @@ use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EnumLabel;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
@@ -279,6 +280,11 @@ class FormSubmissionsPage extends AdminPage
 
         app(SubmissionRetrier::class)->retry($submission);
         $submission->refresh();
+        $this->logSubmission(
+            $submission,
+            'delivery_retried',
+            context: ['result' => $submission->status->value],
+        );
 
         return $submission->status === SubmissionStatus::Handled
             ? Effects::make()->notify(__('tbtop-cms::form-submissions.actions.retried'))->refreshTable()
@@ -304,7 +310,9 @@ class FormSubmissionsPage extends AdminPage
 
     private function delete(ActionCtx $ctx): Effects
     {
-        FormSubmission::query()->whereKey((int) ($ctx->row['id'] ?? 0))->delete();
+        $submission = FormSubmission::query()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $submission->delete();
+        $this->logSubmission($submission, 'deleted');
 
         return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.deleted'))->refreshTable();
     }
@@ -356,7 +364,13 @@ class FormSubmissionsPage extends AdminPage
 
     private function deleteBulk(ActionCtx $ctx): Effects
     {
+        $submissions = FormSubmission::query()->whereKey($ctx->selection)->get();
         FormSubmission::query()->whereKey($ctx->selection)->delete();
+        app(AuditContext::class)->batch(function () use ($submissions): void {
+            foreach ($submissions as $submission) {
+                $this->logSubmission($submission, 'deleted');
+            }
+        });
 
         return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.deleted'))->refreshTable();
     }
@@ -368,6 +382,43 @@ class FormSubmissionsPage extends AdminPage
             return;
         }
 
+        $submissions = FormSubmission::query()->whereKey($ids)->get();
         FormSubmission::query()->whereKey($ids)->update(['lead_status' => $status->value]);
+        app(AuditContext::class)->batch(function () use ($submissions, $status): void {
+            foreach ($submissions as $submission) {
+                if ($submission->lead_status === $status) {
+                    continue;
+                }
+
+                $this->logSubmission($submission, 'status_changed', [
+                    'attributes' => ['lead_status' => $status->value],
+                    'old' => ['lead_status' => $submission->lead_status->value],
+                ]);
+            }
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $changes
+     * @param  array<string, mixed>  $context
+     */
+    private function logSubmission(
+        FormSubmission $submission,
+        string $event,
+        array $changes = [],
+        array $context = [],
+    ): void {
+        app(AuditContext::class)->log(
+            $submission,
+            $event,
+            $submission->kind . ' #' . $submission->getKey(),
+            $changes,
+            [
+                'page_id' => $submission->page_id,
+                'kind' => $submission->kind,
+                'locale' => $submission->locale,
+                ...$context,
+            ],
+        );
     }
 }

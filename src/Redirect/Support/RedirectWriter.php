@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Redirect\Support;
 
+use Spatie\Activitylog\ActivityLogger;
 use Tbtop\Cms\Redirect\Models\Redirect;
 
 class RedirectWriter
@@ -17,16 +18,18 @@ class RedirectWriter
             return;
         }
 
-        Redirect::query()
-            ->where('locale', $locale)
-            ->where('is_auto', true)
-            ->where('to_path', $from)
-            ->update(['to_path' => $to]);
+        app(ActivityLogger::class)->withoutLogs(function () use ($locale, $from, $to): void {
+            Redirect::query()
+                ->where('locale', $locale)
+                ->where('is_auto', true)
+                ->where('to_path', $from)
+                ->update(['to_path' => $to]);
 
-        Redirect::query()->updateOrCreate(
-            ['locale' => $locale, 'from_path' => $from],
-            ['to_path' => $to, 'status_code' => 301, 'is_auto' => true],
-        );
+            Redirect::query()->updateOrCreate(
+                ['locale' => $locale, 'from_path' => $from],
+                ['to_path' => $to, 'status_code' => 301, 'is_auto' => true],
+            );
+        });
     }
 
     public function clearAt(string $locale, string $path): void

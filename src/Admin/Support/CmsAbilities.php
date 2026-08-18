@@ -31,6 +31,7 @@ final class CmsAbilities
         'tbtop-cms.design',
         'tbtop-cms.languages',
         'tbtop-cms.users',
+        'tbtop-cms.audit',
     ];
 
     public static function for(string $ability): ?string

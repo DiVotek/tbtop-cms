@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockEnvelope;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
@@ -492,7 +493,14 @@ class PageForm
         $hierarchyDirty = $page->isDirty(['type', 'parent_id']);
 
         try {
-            $page->save();
+            $save = static fn (): bool => $page->save();
+
+            if (! $isCreate && $statusBefore !== $page->status) {
+                $event = $page->status === PageStatus::Published ? 'published' : 'unpublished';
+                app(AuditContext::class)->during($event, [], $save);
+            } else {
+                $save();
+            }
         } catch (DomainException $e) {
             $field = $statusDirty ? 'status' : ($hierarchyDirty ? 'type' : 'status');
 

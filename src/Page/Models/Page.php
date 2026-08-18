@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Translatable\HasTranslations;
+use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 use Tbtop\Cms\Database\Factories\PageFactory;
 use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -50,6 +51,7 @@ class Page extends Model
     use HasFactory;
 
     use HasTranslations;
+    use LogsCmsActivity;
     use SoftDeletes;
     use TracksAuthors;
 
@@ -195,5 +197,26 @@ class Page extends Model
     protected static function newFactory(): PageFactory
     {
         return PageFactory::new();
+    }
+
+    /** @return list<string> */
+    protected function auditFields(): array
+    {
+        return [
+            'type', 'parent_id', 'status', 'published_at', 'unpublish_at',
+            'name', 'title', 'heading', 'summary', 'body', 'image', 'content',
+            'seo', 'is_indexable', 'is_system', 'sort_order',
+        ];
+    }
+
+    protected function auditLabel(): string
+    {
+        return is_string($this->name) && $this->name !== '' ? $this->name : 'Page #' . $this->getKey();
+    }
+
+    /** @return list<string> */
+    protected function auditMarkerFields(): array
+    {
+        return ['body', 'content', 'seo'];
     }
 }

@@ -21,6 +21,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EnumLabel;
+use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -412,7 +413,11 @@ class PagesPage extends AdminPage
         $page = Page::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
 
         try {
-            $page->forceDelete();
+            app(AuditContext::class)->during(
+                'force_deleted',
+                [],
+                static fn (): ?bool => $page->forceDelete(),
+            );
         } catch (DomainException $e) {
             return Effects::make()->notify($e->getMessage(), 'error');
         }

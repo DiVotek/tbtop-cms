@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Support;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
+use Tbtop\Cms\Audit\AuditContext;
 
 /**
  * Submit handlers for the profile page forms. Password change writes
@@ -24,9 +26,12 @@ final class ProfileActions
 
     public function personal(ActionCtx $ctx): Effects
     {
-        CurrentAdmin::profile()->forceFill([
+        $profile = CurrentAdmin::profile();
+        $old = $profile->display_name;
+        $profile->forceFill([
             'display_name' => $ctx->form['display_name'] ?? null,
         ])->save();
+        $this->logProfileChange('display_name', $old, $profile->display_name);
 
         return Effects::make()->notify(__('tbtop-cms::profile.actions.saved'));
     }
@@ -41,6 +46,15 @@ final class ProfileActions
         $user->forceFill([
             'password' => Hash::make((string) $ctx->form['password']),
         ])->save();
+        app(AuditContext::class)->log(
+            $user,
+            'password_changed',
+            self::userLabel($user),
+            [
+                'attributes' => ['password' => ['changed' => true, 'is_redacted' => true]],
+                'old' => ['password' => ['changed' => true, 'is_redacted' => true]],
+            ],
+        );
 
         return Effects::make()->notify(__('tbtop-cms::profile.actions.password_updated'));
     }
@@ -48,7 +62,9 @@ final class ProfileActions
     public function preferences(ActionCtx $ctx): Effects
     {
         $profile = CurrentAdmin::profile();
+        $old = $profile->locale;
         $profile->forceFill(['locale' => $ctx->form['locale'] ?? null])->save();
+        $this->logProfileChange('locale', $old, $profile->locale);
 
         if (is_string($profile->locale) && $profile->locale !== '') {
             session(['tbtop.locale' => $profile->locale]);
@@ -70,5 +86,27 @@ final class ProfileActions
         }
 
         return Effects::make()->notify(__('tbtop-cms::profile.actions.saved'));
+    }
+
+    private function logProfileChange(string $field, mixed $old, mixed $new): void
+    {
+        $user = CurrentAdmin::user();
+        if ($user === null || $old === $new) {
+            return;
+        }
+
+        app(AuditContext::class)->log(
+            $user,
+            'profile_updated',
+            self::userLabel($user),
+            ['attributes' => [$field => $new], 'old' => [$field => $old]],
+        );
+    }
+
+    private static function userLabel(Model $user): string
+    {
+        $name = (string) $user->getAttribute('name');
+
+        return $name !== '' ? $name : (string) $user->getAttribute('email');
     }
 }

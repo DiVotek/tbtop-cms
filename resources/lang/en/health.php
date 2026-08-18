@@ -30,6 +30,12 @@ return [
         'sqlite_missing' => 'The table view needs the sqlite PHP extension (pdo_sqlite), which this server does not have — showing the plain report instead. Install pdo_sqlite to get the full table, or use `php artisan cms:doctor`.',
     ],
     'checks' => [
+        'activity_log_table' => [
+            'label' => 'Activity log table',
+            'ok' => 'The ":table" table has the required activity log schema.',
+            'missing' => 'The ":table" table or required columns are missing.',
+            'hint' => 'Run php artisan cms:install to publish and run the Spatie activity log migrations.',
+        ],
         'routes_registered' => [
             'label' => 'Panel and frontend routes',
             'ok' => 'The admin panel and the cms frontend are both routable.',

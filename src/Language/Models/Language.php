@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 use Tbtop\Cms\Database\Factories\LanguageFactory;
 use Tbtop\Cms\Language\Observers\LanguageObserver;
 
@@ -26,6 +27,7 @@ class Language extends Model
     /** @use HasFactory<LanguageFactory> */
     use HasFactory;
 
+    use LogsCmsActivity;
     use SoftDeletes;
 
     protected $table = 'tbtop_languages';
@@ -51,5 +53,16 @@ class Language extends Model
     protected static function newFactory(): LanguageFactory
     {
         return LanguageFactory::new();
+    }
+
+    /** @return list<string> */
+    protected function auditFields(): array
+    {
+        return ['name', 'locale', 'is_default', 'is_admin_active', 'is_frontend_active', 'sort_order'];
+    }
+
+    protected function auditLabel(): string
+    {
+        return $this->name !== '' ? $this->name : $this->locale;
     }
 }

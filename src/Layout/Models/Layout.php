@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Layout\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 
 /**
  * @property int $id
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Layout extends Model
 {
+    use LogsCmsActivity;
+
     protected $table = 'tbtop_layouts';
 
     /** @var list<string> */
@@ -22,4 +25,21 @@ class Layout extends Model
     protected $casts = [
         'content' => 'array',
     ];
+
+    /** @return list<string> */
+    protected function auditFields(): array
+    {
+        return ['slot', 'content'];
+    }
+
+    protected function auditLabel(): string
+    {
+        return $this->slot;
+    }
+
+    /** @return list<string> */
+    protected function auditBlockFields(): array
+    {
+        return ['content'];
+    }
 }

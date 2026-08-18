@@ -21,6 +21,7 @@ return [
         'seo_settings' => 'SEO settings',
         'notification_settings' => 'Notifications',
         'users' => 'Users',
+        'audit_log' => 'Audit log',
         'site_health' => 'Site health',
     ],
 ];

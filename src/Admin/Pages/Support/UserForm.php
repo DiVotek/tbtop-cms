@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Audit\AuditContext;
 
 /**
  * Create/edit form for host-app users from UsersPage. UI mirror of
@@ -62,6 +63,17 @@ class UserForm
         ]);
         $user->save();
 
+        app(AuditContext::class)->log(
+            $user,
+            'created',
+            self::label($user),
+            ['attributes' => [
+                'name' => $user->getAttribute('name'),
+                'email' => $user->getAttribute('email'),
+                'password' => ['changed' => true, 'is_redacted' => true],
+            ]],
+        );
+
         return $user;
     }
 
@@ -72,6 +84,7 @@ class UserForm
     public static function update(array $form, string $model, int | string $id): Model
     {
         $user = $model::query()->findOrFail($id);
+        $old = ['name' => $user->getAttribute('name'), 'email' => $user->getAttribute('email')];
 
         $email = trim((string) ($form['email'] ?? ''));
         $name = trim((string) ($form['name'] ?? ''));
@@ -98,6 +111,23 @@ class UserForm
 
         $user->forceFill($attributes)->save();
 
+        $new = ['name' => $user->getAttribute('name'), 'email' => $user->getAttribute('email')];
+        $changed = array_filter($new, static fn (mixed $value, string $key): bool => $value !== $old[$key], ARRAY_FILTER_USE_BOTH);
+        $before = array_intersect_key($old, $changed);
+        if ($password !== '') {
+            $changed['password'] = ['changed' => true, 'is_redacted' => true];
+            $before['password'] = ['changed' => true, 'is_redacted' => true];
+        }
+
+        if ($changed !== []) {
+            app(AuditContext::class)->log(
+                $user,
+                $password !== '' && count($changed) === 1 ? 'password_changed' : 'updated',
+                self::label($user),
+                ['attributes' => $changed, 'old' => $before],
+            );
+        }
+
         return $user;
     }
 
@@ -121,6 +151,13 @@ class UserForm
         if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             throw ValidationException::withMessages(['email' => __('tbtop-cms::users.validation.email_invalid')]);
         }
+    }
+
+    private static function label(Model $user): string
+    {
+        $name = (string) $user->getAttribute('name');
+
+        return $name !== '' ? $name : (string) $user->getAttribute('email');
     }
 
     /** @param class-string<Model> $model */

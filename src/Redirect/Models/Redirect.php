@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Redirect\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 use Tbtop\Cms\Support\Concerns\TracksAuthors;
 
 /**
@@ -19,6 +20,7 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
  */
 class Redirect extends Model
 {
+    use LogsCmsActivity;
     use TracksAuthors;
 
     protected $table = 'tbtop_redirects';
@@ -36,4 +38,15 @@ class Redirect extends Model
         'status_code' => 'integer',
         'is_auto' => 'boolean',
     ];
+
+    /** @return list<string> */
+    protected function auditFields(): array
+    {
+        return ['locale', 'from_path', 'to_path', 'status_code', 'is_auto'];
+    }
+
+    protected function auditLabel(): string
+    {
+        return $this->from_path !== '' ? $this->from_path : 'Redirect #' . $this->getKey();
+    }
 }
