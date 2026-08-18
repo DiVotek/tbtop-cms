@@ -214,6 +214,26 @@ class CmsServiceProvider extends PackageServiceProvider
         ]);
     }
 
+    /**
+     * Guarded admin routes rely on a named `login` route: `auth`'s
+     * unauthenticated handler redirects there. A bare host has none, so cms
+     * provides one pointing at the admin login page.
+     *
+     * A host that ships its own auth (a Laravel starter kit, Fortify,
+     * Breeze) already defines `login`, and registering a second route under
+     * that name is actively harmful: Laravel keeps the first binding for
+     * URL generation but the last matching route wins dispatch, so
+     * `route('login')` would still print the host's URL while GET /login
+     * bounced to the admin panel — the host's own login page unreachable.
+     * It also emits a duplicate export in Wayfinder's generated routes,
+     * breaking the host's frontend build. So it is only registered when
+     * nothing else claims the name.
+     *
+     * The collection is scanned directly rather than asked via Route::has():
+     * the name lookup it consults is a cache rebuilt by refreshNameLookups(),
+     * and during boot that cache still predates routes the host registered,
+     * so has() reports false for a name that is demonstrably present.
+     */
     private function wireAdminLoginRedirect(): void
     {
         if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
@@ -222,6 +242,12 @@ class CmsServiceProvider extends PackageServiceProvider
 
         if (config('tbtop-cms.admin.pages.login') === null) {
             return;
+        }
+
+        foreach (Route::getRoutes()->getRoutes() as $route) {
+            if ($route->getName() === 'login') {
+                return;
+            }
         }
 
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
