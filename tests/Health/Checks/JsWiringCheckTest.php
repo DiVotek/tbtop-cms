@@ -16,7 +16,7 @@ it('warns instead of crashing when none of the expected host files can be found'
     expect($result->status)->toBe(HealthStatus::Warning)
         ->and($result->hint())
         ->toContain(__('tbtop-cms::health.checks.js_wiring.hints.entry_not_found', [
-            'candidates' => 'resources/js/app.tsx, resources/js/app.jsx, resources/js/app.ts',
+            'candidates' => 'resources/js/admin.tsx, resources/js/admin.jsx, resources/js/admin.ts, resources/js/app.tsx, resources/js/app.jsx, resources/js/app.ts',
         ]))
         ->toContain(__('tbtop-cms::health.checks.js_wiring.hints.admin_page_not_found', [
             'candidates' => 'resources/js/pages/admin/page.tsx, resources/js/pages/admin/page.jsx',
@@ -38,7 +38,7 @@ it('treats a directory squatting on a candidate path as not found, not as a read
 
         expect($result->status)->toBe(HealthStatus::Warning)
             ->and($result->hint())->toContain(__('tbtop-cms::health.checks.js_wiring.hints.entry_not_found', [
-                'candidates' => 'resources/js/app.tsx, resources/js/app.jsx, resources/js/app.ts',
+                'candidates' => 'resources/js/admin.tsx, resources/js/admin.jsx, resources/js/admin.ts, resources/js/app.tsx, resources/js/app.jsx, resources/js/app.ts',
             ]));
     } finally {
         File::deleteDirectory(base_path('resources/js'));
@@ -64,3 +64,46 @@ it('warns instead of erroring when the JS entry exists but cannot be read', func
     fn (): bool => function_exists('posix_geteuid') && posix_geteuid() === 0,
     'root reads files regardless of their permission bits',
 );
+
+it('confirms the wiring when the host writes it with double quotes', function (): void {
+    // Hosts format their JS to their own conventions, and the entry published
+    // by admin:install is double-quoted. Matching the quoted literal would
+    // report a correctly wired host as broken.
+    File::ensureDirectoryExists(base_path('resources/js'));
+    File::put(base_path('resources/js/admin.tsx'), <<<'TSX'
+        import "@cms/admin/blocks";
+        import { AdminPage } from "@tbtop/inertia-admin";
+        if (name === "admin/page") { return AdminPage; }
+        TSX);
+    File::ensureDirectoryExists(base_path('resources/css'));
+    File::put(base_path('resources/css/admin.css'), "@source '../../vendor/tbtop/cms/src/**/*.php';");
+
+    try {
+        expect((new JsWiringCheck)->run()->status)->toBe(HealthStatus::Ok);
+    } finally {
+        File::deleteDirectory(base_path('resources/js'));
+        File::deleteDirectory(base_path('resources/css'));
+    }
+});
+
+it('reads the admin entry rather than the app entry when both exist', function (): void {
+    // admin:install publishes a dedicated admin entry to keep the panel bundle
+    // out of the public frontend, so that is where the admin wiring lives —
+    // an app entry left unwired by an older install must not fail the check.
+    File::ensureDirectoryExists(base_path('resources/js'));
+    File::put(base_path('resources/js/app.tsx'), '// the public frontend, deliberately free of admin wiring');
+    File::put(base_path('resources/js/admin.tsx'), <<<'TSX'
+        import "@cms/admin/blocks";
+        import { AdminPage } from "@tbtop/inertia-admin";
+        if (name === "admin/page") { return AdminPage; }
+        TSX);
+    File::ensureDirectoryExists(base_path('resources/css'));
+    File::put(base_path('resources/css/admin.css'), "@source '../../vendor/tbtop/cms/src/**/*.php';");
+
+    try {
+        expect((new JsWiringCheck)->run()->status)->toBe(HealthStatus::Ok);
+    } finally {
+        File::deleteDirectory(base_path('resources/js'));
+        File::deleteDirectory(base_path('resources/css'));
+    }
+});

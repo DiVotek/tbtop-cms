@@ -10,16 +10,16 @@ use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
 
 /**
- * Two independent root views feed the same missing-include failure mode:
- * - the frontend uses `tbtop-cms.render.root_view` when set, else falls
- *   back to whatever the admin panel's root view resolves to.
- * - the admin panel's own root view defaults to "app"
- *   (Tbtop\Admin\Panels\PanelConfig::$rootView) and CmsPanel never
- *   overrides it, so it is effectively fixed at "app" for this package.
- * Both ultimately resolve to the same file when the host has not published
- * a dedicated frontend root view, so this check only needs to inspect one
- * physical file — whichever `tbtop-cms.render.root_view` names, or "app" — for
- * the `@include('tbtop-cms::head')` line the README requires above `@inertiaHead`.
+ * Only the frontend root view matters here. The head partial renders SEO tags
+ * for crawlers, which never reach the admin panel — and since `admin:install`
+ * publishes a dedicated root view for the panel, the two are separate files
+ * on a current host anyway. So this inspects one file: whichever
+ * `tbtop-cms.render.root_view` names, or "app".
+ *
+ * The include has to sit above the Inertia head tag (`<x-inertia::head>` on
+ * Inertia 3, `@inertiaHead` on Inertia 2) so the package's tags win the
+ * reconciliation; the check only confirms the line is present, since parsing
+ * Blade to prove ordering is far more machinery than the failure warrants.
  */
 final class InertiaRootViewCheck implements HealthCheck
 {

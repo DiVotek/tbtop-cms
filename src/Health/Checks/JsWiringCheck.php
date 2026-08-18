@@ -25,16 +25,31 @@ final class JsWiringCheck implements HealthCheck
 {
     use ReadsFiles;
 
-    private const string BLOCKS_IMPORT = "import '@cms/admin/blocks'";
+    private const string BLOCKS_IMPORT = '@cms/admin/blocks';
 
     private const string ADMIN_PAGE_IMPORT = '@tbtop/inertia-admin';
 
-    private const string ADMIN_PAGE_RESOLVE = "'admin/page'";
+    private const string ADMIN_PAGE_RESOLVE = 'admin/page';
 
     private const string TAILWIND_SOURCE_NEEDLE = 'vendor/tbtop/cms';
 
-    /** @var list<string> */
-    private const array JS_ENTRY_CANDIDATES = ['resources/js/app.tsx', 'resources/js/app.jsx', 'resources/js/app.ts'];
+    /**
+     * The admin entry comes first: `admin:install` publishes a dedicated
+     * resources/js/admin.tsx so the panel bundle stays out of the public
+     * frontend, and that is where the admin wiring belongs. The app entry
+     * stays as a fallback for hosts wired before that entry existed, which
+     * put the same imports in their single entry.
+     *
+     * @var list<string>
+     */
+    private const array JS_ENTRY_CANDIDATES = [
+        'resources/js/admin.tsx',
+        'resources/js/admin.jsx',
+        'resources/js/admin.ts',
+        'resources/js/app.tsx',
+        'resources/js/app.jsx',
+        'resources/js/app.ts',
+    ];
 
     /** @var list<string> */
     private const array ADMIN_PAGE_CANDIDATES = [
@@ -92,6 +107,8 @@ final class JsWiringCheck implements HealthCheck
             return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
         }
 
+        // Matched without the surrounding quotes: hosts format JS to their own
+        // conventions, and a double-quoted import is the same wiring.
         if (! str_contains($source, self::BLOCKS_IMPORT)) {
             return [__('tbtop-cms::health.checks.js_wiring.hints.blocks_import_missing', ['path' => $path])];
         }

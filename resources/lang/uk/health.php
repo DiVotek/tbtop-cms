@@ -42,8 +42,8 @@ return [
             'missing' => 'Одного чи кількох очікуваних маршрутів немає.',
             'hints' => [
                 'admin_missing' => 'Маршрут адмінпанелі не зареєстровано. Перевірте, що tbtop-cms.admin.autoregister має значення true і що CmsPanel вказано в tbtop-admin.panels.',
-                'frontend_missing' => 'Маршрути фронтенду cms не зареєстровано. Викличте Tbtop\\Cms\\Cms::frontendRoutes() у файлі маршрутів з web middleware, наприклад routes/web.php.',
-                'both_missing' => 'Не зареєстровано ні маршрут адмінпанелі, ні маршрути фронтенду cms. Перевірте tbtop-cms.admin.autoregister і викличте Tbtop\\Cms\\Cms::frontendRoutes() у routes/web.php.',
+                'frontend_missing' => 'Маршрути фронтенду cms не зареєстровано. Викличте Tbtop\\Cms\\Facades\\Cms::frontendRoutes() у файлі маршрутів з web middleware, наприклад routes/web.php.',
+                'both_missing' => 'Не зареєстровано ні маршрут адмінпанелі, ні маршрути фронтенду cms. Перевірте tbtop-cms.admin.autoregister і викличте Tbtop\\Cms\\Facades\\Cms::frontendRoutes() у routes/web.php.',
             ],
         ],
         'inertia_root_view' => [
@@ -54,7 +54,7 @@ return [
             'unreadable' => 'Кореневий вигляд за шляхом :path існує, але його не вдалося прочитати.',
             'hints' => [
                 'missing_view' => 'Створіть resources/views/:view.blade.php (стандартний scaffold-вигляд Laravel/Inertia) або вкажіть у tbtop-cms.render.root_view існуючий вигляд.',
-                'missing_include' => "Додайте @include('tbtop-cms::head') над @inertiaHead у кореневому Blade-вигляді.",
+                'missing_include' => "Додайте @include('tbtop-cms::head') у кореневий Blade-вигляд, над тегом head від Inertia — <x-inertia::head> в Inertia 3, @inertiaHead в Inertia 2.",
                 'unreadable' => 'Перевірте, що :path — звичайний файл, який користувач вебсервера може прочитати; до цього кожен рендер сторінки завершується помилкою.',
             ],
         ],
