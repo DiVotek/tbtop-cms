@@ -26,3 +26,12 @@ it('configures a compact, full-width appearance', function (): void {
         'maxWidth' => 'full',
     ]);
 });
+
+it('renders the panel through its own root view, not the frontend one', function (): void {
+    $config = (new CmsPanel)->configure(new PanelConfig);
+
+    // PanelConfig defaults to 'app' — the host's public root view. That view
+    // loads the frontend Vite entry, which has no admin/page component, so the
+    // panel would 500 on every request.
+    expect($config->getRootView())->toBe('admin');
+});
