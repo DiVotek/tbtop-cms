@@ -14,11 +14,12 @@ uses(RefreshDatabase::class);
 
 /**
  * Block fields keep their `required` rule inside the page editor
- * (PrefixedField::rename() replays it under the prefixed name), so an explicit
- * Save rejects an empty required block field with an error keyed by that
- * prefixed field. The structural actions that sit inside the same form
- * ("+ Add block", "remove block") opt out of that gate — otherwise one
- * unconfigured block would veto every further edit to the page structure.
+ * (PrefixedField::rename() replays it under the prefixed name), conditioned
+ * on the block being active: an inactive block never renders, so its empty
+ * fields block neither Save nor the structural "+ Add block" / "remove block"
+ * actions. Those actions persist the whole form outside the explicit Save, so
+ * on a published page they run the same rules first — nothing invalid may go
+ * live — while a draft is never gated.
  */
 beforeEach(function (): void {
     config(['tbtop-cms.admin.model' => AdminUser::class]);
@@ -58,24 +59,30 @@ function blockRequiredPayload(): array
     ];
 }
 
-function pageWithEmptyHero(): Page
+function pageWithEmptyHero(bool $active = false, PageStatus $status = PageStatus::Published): Page
 {
     return Page::create([
         'type' => 'page',
-        'status' => PageStatus::Published,
+        'status' => $status,
         'name' => ['en' => 'About Us'],
         'content' => [
-            ['id' => 'hero1', 'kind' => 'Hero', 'active' => false, 'sort' => 0, 'data' => ['title' => ['en' => '']]],
+            ['id' => 'hero1', 'kind' => 'Hero', 'active' => $active, 'sort' => 0, 'data' => ['title' => ['en' => '']]],
         ],
     ]);
 }
 
-it('still adds another block while an existing required block field is empty', function (): void {
+/** @return array<string, mixed> */
+function emptyHeroPayload(bool $active = false): array
+{
+    return [...blockRequiredPayload(), 'block_hero1_active' => $active, 'block_hero1_title' => ['en' => '']];
+}
+
+it('still adds another block while an inactive block\'s required field is empty', function (): void {
     $page = pageWithEmptyHero();
 
     $response = test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Hero",
-        ['payload' => ['form' => [...blockRequiredPayload(), 'block_hero1_title' => ['en' => '']]]],
+        ['payload' => ['form' => emptyHeroPayload()]],
     );
 
     $response->assertOk();
@@ -85,7 +92,7 @@ it('still adds another block while an existing required block field is empty', f
     expect($effects)->toContain('redirect', 'notify');
 });
 
-it('still removes a block while another required block field is empty', function (): void {
+it('still removes a block while another inactive block\'s required field is empty', function (): void {
     $page = pageWithEmptyHero();
     $page->update(['content' => [
         ...$page->content,
@@ -95,8 +102,8 @@ it('still removes a block while another required block field is empty', function
     test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/actions/pageBlockRemove_hero2",
         ['payload' => ['form' => [
-            ...blockRequiredPayload(),
-            'block_hero1_title' => ['en' => ''],
+            ...emptyHeroPayload(),
+            'block_hero2_active' => false,
             'block_hero2_title' => ['en' => 'Second'],
         ]]],
     )->assertOk();
@@ -104,15 +111,88 @@ it('still removes a block while another required block field is empty', function
     expect(collect($page->refresh()->content)->pluck('id')->all())->toBe(['hero1']);
 });
 
-it('rejects Save with an error on the prefixed block field while it is empty', function (): void {
+it('refuses to add a block to a published page while an active block\'s required field is empty', function (): void {
+    $page = pageWithEmptyHero(active: true);
+
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Hero",
+        ['payload' => ['form' => emptyHeroPayload(active: true)]],
+    )->assertUnprocessable()->assertJsonValidationErrors(['block_hero1_title.en']);
+
+    expect($page->refresh()->content)->toHaveCount(1);
+});
+
+it('refuses to remove a block from a published page while an active block\'s required field is empty', function (): void {
+    $page = pageWithEmptyHero(active: true);
+    $page->update(['content' => [
+        ...$page->content,
+        ['id' => 'hero2', 'kind' => 'Hero', 'active' => false, 'sort' => 1, 'data' => ['title' => ['en' => 'Second']]],
+    ]]);
+
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/actions/pageBlockRemove_hero2",
+        ['payload' => ['form' => [
+            ...emptyHeroPayload(active: true),
+            'block_hero2_active' => false,
+            'block_hero2_title' => ['en' => 'Second'],
+        ]]],
+    )->assertUnprocessable()->assertJsonValidationErrors(['block_hero1_title.en']);
+
+    expect($page->refresh()->content)->toHaveCount(2);
+});
+
+it('still adds a block to a draft while an active block\'s required field is empty', function (): void {
+    $page = pageWithEmptyHero(active: true, status: PageStatus::Draft);
+
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Hero",
+        ['payload' => ['form' => [...emptyHeroPayload(active: true), 'status' => PageStatus::Draft->value]]],
+    )->assertOk();
+
+    expect($page->refresh()->content)->toHaveCount(2);
+});
+
+it('does not publish a draft through the add-block action', function (): void {
+    $page = pageWithEmptyHero(status: PageStatus::Draft);
+
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Hero",
+        ['payload' => ['form' => [...emptyHeroPayload(), 'status' => PageStatus::Published->value]]],
+    )->assertOk();
+
+    expect($page->refresh()->status)->toBe(PageStatus::Draft)
+        ->and($page->content)->toHaveCount(2);
+});
+
+it('rejects Save with an error on the prefixed block field while an active block\'s field is empty', function (): void {
+    $page = pageWithEmptyHero(active: true);
+
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...emptyHeroPayload(active: true), 'name' => ['en' => 'Renamed']],
+    )->assertUnprocessable()->assertJsonValidationErrors(['block_hero1_title.en']);
+
+    expect($page->refresh()->getTranslation('name', 'en'))->toBe('About Us');
+});
+
+it('still requires the field when the payload drops the block\'s active flag', function (): void {
+    $page = pageWithEmptyHero(active: true);
+
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...blockRequiredPayload(), 'block_hero1_title' => ['en' => '']],
+    )->assertUnprocessable()->assertJsonValidationErrors(['block_hero1_title.en']);
+});
+
+it('saves a published page while an inactive block\'s required field is empty', function (): void {
     $page = pageWithEmptyHero();
 
     test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...blockRequiredPayload(), 'name' => ['en' => 'Renamed'], 'block_hero1_title' => ['en' => '']],
-    )->assertUnprocessable()->assertJsonValidationErrors(['block_hero1_title.en']);
+        [...emptyHeroPayload(), 'name' => ['en' => 'Renamed']],
+    )->assertRedirect();
 
-    expect($page->refresh()->getTranslation('name', 'en'))->toBe('About Us');
+    expect($page->refresh()->getTranslation('name', 'en'))->toBe('Renamed');
 });
 
 it('keeps the required flag on the block field in the editor structure', function (): void {
@@ -148,11 +228,11 @@ it('keeps the required flag on the block field in the editor structure', functio
 });
 
 it('saves the page once the required block field is filled', function (): void {
-    $page = pageWithEmptyHero();
+    $page = pageWithEmptyHero(active: true);
 
     test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...blockRequiredPayload(), 'block_hero1_title' => ['en' => 'Filled later']],
+        [...blockRequiredPayload(), 'block_hero1_active' => true, 'block_hero1_title' => ['en' => 'Filled later']],
     )->assertRedirect();
 
     expect($page->refresh()->content[0]['data']['title']['en'] ?? null)->toBe('Filled later');
