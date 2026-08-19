@@ -148,3 +148,10 @@ it('returns a haltModal effect when edit validation fails', function (): void {
         ->and($effects[0]['kind'])->toBe('haltModal')
         ->and(Redirect::find($redirect->id)->to_path)->toBe('new-a');
 });
+
+it('preselects all locales and a permanent redirect in the create modal', function (): void {
+    $data = test()->get('/admin/redirects', ['X-Inertia' => 'true'])->assertOk()->json('props.data.redirectCreate');
+
+    expect($data['locale'] ?? null)->toBe(RedirectFormOptions::ALL_LOCALES)
+        ->and($data['status_code'] ?? null)->toBe('301');
+});

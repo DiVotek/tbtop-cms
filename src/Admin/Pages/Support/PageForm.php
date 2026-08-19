@@ -30,6 +30,7 @@ use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\StarterBlocks;
+use Tbtop\Cms\Page\Types\PageType;
 
 class PageForm
 {
@@ -52,7 +53,10 @@ class PageForm
                     ->translatable()->fromField('name'),
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.settings')], [
-                $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types()),
+                // The generic page is what most creates are; category/article
+                // are the deliberate picks.
+                $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types())
+                    ->default(app(PageType::class)->key()),
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
                     ->query(static fn (): Builder => self::parentQuery())
                     ->labelKey('name')->searchable()

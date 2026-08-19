@@ -19,9 +19,12 @@ class RedirectForm
                 ->helperText(__('tbtop-cms::redirects.helpers.from_path')),
             $s->text('to_path')->label(__('tbtop-cms::redirects.fields.to_path'))->required()
                 ->helperText(__('tbtop-cms::redirects.helpers.to_path')),
-            $s->select('locale')->label(__('tbtop-cms::redirects.fields.locale'))->options(RedirectFormOptions::locales()),
+            // Same prefill as the 404 log's create-redirect modal and the
+            // fallback in save().
+            $s->select('locale')->label(__('tbtop-cms::redirects.fields.locale'))->options(RedirectFormOptions::locales())
+                ->default(RedirectFormOptions::ALL_LOCALES),
             $s->select('status_code')->label(__('tbtop-cms::redirects.fields.status_code'))->required()
-                ->options(RedirectFormOptions::statuses()),
+                ->options(RedirectFormOptions::statuses())->default('301'),
         ];
     }
 

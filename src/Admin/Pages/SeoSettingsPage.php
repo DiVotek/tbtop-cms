@@ -92,6 +92,13 @@ class SeoSettingsPage extends SettingsPageBase
         ];
     }
 
+    /** Mirrors SeoResolver's fallbacks for the two selects. */
+    #[\Override]
+    protected function defaults(): array
+    {
+        return ['seo_twitter_card' => 'auto', 'seo_identity_type' => 'none'];
+    }
+
     /**
      * Per-type template fields, keyed exactly as SeoTemplates reads them.
      *
