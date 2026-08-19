@@ -22,6 +22,7 @@ use Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\NotFound\Models\NotFoundHit;
+use Tbtop\Cms\Redirect\Models\Redirect;
 
 /**
  * Redirect-adjacent, deliberately: the operator working the 404 log is the
@@ -121,10 +122,28 @@ class NotFoundLogPage extends AdminPage
         return $s->stack([$table]);
     }
 
-    /** @return Builder<NotFoundHit> */
+    /**
+     * `has_redirect` mirrors RedirectResolver::match(): a redirect for the
+     * hit's own locale or a locale-agnostic one. It is a row flag, not a
+     * column, so createRedirectAction() can hide itself per row
+     * (ColumnProjection ships every model attribute, not only declared
+     * columns). A hit that already redirects is dealt with — the modal would
+     * only end in RedirectValidator's "from_taken" error.
+     *
+     * @return Builder<NotFoundHit>
+     */
     private function query(): Builder
     {
-        return NotFoundHit::query();
+        $redirectExists = Redirect::query()->selectRaw('1')
+            ->whereColumn('tbtop_redirects.from_path', 'tbtop_not_found_hits.path')
+            ->where(static fn (Builder $q): Builder => $q
+                ->whereColumn('tbtop_redirects.locale', 'tbtop_not_found_hits.locale')
+                ->orWhereNull('tbtop_redirects.locale'))
+            ->limit(1);
+
+        return NotFoundHit::query()
+            ->select('tbtop_not_found_hits.*')
+            ->selectSub($redirectExists, 'has_redirect');
     }
 
     /**
@@ -163,7 +182,8 @@ class NotFoundLogPage extends AdminPage
                 'to_path' => '',
                 'status_code' => '301',
             ], needs: ['row'])
-            ->modal(__('tbtop-cms::not-found.actions.create_redirect_title'), $form);
+            ->modal(__('tbtop-cms::not-found.actions.create_redirect_title'), $form)
+            ->hiddenIf(Cond::truthy('has_redirect'));
     }
 
     private static function localeOptionFor(string $locale): string
