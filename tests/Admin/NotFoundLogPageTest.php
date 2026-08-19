@@ -89,6 +89,37 @@ it('shows a created hit in the table query results', function (): void {
     expect(collect($response->json('data.data'))->pluck('path'))->toContain('gone');
 });
 
+it('flags a hit whose path already redirects, for its own locale or any locale', function (): void {
+    actingAsNotFoundAdmin();
+    makeNotFoundHit(['path' => 'covered-en']);
+    makeNotFoundHit(['path' => 'covered-any']);
+    makeNotFoundHit(['path' => 'covered-other-locale']);
+    makeNotFoundHit(['path' => 'uncovered']);
+    Redirect::query()->create(['locale' => 'en', 'from_path' => 'covered-en', 'to_path' => 'x', 'status_code' => 301]);
+    Redirect::query()->create(['locale' => null, 'from_path' => 'covered-any', 'to_path' => 'x', 'status_code' => 301]);
+    Redirect::query()->create(['locale' => 'de', 'from_path' => 'covered-other-locale', 'to_path' => 'x', 'status_code' => 301]);
+
+    $rows = collect(test()->getJson('/admin/not-found/tables/notFoundHits')->assertOk()->json('data.data'))
+        ->mapWithKeys(static fn (array $row): array => [$row['path'] => (bool) $row['has_redirect']]);
+
+    expect($rows->all())->toBe([
+        'covered-en' => true,
+        'covered-any' => true,
+        'covered-other-locale' => false,
+        'uncovered' => false,
+    ]);
+});
+
+it('hides the create-redirect row action when the path already redirects', function (): void {
+    actingAsNotFoundAdmin();
+
+    $node = notFoundTableNode();
+    $action = collect($node['options']['rowActions'])->firstWhere('name', 'notFoundCreateRedirect');
+
+    expect($action)->not->toBeNull()
+        ->and($action['meta']['hiddenIf'] ?? null)->toBe(['op' => 'truthy', 'field' => 'has_redirect']);
+});
+
 it('creates a redirect from the row action and marks the hit ignored', function (): void {
     actingAsNotFoundAdmin();
     $hit = makeNotFoundHit(['path' => 'old-broken-link']);
