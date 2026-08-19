@@ -24,6 +24,11 @@ class CmsPanel extends Panel
             ->id('cms')
             ->prefix($prefix)
             ->guard((string) config('tbtop-cms.admin.guard', 'web'))
+            // The panel has its own Vite entry (resources/js/admin.tsx, published
+            // by admin:install), so it needs its own Blade root view. PanelConfig
+            // defaults to 'app' — the host's public root view, which loads the
+            // frontend bundle and cannot resolve the admin/page component.
+            ->rootView('admin')
             // Inertia\Middleware is what turns session-flashed validation errors
             // into the `errors` prop after a redirect-back. tbtop/admin leaves
             // it to the host's `web` group; a host without HandleInertiaRequests
