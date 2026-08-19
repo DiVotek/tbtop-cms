@@ -268,6 +268,13 @@ class NotificationSettingsPage extends SettingsPageBase
 
     private const array TAG_FIELDS = ['notification_mail_recipients', 'notification_telegram_chat_ids'];
 
+    /** Mirrors CmsMailer::transportConfig()'s encryption fallback. */
+    #[\Override]
+    protected function defaults(): array
+    {
+        return ['mail_encryption' => 'tls'];
+    }
+
     /**
      * Recipients and chat ids are stored as one separator-joined string
      * (Recipients/ChatIds parse it at send time) but edited as tag chips —

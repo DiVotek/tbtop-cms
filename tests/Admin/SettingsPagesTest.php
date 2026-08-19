@@ -430,3 +430,16 @@ function settingsCollectByKind(array $node, string $kind, array &$out): void
         settingsCollectByKind($child, $kind, $out);
     }
 }
+
+it('shows the runtime fallback in a select whose setting was never stored, and the stored value once it is', function (): void {
+    expect(test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])->assertOk()->json('props.data.seo-settings'))
+        ->toMatchArray(['seo_twitter_card' => 'auto', 'seo_identity_type' => 'none']);
+    expect(test()->get('/admin/notification-settings', ['X-Inertia' => 'true'])->assertOk()->json('props.data.notification-settings'))
+        ->toMatchArray(['mail_encryption' => 'tls']);
+
+    app(Settings::class)->set('seo.twitter_card', 'summary');
+    app(Settings::class)->set('mail.encryption', 'ssl');
+
+    expect(test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])->json('props.data.seo-settings.seo_twitter_card'))->toBe('summary')
+        ->and(test()->get('/admin/notification-settings', ['X-Inertia' => 'true'])->json('props.data.notification-settings.mail_encryption'))->toBe('ssl');
+});

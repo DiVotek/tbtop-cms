@@ -226,3 +226,9 @@ it('redirects to the new page edit screen after create', function (): void {
     expect($redirect)->not->toBeNull()
         ->and($redirect['href'] ?? $redirect['url'] ?? null)->toEndWith("/admin/pages/{$page->id}/edit");
 });
+
+it('preselects the generic page type in the create modal', function (): void {
+    $data = test()->get('/admin/pages', ['X-Inertia' => 'true'])->assertOk()->json('props.data.pageCreate');
+
+    expect($data['type'] ?? null)->toBe('page');
+});

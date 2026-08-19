@@ -13,14 +13,15 @@ class SettingsForm
 {
     /**
      * @param  array<string, string>  $map  field name => store key
+     * @param  array<string, mixed>  $defaults  field name => value shown while the key was never stored
      * @return array<string, mixed>
      */
-    public static function record(array $map, Settings $settings): array
+    public static function record(array $map, Settings $settings, array $defaults = []): array
     {
         $record = [];
 
         foreach ($map as $field => $key) {
-            $record[$field] = $settings->isSecret($key) ? null : $settings->get($key);
+            $record[$field] = $settings->isSecret($key) ? null : $settings->get($key, $defaults[$field] ?? null);
         }
 
         return $record;

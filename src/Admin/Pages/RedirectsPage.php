@@ -15,6 +15,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
+use Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Redirect\Models\Redirect;
@@ -119,7 +120,10 @@ class RedirectsPage extends AdminPage
         $form = $s->form('redirectCreate', [
             ...RedirectForm::fields($s),
             $s->flex([$s->spacer(), $cancel, $create], justify: 'end'),
-        ]);
+        ])
+            // Same prefill as the 404 log's create-redirect modal and the
+            // server fallback in RedirectForm::save().
+            ->record(['locale' => RedirectFormOptions::ALL_LOCALES, 'status_code' => '301']);
 
         return $s->action('redirectCreate')->label(__('tbtop-cms::redirects.actions.new'))
             ->icon('plus')->color('primary')

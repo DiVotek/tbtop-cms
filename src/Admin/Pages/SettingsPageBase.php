@@ -41,10 +41,22 @@ abstract class SettingsPageBase extends Page
             ...$this->fields($s),
             $footer,
         ])
-            ->record($this->presentRecord(SettingsForm::record($this->map(), app(Settings::class))))
+            ->record($this->presentRecord(SettingsForm::record($this->map(), app(Settings::class), $this->defaults())))
             ->onSubmit($this->save(...));
 
         return $s->stack([$form]);
+    }
+
+    /**
+     * Values a never-stored key shows in the form — the same fallback its
+     * consumer applies at runtime, so the select is not blank on a fresh
+     * install. Not written to the store until the page is saved.
+     *
+     * @return array<string, mixed> field name => value
+     */
+    protected function defaults(): array
+    {
+        return [];
     }
 
     /**
