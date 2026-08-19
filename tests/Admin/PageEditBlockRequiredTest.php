@@ -13,12 +13,12 @@ use Tbtop\Cms\Tests\Fixtures\AdminUser;
 uses(RefreshDatabase::class);
 
 /**
- * Block fields lose their `required` rule inside the page editor (see
- * PrefixedField::withoutRequired()): every form-scoped action ("+ Add block",
- * "remove block") runs the whole form's rules, and until the admin package
- * shows validation feedback for actions (CMS_TASKS.md A7), an empty required
- * block field would silently kill every action on the page. The live repro:
- * add an (empty) Hero to a page, then no further block can be added.
+ * Block fields keep their `required` rule inside the page editor
+ * (PrefixedField::rename() replays it under the prefixed name), so an explicit
+ * Save rejects an empty required block field with an error keyed by that
+ * prefixed field. The structural actions that sit inside the same form
+ * ("+ Add block", "remove block") opt out of that gate — otherwise one
+ * unconfigured block would veto every further edit to the page structure.
  */
 beforeEach(function (): void {
     config(['tbtop-cms.admin.model' => AdminUser::class]);
@@ -27,7 +27,7 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
 });
 
-function softRequiredAdmin(): AdminUser
+function blockRequiredAdmin(): AdminUser
 {
     $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
     CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
@@ -36,7 +36,7 @@ function softRequiredAdmin(): AdminUser
 }
 
 /** @return array<string, mixed> */
-function softRequiredPayload(): array
+function blockRequiredPayload(): array
 {
     return [
         'name' => ['en' => 'About Us'],
@@ -73,9 +73,9 @@ function pageWithEmptyHero(): Page
 it('still adds another block while an existing required block field is empty', function (): void {
     $page = pageWithEmptyHero();
 
-    $response = test()->actingAs(softRequiredAdmin(), 'web')->postJson(
+    $response = test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Hero",
-        ['payload' => ['form' => [...softRequiredPayload(), 'block_hero1_title' => ['en' => '']]]],
+        ['payload' => ['form' => [...blockRequiredPayload(), 'block_hero1_title' => ['en' => '']]]],
     );
 
     $response->assertOk();
@@ -85,21 +85,40 @@ it('still adds another block while an existing required block field is empty', f
     expect($effects)->toContain('redirect', 'notify');
 });
 
-it('still saves the page while a required block field is empty', function (): void {
+it('still removes a block while another required block field is empty', function (): void {
     $page = pageWithEmptyHero();
+    $page->update(['content' => [
+        ...$page->content,
+        ['id' => 'hero2', 'kind' => 'Hero', 'active' => false, 'sort' => 1, 'data' => ['title' => ['en' => 'Second']]],
+    ]]);
 
-    test()->actingAs(softRequiredAdmin(), 'web')->postJson(
-        "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...softRequiredPayload(), 'name' => ['en' => 'Renamed'], 'block_hero1_title' => ['en' => '']],
-    )->assertRedirect();
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/actions/pageBlockRemove_hero2",
+        ['payload' => ['form' => [
+            ...blockRequiredPayload(),
+            'block_hero1_title' => ['en' => ''],
+            'block_hero2_title' => ['en' => 'Second'],
+        ]]],
+    )->assertOk();
 
-    expect($page->refresh()->getTranslation('name', 'en'))->toBe('Renamed');
+    expect(collect($page->refresh()->content)->pluck('id')->all())->toBe(['hero1']);
 });
 
-it('keeps non-required block rules and drops the asterisk from the editor structure', function (): void {
+it('rejects Save with an error on the prefixed block field while it is empty', function (): void {
     $page = pageWithEmptyHero();
 
-    $structure = test()->actingAs(softRequiredAdmin(), 'web')
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...blockRequiredPayload(), 'name' => ['en' => 'Renamed'], 'block_hero1_title' => ['en' => '']],
+    )->assertUnprocessable()->assertJsonValidationErrors(['block_hero1_title.en']);
+
+    expect($page->refresh()->getTranslation('name', 'en'))->toBe('About Us');
+});
+
+it('keeps the required flag on the block field in the editor structure', function (): void {
+    $page = pageWithEmptyHero();
+
+    $structure = test()->actingAs(blockRequiredAdmin(), 'web')
         ->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
         ->assertOk()
         ->json('props.structure');
@@ -125,15 +144,15 @@ it('keeps non-required block rules and drops the asterisk from the editor struct
     $walk($structure);
 
     expect($field)->not->toBeNull()
-        ->and($field['options']['required'] ?? false)->toBeFalse();
+        ->and($field['options']['required'] ?? false)->toBeTrue();
 });
 
-it('block field values still round-trip through save without a required rule', function (): void {
+it('saves the page once the required block field is filled', function (): void {
     $page = pageWithEmptyHero();
 
-    test()->actingAs(softRequiredAdmin(), 'web')->postJson(
+    test()->actingAs(blockRequiredAdmin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...softRequiredPayload(), 'block_hero1_title' => ['en' => 'Filled later']],
+        [...blockRequiredPayload(), 'block_hero1_title' => ['en' => 'Filled later']],
     )->assertRedirect();
 
     expect($page->refresh()->content[0]['data']['title']['en'] ?? null)->toBe('Filled later');

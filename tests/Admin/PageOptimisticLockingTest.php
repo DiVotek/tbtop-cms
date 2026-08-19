@@ -163,7 +163,7 @@ it('creates a page via the pages create-modal action, which carries no lock_vers
             'form' => [
                 'name' => ['en' => 'New Page'],
                 'title' => ['en' => ''],
-                'slug' => ['en' => ''],
+                'slug' => ['en' => 'new-page'],
                 'type' => 'page',
                 'parent_id' => 'none',
             ],

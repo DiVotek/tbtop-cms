@@ -87,7 +87,7 @@ it('creates a page as draft when the form sends no status (status is edit-only)'
             'form' => [
                 'name' => ['en' => 'Statusless'],
                 'title' => ['en' => ''],
-                'slug' => ['en' => ''],
+                'slug' => ['en' => 'statusless'],
                 'type' => 'page',
                 'parent_id' => 'none',
             ],
@@ -117,7 +117,7 @@ it('creates a page using the submitted per-locale slug instead of deriving it fr
     expect($page->pathFor('en'))->toBe('custom-about');
 });
 
-it('falls back to name-derived slug generation when the slug field is left empty', function (): void {
+it('rejects an empty default-locale slug before the handler runs', function (): void {
     $this->postJson('/admin/pages/actions/pageCreateSave', [
         'payload' => [
             'form' => [
@@ -128,10 +128,29 @@ it('falls back to name-derived slug generation when the slug field is left empty
                 'parent_id' => 'none',
             ],
         ],
+    ])->assertUnprocessable()->assertJsonValidationErrors(['slug.en']);
+
+    expect(Page::query()->where('type', 'page')->exists())->toBeFalse();
+});
+
+it('falls back to name-derived slug generation for a secondary locale left empty', function (): void {
+    Language::factory()->create(['locale' => 'uk', 'is_admin_active' => true, 'sort_order' => 1]);
+
+    $this->postJson('/admin/pages/actions/pageCreateSave', [
+        'payload' => [
+            'form' => [
+                'name' => ['en' => 'Fresh Page', 'uk' => 'Fresh Page UK'],
+                'title' => ['en' => '', 'uk' => ''],
+                'slug' => ['en' => 'fresh-page', 'uk' => ''],
+                'type' => 'page',
+                'parent_id' => 'none',
+            ],
+        ],
     ])->assertOk();
 
     $page = Page::query()->where('type', 'page')->firstOrFail();
-    expect($page->pathFor('en'))->toBe('fresh-page');
+    expect($page->pathFor('en'))->toBe('fresh-page')
+        ->and($page->pathFor('uk'))->toBe('fresh-page-uk');
 });
 
 it('falls the title back to the name per locale when title is left empty', function (): void {
@@ -140,7 +159,7 @@ it('falls the title back to the name per locale when title is left empty', funct
             'form' => [
                 'name' => ['en' => 'About Us'],
                 'title' => ['en' => ''],
-                'slug' => ['en' => ''],
+                'slug' => ['en' => 'about-us'],
                 'type' => 'page',
                 'parent_id' => 'none',
             ],
@@ -157,7 +176,7 @@ it('keeps an explicit title over the name fallback', function (): void {
             'form' => [
                 'name' => ['en' => 'About Us'],
                 'title' => ['en' => 'Custom Title'],
-                'slug' => ['en' => ''],
+                'slug' => ['en' => 'about-us'],
                 'type' => 'page',
                 'parent_id' => 'none',
             ],
@@ -174,7 +193,7 @@ it('always creates pages as indexable, since the create form has no is_indexable
             'form' => [
                 'name' => ['en' => 'About Us'],
                 'title' => ['en' => ''],
-                'slug' => ['en' => ''],
+                'slug' => ['en' => 'about-us'],
                 'type' => 'page',
                 'parent_id' => 'none',
             ],
@@ -191,7 +210,7 @@ it('redirects to the new page edit screen after create', function (): void {
             'form' => [
                 'name' => ['en' => 'About Us'],
                 'title' => ['en' => ''],
-                'slug' => ['en' => ''],
+                'slug' => ['en' => 'about-us'],
                 'type' => 'page',
                 'parent_id' => 'none',
             ],

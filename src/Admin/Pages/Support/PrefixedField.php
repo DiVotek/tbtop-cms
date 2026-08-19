@@ -36,18 +36,13 @@ use Tbtop\Admin\Dsl\S;
  */
 final class PrefixedField
 {
-    public static function rename(Field $field, string $newName, bool $stripRequired = false): Field
+    public static function rename(Field $field, string $newName): Field
     {
         $node = $field->toNode();
         $clone = S::makeField($node->kind, $newName);
 
         foreach ($node->options as $key => $value) {
             if ($key === 'constraints' || $key === 'translatable') {
-                continue;
-            }
-            // The required flag drives the asterisk; without the rule (below)
-            // it would promise a validation that never comes.
-            if ($stripRequired && $key === 'required') {
                 continue;
             }
             $clone->set($key, $value);
@@ -57,7 +52,7 @@ final class PrefixedField
             $clone->meta($key, $value);
         }
 
-        $rules = $stripRequired ? self::withoutRequired($field->ruleEntries()) : $field->ruleEntries();
+        $rules = $field->ruleEntries();
         if ($rules !== []) {
             $clone->rules($rules);
         }
@@ -67,31 +62,11 @@ final class PrefixedField
         }
 
         foreach ($field->localeRuleEntries() as $locale => $localeRules) {
-            $localeRules = $stripRequired ? self::withoutRequired($localeRules) : $localeRules;
             if ($localeRules !== []) {
                 $clone->rulesForLocale($locale, $localeRules);
             }
         }
 
         return $clone;
-    }
-
-    /**
-     * Every rule except `required` (max:, regex:, email, ... all survive).
-     * Used by the page editor's block tabs: any form-scoped action ("+ Add
-     * block", "remove block") runs the WHOLE form's rules server-side and a
-     * required-but-still-empty block field would veto it — silently, because
-     * the admin client shows no validation feedback for actions (see
-     * CMS_TASKS.md A7). Until the admin package validates on explicit submit
-     * only, block fields must not hard-block the editor; emptiness is
-     * signalled softly instead (blocks start inactive). Revert to hard
-     * required once A7 lands.
-     *
-     * @param  list<string>  $rules
-     * @return list<string>
-     */
-    private static function withoutRequired(array $rules): array
-    {
-        return array_values(array_filter($rules, static fn (string $rule): bool => $rule !== 'required'));
     }
 }

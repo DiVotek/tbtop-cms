@@ -131,8 +131,11 @@ class NotFoundLogPage extends AdminPage
      * from_path/locale are read from the row context server-side rather than
      * round-tripped through the form (a disabled field's value is a client
      * concern, not a guaranteed payload) — the operator only fills in the
-     * target and picks a status. Saving writes through RedirectForm::save(),
-     * the same path RedirectsPage's own create modal uses, rather than
+     * target and picks a status. For the same reason from_path carries no
+     * `required`: the form's rules run against the action payload before the
+     * handler, and the real guard is RedirectForm::save(), which validates
+     * the row-sourced value. Saving writes through RedirectForm::save(), the
+     * same path RedirectsPage's own create modal uses, rather than
      * hand-rolling redirect creation here.
      */
     private function createRedirectAction(S $s): ActionBuilder
@@ -143,7 +146,7 @@ class NotFoundLogPage extends AdminPage
             ->color('primary')->handle($this->createRedirect(...), needs: ['row', 'form']);
 
         $form = $s->form('notFoundCreateRedirect', [
-            $s->text('from_path')->label(__('tbtop-cms::redirects.fields.from_path'))->required()
+            $s->text('from_path')->label(__('tbtop-cms::redirects.fields.from_path'))
                 ->meta('disabled', true),
             $s->select('locale')->label(__('tbtop-cms::redirects.fields.locale'))->options(RedirectFormOptions::locales()),
             $s->text('to_path')->label(__('tbtop-cms::not-found.fields.to_path'))->required()
