@@ -115,6 +115,13 @@ it('falls back to the system theme on a tampered cookie', function (): void {
     expect($theme)->toBe('system');
 });
 
+it('preselects the panel default locale while the profile has none', function (): void {
+    $locale = test()->get('/admin/profile', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.data.preferences.locale');
+
+    expect($locale)->toBe('en');
+});
+
 it('changes the password when the current password is correct', function (): void {
     test()->post('/admin/profile/forms/password', [
         'current_password' => PROFILE_PASSWORD,

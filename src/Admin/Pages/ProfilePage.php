@@ -78,10 +78,12 @@ class ProfilePage extends Page
             ];
         }
 
+        // A fresh profile stores no locale; show the one the panel actually
+        // renders in, so the select is never blank and Save round-trips it.
         $tabs[] = [
             'label' => __('tbtop-cms::profile.sections.preferences'),
             'body' => $forms->preferences(
-                ['locale' => $profile->locale, 'theme' => $this->currentTheme()],
+                ['locale' => $profile->locale ?? LocaleService::currentLocale(), 'theme' => $this->currentTheme()],
                 LocaleService::availableLocales(),
                 $actions->preferences(...),
             ),
