@@ -31,7 +31,6 @@ use Tbtop\Cms\Page\Events\PageRestored;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\Support\PageDuplicator;
-use Tbtop\Cms\Page\Types\PageType;
 
 class PagesPage extends AdminPage
 {
@@ -343,10 +342,7 @@ class PagesPage extends AdminPage
         $form = $s->form('pageCreate', [
             ...PageForm::fields($s),
             $s->flex([$s->spacer(), $cancel, $create], justify: 'end'),
-        ])
-            // The generic page is what most creates are; category/article
-            // are the deliberate picks.
-            ->record(['type' => app(PageType::class)->key()]);
+        ]);
 
         return $s->action('pageCreate')->label(__('tbtop-cms::pages.actions.new'))->icon('plus')->color('primary')
             ->modal(__('tbtop-cms::pages.actions.create_title'), $form);
