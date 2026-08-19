@@ -8,10 +8,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
- * Counterpart to LoginPage::authenticate(): the admin package's
- * ProfileDropdown posts to '/logout' (root, unprefixed — it has no
- * awareness of the panel prefix), so this route is registered at root
- * from CmsServiceProvider rather than as a Page under {prefix}.
+ * Counterpart to LoginPage::authenticate(): the admin client's
+ * ProfileDropdown posts to `{prefix}/logout`, registered from
+ * CmsServiceProvider (not a Page — it has no view).
  */
 class LogoutController
 {
