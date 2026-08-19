@@ -56,7 +56,7 @@ it('stamps created_by and updated_by with the acting admin when a page is create
         'payload' => ['form' => [
             'name' => ['en' => 'New Page'],
             'title' => ['en' => ''],
-            'slug' => ['en' => ''],
+            'slug' => ['en' => 'new-page'],
             'type' => 'page',
             'parent_id' => 'none',
         ]],

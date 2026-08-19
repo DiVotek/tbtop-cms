@@ -1,10 +1,24 @@
 laravel: '@testbench'
 
+# Cookie sessions (testbench's default) silently drop the flash when a
+# rejected page-editor save redirects back with withInput(): the whole form
+# payload has to fit in a ~4 KB cookie. File sessions keep the errors prop
+# reaching the page, which is what manual review of validation needs.
+env:
+  - SESSION_DRIVER=file
+
 seeders:
   - Workbench\Database\Seeders\DatabaseSeeder
 
 workbench:
   start: '/landing'
+  # Vite writes to workbench/public/build (vite.config.ts publicDirectory);
+  # `testbench serve` serves the skeleton's public/. Without this link the
+  # bundle falls through to Laravel and comes back as a JSON 404 —
+  # "disallowed MIME type (application/json)" in the browser console.
+  sync:
+    - from: workbench/public/build
+      to: public/build
   build:
     - create-sqlite-db
     - migrate-fresh

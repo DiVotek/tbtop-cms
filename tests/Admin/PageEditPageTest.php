@@ -289,6 +289,32 @@ it('round-trips a translatable block field through save', function (): void {
     expect($page->refresh()->content[0]['data'])->toBe(['title' => ['en' => 'Updated']]);
 });
 
+it('delivers server-side validation errors to the Inertia page after a rejected save', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $admin = makePageEditAdmin();
+
+    // The editor submits through Inertia's router: a failed validation is a
+    // redirect back, and the client only learns about it from props.errors on
+    // the page it lands on. Without that prop Inertia reports success and the
+    // form resyncs to the stored record — the user's edit vanishes silently.
+    test()->actingAs($admin, 'web')
+        ->from("/admin/pages/{$page->id}/edit")
+        ->post(
+            "/admin/pages/{$page->id}/edit/forms/pageEditor",
+            [...baseEditPayload(), 'name' => ['en' => '']],
+            ['X-Inertia' => 'true'],
+        )
+        ->assertRedirect("/admin/pages/{$page->id}/edit");
+
+    $errors = test()->actingAs($admin, 'web')
+        ->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.errors');
+
+    expect($errors)->toBeArray()->toHaveKey('name.en')
+        ->and($errors['name.en'])->toBeString()->not->toBe('');
+});
+
 it('preserves a block whose kind is no longer registered instead of crashing on save', function (): void {
     $page = pageWithBlocks([
         ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'Hi']],

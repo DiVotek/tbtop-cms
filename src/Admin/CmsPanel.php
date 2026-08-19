@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin;
 
+use Inertia\Middleware as InertiaMiddleware;
 use Tbtop\Admin\Navigation\NavGroup;
 use Tbtop\Admin\Navigation\NavItem;
 use Tbtop\Admin\Pages\Page;
@@ -23,7 +24,11 @@ class CmsPanel extends Panel
             ->id('cms')
             ->prefix($prefix)
             ->guard((string) config('tbtop-cms.admin.guard', 'web'))
-            ->middleware(['web', EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
+            // Inertia\Middleware is what turns session-flashed validation errors
+            // into the `errors` prop after a redirect-back. tbtop/admin leaves
+            // it to the host's `web` group; a host without HandleInertiaRequests
+            // there would get a silent form resync on every rejected save.
+            ->middleware(['web', InertiaMiddleware::class, EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
             ->chrome(CmsChrome::class)
             // Product brand (the CMS itself, not the host site) shown in the topbar
             // and on the login card. A logo will replace/accompany it later.

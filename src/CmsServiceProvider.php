@@ -91,6 +91,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_12_000001_create_not_found_hits_table')
             ->hasMigration('2026_08_17_000000_drop_cms_templates_table')
             ->hasMigration('2026_08_17_000001_update_pages_add_starter_blocks_table')
+            ->hasMigration('2026_08_18_000000_create_activity_log_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

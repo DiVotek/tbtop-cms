@@ -84,10 +84,7 @@ final class PageEditBlockTabs
 
         $fields = $registry->has($kind)
             ? array_map(
-                // stripRequired: an empty required block field would silently
-                // veto every form-scoped action on this page — see
-                // PrefixedField::withoutRequired() and CMS_TASKS.md A7.
-                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", stripRequired: true),
+                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}"),
                 $registry->get($kind)->form($s),
             )
             : [];
@@ -114,6 +111,12 @@ final class PageEditBlockTabs
         return $s->action("pageBlockRemove_{$id}")
             ->label(__('tbtop-cms::pages.blocks.remove'))->color('danger')
             ->confirm(__('tbtop-cms::pages.blocks.remove_title'), __('tbtop-cms::pages.blocks.remove_confirm'))
+            // Add/remove run the whole pageEditor form's rules before the
+            // handler; a still-empty required field on another block would
+            // veto structural edits, so both opt out of the gate (keys are
+            // still filtered to the form's schema) and leave `required` to
+            // the explicit Save.
+            ->withoutValidation()
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleRemove($ctx, $page, $id),
                 needs: ['form'],
@@ -160,6 +163,7 @@ final class PageEditBlockTabs
     {
         return $s->action("pageBlockAdd_{$kind}")
             ->label(__('tbtop-cms::pages.blocks.add', ['kind' => $kind]))
+            ->withoutValidation() // see removeAction()
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleAdd($ctx, $page, $kind),
                 needs: ['form'],

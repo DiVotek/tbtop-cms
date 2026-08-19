@@ -282,23 +282,19 @@ it('allows an admin to edit their own row', function (): void {
     expect($actor->fresh()->name)->toBe('New Name');
 });
 
-// The form marks name required, but only the server assert protects against
-// a direct action request that bypasses the client-side check.
+// The form marks name required; the server applies the form's rules to the
+// action request too, so a direct call that bypasses the client preflight
+// still gets a 422 keyed by field.
 it('rejects editing a user to a blank name and keeps the current one', function (): void {
     makeUsersPageActor('actor@example.com');
     $target = makeTargetUser('target@example.com', withAccess: true);
 
-    $response = test()->postJson('/admin/users/actions/userEditSave', [
+    test()->postJson('/admin/users/actions/userEditSave', [
         'payload' => [
             'row' => ['id' => $target->id],
             'form' => ['name' => '   ', 'email' => $target->email, 'password' => ''],
         ],
-    ]);
+    ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
 
-    $response->assertOk();
-    $effects = $response->json('effects');
-
-    expect($effects)->toHaveCount(1)
-        ->and($effects[0]['kind'])->toBe('haltModal')
-        ->and($target->fresh()->name)->toBe('Target');
+    expect($target->fresh()->name)->toBe('Target');
 });
