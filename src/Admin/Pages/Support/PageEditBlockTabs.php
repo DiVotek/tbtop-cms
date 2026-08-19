@@ -10,6 +10,7 @@ use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -84,7 +85,7 @@ final class PageEditBlockTabs
 
         $fields = $registry->has($kind)
             ? array_map(
-                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}"),
+                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"),
                 $registry->get($kind)->form($s),
             )
             : [];
@@ -111,16 +112,38 @@ final class PageEditBlockTabs
         return $s->action("pageBlockRemove_{$id}")
             ->label(__('tbtop-cms::pages.blocks.remove'))->color('danger')
             ->confirm(__('tbtop-cms::pages.blocks.remove_title'), __('tbtop-cms::pages.blocks.remove_confirm'))
-            // Add/remove run the whole pageEditor form's rules before the
-            // handler; a still-empty required field on another block would
-            // veto structural edits, so both opt out of the gate (keys are
-            // still filtered to the form's schema) and leave `required` to
-            // the explicit Save.
-            ->withoutValidation()
+            ->withoutValidation(self::skipsGate($page))
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleRemove($ctx, $page, $id),
                 needs: ['form'],
             );
+    }
+
+    /**
+     * Add/remove persist the whole pageEditor form outside the explicit Save,
+     * so on a published page they run the form's rules first — otherwise a
+     * half-edited required field would go live with the structural change.
+     * A draft cannot leak, so there the gate stays off (keys are still
+     * filtered to the form's schema). Inactive blocks never trip the gate:
+     * PrefixedField::rename() conditions their `required` on the active flag.
+     */
+    private static function skipsGate(Page $page): bool
+    {
+        return $page->status !== PageStatus::Published;
+    }
+
+    /**
+     * A structural action must not publish or unpublish: the gate above is
+     * decided by the persisted status, so a pending status change in the form
+     * waits for the explicit (validated) Save.
+     *
+     * @param  array<string, mixed>  $form
+     * @param  list<array<string, mixed>>  $rows
+     * @return array<string, mixed>
+     */
+    private static function structuralForm(array $form, Page $page, array $rows): array
+    {
+        return [...$form, 'content' => $rows, 'status' => $page->status->value];
     }
 
     private static function handleRemove(ActionCtx $ctx, Page $page, string $id): Effects
@@ -136,7 +159,7 @@ final class PageEditBlockTabs
         // PageForm::save(), so it needs the same non-destructive handling of
         // a conflict: error notify, no redirect, block NOT removed.
         try {
-            PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
+            PageForm::save(self::structuralForm($ctx->form, $page, $rows), $page->getKey());
         } catch (PageConflictException) {
             return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
         }
@@ -163,7 +186,7 @@ final class PageEditBlockTabs
     {
         return $s->action("pageBlockAdd_{$kind}")
             ->label(__('tbtop-cms::pages.blocks.add', ['kind' => $kind]))
-            ->withoutValidation() // see removeAction()
+            ->withoutValidation(self::skipsGate($page))
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleAdd($ctx, $page, $kind),
                 needs: ['form'],
@@ -182,7 +205,7 @@ final class PageEditBlockTabs
 
         // See handleRemove()'s matching comment: same conflict handling.
         try {
-            PageForm::save([...$ctx->form, 'content' => $rows], $page->getKey());
+            PageForm::save(self::structuralForm($ctx->form, $page, $rows), $page->getKey());
         } catch (PageConflictException) {
             return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
         }

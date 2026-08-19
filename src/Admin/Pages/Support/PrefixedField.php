@@ -29,6 +29,14 @@ use Tbtop\Admin\Dsl\S;
  * - `localeRuleEntries()` and the translatable flag, for per-locale rules.
  * - `toNode()->meta` (hiddenIf/disabledIf/custom meta).
  *
+ * With $activeField given, every `required` (field-level and per-locale)
+ * is rewritten to `required_unless:{activeField},false,0`: an inactive block
+ * never renders, so its empty fields must not veto Save or the structural
+ * add/remove actions. The label keeps its required marker — the field is
+ * still required for the block to go live. Only the server enforces the
+ * conditional rule; ConstraintMap does not project `required_unless` to the
+ * client, which is what keeps the client pre-flight from blocking on it.
+ *
  * Known limitation: does not recurse into `childFields()` (repeater
  * sub-fields nested under the field itself, not a page-level repeater). No
  * shipped block uses a repeater field in its form(), so this is untested
@@ -36,7 +44,7 @@ use Tbtop\Admin\Dsl\S;
  */
 final class PrefixedField
 {
-    public static function rename(Field $field, string $newName): Field
+    public static function rename(Field $field, string $newName, ?string $activeField = null): Field
     {
         $node = $field->toNode();
         $clone = S::makeField($node->kind, $newName);
@@ -52,7 +60,7 @@ final class PrefixedField
             $clone->meta($key, $value);
         }
 
-        $rules = $field->ruleEntries();
+        $rules = self::gateRequired($field->ruleEntries(), $activeField);
         if ($rules !== []) {
             $clone->rules($rules);
         }
@@ -63,10 +71,29 @@ final class PrefixedField
 
         foreach ($field->localeRuleEntries() as $locale => $localeRules) {
             if ($localeRules !== []) {
-                $clone->rulesForLocale($locale, $localeRules);
+                $clone->rulesForLocale($locale, self::gateRequired($localeRules, $activeField));
             }
         }
 
         return $clone;
+    }
+
+    /**
+     * `required_unless` with an absent or null other field still requires —
+     * a payload that drops the active flag cannot sneak an empty field past.
+     *
+     * @param  list<string>  $rules
+     * @return list<string>
+     */
+    private static function gateRequired(array $rules, ?string $activeField): array
+    {
+        if ($activeField === null) {
+            return $rules;
+        }
+
+        return array_map(
+            static fn (string $rule): string => $rule === 'required' ? "required_unless:{$activeField},false,0" : $rule,
+            $rules,
+        );
     }
 }
