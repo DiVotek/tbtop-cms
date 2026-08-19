@@ -104,10 +104,52 @@ class InstallCommand extends Command
         return true;
     }
 
+    /**
+     * The host wiring this package cannot write for itself.
+     *
+     * Every line below lands in a file the host or tbtop/admin owns — a build
+     * config, the frontend root view, the admin entry `admin:install`
+     * publishes. Editing those from here is how a package silently breaks an
+     * application it does not understand, so they are printed instead, and
+     * `cms:doctor` re-checks each one against the filesystem afterwards.
+     */
     private function nextSteps(): void
     {
         $this->newLine();
         $this->info('Next: create your first admin user with');
         $this->line('  php artisan cms:admin:create you@example.com');
+
+        $this->newLine();
+        $this->warn('Then wire the host up — none of these live in files this package owns:');
+        $this->newLine();
+
+        $this->line('  1. Register the frontend routes (routes/web.php):');
+        $this->line('       use Tbtop\\Cms\\Facades\\Cms;');
+        $this->line('       Cms::frontendRoutes();');
+        $this->newLine();
+
+        $this->line('  2. Render the SEO head in your frontend root view (resources/views/app.blade.php),');
+        $this->line('     above the Inertia head tag:');
+        $this->line("       @include('tbtop-cms::head')");
+        $this->newLine();
+
+        $this->line('  3. Point the @cms alias at this package (vite.config.ts and tsconfig.json):');
+        $this->line("       '@cms' => 'vendor/tbtop/cms/resources/js/cms'");
+        $this->newLine();
+
+        $this->line('  4. Register the admin blocks from your admin entry (resources/js/admin.tsx):');
+        $this->line("       import '@cms/admin/blocks';");
+        $this->newLine();
+
+        $this->line('  5. Let Tailwind scan this package (resources/css/admin.css):');
+        $this->line("       @source '../../vendor/tbtop/cms/src/**/*.php';");
+        $this->line("       @source '../../vendor/tbtop/cms/resources/js/cms/admin/**/*.tsx';");
+        $this->newLine();
+
+        $this->line('  6. Delete public/robots.txt if your skeleton shipped one — Laravel serves files');
+        $this->line('     under public/ before any route runs, so it shadows the dynamic /robots.txt.');
+        $this->newLine();
+
+        $this->line('  Then run `php artisan cms:doctor` — it verifies each step above.');
     }
 }

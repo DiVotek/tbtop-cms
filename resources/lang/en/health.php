@@ -42,8 +42,8 @@ return [
             'missing' => 'One or more expected routes are missing.',
             'hints' => [
                 'admin_missing' => 'The admin panel route is not registered. Check that tbtop-cms.admin.autoregister is true and that the CmsPanel is listed under tbtop-admin.panels.',
-                'frontend_missing' => 'The cms frontend routes are not registered. Call Tbtop\\Cms\\Cms::frontendRoutes() from a web-middleware route file, e.g. routes/web.php.',
-                'both_missing' => 'Neither the admin panel nor the cms frontend routes are registered. Check tbtop-cms.admin.autoregister and call Tbtop\\Cms\\Cms::frontendRoutes() from routes/web.php.',
+                'frontend_missing' => 'The cms frontend routes are not registered. Call Tbtop\\Cms\\Facades\\Cms::frontendRoutes() from a web-middleware route file, e.g. routes/web.php.',
+                'both_missing' => 'Neither the admin panel nor the cms frontend routes are registered. Check tbtop-cms.admin.autoregister and call Tbtop\\Cms\\Facades\\Cms::frontendRoutes() from routes/web.php.',
             ],
         ],
         'inertia_root_view' => [
@@ -54,7 +54,7 @@ return [
             'unreadable' => 'The root view at :path exists but could not be read.',
             'hints' => [
                 'missing_view' => 'Create resources/views/:view.blade.php (the standard Laravel/Inertia scaffold view), or set tbtop-cms.render.root_view to an existing view.',
-                'missing_include' => "Add @include('tbtop-cms::head') above @inertiaHead in your root Blade view.",
+                'missing_include' => "Add @include('tbtop-cms::head') to your root Blade view, above the Inertia head tag — <x-inertia::head> on Inertia 3, @inertiaHead on Inertia 2.",
                 'unreadable' => 'Check that :path is a regular file the web server user can read — every page render fails until it is.',
             ],
         ],
