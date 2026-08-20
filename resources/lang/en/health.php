@@ -34,7 +34,7 @@ return [
             'label' => 'Activity log table',
             'ok' => 'The ":table" table has the required activity log schema.',
             'missing' => 'The ":table" table or required columns are missing.',
-            'hint' => 'Run php artisan cms:install to publish and run the Spatie activity log migrations.',
+            'hint' => 'Run php artisan migrate (or php artisan cms:install) to create the activity log table.',
         ],
         'routes_registered' => [
             'label' => 'Panel and frontend routes',
