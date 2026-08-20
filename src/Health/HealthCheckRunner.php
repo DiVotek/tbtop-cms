@@ -15,6 +15,7 @@ use Tbtop\Cms\Health\Checks\PackageVersionsMatchCheck;
 use Tbtop\Cms\Health\Checks\RobotsTxtCheck;
 use Tbtop\Cms\Health\Checks\RoutesRegisteredCheck;
 use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
+use Tbtop\Cms\Health\Checks\SessionDriverCheck;
 use Throwable;
 
 /**
@@ -41,6 +42,7 @@ final class HealthCheckRunner
             SchedulerHeartbeatCheck::class,
             AppUrlCheck::class,
             DefaultOwnerAndLanguageCheck::class,
+            SessionDriverCheck::class,
         ];
     }
 
