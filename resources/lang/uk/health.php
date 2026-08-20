@@ -34,7 +34,7 @@ return [
             'label' => 'Таблиця журналу аудиту',
             'ok' => 'Таблиця ":table" має потрібну схему журналу аудиту.',
             'missing' => 'Таблиця ":table" або потрібні стовпці відсутні.',
-            'hint' => 'Виконайте php artisan cms:install, щоб опублікувати й запустити міграції Spatie activity log.',
+            'hint' => 'Виконайте php artisan migrate (або php artisan cms:install), щоб створити таблицю журналу аудиту.',
         ],
         'routes_registered' => [
             'label' => 'Маршрути панелі та фронтенду',
