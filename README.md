@@ -230,9 +230,10 @@ public visitor, defeating the bundle split `admin:install` sets up. (`app.tsx`
 is still accepted as a fallback for hosts wired before `admin:install`
 published a dedicated entry, but new installs should use `admin.tsx`.)
 
-This assumes the `@cms` alias the frontend setup already uses (`vite.config.js`
-`resolve.alias` plus `tsconfig.json` `paths`), pointing at
-`vendor/tbtop/cms/resources/js/cms`:
+This needs a `@cms` alias pointing at `vendor/tbtop/cms/resources/js/cms`, in
+both `vite.config.ts` (`resolve.alias`) and `tsconfig.json` (`paths`). A
+current `laravel new --react` scaffold ships no `resolve` block at all, so
+add the whole block rather than extending an existing one:
 
 ```ts
 // vite.config.ts
