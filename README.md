@@ -76,6 +76,29 @@ starter kit's own root route (`routes/web.php`: `Route::inertia('/', 'welcome')`
 — it matches `/` first and permanently shadows the CMS's seeded home page,
 `frontendRoutes()` position notwithstanding.
 
+Deleting that route outright breaks `npm run build`, though: the React
+starter kit's `auth-simple-layout.tsx`, `auth-split-layout.tsx`, and
+`auth-card-layout.tsx` all call the Wayfinder-generated `home()` helper
+unconditionally (the "back to the site" logo link), and Wayfinder stops
+exporting it the moment nothing is named `home`:
+
+```
+[MISSING_EXPORT] "home" is not exported by "resources/js/routes/index.ts"
+```
+
+Don't edit the three layouts — keep the name instead, on a route that never
+actually answers a request. `frontendRoutes()`'s catch-all already matches
+`/` first and serves it correctly once `welcome` is out of the way, so a
+second `/` route registered **after** it is permanently shadowed for real
+traffic; it exists purely so `route('home')`/`home()` still resolves to `/`:
+
+```php
+// routes/web.php
+Cms::frontendRoutes();
+
+Route::get('/', fn () => abort(404))->name('home');
+```
+
 Create the first admin user and verify the install:
 
 ```bash
@@ -114,6 +137,58 @@ separate from the host's own `resources/js/app.tsx` so the admin bundle (the
 richtext editor alone is a few hundred KB) never ships to public visitors. Its
 `resolve()` handles `admin/page` inline by importing `AdminPage` from
 `@tbtop/inertia-admin`; there's no separate page-component file to create.
+
+### Frontend page component (`Cms/Page`)
+
+Every frontend page request renders the Inertia component named by
+`tbtop-cms.render.component` (`Cms/Page` by default). Unlike `admin/page`
+above, this package cannot resolve that name for you: `admin.tsx` is this
+package's own dedicated Vite entry, so its `resolve()` can special-case a
+component name inline, but `Cms/Page` has to resolve through the host's
+**own** `app.tsx` — the entry that also renders every other page the host
+owns, wired however the host's scaffold set it up. Both shapes seen in
+practice end up at the same requirement, though: a current `laravel new
+--react` app leaves `app.tsx`'s `createInertiaApp()` call with no
+`resolve`/`pages` property at all, so the `@inertiajs/vite` plugin fills one
+in at build time that globs `resources/js/pages/**/*.tsx`; a host with its
+own explicit `resolve` (this package's own workbench dev host does this, and
+so does `admin.tsx` above) typically globs the same directory by hand. Either
+way the component name is looked up as a literal file path. That means
+`Cms/Page` has to exist on disk as a real file — skip it and every frontend
+page 500s with `Unable to locate file in Vite manifest:
+resources/js/pages/Cms/Page.tsx`, since there is nothing else to build. This
+package's own `resources/js/cms/CmsPage.tsx` is that component; the host file
+just re-exports it — this package's workbench host uses the identical file:
+
+```tsx
+// resources/js/pages/Cms/Page.tsx
+export { default } from '@cms/CmsPage';
+```
+
+Nothing prevents a host from special-casing the literal name `Cms/Page`
+inside its own `resolve()` instead — the way `admin.tsx` special-cases
+`admin/page` — and skipping the file on disk, but that is unusual: `app.tsx`
+resolves every other page the host owns too, and a hand-rolled `resolve`
+still has to fall through to a glob for those, so in practice the file above
+is simpler than a special case would be.
+
+`CmsPage.tsx` imports `@json-render/react`, which this package's own build
+depends on (`@json-render/core` and `@json-render/react`, pinned to the same
+`^0.19.0` this package ships against) but does not install for the host —
+same division of responsibility as `@tbtop/inertia-admin` in the installation
+steps above. The moment `Cms/Page.tsx` above pulls `CmsPage.tsx` into the
+host's build, the host's bundler needs both packages resolvable, or the build
+fails outright (`Rolldown failed to resolve import "@json-render/react"`),
+not just at runtime:
+
+```bash
+npm install @json-render/core @json-render/react
+```
+
+The SSR section further down also references these two as `noExternal`
+entries — that's an additional dev-SSR-specific concern (see there), not a
+substitute for installing them here; every host needs them once it renders a
+real CMS page, SSR or not.
 
 ### Admin stylesheet (`@source` over this package)
 
@@ -155,9 +230,10 @@ public visitor, defeating the bundle split `admin:install` sets up. (`app.tsx`
 is still accepted as a fallback for hosts wired before `admin:install`
 published a dedicated entry, but new installs should use `admin.tsx`.)
 
-This assumes the `@cms` alias the frontend setup already uses (`vite.config.js`
-`resolve.alias` plus `tsconfig.json` `paths`), pointing at
-`vendor/tbtop/cms/resources/js/cms`:
+This needs a `@cms` alias pointing at `vendor/tbtop/cms/resources/js/cms`, in
+both `vite.config.ts` (`resolve.alias`) and `tsconfig.json` (`paths`). A
+current `laravel new --react` scaffold ships no `resolve` block at all, so
+add the whole block rather than extending an existing one:
 
 ```ts
 // vite.config.ts
@@ -168,6 +244,33 @@ resolve: { alias: { '@cms': path.resolve(__dirname, 'vendor/tbtop/cms/resources/
 // tsconfig.json
 { "compilerOptions": { "paths": { "@cms/*": ["./vendor/tbtop/cms/resources/js/cms/*"] } } }
 ```
+
+### Admin login and a host `login` route
+
+Admin pages other than the login page itself carry `auth:{guard}` in their
+middleware (`PanelConfig::authStack()`), including the bare `/admin` →
+`/admin/dashboard` redirect. Laravel's `auth` middleware sends an
+unauthenticated visitor to `route('login')`. This package registers its own
+`login` route pointing at the branded panel login (`tbtop.cms.login-page`,
+served at `admin/login`) — but **only when nothing else already owns that
+name** (`CmsServiceProvider::wireAdminLoginRedirect()`): a second route named
+`login` would still lose the URL Laravel actually generates for `route('login')`
+to whichever registered first, while also duplicating a Wayfinder export and
+breaking the host's frontend build. So on a host that ships its own
+`login`-named route — Fortify, Breeze, Jetstream, and most starter kits — an
+unauthenticated visit to `/admin` lands on the **host's** login screen, not
+the CMS's.
+
+Nothing is actually broken: `admin/login` still works when visited directly,
+and a standard `redirect()->intended(...)` login controller sends the user
+back to `/admin/dashboard` after authenticating there. The only symptom is
+cosmetic — a visitor who types `/admin` sees the host's login page instead of
+the CMS's. A host that wants `/admin` itself to land on the CMS login can
+either point its own `login`-named route handler at a redirect to
+`admin/login`, or drop the redirect entirely and link users to `admin/login`
+directly. `cms:doctor` does not flag this: its route check only confirms
+`tbtop.cms.login-page` exists, which it always does regardless of which
+`login` route wins.
 
 ### Frontend props (`ShareCmsProps`)
 
