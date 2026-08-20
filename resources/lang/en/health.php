@@ -146,5 +146,15 @@ return [
                 'both_missing' => 'No owner account and no active default frontend language exist. Run php artisan cms:install and php artisan cms:admin:create to set up both.',
             ],
         ],
+        'session_driver' => [
+            'label' => 'Session driver',
+            'ok' => 'The session driver is ":driver".',
+            'cookie' => 'The session driver is "cookie", which stores the whole session in one browser cookie.',
+            'array' => 'The session driver is "array", which discards the session at the end of every request.',
+            'hints' => [
+                'cookie' => 'A cookie session is capped at roughly 4KB. Large page-editor forms flash more validation errors and old input than that, and the overflow is dropped silently — the form resets with no errors shown. Set SESSION_DRIVER to file, database, or redis.',
+                'array' => 'An array session never survives a redirect, so logging in and every flash message silently fail. This driver is meant for tests — set SESSION_DRIVER to file, database, or redis.',
+            ],
+        ],
     ],
 ];
