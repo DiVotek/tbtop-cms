@@ -13,15 +13,79 @@ Minimal `tbtop` + `json-render` CMS core for Laravel.
 
 ## Installation
 
+This package supplies the CMS domain (content, migrations, admin pages,
+frontend routes); the admin panel itself — root view, Inertia entry,
+stylesheet — comes from its dependency `tbtop/admin` and is wired by a
+separate installer. Run both, in order:
+
 ```bash
 composer require tbtop/cms
+php artisan vendor:publish --tag="tbtop-cms-config"
+php artisan admin:install
+php artisan cms:install
 ```
 
-Publish the config file:
+- `vendor:publish --tag="tbtop-cms-config"` publishes `config/tbtop-cms.php`.
+- `admin:install` (from `tbtop/admin`) publishes three files this package's
+  panel depends on: `resources/views/admin.blade.php` (a dedicated root view —
+  see below), `resources/js/admin.tsx` (a dedicated Inertia entry, so the
+  admin bundle never ships to public visitors), and `resources/css/admin.css`.
+  It only writes files that don't already exist; on a populated host, pass
+  `--force` if you're intentionally overwriting one. It also prints manual
+  steps this README covers below — do them in order, since each one it lists
+  depends on the ones before it.
+- `cms:install` runs migrations and seeds the default language and home page.
+  It's the only documented way to get there: skip it and `cms:doctor` reports
+  three errors (missing tables/route registration/content) instead of one.
+
+Then finish the host-side wiring both installers print but can't do for you:
 
 ```bash
-php artisan vendor:publish --tag="tbtop-cms-config"
+npm install @tbtop/inertia-admin
 ```
+
+The README imports from this package below; nothing installs it for you.
+
+```js
+// vite.config.ts
+laravel({
+    input: ['resources/css/app.css', 'resources/js/app.tsx', 'resources/js/admin.tsx'],
+    refresh: true,
+}),
+```
+
+Add the admin entry alongside the app one. Miss this and `admin.css` never
+compiles — it's silently absent from `public/build/manifest.json`, so the
+panel loads unstyled with no error.
+
+Register the frontend routes (`routes/web.php`):
+
+```php
+use Tbtop\Cms\Facades\Cms;
+
+Cms::frontendRoutes();
+```
+
+`frontendRoutes()` ends in a catch-all (`Route::get('{path?}', ...)->where('path', '.*')`)
+that resolves any path the CMS doesn't recognize into a 404 page — call it
+**last**, after every route the host defines itself. Registered earlier, it
+swallows everything after it: a populated host's own `/about`, `/contact`,
+`/pricing` all start 404ing, and `/` 500s until the CMS has a seeded page to
+resolve. On a fresh `laravel new --react` app, also delete or rename the
+starter kit's own root route (`routes/web.php`: `Route::inertia('/', 'welcome')`)
+— it matches `/` first and permanently shadows the CMS's seeded home page,
+`frontendRoutes()` position notwithstanding.
+
+Create the first admin user and verify the install:
+
+```bash
+php artisan cms:admin:create you@example.com
+php artisan cms:doctor
+```
+
+The sections below are the detail behind each piece `admin:install` and
+`cms:install` print as a manual step — read them once, then use `cms:doctor`
+on future changes instead of re-reading this file.
 
 ## Host application requirements
 
@@ -30,38 +94,44 @@ The host-side wiring below is not created by this package; skipping a piece
 produces a blank page, an Inertia resolution error, unstyled admin markup, or
 placeholder boxes where this package's own blocks should render.
 
-### Root Blade view (`app`)
+### Root Blade view (`admin`)
 
-The admin panel renders into the host's root view, which defaults to `app` (see
-`Tbtop\Admin\Panels\PanelConfig::$rootView`). The standard Laravel/Inertia
-scaffold view must exist at `resources/views/app.blade.php`. This is not
-configurable from `tbtop/cms` today — only a per-panel `rootView()` override on
-the upstream `Panel` class can change it.
+`tbtop/admin`'s `PanelConfig` defaults every panel's root view to `app` — the
+host's own public root view, which loads the public frontend bundle and has no
+way to resolve the admin client's `admin/page` component. This package's panel
+(`Tbtop\Cms\Admin\CmsPanel`) already overrides that default with
+`->rootView('admin')`, because the admin client has its own Vite entry and
+needs a matching root view to load it. `admin:install` (from `tbtop/admin`)
+publishes that view at `resources/views/admin.blade.php`. Nothing manual is
+needed here — just don't skip `admin:install`, and don't delete the published
+view.
 
-### Inertia page component (`admin/page`)
+### Inertia entry and page component (`admin/page`)
 
-Every admin page request renders the Inertia component `admin/page`. The host's
-`createInertiaApp` resolver must be able to resolve it — typically a thin
-delegate to the client package's page component:
-
-```tsx
-// resources/js/pages/admin/page.tsx
-import { AdminPage } from "@tbtop/inertia-admin";
-export default AdminPage;
-```
+Every admin page request renders the Inertia component `admin/page`.
+`admin:install` publishes `resources/js/admin.tsx` — a dedicated entry, kept
+separate from the host's own `resources/js/app.tsx` so the admin bundle (the
+richtext editor alone is a few hundred KB) never ships to public visitors. Its
+`resolve()` handles `admin/page` inline by importing `AdminPage` from
+`@tbtop/inertia-admin`; there's no separate page-component file to create.
 
 ### Admin stylesheet (`@source` over this package)
 
 The client package ships a Tailwind v4 **source** file, so the host pipeline
-compiles it. The `@source` lines are what make Tailwind scan this package for
-the class names it authors itself — PHP for the admin DSL (`->class()`, section
-`class` options), TSX for the admin blocks below. Without them those classes
-silently compile to nothing and the affected blocks render unstyled:
+compiles it. `admin:install` publishes `resources/css/admin.css` with one
+`@source` line already in it, scoped to the host's own `app/**/*.php` — enough
+for classes the host's own code authors, but not for this package's. Add the
+two lines below on top of what's published, so Tailwind also scans this
+package for the class names **it** authors — PHP for the admin DSL
+(`->class()`, section `class` options), TSX for the admin blocks below.
+Without them those classes silently compile to nothing and the affected blocks
+render unstyled:
 
 ```css
 /* resources/css/admin.css */
 @import '@tbtop/inertia-admin/styles.css';
 
+@source '../../app/**/*.php';
 @source '../../vendor/tbtop/cms/src/**/*.php';
 @source '../../vendor/tbtop/cms/resources/js/cms/admin/**/*.tsx';
 ```
@@ -75,13 +145,29 @@ display block can do. Importing the barrel registers them; without the import
 the client falls back to its unknown-kind placeholder for those nodes:
 
 ```tsx
-// resources/js/app.tsx — side-effect import, before createInertiaApp()
+// resources/js/admin.tsx — side-effect import, before createInertiaApp()
 import '@cms/admin/blocks';
 ```
 
+This goes in the **admin** entry, not the host's `app.tsx` — putting it in
+`app.tsx` instead ships the admin blocks (and their dependencies) to every
+public visitor, defeating the bundle split `admin:install` sets up. (`app.tsx`
+is still accepted as a fallback for hosts wired before `admin:install`
+published a dedicated entry, but new installs should use `admin.tsx`.)
+
 This assumes the `@cms` alias the frontend setup already uses (`vite.config.js`
 `resolve.alias` plus `tsconfig.json` `paths`), pointing at
-`vendor/tbtop/cms/resources/js/cms`.
+`vendor/tbtop/cms/resources/js/cms`:
+
+```ts
+// vite.config.ts
+resolve: { alias: { '@cms': path.resolve(__dirname, 'vendor/tbtop/cms/resources/js/cms') } },
+```
+
+```json
+// tsconfig.json
+{ "compilerOptions": { "paths": { "@cms/*": ["./vendor/tbtop/cms/resources/js/cms/*"] } } }
+```
 
 ### Frontend props (`ShareCmsProps`)
 
@@ -101,13 +187,17 @@ Frontend meta tags (title, description, canonical, Open Graph, Twitter Card,
 hreflang, favicon, JSON-LD) are rendered server-side so crawlers and
 social-network bots see them without executing JS — whether or not full-page
 SSR (see the next section) is turned on. Add the include to the host's root
-view, **above** `@inertiaHead`:
+view, **above** the Inertia head output — either the `@inertiaHead` directive
+or its `<x-inertia::head>` component form (a current Laravel 13 React scaffold
+uses the latter; both are the same directive under the hood):
 
 ```blade
 {{-- resources/views/app.blade.php --}}
 @vite(['resources/css/app.css', 'resources/js/app.tsx'])
 @include('tbtop-cms::head')
-@inertiaHead
+<x-inertia::head>
+    <title>{{ config('app.name', 'Laravel') }}</title>
+</x-inertia::head>
 ```
 
 The included view (`resources/views/head.blade.php` in this package) reads
