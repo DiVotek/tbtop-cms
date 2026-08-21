@@ -106,12 +106,18 @@ class BlockContentField
 
             $data = is_array($block['data'] ?? null) ? $block['data'] : [];
 
-            $rows[] = [
+            $row = [
                 ...$data,
                 'id' => (string) ($block['id'] ?? ''),
                 'kind' => (string) ($block['kind'] ?? ''),
                 'active' => (bool) ($block['active'] ?? true),
             ];
+
+            if (is_numeric($block['sort'] ?? null)) {
+                $row['sort'] = (int) $block['sort'];
+            }
+
+            $rows[] = $row;
         }
 
         return $rows;
