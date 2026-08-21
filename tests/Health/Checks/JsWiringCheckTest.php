@@ -26,6 +26,18 @@ it('warns instead of crashing when none of the expected host files can be found'
         ]));
 });
 
+it('translates every diagnostic when the result is rendered in a later locale', function (): void {
+    app()->setLocale('en');
+    $result = (new JsWiringCheck)->run();
+
+    app()->setLocale('uk');
+
+    expect($result->hint())
+        ->toContain('JS-точку входу не знайдено')
+        ->toContain('Компонент admin-сторінки не знайдено')
+        ->toContain('CSS-точку входу не знайдено');
+});
+
 it('treats a directory squatting on a candidate path as not found, not as a readable file', function (): void {
     // file_exists() is true for directories, so a naive exists() candidate
     // scan would try to File::get() a directory and crash the check.

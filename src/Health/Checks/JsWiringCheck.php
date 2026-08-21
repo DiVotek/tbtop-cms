@@ -88,35 +88,35 @@ final class JsWiringCheck implements HealthCheck
             labelKey: 'tbtop-cms::health.checks.js_wiring.label',
             messageKey: 'tbtop-cms::health.checks.js_wiring.warning',
             hintKey: 'tbtop-cms::health.checks.js_wiring.hints.combined',
-            hintReplace: ['details' => implode(' ', $problems)],
+            hintFragments: $problems,
         );
     }
 
-    /** @return list<string> Hint fragments, one per unresolved heuristic. */
+    /** @return list<array{key: string, replace: array<string, string>}> Hint fragments, one per unresolved heuristic. */
     private function checkBlocksImport(): array
     {
         $path = $this->firstExisting(self::JS_ENTRY_CANDIDATES);
 
         if ($path === null) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.entry_not_found', ['candidates' => implode(', ', self::JS_ENTRY_CANDIDATES)])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.entry_not_found', 'replace' => ['candidates' => implode(', ', self::JS_ENTRY_CANDIDATES)]]];
         }
 
         $source = $this->readFile($path);
 
         if ($source === null) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.unreadable', 'replace' => ['path' => $path]]];
         }
 
         // Matched without the surrounding quotes: hosts format JS to their own
         // conventions, and a double-quoted import is the same wiring.
         if (! str_contains($source, self::BLOCKS_IMPORT)) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.blocks_import_missing', ['path' => $path])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.blocks_import_missing', 'replace' => ['path' => $path]]];
         }
 
         return [];
     }
 
-    /** @return list<string> */
+    /** @return list<array{key: string, replace: array<string, string>}> */
     private function checkAdminPageComponent(): array
     {
         // The canonical wiring resolves 'admin/page' inline in the JS entry
@@ -138,39 +138,39 @@ final class JsWiringCheck implements HealthCheck
         $path = $this->firstExisting(self::ADMIN_PAGE_CANDIDATES);
 
         if ($path === null) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.admin_page_not_found', ['candidates' => implode(', ', self::ADMIN_PAGE_CANDIDATES)])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.admin_page_not_found', 'replace' => ['candidates' => implode(', ', self::ADMIN_PAGE_CANDIDATES)]]];
         }
 
         $source = $this->readFile($path);
 
         if ($source === null) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.unreadable', 'replace' => ['path' => $path]]];
         }
 
         if (! str_contains($source, self::ADMIN_PAGE_IMPORT)) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.admin_page_import_missing', ['path' => $path])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.admin_page_import_missing', 'replace' => ['path' => $path]]];
         }
 
         return [];
     }
 
-    /** @return list<string> */
+    /** @return list<array{key: string, replace: array<string, string>}> */
     private function checkTailwindSource(): array
     {
         $path = $this->firstExisting(self::CSS_CANDIDATES);
 
         if ($path === null) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.css_not_found', ['candidates' => implode(', ', self::CSS_CANDIDATES)])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.css_not_found', 'replace' => ['candidates' => implode(', ', self::CSS_CANDIDATES)]]];
         }
 
         $source = $this->readFile($path);
 
         if ($source === null) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.unreadable', ['path' => $path])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.unreadable', 'replace' => ['path' => $path]]];
         }
 
         if (! str_contains($source, self::TAILWIND_SOURCE_NEEDLE)) {
-            return [__('tbtop-cms::health.checks.js_wiring.hints.source_missing', ['path' => $path])];
+            return [['key' => 'tbtop-cms::health.checks.js_wiring.hints.source_missing', 'replace' => ['path' => $path]]];
         }
 
         return [];

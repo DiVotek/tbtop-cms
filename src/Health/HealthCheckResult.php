@@ -18,6 +18,7 @@ final class HealthCheckResult
     /**
      * @param  array<string, string|int|float>  $messageReplace
      * @param  array<string, string|int|float>  $hintReplace
+     * @param  list<array{key: string, replace: array<string, string|int|float>}>  $hintFragments
      */
     public function __construct(
         public readonly string $checkId,
@@ -27,6 +28,7 @@ final class HealthCheckResult
         public readonly array $messageReplace = [],
         public readonly ?string $hintKey = null,
         public readonly array $hintReplace = [],
+        public readonly array $hintFragments = [],
     ) {}
 
     public function label(): string
@@ -41,6 +43,19 @@ final class HealthCheckResult
 
     public function hint(): ?string
     {
-        return $this->hintKey === null ? null : __($this->hintKey, $this->hintReplace);
+        if ($this->hintKey === null) {
+            return null;
+        }
+
+        $replace = $this->hintReplace;
+
+        if ($this->hintFragments !== []) {
+            $replace['details'] = implode(' ', array_map(
+                static fn (array $fragment): string => __($fragment['key'], $fragment['replace']),
+                $this->hintFragments,
+            ));
+        }
+
+        return __($this->hintKey, $replace);
     }
 }
