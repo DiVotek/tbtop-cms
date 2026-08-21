@@ -76,7 +76,7 @@ class SitemapController
      */
     private function guard(): void
     {
-        if (! $this->indexing->enabled()) {
+        if (! $this->indexing->enabled() || ! config('tbtop-cms.seo.sitemap.enabled', true)) {
             abort(404);
         }
     }

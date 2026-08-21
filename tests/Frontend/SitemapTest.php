@@ -100,6 +100,7 @@ it('returns 404 for sitemap but keeps robots reachable when the sitemap config d
     app(Cms::class)->frontendRoutes();
 
     $this->get('/sitemap.xml')->assertNotFound();
+    $this->get('/sitemap-1.xml')->assertNotFound();
 
     $response = $this->get('/robots.txt')
         ->assertOk()
