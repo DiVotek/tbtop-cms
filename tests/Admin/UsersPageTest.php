@@ -9,6 +9,7 @@ use Tbtop\Cms\Admin\Events\CmsAccessGranted;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
 
 uses(RefreshDatabase::class);
 
@@ -120,6 +121,37 @@ it('rejects revoking access from a user who has none', function (): void {
 
     $response->assertOk();
     expect(collect($response->json('effects'))->pluck('kind'))->not->toContain('refreshTable');
+});
+
+it('rejects profile grants and revocations when the user model controls access', function (): void {
+    config(['tbtop-cms.admin.model' => GatedContractAdminUser::class]);
+    config(['auth.providers.users.model' => GatedContractAdminUser::class]);
+
+    $actor = GatedContractAdminUser::query()->create([
+        'name' => 'Actor', 'email' => 'actor@admins.test', 'password' => 'secret',
+    ]);
+    $denied = GatedContractAdminUser::query()->create([
+        'name' => 'Denied', 'email' => 'denied@example.com', 'password' => 'secret',
+    ]);
+    $allowed = GatedContractAdminUser::query()->create([
+        'name' => 'Allowed', 'email' => 'allowed@admins.test', 'password' => 'secret',
+    ]);
+    CmsUserProfile::query()->create(['user_id' => $allowed->id]);
+    test()->actingAs($actor, 'web');
+
+    $grant = test()->postJson('/admin/users/actions/userGrant', [
+        'payload' => ['row' => ['id' => $denied->id]],
+    ])->assertOk();
+    $revoke = test()->postJson('/admin/users/actions/userRevoke', [
+        'payload' => ['row' => ['id' => $allowed->id]],
+    ])->assertOk();
+
+    expect(collect($grant->json('effects'))->firstWhere('kind', 'notify')['message'])
+        ->toBe(__('tbtop-cms::users.validation.access_managed_by_application'))
+        ->and(CmsUserProfile::query()->where('user_id', $denied->id)->exists())->toBeFalse()
+        ->and(collect($revoke->json('effects'))->firstWhere('kind', 'notify')['message'])
+        ->toBe(__('tbtop-cms::users.validation.access_managed_by_application'))
+        ->and(CmsUserProfile::query()->where('user_id', $allowed->id)->exists())->toBeTrue();
 });
 
 it('rejects self-revoke, keeping the actor row', function (): void {

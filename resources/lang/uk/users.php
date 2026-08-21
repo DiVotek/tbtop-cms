@@ -14,6 +14,7 @@ return [
         'granted' => 'Має доступ',
         'owner' => 'Власник',
         'none' => 'Немає доступу',
+        'managed' => 'Керується застосунком',
     ],
     'fields' => [
         'name' => 'Імʼя',
@@ -48,6 +49,7 @@ return [
     ],
     'validation' => [
         'cannot_manage_self' => 'Ви не можете змінити власний доступ.',
+        'access_managed_by_application' => 'Доступ до CMS керується застосунком.',
         'already_has_access' => 'Цей користувач вже має доступ до CMS.',
         'no_access' => 'У цього користувача немає доступу до CMS для відкликання.',
         'cannot_revoke_owner' => 'Власника не можна відкликати.',
