@@ -51,6 +51,7 @@ return [
             'ok' => 'The root view exists and includes the cms head partial.',
             'missing_view' => 'The configured root view ":view" does not exist.',
             'missing_include' => 'The root view at :path is missing the cms head include.',
+            'include_after_head' => 'The cms head include in :path appears after the Inertia head directive.',
             'unreadable' => 'The root view at :path exists but could not be read.',
             'hints' => [
                 'missing_view' => 'Create resources/views/:view.blade.php (the standard Laravel/Inertia scaffold view), or set tbtop-cms.render.root_view to an existing view.',
