@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -22,6 +23,33 @@ it('suffixes a colliding sibling slug', function (): void {
     $second = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     expect($second->pathFor('en'))->toBe('about-2');
+});
+
+it('retries with the next suffix when the resolved path is claimed before insert', function (): void {
+    $competitor = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Competitor']]);
+    $competitor->slugs()->delete();
+    $injected = false;
+
+    PageSlug::creating(function (PageSlug $slug) use ($competitor, &$injected): void {
+        if ($injected || $slug->locale !== 'en' || $slug->path !== 'about') {
+            return;
+        }
+
+        $injected = true;
+        DB::table('tbtop_page_slugs')->insert([
+            'page_id' => $competitor->id,
+            'locale' => 'en',
+            'slug' => 'about',
+            'path' => 'about',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
+
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    expect($injected)->toBeTrue()
+        ->and($page->pathFor('en'))->toBe('about-2');
 });
 
 it('builds nested paths from the ancestor chain', function (): void {

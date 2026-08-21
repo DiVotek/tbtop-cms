@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Support;
 
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
@@ -11,6 +12,8 @@ use Tbtop\Cms\Page\Models\PageSlug;
 
 class PageSlugWriter
 {
+    private const MAX_WRITE_ATTEMPTS = 100;
+
     public function __construct(private readonly Languages $languages) {}
 
     /**
@@ -78,26 +81,51 @@ class PageSlugWriter
             ->first();
 
         $base = $this->baseFor($page, $locale, $existing, $slugOverride);
-        [$slug, $path] = $this->resolve($page, $locale, $base);
+        $minimumCandidate = 1;
 
-        if ($existing !== null && $existing->slug === $slug && $existing->path === $path) {
-            return false;
+        for ($attempt = 1; $attempt <= self::MAX_WRITE_ATTEMPTS; $attempt++) {
+            [$slug, $path] = $this->resolve($page, $locale, $base, $minimumCandidate);
+
+            if ($existing !== null && $existing->slug === $slug && $existing->path === $path) {
+                return false;
+            }
+
+            try {
+                PageSlug::query()->updateOrCreate(
+                    ['page_id' => $page->getKey(), 'locale' => $locale],
+                    ['slug' => $slug, 'path' => $path],
+                );
+
+                return true;
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($attempt === self::MAX_WRITE_ATTEMPTS) {
+                    throw $exception;
+                }
+
+                $existing = PageSlug::query()
+                    ->where('page_id', $page->getKey())
+                    ->where('locale', $locale)
+                    ->first();
+
+                if ($existing !== null) {
+                    $minimumCandidate = 1;
+
+                    continue;
+                }
+
+                $minimumCandidate = $minimumCandidate === 1 ? 2 : $minimumCandidate + 1;
+            }
         }
 
-        PageSlug::query()->updateOrCreate(
-            ['page_id' => $page->getKey(), 'locale' => $locale],
-            ['slug' => $slug, 'path' => $path],
-        );
-
-        return true;
+        return false;
     }
 
     /** @return array{0: string, 1: string} */
-    private function resolve(Page $page, string $locale, string $base): array
+    private function resolve(Page $page, string $locale, string $base, int $minimumCandidate = 1): array
     {
         $parentPath = $this->parentPath($page, $locale);
-        $slug = $base;
-        $suffix = 2;
+        $slug = $minimumCandidate === 1 ? $base : $base . '-' . $minimumCandidate;
+        $suffix = max(2, $minimumCandidate + 1);
 
         while (true) {
             $path = $this->join($parentPath, $slug);
