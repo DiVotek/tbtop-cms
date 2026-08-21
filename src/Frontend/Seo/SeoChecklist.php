@@ -56,7 +56,7 @@ class SeoChecklist
             $this->canonicalCheck($resolved['canonical']),
             $this->hreflangCheck($page),
             ...$this->focusKeywordChecks($page, $seo, $locale, $resolved),
-            $this->duplicateTitleCheck($page, $resolved['ownTitle'], $locale),
+            $this->duplicateTitleCheck($page, $resolved['title'], $locale),
         ];
     }
 
@@ -213,13 +213,9 @@ class SeoChecklist
     }
 
     /**
-     * Compares against the same seo.title → title → name cascade
-     * SeoResolver::metaTitle() applies, deliberately stopping there: running
-     * a full resolve() per page would also build every page's alternates and
-     * JSON-LD objects, turning one editor load into hundreds of resolutions
-     * on a site of any size. The template/suffix step is skipped too — it is
-     * site-wide, so it can never turn two distinct bases into a collision or
-     * split a real one.
+     * Compares the rendered title while avoiding a full resolve() per page,
+     * which would also build alternates and JSON-LD objects. Templates may
+     * omit {title}, so comparing only each page's base misses collisions.
      *
      * Only the columns the cascade reads are hydrated, and drafts count:
      * a duplicate that is about to be published is exactly what this warns
@@ -233,19 +229,20 @@ class SeoChecklist
             return $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass'));
         }
 
-        $base = $this->metaTitleBase($page, $locale);
-
-        if ($base === '') {
-            return $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass'));
-        }
-
         $others = Page::query()
             ->whereKeyNot($page->getKey())
-            ->select(['id', 'seo', 'title', 'name'])
+            ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'seo', 'title', 'name'])
             ->cursor();
 
         foreach ($others as $other) {
-            if ($this->metaTitleBase($other, $locale) === $base) {
+            $otherTitle = $this->resolver->renderedTitle(
+                $other,
+                $this->metaTitleBase($other, $locale),
+                $locale,
+                $this->breadcrumbs->forPage($other, $locale),
+            );
+
+            if ($otherTitle === $title) {
                 return $this->check('duplicate_title', 'warn', __('tbtop-cms::pages.seo_checklist.duplicate_title.warn'));
             }
         }

@@ -206,6 +206,15 @@ it('does not warn about a duplicate title when every other page differs', functi
     expect(checkByKey(checklistFor($page), 'duplicate_title')['status'])->toBe('pass');
 });
 
+it('warns when a title-omitting template makes distinct page titles collide', function (): void {
+    app(Settings::class)->set('site.name', 'Acme');
+    app(Settings::class)->set('seo.title_template', '{site_name}');
+    Page::factory()->create(['name' => ['en' => 'One'], 'title' => ['en' => 'One']]);
+    $page = Page::factory()->create(['name' => ['en' => 'Two'], 'title' => ['en' => 'Two']]);
+
+    expect(checkByKey(checklistFor($page), 'duplicate_title')['status'])->toBe('warn');
+});
+
 it('detects a duplicate that only collides further down the title cascade', function (): void {
     // The check walks seo.title → title → name itself rather than calling
     // resolve() per page; this pins it to the same cascade, catching a

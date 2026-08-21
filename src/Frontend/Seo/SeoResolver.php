@@ -380,6 +380,17 @@ class SeoResolver
     }
 
     /**
+     * Renders only the title, for duplicate checks that must follow the same
+     * template rules without paying for a full SEO resolution.
+     *
+     * @param  list<Breadcrumb>  $breadcrumbs
+     */
+    public function renderedTitle(Page $page, string $base, string $locale, array $breadcrumbs = []): string
+    {
+        return $this->title($page, $base, $locale, $breadcrumbs);
+    }
+
+    /**
      * Mirrors the title template, per-type fallback included: applied on top
      * of whatever the description cascade resolved to, with an empty template
      * meaning "use the description as is" — existing sites keep
