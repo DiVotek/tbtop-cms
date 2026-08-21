@@ -24,6 +24,10 @@ use Tbtop\Cms\Page\Models\Page;
  * @property LeadStatus $lead_status
  * @property string|null $error
  * @property Carbon|null $handled_at
+ * @property Carbon|null $handler_handled_at
+ * @property string|null $handler_error
+ * @property Carbon|null $notification_handled_at
+ * @property string|null $notification_error
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -57,7 +61,45 @@ class FormSubmission extends Model
         'status' => SubmissionStatus::class,
         'lead_status' => LeadStatus::class,
         'handled_at' => 'datetime',
+        'handler_handled_at' => 'datetime',
+        'notification_handled_at' => 'datetime',
     ];
+
+    public function markHandlerHandled(): void
+    {
+        $this->forceFill(['handler_handled_at' => now(), 'handler_error' => null])->save();
+        $this->syncDeliveryStatus();
+    }
+
+    public function markHandlerFailed(string $error): void
+    {
+        $this->forceFill(['handler_error' => $error])->save();
+        $this->syncDeliveryStatus();
+    }
+
+    public function markNotificationHandled(): void
+    {
+        $this->forceFill(['notification_handled_at' => now(), 'notification_error' => null])->save();
+        $this->syncDeliveryStatus();
+    }
+
+    public function markNotificationFailed(string $error): void
+    {
+        $this->forceFill(['notification_error' => $error])->save();
+        $this->syncDeliveryStatus();
+    }
+
+    public function syncDeliveryStatus(): void
+    {
+        $errors = array_values(array_filter([$this->handler_error, $this->notification_error]));
+        $handled = $this->handler_handled_at !== null && $this->notification_handled_at !== null;
+
+        $this->forceFill([
+            'status' => $handled ? SubmissionStatus::Handled : ($errors === [] ? SubmissionStatus::Pending : SubmissionStatus::Failed),
+            'handled_at' => $handled ? ($this->handled_at ?? now()) : null,
+            'error' => $errors === [] ? null : implode(' | ', $errors),
+        ])->save();
+    }
 
     /** @param  Builder<self>  $query */
     public function scopeUnread(Builder $query): void

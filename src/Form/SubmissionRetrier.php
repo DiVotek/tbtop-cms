@@ -10,17 +10,7 @@ use Tbtop\Cms\Form\Support\LocatedFormBlock;
 use Tbtop\Cms\Page\Models\Page;
 use Throwable;
 
-/**
- * Retry has two independent deliveries to re-run, both of which the original
- * submit attempted: the block's own handleSubmit() (a custom block may
- * forward to a CRM, queue a job, etc — HandlesFormSubmission's contract,
- * unrelated to cms-owned notifications) and SubmissionNotifier's bell/mail/
- * telegram fan-out. Both run; the submission is Handled only if both
- * succeed, Failed with both errors joined if either doesn't — a retry that
- * silently drops one of the two original delivery paths would be a
- * regression for any block that relies on handleSubmit() for its own
- * delivery, not just the notification rework.
- */
+/** Retry only the independently persisted delivery branches that have not succeeded. */
 class SubmissionRetrier
 {
     public function __construct(
@@ -56,32 +46,20 @@ class SubmissionRetrier
             return;
         }
 
-        $errors = [];
-
-        try {
-            $located->block->handleSubmit($submission->payload, $located->data, $located->context);
-        } catch (Throwable $e) {
-            $errors[] = $e->getMessage();
+        if ($submission->handler_handled_at === null) {
+            try {
+                $located->block->handleSubmit($submission->payload, $located->data, $located->context);
+                $submission->markHandlerHandled();
+            } catch (Throwable $e) {
+                $submission->markHandlerFailed($e->getMessage());
+            }
         }
 
-        $this->notifier->notify($submission, $page);
-        $submission->refresh();
-
-        if ($submission->status === SubmissionStatus::Failed) {
-            $errors[] = (string) $submission->error;
+        if ($submission->notification_handled_at === null) {
+            $this->notifier->notify($submission, $page);
         }
 
-        if ($errors !== []) {
-            $this->markFailed($submission, implode(' | ', $errors));
-
-            return;
-        }
-
-        $submission->forceFill([
-            'status' => SubmissionStatus::Handled,
-            'handled_at' => now(),
-            'error' => null,
-        ])->save();
+        $submission->refresh()->syncDeliveryStatus();
     }
 
     private function markFailed(FormSubmission $submission, string $error): void
