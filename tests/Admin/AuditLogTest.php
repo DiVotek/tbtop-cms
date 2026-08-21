@@ -8,6 +8,7 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Settings\Models\Setting;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\ContractAdminUser;
 
 uses(RefreshDatabase::class);
 
@@ -43,4 +44,29 @@ it('audits an administrative change without storing its secret value', function 
 
     test()->get('/admin/audit-log', ['X-Inertia' => 'true'])->assertOk();
     test()->get("/admin/audit-log/{$activity->id}", ['X-Inertia' => 'true'])->assertOk();
+});
+
+it('offers a recorded profile-less CmsAdmin actor in the author filter', function (): void {
+    config(['tbtop-cms.admin.model' => ContractAdminUser::class]);
+    config(['auth.providers.users.model' => ContractAdminUser::class]);
+
+    $admin = ContractAdminUser::create([
+        'name' => 'Contract Admin',
+        'email' => 'contract@example.com',
+        'password' => 'secret',
+    ]);
+
+    activity('tbtop-cms')->causedBy($admin)->log('Test activity');
+    test()->actingAs($admin, 'web');
+
+    $structure = test()->get('/admin/audit-log', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.structure');
+    $authorFilter = collect(data_get($structure, 'options.children.0.options.filters'))
+        ->firstWhere('name', 'causer_id');
+
+    expect($authorFilter['options']['options'] ?? [])->toContain([
+        'value' => (string) $admin->id,
+        'label' => 'Contract Admin',
+    ]);
 });
