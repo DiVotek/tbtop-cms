@@ -82,7 +82,7 @@ final class RecordsNotFoundHit
             ]],
             ['locale', 'path_hash'],
             [
-                'hits' => DB::raw('hits + 1'),
+                'hits' => DB::raw('tbtop_not_found_hits.hits + 1'),
                 'last_seen_at' => $now,
                 'last_referer' => $referer,
                 'last_user_agent' => $userAgent,
