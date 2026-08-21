@@ -18,9 +18,10 @@ final class TelegramSubmissionNotifier
 
     /**
      * @param  list<string>  $chatIds
+     * @param  callable(string): void|null  $delivered
      * @return list<string> per-chat error messages; empty means every send succeeded
      */
-    public function notify(string $token, array $chatIds, FormSubmission $submission, string $pageName): array
+    public function notify(string $token, array $chatIds, FormSubmission $submission, string $pageName, ?callable $delivered = null): array
     {
         $message = $this->message($submission, $pageName);
         $errors = [];
@@ -28,6 +29,9 @@ final class TelegramSubmissionNotifier
         foreach ($chatIds as $chatId) {
             try {
                 $this->client->sendMessage($token, $chatId, $message);
+                if ($delivered !== null) {
+                    $delivered($chatId);
+                }
             } catch (TelegramApiException $e) {
                 $errors[] = $e->getMessage();
             }

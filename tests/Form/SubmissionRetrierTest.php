@@ -251,3 +251,40 @@ it('keeps the submission failed with a joined error when the fan-out still fails
     expect($submission->status)->toBe(SubmissionStatus::Failed)
         ->and($submission->error)->toContain('still down');
 });
+
+it('retries only telegram chats that did not previously succeed', function (): void {
+    $attempts = [];
+    Http::fake(function ($request) use (&$attempts) {
+        $chatId = (string) $request['chat_id'];
+        $attempts[] = $chatId;
+
+        if ($chatId === '222' && count(array_filter($attempts, fn (string $id): bool => $id === '222')) === 1) {
+            return Http::response(['ok' => false, 'description' => 'temporarily unavailable'], 500);
+        }
+
+        return Http::response(['ok' => true, 'result' => []]);
+    });
+    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', "111\n222");
+
+    $page = contactPageForRetry();
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'previous error',
+    ]);
+    $submission->forceFill(['handled_at' => now()])->save();
+
+    app(SubmissionRetrier::class)->retry($submission);
+    expect($submission->refresh()->status)->toBe(SubmissionStatus::Failed);
+
+    app(SubmissionRetrier::class)->retry($submission);
+
+    expect($attempts)->toBe(['111', '222', '222'])
+        ->and($submission->refresh()->status)->toBe(SubmissionStatus::Handled);
+});

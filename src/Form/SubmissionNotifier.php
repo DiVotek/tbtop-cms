@@ -61,6 +61,10 @@ class SubmissionNotifier
     /** @return list<string> */
     private function notifyBell(FormSubmission $submission): array
     {
+        if ($this->wasDelivered($submission, 'bell')) {
+            return [];
+        }
+
         $admins = AdminUsers::all();
 
         if ($admins->isEmpty()) {
@@ -77,6 +81,7 @@ class SubmissionNotifier
                         ->url(route('tbtop.cms.form-submission-page', ['submission' => $submission->id])),
                 ])
                 ->sendToDatabase($admins);
+            $this->markDelivered($submission, 'bell');
         } catch (Throwable $e) {
             return [__('tbtop-cms::notifications.errors.bell', ['error' => $e->getMessage()])];
         }
@@ -91,6 +96,10 @@ class SubmissionNotifier
             return [];
         }
 
+        if ($this->wasDelivered($submission, 'mail')) {
+            return [];
+        }
+
         $recipients = Recipients::parse($this->settings->get('notifications.mail.recipients'));
 
         // Enabled with nothing to send to is a misconfiguration, not a
@@ -102,6 +111,7 @@ class SubmissionNotifier
 
         try {
             $this->mailer->send(new SubmissionMail($submission, $this->pageName($page)), $recipients);
+            $this->markDelivered($submission, 'mail');
         } catch (Throwable $e) {
             return [__('tbtop-cms::notifications.errors.mail', ['error' => $e->getMessage()])];
         }
@@ -125,7 +135,18 @@ class SubmissionNotifier
             return [__('tbtop-cms::notifications.errors.telegram_not_configured')];
         }
 
-        $errors = $this->telegram->notify($token, $chatIds, $submission, $this->pageName($page));
+        $chatIds = array_values(array_filter(
+            $chatIds,
+            fn (string $chatId): bool => ! $this->wasDelivered($submission, "telegram:{$chatId}"),
+        ));
+
+        $errors = $this->telegram->notify(
+            $token,
+            $chatIds,
+            $submission,
+            $this->pageName($page),
+            fn (string $chatId) => $this->markDelivered($submission, "telegram:{$chatId}"),
+        );
 
         return array_map(
             static fn (string $error): string => __('tbtop-cms::notifications.errors.telegram', ['error' => $error]),
@@ -138,5 +159,17 @@ class SubmissionNotifier
         $name = $page->name;
 
         return is_string($name) && trim($name) !== '' ? $name : __('tbtop-cms::form-submissions.values.page_number', ['id' => $page->getKey()]);
+    }
+
+    private function wasDelivered(FormSubmission $submission, string $destination): bool
+    {
+        return ($submission->notification_deliveries ?? [])[$destination] ?? false;
+    }
+
+    private function markDelivered(FormSubmission $submission, string $destination): void
+    {
+        $deliveries = $submission->notification_deliveries ?? [];
+        $deliveries[$destination] = true;
+        $submission->forceFill(['notification_deliveries' => $deliveries])->save();
     }
 }

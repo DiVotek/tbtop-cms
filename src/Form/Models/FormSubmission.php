@@ -23,6 +23,7 @@ use Tbtop\Cms\Page\Models\Page;
  * @property SubmissionStatus $status
  * @property LeadStatus $lead_status
  * @property string|null $error
+ * @property array<string, bool>|null $notification_deliveries
  * @property Carbon|null $handled_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -60,6 +61,7 @@ class FormSubmission extends Model
         'status' => SubmissionStatus::class,
         'lead_status' => LeadStatus::class,
         'handled_at' => 'datetime',
+        'notification_deliveries' => 'array',
     ];
 
     /** @param  Builder<self>  $query */
