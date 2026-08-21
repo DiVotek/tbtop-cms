@@ -39,10 +39,10 @@ return new class extends Migration
             return;
         }
 
-        $expectsInteger = UserKeyColumn::isIntegerBacked();
-        $isCurrentlyInteger = $this->isIntegerType(Schema::getColumnType($table, $column));
-
-        if ($expectsInteger === $isCurrentlyInteger) {
+        if (UserKeyColumn::matchesSchemaType(
+            Schema::getColumnType($table, $column),
+            Schema::getColumnType($table, $column, true),
+        )) {
             return;
         }
 
@@ -53,10 +53,5 @@ return new class extends Migration
                 $definition->nullable();
             }
         });
-    }
-
-    private function isIntegerType(string $type): bool
-    {
-        return str_contains(strtolower($type), 'int');
     }
 };

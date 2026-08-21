@@ -21,46 +21,70 @@ use function config;
  */
 final class UserKeyColumn
 {
+    private const INTEGER = 'integer';
+
+    private const UUID = 'uuid';
+
+    private const ULID = 'ulid';
+
     public static function define(Blueprint $table, string $column): ColumnDefinition
     {
+        return match (self::shape()) {
+            self::INTEGER => $table->unsignedBigInteger($column),
+            self::UUID => $table->uuid($column),
+            self::ULID => $table->ulid($column),
+            default => throw new RuntimeException('Unsupported user key column shape.'),
+        };
+    }
+
+    public static function isIntegerBacked(): bool
+    {
+        return self::shape() === self::INTEGER;
+    }
+
+    public static function matchesSchemaType(string $type, string $fullType): bool
+    {
+        $type = strtolower($type);
+        $fullType = strtolower($fullType);
+
+        return match (self::shape()) {
+            self::INTEGER => str_contains($type, 'int'),
+            self::UUID => $type === 'uuid'
+                || (preg_match('/^(?:char|varchar)\s*\(36\)$/', $fullType) === 1)
+                || $fullType === 'varchar',
+            self::ULID => preg_match('/^char\s*\(26\)$/', $fullType) === 1,
+            default => throw new RuntimeException('Unsupported user key column shape.'),
+        };
+    }
+
+    private static function shape(): string
+    {
         if (! self::userModelResolvable()) {
-            return $table->unsignedBigInteger($column);
+            return self::INTEGER;
         }
 
         $model = self::resolveUserModel();
         $traits = class_uses_recursive($model);
 
         if (isset($traits[HasUlids::class])) {
-            return $table->ulid($column);
+            return self::ULID;
         }
 
         if (isset($traits[HasUuids::class])) {
-            return $table->uuid($column);
+            return self::UUID;
         }
 
         if ($model->getKeyType() === 'int' && $model->getIncrementing()) {
-            return $table->unsignedBigInteger($column);
+            return self::INTEGER;
         }
 
         throw new RuntimeException(sprintf(
-            'Cannot derive a %s column type for user model %s (key type: %s, incrementing: %s). '
+            'Cannot derive a user key column type for user model %s (key type: %s, incrementing: %s). '
                 . 'Supported key shapes: int autoincrement, HasUuids, HasUlids.',
-            $column,
             $model::class,
             $model->getKeyType(),
             $model->getIncrementing() ? 'true' : 'false',
         ));
-    }
-
-    public static function isIntegerBacked(): bool
-    {
-        if (! self::userModelResolvable()) {
-            return true;
-        }
-
-        $model = self::resolveUserModel();
-
-        return $model->getKeyType() === 'int' && $model->getIncrementing();
     }
 
     private static function userModelResolvable(): bool

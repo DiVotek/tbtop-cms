@@ -6,6 +6,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Tbtop\Cms\Support\UserKeyColumn;
+use Tbtop\Cms\Tests\Fixtures\UlidAdminUser;
 use Tbtop\Cms\Tests\Fixtures\UuidAdminUser;
 
 // Provider order for the affected migrations — proves the corrective
@@ -101,4 +103,21 @@ it('lets a uuid-pk host save a profile row and a page revision snapshot with the
 
     $storedRevisionUserId = DB::connection('uuid_host_test')->table('tbtop_page_revisions')->where('page_id', $pageId)->value('user_id');
     expect($storedRevisionUserId)->toBe($userId);
+});
+
+it('does not treat a uuid schema type as matching an ulid host', function (): void {
+    config(['tbtop-cms.admin.model' => UlidAdminUser::class]);
+
+    expect(UserKeyColumn::matchesSchemaType('varchar', 'varchar'))->toBeFalse()
+        ->and(UserKeyColumn::matchesSchemaType('char', 'char(36)'))->toBeFalse()
+        ->and(UserKeyColumn::matchesSchemaType('char', 'char(26)'))->toBeTrue();
+});
+
+it('does not treat an ulid schema type as matching a uuid host', function (): void {
+    config(['tbtop-cms.admin.model' => UuidAdminUser::class]);
+
+    expect(UserKeyColumn::matchesSchemaType('char', 'char(26)'))->toBeFalse()
+        ->and(UserKeyColumn::matchesSchemaType('uuid', 'uuid'))->toBeTrue()
+        ->and(UserKeyColumn::matchesSchemaType('char', 'char(36)'))->toBeTrue()
+        ->and(UserKeyColumn::matchesSchemaType('varchar', 'varchar'))->toBeTrue();
 });
