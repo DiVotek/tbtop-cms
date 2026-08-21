@@ -43,6 +43,15 @@ it('preserves the incoming query string', function (): void {
     $this->get('/old?page=2&ref=abc')->assertRedirect('/new?page=2&ref=abc');
 });
 
+it('places the incoming query string before a target fragment', function (string $target, string $expected): void {
+    Redirect::create(['locale' => 'en', 'from_path' => 'old', 'to_path' => $target, 'status_code' => 301]);
+
+    $this->get('/old?a=1')->assertRedirect($expected);
+})->with([
+    'local target' => ['new#section', '/new?a=1#section'],
+    'external target' => ['https://example.com/page#section', 'https://example.com/page?a=1#section'],
+]);
+
 it('keeps the target query string and drops the incoming one', function (): void {
     Redirect::create(['locale' => 'en', 'from_path' => 'old', 'to_path' => 'new?keep=1', 'status_code' => 301]);
 
