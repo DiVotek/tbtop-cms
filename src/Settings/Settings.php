@@ -20,6 +20,8 @@ class Settings
     // public URLs so consumers never see a raw id.
     private const array MEDIA_KEYS = ['site.logo', 'site.favicon', 'seo.default_og_image', 'seo.identity.logo'];
 
+    private const array FRONTEND_KEY_PREFIXES = ['site.', 'seo.'];
+
     /** @var array<string, string|null>|null */
     private ?array $memo = null;
 
@@ -68,7 +70,7 @@ class Settings
         $result = [];
 
         foreach ($this->rawAll() as $key => $raw) {
-            if ($this->isSecret($key)) {
+            if (! $this->isFrontendKey($key) || $this->isSecret($key)) {
                 continue;
             }
 
@@ -83,6 +85,17 @@ class Settings
         }
 
         return $result;
+    }
+
+    private function isFrontendKey(string $key): bool
+    {
+        foreach (self::FRONTEND_KEY_PREFIXES as $prefix) {
+            if (str_starts_with($key, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resolveMediaValue(mixed $id): ?string
