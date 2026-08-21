@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Http\Middleware;
 
 use Closure;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
@@ -15,7 +16,11 @@ class EnsureCmsAdmin
     {
         $user = $request->user(CurrentAdmin::guard());
 
-        if ($user !== null && ! CurrentAdmin::allows($user)) {
+        if ($user === null) {
+            throw new AuthenticationException(guards: [CurrentAdmin::guard()]);
+        }
+
+        if (! CurrentAdmin::allows($user)) {
             abort(403);
         }
 
