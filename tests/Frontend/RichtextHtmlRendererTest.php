@@ -116,6 +116,26 @@ it('renders a nested list inside its parent listitem', function (): void {
     expect($html)->toBe('<ul><li>parent<ul><li>child</li></ul></li></ul>');
 });
 
+it('bounds deeply nested and cyclic documents', function (): void {
+    $nested = textNode('too deep');
+
+    for ($depth = 0; $depth < 65; $depth++) {
+        $nested = ['type' => 'unknown', 'children' => [$nested]];
+    }
+
+    $cyclic = ['type' => 'unknown'];
+    $cyclic['children'] = [&$cyclic];
+
+    expect($this->renderer->render(editorState([$nested])))->toBe('')
+        ->and($this->renderer->render(editorState([$cyclic])))->toBe('');
+});
+
+it('bounds the total number of rendered nodes', function (): void {
+    $children = array_fill(0, 10001, textNode('x'));
+
+    expect($this->renderer->render(editorState($children)))->toBe(str_repeat('x', 10000));
+});
+
 it('renders code blocks and linebreaks', function (): void {
     $code = $this->renderer->render(editorState([
         ['type' => 'code', 'children' => [textNode('const x = 1;')]],
