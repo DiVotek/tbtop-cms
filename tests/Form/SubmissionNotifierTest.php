@@ -177,6 +177,29 @@ it('mails every configured recipient when enabled', function (): void {
     );
 });
 
+it('renders structured submission values safely in mail', function (): void {
+    $submission = new FormSubmission([
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => [
+            'interests' => ['news', '<events>'],
+            'preferences' => (object) ['daily' => true],
+            'subscribed' => false,
+            'note' => null,
+        ],
+    ]);
+    $submission->forceFill(['id' => 123]);
+
+    $html = (new SubmissionMail($submission, 'Contact'))->content()->htmlString;
+
+    expect($html)
+        ->toContain('[&quot;news&quot;,&quot;&lt;events&gt;&quot;]')
+        ->toContain('{&quot;daily&quot;:true}')
+        ->toContain('<strong>subscribed:</strong> </p>')
+        ->toContain('<strong>note:</strong> </p>');
+});
+
 it('sends no mail when disabled even with recipients configured', function (): void {
     Mail::fake();
     app(Settings::class)->set('notifications.mail.enabled', false);
