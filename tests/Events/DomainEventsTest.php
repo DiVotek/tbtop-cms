@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
-use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
 use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\SettingsForm;
@@ -272,33 +271,31 @@ it('raises LayoutSaved when a layout slot is saved', function (): void {
 
 // --- Language: LanguagesChanged ---
 
-it('raises LanguagesChanged when a language is saved', function (): void {
+it('raises LanguagesChanged once when a language is created and updated directly', function (): void {
     Event::fake([LanguagesChanged::class]);
 
-    LanguageForm::save(['locale' => 'uk', 'is_default' => false, 'is_admin_active' => true, 'is_frontend_active' => true, 'sort_order' => 1]);
+    $language = Language::factory()->create(['locale' => 'uk']);
 
-    Event::assertDispatched(LanguagesChanged::class);
+    Event::assertDispatched(LanguagesChanged::class, 1);
+
+    Event::fake([LanguagesChanged::class]);
+    $language->update(['name' => 'Updated']);
+
+    Event::assertDispatched(LanguagesChanged::class, 1);
 });
 
-it('raises LanguagesChanged when a language is soft-deleted, restored, and force-deleted', function (): void {
+it('raises LanguagesChanged once when a language is directly soft-deleted, restored, and force-deleted', function (): void {
     $language = Language::factory()->create(['locale' => 'de']);
-    $admin = makeEventsAdmin();
 
     Event::fake([LanguagesChanged::class]);
-    test()->actingAs($admin, 'web')
-        ->postJson('/admin/languages/actions/languageDelete', ['payload' => ['row' => ['id' => $language->id]]])
-        ->assertOk();
+    $language->delete();
     Event::assertDispatched(LanguagesChanged::class, 1);
 
     Event::fake([LanguagesChanged::class]);
-    test()->actingAs($admin, 'web')
-        ->postJson('/admin/languages/actions/languageRestore', ['payload' => ['row' => ['id' => $language->id]]])
-        ->assertOk();
+    $language->restore();
     Event::assertDispatched(LanguagesChanged::class, 1);
 
     Event::fake([LanguagesChanged::class]);
-    test()->actingAs($admin, 'web')
-        ->postJson('/admin/languages/actions/languageForceDelete', ['payload' => ['row' => ['id' => $language->id]]])
-        ->assertOk();
+    $language->forceDelete();
     Event::assertDispatched(LanguagesChanged::class, 1);
 });
