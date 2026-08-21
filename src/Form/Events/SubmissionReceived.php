@@ -9,8 +9,8 @@ use Tbtop\Cms\Page\Models\Page;
 
 /**
  * Raised after a form submission passes validation and is stored (or would
- * have been, had storage not been disabled via config), before delivery is
- * attempted. A typical subscriber forwards the lead to a CRM or sends an
+ * have been, had storage not been disabled via config), after the block's
+ * synchronous submission handler succeeds. A typical subscriber sends an
  * internal notification.
  */
 final class SubmissionReceived

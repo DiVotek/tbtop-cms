@@ -30,6 +30,7 @@ use Tbtop\Cms\Page\Support\PageRevisionWriter;
 use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 
 uses(RefreshDatabase::class);
 
@@ -219,6 +220,28 @@ it('raises SubmissionReceived with a null submission when forms.store is disable
     ])->assertRedirect();
 
     Event::assertDispatched(SubmissionReceived::class, fn (SubmissionReceived $e): bool => $e->submission === null);
+});
+
+it('does not raise SubmissionReceived when the block handler fails', function (): void {
+    config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Boom'],
+        'content' => [[
+            'id' => 'throw-1',
+            'kind' => 'Throwing',
+            'active' => true,
+            'data' => [],
+        ]],
+    ]);
+    app(Cms::class)->frontendRoutes();
+    Event::fake([SubmissionReceived::class]);
+
+    test()->post(route('tbtop-cms.form.submit', ['locale' => 'en', 'page' => $page->id, 'block' => 'throw-1']), [
+        'value' => 'x',
+    ])->assertSessionHasErrors(['form']);
+
+    Event::assertNotDispatched(SubmissionReceived::class);
 });
 
 it('does not raise SubmissionReceived when the honeypot field is tripped', function (): void {

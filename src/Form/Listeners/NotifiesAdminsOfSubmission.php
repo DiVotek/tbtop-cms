@@ -37,13 +37,8 @@ final class NotifiesAdminsOfSubmission
         $page = $event->page;
 
         $this->app->terminating(function () use ($submission, $page): void {
-            // The event fires before the block's own handleSubmit() runs
-            // (see FormSubmitController) — if that threw, the controller
-            // already wrote Failed with its own error synchronously, before
-            // this callback ever runs. That failure is the block's own
-            // delivery contract and takes precedence: a successful
-            // bell/mail/telegram fan-out must not silently paper over it by
-            // overwriting the row back to Handled.
+            // Preserve a non-pending state if another process handled or
+            // failed this submission before the deferred callback runs.
             $submission->refresh();
 
             if ($submission->status !== SubmissionStatus::Pending) {

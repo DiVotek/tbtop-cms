@@ -54,16 +54,6 @@ class FormSubmitController
 
         $submission = $this->store($model, $block, $located, $payload);
 
-        // SubmissionReceived's listener defers the bell/mail/telegram
-        // fan-out to app()->terminating() — it runs after this response is
-        // sent and is what eventually flips $submission from Pending to
-        // Handled/Failed (see SubmissionNotifier). handleSubmit() below is
-        // the block's own delivery contract (a custom block may forward to
-        // a CRM, queue a job, etc) and is unrelated to that fan-out; it
-        // still runs synchronously and can still fail the request the way
-        // it always has.
-        event(new SubmissionReceived($submission, $payload, $model, $block, $located->context->locale));
-
         try {
             $located->block->handleSubmit($payload, $located->data, $located->context);
         } catch (Throwable $e) {
@@ -73,6 +63,11 @@ class FormSubmitController
 
             return back()->withErrors(['form' => 'Sorry, we could not process your submission. Please try again.']);
         }
+
+        // Notify only after the block's own synchronous delivery succeeds.
+        // The listener defers its fan-out until after the response and then
+        // moves the stored submission from Pending to Handled/Failed.
+        event(new SubmissionReceived($submission, $payload, $model, $block, $located->context->locale));
 
         return back();
     }
