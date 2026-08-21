@@ -27,13 +27,13 @@
     the host's root view), so asking it here is free of extra SSR round
     trips. If SSR is down or returns null, or the flag is off, this view
     renders the fallback tags below exactly as PR #101 did — SSR failure
-    must never mean "no head". `config('inertia.ssr.enabled')` is checked
-    first so the non-SSR path never touches SsrState at all.
+    must never mean "no head". The request marker is checked first so the
+    non-SSR path never touches SsrState at all.
 --}}
 @php
     /** @var array<string, mixed>|null $seo */
     $seo = $page['props']['seo'] ?? null;
-    $ssrOwnsHead = (bool) config('inertia.ssr.enabled')
+    $ssrOwnsHead = (bool) request()->attributes->get(\Tbtop\Cms\Frontend\Http\Middleware\EnableSsr::REQUEST_ATTRIBUTE, false)
         && app(\Inertia\Ssr\SsrState::class)->dispatch() !== null;
 @endphp
 @if (is_array($seo) && ! $ssrOwnsHead)

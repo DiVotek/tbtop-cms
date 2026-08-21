@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Ssr\Gateway;
 use Inertia\Ssr\Response as SsrResponse;
@@ -22,12 +23,18 @@ beforeEach(function (): void {
     RecordingSsrGateway::$response = new SsrResponse('<title data-inertia="">SSR Title</title>', '<div id="app"></div>');
 });
 
-it('leaves inertia.ssr.enabled untouched when the cms flag is off', function (): void {
+it('marks the request disabled without mutating global inertia config when the cms flag is off', function (): void {
     config(['tbtop-cms.ssr.enabled' => false, 'inertia.ssr.enabled' => false]);
 
-    (new EnableSsr)->handle(request(), fn ($request) => response('ok'));
+    $seenInside = null;
+    (new EnableSsr)->handle(request(), function ($request) use (&$seenInside) {
+        $seenInside = $request->attributes->get(EnableSsr::REQUEST_ATTRIBUTE);
 
-    expect(config('inertia.ssr.enabled'))->toBeFalse();
+        return response('ok');
+    });
+
+    expect($seenInside)->toBeFalse()
+        ->and(config('inertia.ssr.enabled'))->toBeFalse();
 });
 
 // StartSsr::handle() refuses to boot the SSR node process when
@@ -49,12 +56,12 @@ it('mirrors the cms flag onto inertia.ssr.enabled in console so inertia:start-ss
     expect(config('inertia.ssr.enabled'))->toBeTrue();
 });
 
-it('flips inertia.ssr.enabled on for the duration of the request and restores it after', function (): void {
+it('marks only the current request for ssr without mutating global inertia config', function (): void {
     config(['tbtop-cms.ssr.enabled' => true, 'inertia.ssr.enabled' => false]);
     $seenInside = null;
 
     (new EnableSsr)->handle(request(), function ($request) use (&$seenInside) {
-        $seenInside = config('inertia.ssr.enabled');
+        $seenInside = $request->attributes->get(EnableSsr::REQUEST_ATTRIBUTE);
 
         return response('ok');
     });
@@ -66,7 +73,25 @@ it('flips inertia.ssr.enabled on for the duration of the request and restores it
         ->and(config('inertia.ssr.enabled'))->toBeFalse();
 });
 
-it('restores the flag even when the downstream pipeline throws', function (): void {
+it('keeps overlapping request decisions isolated', function (): void {
+    config(['tbtop-cms.ssr.enabled' => true, 'inertia.ssr.enabled' => false]);
+    $cmsRequest = Request::create('/cms');
+    $otherRequest = Request::create('/other');
+
+    (new EnableSsr)->handle($cmsRequest, function () use ($cmsRequest, $otherRequest) {
+        config(['tbtop-cms.ssr.enabled' => false]);
+
+        (new EnableSsr)->handle($otherRequest, fn () => response('other'));
+
+        expect($cmsRequest->attributes->get(EnableSsr::REQUEST_ATTRIBUTE))->toBeTrue()
+            ->and($otherRequest->attributes->get(EnableSsr::REQUEST_ATTRIBUTE))->toBeFalse()
+            ->and(config('inertia.ssr.enabled'))->toBeFalse();
+
+        return response('cms');
+    });
+});
+
+it('does not mutate global inertia config when the downstream pipeline throws', function (): void {
     config(['tbtop-cms.ssr.enabled' => true, 'inertia.ssr.enabled' => false]);
 
     expect(fn () => (new EnableSsr)->handle(request(), function ($request): never {
@@ -106,7 +131,7 @@ it('never calls the SSR gateway for an X-Inertia admin request even when the cms
     expect(RecordingSsrGateway::$calls)->toBe(0);
 });
 
-it('applies EnableSsr to cms frontend routes, flipping the config for that request', function (): void {
+it('applies EnableSsr to cms frontend routes without flipping global config', function (): void {
     config(['cache.default' => 'array', 'tbtop-cms.render.root_view' => 'server-head-test', 'tbtop-cms.ssr.enabled' => true]);
     Language::factory()->default()->create(['locale' => 'en']);
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
