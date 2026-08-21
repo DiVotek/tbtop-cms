@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Support;
 
+use DomainException;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Page\Events\PageSaved;
@@ -82,6 +83,10 @@ class PageRevisionWriter
      */
     public function restore(Page $page, PageRevision $revision): void
     {
+        if ($revision->page_id !== $page->getKey()) {
+            throw new DomainException('The revision does not belong to this page.');
+        }
+
         $payload = $revision->payload;
 
         foreach (self::TRANSLATABLE_FIELDS as $field) {
