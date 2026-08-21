@@ -19,9 +19,11 @@ class DashboardRecent
     private const LIMIT = 5;
 
     /** @return list<Node> */
-    public static function cards(S $s): array
+    public static function cards(S $s, bool $showSubmissions = true): array
     {
-        return [self::recentPagesCard($s), self::latestSubmissionsCard($s)];
+        return $showSubmissions
+            ? [self::recentPagesCard($s), self::latestSubmissionsCard($s)]
+            : [self::recentPagesCard($s)];
     }
 
     private static function recentPagesCard(S $s): Node
