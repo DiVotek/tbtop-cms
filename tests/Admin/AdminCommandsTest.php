@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\ContractAdminUser;
+use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
 
 uses(RefreshDatabase::class);
 
@@ -36,6 +37,14 @@ it('rejects creating a user with a password shorter than 8 characters', function
         ->assertExitCode(1);
 
     expect(AdminUser::where('email', 'a@example.com')->exists())->toBeFalse();
+});
+
+it('warns when creating a CmsAdmin-contract user whose access is controlled by the application', function (): void {
+    config(['tbtop-cms.admin.model' => GatedContractAdminUser::class]);
+
+    $this->artisan('cms:admin:create', ['email' => 'denied@example.com', '--password' => 'password123'])
+        ->assertExitCode(0)
+        ->expectsOutputToContain('implements CmsAdmin; access is controlled by canAccessCmsAdmin()');
 });
 
 it('grants then revokes access for an existing user', function (): void {
