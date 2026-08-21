@@ -134,12 +134,7 @@ it('allows only one stale retry request to claim a failed submission', function 
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'Recorder'],
-        'content' => [[
-            'id' => 'rec-1',
-            'kind' => 'Recording',
-            'active' => true,
-            'data' => [],
-        ]],
+        'content' => [['id' => 'rec-1', 'kind' => 'Recording', 'active' => true, 'data' => []]],
     ]);
 
     $submission = FormSubmission::query()->create([
@@ -157,6 +152,33 @@ it('allows only one stale retry request to claim a failed submission', function 
     app(SubmissionRetrier::class)->retry($concurrentRequest);
 
     expect(RecordingFormBlock::$handled)->toBe(1);
+});
+
+it('does not repeat a successful block delivery when retrying failed notifications', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$handled = 0;
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [['id' => 'rec-1', 'kind' => 'Recording', 'active' => true, 'data' => []]],
+    ]);
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'rec-1',
+        'kind' => 'Recording',
+        'locale' => 'en',
+        'payload' => ['value' => 'hello'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'notification failed',
+    ]);
+    $submission->forceFill(['handled_at' => now()])->save();
+
+    app(SubmissionRetrier::class)->retry($submission);
+
+    expect(RecordingFormBlock::$handled)->toBe(0)
+        ->and($submission->refresh()->status)->toBe(SubmissionStatus::Handled);
 });
 
 it('re-runs the notification fan-out on retry and can flip failed to handled via mail', function (): void {

@@ -50,7 +50,7 @@ class SubmissionNotifier
         ];
 
         if ($errors === []) {
-            $submission->forceFill(['status' => SubmissionStatus::Handled, 'handled_at' => now(), 'error' => null])->save();
+            $submission->forceFill(['status' => SubmissionStatus::Handled, 'handled_at' => $submission->handled_at ?? now(), 'error' => null])->save();
 
             return;
         }

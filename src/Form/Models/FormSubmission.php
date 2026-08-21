@@ -30,7 +30,10 @@ use Tbtop\Cms\Page\Models\Page;
 class FormSubmission extends Model
 {
     /**
-     * handled_at is written only via forceFill() (SubmissionRetrier,
+     * handled_at marks the block handler's success, not the overall status:
+     * a row can be Failed (fan-out error) with handled_at set, which is what
+     * tells SubmissionRetrier not to run the non-idempotent handler again.
+     * It is written only via forceFill() (SubmissionRetrier, SubmissionNotifier,
      * FormSubmitController) and stays out of this list on purpose; every
      * other column here is mass-assigned somewhere (created_at is set
      * explicitly in dashboard/list tests to control ordering).

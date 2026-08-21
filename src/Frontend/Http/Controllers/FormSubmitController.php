@@ -66,6 +66,7 @@ class FormSubmitController
 
         try {
             $located->block->handleSubmit($payload, $located->data, $located->context);
+            $submission?->forceFill(['handled_at' => now()])->save();
         } catch (Throwable $e) {
             Log::error('form.submit.failed', ['page' => $model->getKey(), 'block' => $block, 'error' => $e->getMessage()]);
 

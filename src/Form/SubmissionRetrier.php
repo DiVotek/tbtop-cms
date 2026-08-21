@@ -15,11 +15,17 @@ use Throwable;
  * submit attempted: the block's own handleSubmit() (a custom block may
  * forward to a CRM, queue a job, etc — HandlesFormSubmission's contract,
  * unrelated to cms-owned notifications) and SubmissionNotifier's bell/mail/
- * telegram fan-out. Both run; the submission is Handled only if both
- * succeed, Failed with both errors joined if either doesn't — a retry that
- * silently drops one of the two original delivery paths would be a
- * regression for any block that relies on handleSubmit() for its own
- * delivery, not just the notification rework.
+ * telegram fan-out. The submission is Handled only if both succeed, Failed
+ * with both errors joined if either doesn't — a retry that silently drops
+ * one of the two original delivery paths would be a regression for any
+ * block that relies on handleSubmit() for its own delivery, not just the
+ * notification rework.
+ *
+ * handleSubmit() is not idempotent, so it runs only while handled_at is
+ * null: that column records the handler's own success (FormSubmitController
+ * and this class set it the moment handleSubmit() returns), which lets a
+ * retry for a failed fan-out skip the CRM/queue side effects that already
+ * happened.
  */
 class SubmissionRetrier
 {
@@ -58,10 +64,13 @@ class SubmissionRetrier
 
         $errors = [];
 
-        try {
-            $located->block->handleSubmit($submission->payload, $located->data, $located->context);
-        } catch (Throwable $e) {
-            $errors[] = $e->getMessage();
+        if ($submission->handled_at === null) {
+            try {
+                $located->block->handleSubmit($submission->payload, $located->data, $located->context);
+                $submission->forceFill(['handled_at' => now()])->save();
+            } catch (Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
         }
 
         $this->notifier->notify($submission, $page);
@@ -79,7 +88,6 @@ class SubmissionRetrier
 
         $submission->forceFill([
             'status' => SubmissionStatus::Handled,
-            'handled_at' => now(),
             'error' => null,
         ])->save();
     }
