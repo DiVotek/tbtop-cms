@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
 use Tbtop\Cms\Language\Models\Language;
@@ -26,12 +27,20 @@ function makeLayoutAdmin(): AdminUser
     return $user;
 }
 
-it('creates a layout row via updateOrCreate on first save', function (): void {
+it('creates a layout row with a conflict-safe upsert on first save', function (): void {
+    DB::enableQueryLog();
+
     $layout = LayoutForm::save([
         'content' => [['kind' => 'Hero', 'title' => 'Hi']],
     ], Slots::HEADER);
 
+    $write = collect(DB::getQueryLog())->first(
+        fn (array $query): bool => str_contains($query['query'], 'insert into "tbtop_layouts"'),
+    );
+
     expect(Layout::query()->where('slot', Slots::HEADER)->count())->toBe(1)
+        ->and($write)->not->toBeNull()
+        ->and($write['query'])->toContain('on conflict ("slot") do update')
         ->and($layout->content)->toHaveCount(1)
         ->and($layout->content[0]['kind'])->toBe('Hero')
         ->and($layout->content[0]['data'])->toBe(['title' => 'Hi']);

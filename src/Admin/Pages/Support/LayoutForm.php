@@ -21,10 +21,14 @@ class LayoutForm
     /** @param array<string, mixed> $form */
     public static function save(array $form, string $slot): Layout
     {
-        $layout = Layout::query()->updateOrCreate(
-            ['slot' => $slot],
-            ['content' => BlockContentField::toEnvelope($form['content'] ?? null)],
-        );
+        $attributes = (new Layout)->forceFill([
+            'slot' => $slot,
+            'content' => BlockContentField::toEnvelope($form['content'] ?? null),
+        ])->getAttributes();
+
+        Layout::query()->upsert([$attributes], ['slot'], ['content']);
+
+        $layout = Layout::query()->where('slot', $slot)->firstOrFail();
 
         event(new LayoutSaved($layout));
 
