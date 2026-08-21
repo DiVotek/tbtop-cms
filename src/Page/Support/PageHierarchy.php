@@ -12,6 +12,8 @@ class PageHierarchy
 {
     public static function assert(Page $page, PageTypeRegistry $registry): void
     {
+        self::lockHierarchyRows();
+
         self::assertTypeRegistered($page, $registry);
         self::assertChildrenAllowed($page, $registry);
         self::assertParentRequirement($page, $registry);
@@ -25,6 +27,14 @@ class PageHierarchy
         $chain = AncestorChain::forPage($page);
         self::assertNoCycle($page, $chain);
         self::assertNestingDepth($page, $chain, $registry);
+    }
+
+    private static function lockHierarchyRows(): void
+    {
+        // Structural writes are rare and cycles may involve disjoint changed
+        // endpoints joined by unchanged ancestors. Locking the hierarchy in a
+        // stable order serializes every parent/type mutation before validation.
+        Page::withTrashed()->orderBy((new Page)->getKeyName())->lockForUpdate()->get();
     }
 
     private static function assertTypeRegistered(Page $page, PageTypeRegistry $registry): void

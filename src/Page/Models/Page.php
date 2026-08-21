@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Spatie\Translatable\HasTranslations;
 use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 use Tbtop\Cms\Database\Factories\PageFactory;
@@ -127,6 +128,22 @@ class Page extends Model
         'sort_order' => 'integer',
         'lock_version' => 'integer',
     ];
+
+    /**
+     * Keep hierarchy validation and its row locks in the same transaction as
+     * the structural write. The observer performs the validation after these
+     * locks have been acquired.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function save(array $options = []): bool
+    {
+        if (! $this->isDirty(['type', 'parent_id'])) {
+            return parent::save($options);
+        }
+
+        return DB::transaction(fn (): bool => parent::save($options));
+    }
 
     /** @return BelongsTo<Page, $this> */
     public function parent(): BelongsTo

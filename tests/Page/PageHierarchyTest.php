@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Page\Models\Page;
 
 uses(RefreshDatabase::class);
@@ -60,6 +61,21 @@ it('rejects a parent change that creates a cycle', function (): void {
 
     expect(fn () => $a->update(['parent_id' => $b->id]))
         ->toThrow(DomainException::class);
+});
+
+it('validates structural changes inside the write transaction', function (): void {
+    $page = Page::factory()->category()->create();
+    $parent = Page::factory()->category()->create();
+    $levels = [];
+
+    DB::listen(function () use (&$levels): void {
+        $levels[] = DB::transactionLevel();
+    });
+
+    $page->update(['parent_id' => $parent->id]);
+
+    expect($levels)->not->toBeEmpty()
+        ->and(min($levels))->toBeGreaterThan(0);
 });
 
 it('allows category nesting up to depth 3', function (): void {
