@@ -15,6 +15,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Admin\Panels\CurrentPanel;
 use Tbtop\Admin\Panels\PanelConfig;
+use Tbtop\Cms\Admin\Support\CurrentAdmin;
 
 class LoginPage extends Page
 {
@@ -160,6 +161,16 @@ class LoginPage extends Page
         ], $remember);
 
         if (! $ok) {
+            RateLimiter::hit($throttleKey, 60);
+
+            throw ValidationException::withMessages(['email' => __('tbtop-cms::login.errors.failed')]);
+        }
+
+        $authenticated = auth()->guard($guard)->user();
+        if ($authenticated === null || ! CurrentAdmin::allows($authenticated)) {
+            auth()->guard($guard)->logout();
+            $ctx->request->session()->invalidate();
+            $ctx->request->session()->regenerateToken();
             RateLimiter::hit($throttleKey, 60);
 
             throw ValidationException::withMessages(['email' => __('tbtop-cms::login.errors.failed')]);
