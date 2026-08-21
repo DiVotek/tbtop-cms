@@ -18,6 +18,7 @@ return new class extends Migration
         Schema::create('tbtop_redirects', function (Blueprint $table): void {
             $table->id();
             $table->string('locale', 5)->nullable();
+            $table->string('locale_key', 5)->storedAs("COALESCE(locale, '')");
             $table->string('from_path', 600);
             $table->string('to_path', 2048);
             $table->unsignedSmallInteger('status_code')->default(301);
@@ -25,7 +26,7 @@ return new class extends Migration
             UserKeyColumn::define($table, 'created_by')->nullable();
             UserKeyColumn::define($table, 'updated_by')->nullable();
 
-            $table->unique(['locale', 'from_path']);
+            $table->unique(['locale_key', 'from_path']);
 
             $table->timestamps();
         });

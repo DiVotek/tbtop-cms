@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Redirect\Models\Redirect;
@@ -46,7 +48,24 @@ class RedirectForm
             'status_code' => $status,
             'is_auto' => false,
         ]);
-        $redirect->save();
+
+        try {
+            $redirect->save();
+        } catch (QueryException $e) {
+            $duplicate = Redirect::query()
+                ->where('locale', $locale)
+                ->where('from_path', $from)
+                ->when($id !== null, static fn ($query) => $query->whereKeyNot($id))
+                ->exists();
+
+            if (! $duplicate) {
+                throw $e;
+            }
+
+            throw ValidationException::withMessages([
+                'from_path' => __('tbtop-cms::redirects.validation.from_taken'),
+            ]);
+        }
 
         return $redirect;
     }

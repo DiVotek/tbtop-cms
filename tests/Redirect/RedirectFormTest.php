@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
 use Tbtop\Cms\Language\Models\Language;
@@ -24,6 +26,20 @@ it('creates a manual global redirect', function (): void {
         ->and($redirect->status_code)->toBe(301)
         ->and($redirect->is_auto)->toBeFalse();
 });
+
+it('enforces global redirect uniqueness at the database boundary', function (): void {
+    DB::table('tbtop_redirects')->insert([
+        'locale' => null,
+        'from_path' => 'old',
+        'to_path' => 'first',
+    ]);
+
+    DB::table('tbtop_redirects')->insert([
+        'locale' => null,
+        'from_path' => 'old',
+        'to_path' => 'second',
+    ]);
+})->throws(QueryException::class);
 
 it('rejects a self redirect', function (): void {
     RedirectForm::save(['from_path' => 'loop', 'to_path' => 'loop', 'locale' => '', 'status_code' => '301']);
