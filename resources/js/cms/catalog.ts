@@ -13,7 +13,8 @@ export const contactFormProps = z.object({
     heading: z.string(),
     submitLabel: z.string(),
     successMessage: z.string(),
-    action: z.string(),
+    // Added by FormActionBinder once the page and block IDs are available.
+    action: z.string().default(""),
     fields: z.array(
         z.object({
             name: z.string(),
