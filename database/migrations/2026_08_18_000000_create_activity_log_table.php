@@ -41,7 +41,8 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::connection(config('activitylog.database_connection'))
-            ->dropIfExists((string) config('activitylog.table_name', 'activity_log'));
+        // Intentionally a no-op: up() skips creation when the host already
+        // owns the shared activity log table, and rollback cannot determine
+        // who created it without risking the host application's audit data.
     }
 };
