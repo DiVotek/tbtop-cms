@@ -96,6 +96,7 @@ it('retries a submission in its stored locale, not the current app locale', func
     config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
     RecordingFormBlock::$locale = null;
     RecordingFormBlock::$data = [];
+    RecordingFormBlock::$handled = 0;
 
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
@@ -124,6 +125,38 @@ it('retries a submission in its stored locale, not the current app locale', func
 
     expect(RecordingFormBlock::$locale)->toBe('uk')
         ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
+});
+
+it('allows only one stale retry request to claim a failed submission', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$handled = 0;
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [[
+            'id' => 'rec-1',
+            'kind' => 'Recording',
+            'active' => true,
+            'data' => [],
+        ]],
+    ]);
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'rec-1',
+        'kind' => 'Recording',
+        'locale' => 'en',
+        'payload' => ['value' => 'hello'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'previous error',
+    ]);
+    $concurrentRequest = FormSubmission::query()->findOrFail($submission->getKey());
+
+    app(SubmissionRetrier::class)->retry($submission);
+    app(SubmissionRetrier::class)->retry($concurrentRequest);
+
+    expect(RecordingFormBlock::$handled)->toBe(1);
 });
 
 it('re-runs the notification fan-out on retry and can flip failed to handled via mail', function (): void {
