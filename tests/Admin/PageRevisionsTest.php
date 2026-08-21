@@ -5,12 +5,15 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageRevision;
+use Tbtop\Cms\Page\Support\PageRevisionWriter;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -233,6 +236,21 @@ it('restores a page from a revision via the action endpoint, leaves status untou
 
     $effects = collect($response->json('effects'))->pluck('kind');
     expect($effects)->toContain('redirect');
+});
+
+it('rejects restoring a revision that belongs to another page without side effects', function (): void {
+    $source = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Source']]);
+    $target = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Target']]);
+    $revision = PageRevision::query()->where('page_id', $source->id)->firstOrFail();
+    $revisionCount = PageRevision::query()->count();
+    Event::fake([PageSaved::class]);
+
+    expect(fn () => app(PageRevisionWriter::class)->restore($target, $revision))
+        ->toThrow(DomainException::class, 'The revision does not belong to this page.');
+
+    expect($target->refresh()->getTranslation('name', 'en'))->toBe('Target')
+        ->and(PageRevision::query()->count())->toBe($revisionCount);
+    Event::assertNotDispatched(PageSaved::class);
 });
 
 it('does not offer a restore action for the newest revision', function (): void {
