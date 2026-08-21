@@ -30,6 +30,16 @@ class SubmissionRetrier
 
     public function retry(FormSubmission $submission): void
     {
+        $claimed = FormSubmission::query()
+            ->whereKey($submission->getKey())
+            ->where('status', SubmissionStatus::Failed->value)
+            ->update(['status' => SubmissionStatus::Pending->value]);
+
+        if ($claimed !== 1) {
+            return;
+        }
+
+        $submission->refresh();
         $page = $submission->page_id !== null ? Page::query()->find($submission->page_id) : null;
 
         if (! $page instanceof Page) {

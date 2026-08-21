@@ -17,6 +17,8 @@ class RecordingFormBlock extends Block implements HandlesFormSubmission
     /** @var array<string, mixed> */
     public static array $data = [];
 
+    public static int $handled = 0;
+
     public function kind(): string
     {
         return 'Recording';
@@ -43,6 +45,7 @@ class RecordingFormBlock extends Block implements HandlesFormSubmission
      */
     public function handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void
     {
+        self::$handled++;
         self::$locale = $ctx->locale;
         self::$data = $blockData;
     }
