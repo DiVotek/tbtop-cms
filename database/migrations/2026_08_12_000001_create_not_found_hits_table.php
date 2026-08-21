@@ -20,7 +20,7 @@ return new class extends Migration
             // a nullable column in the (locale, path_hash) unique index would
             // not dedupe (NULL <> NULL in a unique constraint), fragmenting
             // the hit counter across rows for the same path.
-            $table->string('locale', 5);
+            $table->string('locale', 32);
             $table->text('path');
             // sha256 of `path`, not `path` itself: MySQL's utf8mb4 key limit
             // (3072 bytes) can't safely index an unbounded text column.

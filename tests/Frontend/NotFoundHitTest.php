@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\NotFound\Models\NotFoundHit;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -55,6 +56,15 @@ it('increments the same row to hits = 2 on a repeat miss instead of inserting a 
 
     expect(NotFoundHit::query()->count())->toBe(1)
         ->and(NotFoundHit::query()->first()->hits)->toBe(2);
+});
+
+it('stores long locale identifiers without truncating or merging them', function (): void {
+    event(new PageNotFound('missing', 'zh-Hant', null, null));
+    event(new PageNotFound('missing', 'sr-Latn', null, null));
+    app()->terminate();
+
+    expect(NotFoundHit::query()->orderBy('locale')->pluck('locale')->all())
+        ->toBe(['sr-Latn', 'zh-Hant']);
 });
 
 it('does not log a path that resolves to a redirect', function (): void {
