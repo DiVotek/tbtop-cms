@@ -16,6 +16,7 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
+use Tbtop\Cms\Admin\Contracts\CmsAdmin;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\UserForm;
 use Tbtop\Cms\Admin\Support\AdminAccess;
@@ -106,6 +107,7 @@ class UsersPage extends AdminPage
                         __('tbtop-cms::users.access.granted') => Color::Info,
                         __('tbtop-cms::users.access.owner') => Color::Success,
                         __('tbtop-cms::users.access.none') => Color::Gray,
+                        __('tbtop-cms::users.access.managed') => Color::Gray,
                     ]),
                 // Not shown by default — projected purely so hiddenIf() can
                 // gate row actions client-side (mirrors PagesPage's
@@ -147,6 +149,17 @@ class UsersPage extends AdminPage
         $table = (new $model)->getTable();
         $currentId = CurrentAdmin::user()?->getKey();
 
+        if (is_a($model, CmsAdmin::class, true)) {
+            return $model::query()
+                ->select($table . '.*')
+                ->selectRaw("'managed' as has_access")
+                ->selectRaw('0 as is_owner')
+                ->selectRaw(
+                    $currentId !== null ? $table . '.id = ? as is_self' : '0 as is_self',
+                    $currentId !== null ? [$currentId] : [],
+                );
+        }
+
         return $model::query()
             ->select($table . '.*')
             ->selectSub(
@@ -173,6 +186,7 @@ class UsersPage extends AdminPage
         return match ($value) {
             'owner' => __('tbtop-cms::users.access.owner'),
             'granted' => __('tbtop-cms::users.access.granted'),
+            'managed' => __('tbtop-cms::users.access.managed'),
             default => __('tbtop-cms::users.access.none'),
         };
     }
@@ -184,6 +198,7 @@ class UsersPage extends AdminPage
             ->handle($this->grant(...), needs: ['row'])
             ->hiddenIf(Cond::any(
                 Cond::eq('is_self', true),
+                Cond::eq('has_access', __('tbtop-cms::users.access.managed')),
                 Cond::neq('has_access', __('tbtop-cms::users.access.none')),
             ));
     }
@@ -193,6 +208,7 @@ class UsersPage extends AdminPage
         $userId = self::rowId($ctx);
 
         try {
+            $this->assertProfileControlsAccess();
             $this->assertNotSelf($userId);
             $this->assertNoExistingProfile($userId);
         } catch (ValidationException $e) {
@@ -211,6 +227,7 @@ class UsersPage extends AdminPage
             ->handle($this->revoke(...), needs: ['row'])
             ->hiddenIf(Cond::any(
                 Cond::eq('is_self', true),
+                Cond::eq('has_access', __('tbtop-cms::users.access.managed')),
                 Cond::eq('has_access', __('tbtop-cms::users.access.none')),
                 Cond::eq('is_owner', true),
             ));
@@ -221,6 +238,7 @@ class UsersPage extends AdminPage
         $userId = self::rowId($ctx);
 
         try {
+            $this->assertProfileControlsAccess();
             $this->assertNotSelf($userId);
             $this->assertExistingProfile($userId);
             $this->assertNotOwner($userId, 'cannot_revoke_owner');
@@ -316,6 +334,13 @@ class UsersPage extends AdminPage
         $currentId = CurrentAdmin::user()?->getKey();
         if ($currentId !== null && (string) $currentId === (string) $userId) {
             throw ValidationException::withMessages(['user' => __('tbtop-cms::users.validation.cannot_manage_self')]);
+        }
+    }
+
+    private function assertProfileControlsAccess(): void
+    {
+        if (is_a($this->userModel(), CmsAdmin::class, true)) {
+            throw ValidationException::withMessages(['user' => __('tbtop-cms::users.validation.access_managed_by_application')]);
         }
     }
 

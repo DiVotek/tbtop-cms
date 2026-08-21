@@ -14,6 +14,7 @@ return [
         'granted' => 'Has access',
         'owner' => 'Owner',
         'none' => 'No access',
+        'managed' => 'Managed by application',
     ],
     'fields' => [
         'name' => 'Name',
@@ -48,6 +49,7 @@ return [
     ],
     'validation' => [
         'cannot_manage_self' => 'You cannot change your own access.',
+        'access_managed_by_application' => 'CMS access is managed by the application.',
         'already_has_access' => 'This user already has CMS access.',
         'no_access' => 'This user has no CMS access to revoke.',
         'cannot_revoke_owner' => 'The owner cannot be revoked.',
