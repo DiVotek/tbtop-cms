@@ -50,12 +50,12 @@ class SubmissionNotifier
         ];
 
         if ($errors === []) {
-            $submission->markNotificationHandled();
+            $submission->forceFill(['status' => SubmissionStatus::Handled, 'handled_at' => $submission->handled_at ?? now(), 'error' => null])->save();
 
             return;
         }
 
-        $submission->markNotificationFailed(implode(' | ', $errors));
+        $submission->forceFill(['status' => SubmissionStatus::Failed, 'error' => implode(' | ', $errors)])->save();
     }
 
     /** @return list<string> */

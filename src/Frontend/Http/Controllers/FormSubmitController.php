@@ -66,11 +66,11 @@ class FormSubmitController
 
         try {
             $located->block->handleSubmit($payload, $located->data, $located->context);
-            $submission?->markHandlerHandled();
+            $submission?->forceFill(['handled_at' => now()])->save();
         } catch (Throwable $e) {
             Log::error('form.submit.failed', ['page' => $model->getKey(), 'block' => $block, 'error' => $e->getMessage()]);
 
-            $submission?->markHandlerFailed($e->getMessage());
+            $submission?->forceFill(['status' => SubmissionStatus::Failed, 'error' => $e->getMessage()])->save();
 
             return back()->withErrors(['form' => 'Sorry, we could not process your submission. Please try again.']);
         }
