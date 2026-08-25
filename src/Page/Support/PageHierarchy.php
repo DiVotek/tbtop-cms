@@ -90,14 +90,36 @@ class PageHierarchy
     /** @param list<Page> $chain */
     private static function assertNestingDepth(Page $page, array $chain, PageTypeRegistry $registry): void
     {
+        $depth = count($chain) + 1;
+
+        self::assertPageDepth($page, $depth, $registry);
+
+        if (! $page->exists || ! $page->isDirty('parent_id')) {
+            return;
+        }
+
+        $descendants = [[$page->id, $depth]];
+
+        while ($descendants !== []) {
+            [$parentId, $parentDepth] = array_shift($descendants);
+
+            foreach (Page::query()->where('parent_id', $parentId)->get() as $descendant) {
+                $descendantDepth = $parentDepth + 1;
+
+                self::assertPageDepth($descendant, $descendantDepth, $registry);
+                $descendants[] = [$descendant->id, $descendantDepth];
+            }
+        }
+    }
+
+    private static function assertPageDepth(Page $page, int $depth, PageTypeRegistry $registry): void
+    {
         $type = $registry->get($page->type);
 
         // Leaf types do not extend nesting; depth is bounded by their containers.
         if ($type->allowedChildren() === []) {
             return;
         }
-
-        $depth = count($chain) + 1;
 
         if ($depth > $type->maxDepth()) {
             throw new DomainException("Nesting depth {$depth} exceeds maximum {$type->maxDepth()} for type [{$page->type}].");
