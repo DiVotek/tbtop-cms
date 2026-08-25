@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Language\Observers;
 
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 
@@ -53,17 +54,20 @@ class LanguageObserver
             });
         }
 
-        $this->refreshService();
+        // Restoring also fires saved; restored handles that lifecycle once.
+        if (! $language->wasChanged('deleted_at')) {
+            $this->languagesChanged();
+        }
     }
 
     public function deleted(Language $language): void
     {
-        $this->refreshService();
+        $this->languagesChanged();
     }
 
     public function restored(Language $language): void
     {
-        $this->refreshService();
+        $this->languagesChanged();
     }
 
     private function guardFrontendRequiresAdmin(Language $language): void
@@ -107,10 +111,12 @@ class LanguageObserver
         }
     }
 
-    private function refreshService(): void
+    private function languagesChanged(): void
     {
         if (app()->bound(Languages::class)) {
             app(Languages::class)->refresh();
         }
+
+        event(new LanguagesChanged);
     }
 }
