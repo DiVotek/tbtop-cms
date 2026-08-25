@@ -104,14 +104,16 @@ final class CmsCache
      * Bumps the content version, invalidating every previously cached
      * versioned key. increment() is atomic and preferred, but some stores
      * (e.g. database) return false instead of seeding the key when it
-     * doesn't exist yet — that miss falls back to a plain get+put.
+     * doesn't exist yet. Atomically seed zero in that case, then retry the
+     * increment; a concurrent initializer winning add() is harmless.
      */
     public function bump(): void
     {
         $store = $this->store();
 
         if ($store->increment(self::VERSION_KEY) === false) {
-            $store->forever(self::VERSION_KEY, $this->readVersion($store) + 1);
+            $store->add(self::VERSION_KEY, 0, PHP_INT_MAX);
+            $store->increment(self::VERSION_KEY);
         }
 
         $this->version = null;
