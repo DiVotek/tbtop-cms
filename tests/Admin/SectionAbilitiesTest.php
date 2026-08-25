@@ -103,6 +103,29 @@ it('dispatches CmsAccessGranted only when granting actually creates a profile ro
     Event::assertNotDispatched(CmsAccessGranted::class);
 });
 
+it('rolls back a grant when its event listener fails and can retry it', function (): void {
+    $target = AdminUser::create(['name' => 'Target', 'email' => 'target@example.com', 'password' => 'secret']);
+    $shouldFail = true;
+    $handled = 0;
+
+    Event::listen(CmsAccessGranted::class, function () use (&$shouldFail, &$handled): void {
+        if ($shouldFail) {
+            throw new RuntimeException('Listener failed.');
+        }
+
+        $handled++;
+    });
+
+    expect(fn () => AdminAccess::grant($target->id))->toThrow(RuntimeException::class)
+        ->and(CmsUserProfile::query()->where('user_id', $target->id)->exists())->toBeFalse();
+
+    $shouldFail = false;
+    AdminAccess::grant($target->id);
+
+    expect(CmsUserProfile::query()->where('user_id', $target->id)->count())->toBe(1)
+        ->and($handled)->toBe(1);
+});
+
 it('dispatches CmsAccessRevoked only when revoking actually deletes a profile row', function (): void {
     $target = AdminUser::create(['name' => 'Target', 'email' => 'target@example.com', 'password' => 'secret']);
     CmsUserProfile::query()->create(['user_id' => $target->id]);

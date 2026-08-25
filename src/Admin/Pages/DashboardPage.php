@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Node;
@@ -13,6 +14,7 @@ use Tbtop\Cms\Admin\Pages\Support\DashboardCharts;
 use Tbtop\Cms\Admin\Pages\Support\DashboardRecent;
 use Tbtop\Cms\Admin\Pages\Support\DashboardStats;
 use Tbtop\Cms\Admin\Pages\Support\DashboardSystem;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 
 class DashboardPage extends Page
 {
@@ -64,10 +66,12 @@ class DashboardPage extends Page
 
     public function view(S $s): Node
     {
+        $showSubmissions = ! CmsAbilities::enabled() || Gate::allows('tbtop-cms.submissions');
+
         return $s->stack([
-            $s->grid(['cols' => 4], DashboardStats::cards($s)),
-            $s->grid(['cols' => 2], DashboardCharts::charts($s)),
-            $s->grid(['cols' => 2], DashboardRecent::cards($s)),
+            $s->grid(['cols' => 4], DashboardStats::cards($s, $showSubmissions)),
+            ...($showSubmissions ? [$s->grid(['cols' => 2], DashboardCharts::charts($s))] : []),
+            $s->grid(['cols' => 2], DashboardRecent::cards($s, $showSubmissions)),
             $this->systemSection($s),
         ]);
     }

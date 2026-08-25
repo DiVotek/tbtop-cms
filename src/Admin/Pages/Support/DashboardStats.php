@@ -24,14 +24,14 @@ class DashboardStats
     private const TREND_DAYS = 14;
 
     /** @return list<Stat> */
-    public static function cards(S $s): array
+    public static function cards(S $s, bool $showSubmissions = true): array
     {
-        return [
+        return array_values(array_filter([
             self::pagesCard($s),
-            self::submissionsCard($s),
+            $showSubmissions ? self::submissionsCard($s) : null,
             self::mediaCard($s),
             self::layoutsCard($s),
-        ];
+        ]));
     }
 
     private static function pagesCard(S $s): Stat

@@ -34,3 +34,21 @@ it('errors when the configured root view does not exist at all', function (): vo
     expect($result->status)->toBe(HealthStatus::Error)
         ->and($result->message())->toBe(__('tbtop-cms::health.checks.inertia_root_view.missing_view', ['view' => 'no-such-root-view']));
 });
+
+it('requires the cms head include before the Inertia head directive', function (string $directive, bool $includeFirst, HealthStatus $status): void {
+    $path = resource_path('views/ordered-root.blade.php');
+    $include = "@include('tbtop-cms::head')";
+    File::put($path, $includeFirst ? "{$include}\n{$directive}" : "{$directive}\n{$include}");
+    config(['tbtop-cms.render.root_view' => 'ordered-root']);
+
+    try {
+        expect((new InertiaRootViewCheck)->run()->status)->toBe($status);
+    } finally {
+        File::delete($path);
+    }
+})->with([
+    'Inertia 2 correct order' => ['@inertiaHead', true, HealthStatus::Ok],
+    'Inertia 2 reversed order' => ['@inertiaHead', false, HealthStatus::Error],
+    'Inertia 3 correct order' => ['<x-inertia::head>', true, HealthStatus::Ok],
+    'Inertia 3 reversed order' => ['<x-inertia::head>', false, HealthStatus::Error],
+]);

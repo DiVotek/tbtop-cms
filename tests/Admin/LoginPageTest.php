@@ -46,6 +46,21 @@ it('rejects an invalid password without authenticating', function (): void {
     expect(auth('web')->check())->toBeFalse();
 });
 
+it('rolls back authentication when valid credentials lack cms access', function (): void {
+    AdminUser::create(['name' => 'A', 'email' => 'a@example.com', 'password' => 'correct-password']);
+    $rememberCookie = auth('web')->getRecallerName();
+
+    $response = submitLoginForm([
+        'email' => 'a@example.com',
+        'password' => 'correct-password',
+        'remember' => true,
+    ])->assertInvalid(['email']);
+
+    expect(auth('web')->check())->toBeFalse();
+    $response->assertSessionHasErrors(['email' => __('tbtop-cms::login.errors.failed')])
+        ->assertCookieMissing($rememberCookie);
+});
+
 it('locks out further attempts after 5 failed logins from the same email and ip', function (): void {
     makeLoginableAdmin();
 
@@ -98,6 +113,15 @@ it('keeps the default locale when the profile has none set', function (): void {
     submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
 
     expect(session('tbtop.locale'))->toBeNull();
+});
+
+it('clears a previous user locale when the profile has none set', function (): void {
+    makeLoginableAdmin();
+    session(['tbtop.locale' => 'uk']);
+
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+
+    expect(session()->has('tbtop.locale'))->toBeFalse();
 });
 
 it('carries the page title and a single breadcrumb from translations', function (): void {

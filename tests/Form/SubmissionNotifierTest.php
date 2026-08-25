@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
@@ -177,6 +178,29 @@ it('mails every configured recipient when enabled', function (): void {
     );
 });
 
+it('renders structured submission values safely in mail', function (): void {
+    $submission = new FormSubmission([
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => [
+            'interests' => ['news', '<events>'],
+            'preferences' => (object) ['daily' => true],
+            'subscribed' => false,
+            'note' => null,
+        ],
+    ]);
+    $submission->forceFill(['id' => 123]);
+
+    $html = (new SubmissionMail($submission, 'Contact'))->content()->htmlString;
+
+    expect($html)
+        ->toContain('[&quot;news&quot;,&quot;&lt;events&gt;&quot;]')
+        ->toContain('{&quot;daily&quot;:true}')
+        ->toContain('<strong>subscribed:</strong> </p>')
+        ->toContain('<strong>note:</strong> </p>');
+});
+
 it('sends no mail when disabled even with recipients configured', function (): void {
     Mail::fake();
     app(Settings::class)->set('notifications.mail.enabled', false);
@@ -226,6 +250,25 @@ it('marks the submission failed with an aggregated error when a telegram chat se
     $submission = FormSubmission::query()->sole();
     expect($submission->status)->toBe(SubmissionStatus::Failed)
         ->and($submission->error)->toContain('chat not found');
+});
+
+it('does not persist the bot token when a telegram connection fails', function (): void {
+    $token = 'SECRET-TOKEN';
+    Http::fake(fn () => throw new ConnectionException("Could not connect to https://api.telegram.org/bot{$token}/sendMessage"));
+    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.telegram.bot_token', $token);
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toContain('Could not reach Telegram.')
+        ->and($submission->error)->not->toContain($token)
+        ->and($submission->error)->not->toContain('api.telegram.org/bot');
 });
 
 it('sends nothing over telegram when disabled', function (): void {
