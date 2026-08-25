@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -40,4 +42,22 @@ it('fails gracefully instead of throwing when migrations cannot run', function (
     } finally {
         config(['database.default' => 'testing']);
     }
+});
+
+it('stops installation when configuration publishing fails', function (): void {
+    $command = Mockery::mock(InstallCommand::class)->makePartial();
+    $command->__construct();
+    $command->shouldReceive('callSilently')
+        ->once()
+        ->with('vendor:publish', ['--tag' => 'tbtop-cms-config'])
+        ->andReturn(1);
+    $this->app->make(Kernel::class)->registerCommand($command);
+
+    $this->artisan('cms:install')
+        ->expectsOutput('Configuration publishing failed. Resolve the issue above and re-run `cms:install`.')
+        ->doesntExpectOutput('Published the CMS config.')
+        ->assertExitCode(1);
+
+    expect(Language::count())->toBe(0)
+        ->and(Page::count())->toBe(0);
 });

@@ -17,7 +17,9 @@ class InstallCommand extends Command
 
     public function handle(): int
     {
-        $this->publishConfig();
+        if (! $this->publishConfig()) {
+            return self::FAILURE;
+        }
 
         if (! $this->runMigrations()) {
             return self::FAILURE;
@@ -32,7 +34,7 @@ class InstallCommand extends Command
         return self::SUCCESS;
     }
 
-    private function publishConfig(): void
+    private function publishConfig(): bool
     {
         $arguments = ['--tag' => 'tbtop-cms-config'];
 
@@ -40,8 +42,23 @@ class InstallCommand extends Command
             $arguments['--force'] = true;
         }
 
-        $this->callSilently('vendor:publish', $arguments);
+        try {
+            $exitCode = $this->callSilently('vendor:publish', $arguments);
+        } catch (Throwable $e) {
+            $this->error("Configuration publishing failed: {$e->getMessage()}");
+
+            return false;
+        }
+
+        if ($exitCode !== self::SUCCESS) {
+            $this->error('Configuration publishing failed. Resolve the issue above and re-run `cms:install`.');
+
+            return false;
+        }
+
         $this->info('Published the CMS config.');
+
+        return true;
     }
 
     private function runMigrations(): bool
