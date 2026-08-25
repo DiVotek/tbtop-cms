@@ -213,9 +213,15 @@ class SeoChecklist
     }
 
     /**
-     * Compares the rendered title while avoiding a full resolve() per page,
-     * which would also build alternates and JSON-LD objects. Templates may
-     * omit {title}, so comparing only each page's base misses collisions.
+     * Compares the RENDERED title, not each page's base: a template is free
+     * to drop {title} entirely (e.g. plain "{site_name}"), which collapses
+     * two distinct bases into one identical <title> — the exact collision
+     * this check exists to report.
+     *
+     * Still avoids a full resolve() per page, which would also build every
+     * page's alternates and JSON-LD objects. renderedTitle() takes the
+     * breadcrumbs lazily, so the per-page ancestor query only runs for
+     * templates that actually reference {parent}.
      *
      * Only the columns the cascade reads are hydrated, and drafts count:
      * a duplicate that is about to be published is exactly what this warns
@@ -239,7 +245,7 @@ class SeoChecklist
                 $other,
                 $this->metaTitleBase($other, $locale),
                 $locale,
-                $this->breadcrumbs->forPage($other, $locale),
+                fn (): array => $this->breadcrumbs->forPage($other, $locale),
             );
 
             if ($otherTitle === $title) {

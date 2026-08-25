@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Frontend\Seo;
 
 use Illuminate\Support\Collection;
+use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
@@ -30,6 +31,7 @@ final class SeoAudit
     public function __construct(
         private readonly Languages $languages,
         private readonly Settings $settings,
+        private readonly MediaUrlResolver $mediaUrlResolver,
         private readonly SeoResolver $resolver,
         private readonly Breadcrumbs $breadcrumbs,
     ) {}
@@ -116,8 +118,10 @@ final class SeoAudit
     }
 
     /**
-     * Mirrors SeoChecklist::duplicateTitleCheck(): title-only rendering keeps
-     * this lightweight while accounting for templates that omit {title}.
+     * Mirrors SeoChecklist::duplicateTitleCheck(): compares rendered titles,
+     * because a template that omits {title} turns distinct bases into one
+     * identical <title>. Title-only rendering with lazy breadcrumbs keeps
+     * this off the per-page ancestor query unless {parent} is in play.
      *
      * @param  Collection<int, Page>  $pages
      * @param  list<string>  $locales
@@ -137,7 +141,7 @@ final class SeoAudit
                     $page,
                     $base,
                     $locale,
-                    $this->breadcrumbs->forPage($page, $locale),
+                    fn (): array => $this->breadcrumbs->forPage($page, $locale),
                 );
 
                 if ($title === '') {
@@ -189,21 +193,18 @@ final class SeoAudit
     private function missingOgImages($pages): array
     {
         $globalDefault = $this->settings->get('seo.default_og_image');
-        $hasGlobalDefault = is_string($globalDefault) && $globalDefault !== '';
-
-        if ($hasGlobalDefault) {
-            return [];
-        }
 
         $issues = [];
 
         foreach ($pages as $page) {
             $seo = is_array($page->seo) ? $page->seo : [];
             $override = $seo['og_image'] ?? null;
-            $hasOwnImage = (is_string($override) && $override !== '')
-                || ($page->image !== null && $page->image !== '');
+            $image = is_string($override) && $override !== ''
+                ? $override
+                : ($page->image !== null && $page->image !== '' ? $page->image : $globalDefault);
+            $url = is_string($image) && $image !== '' ? $this->mediaUrlResolver->resolve($image) : null;
 
-            if (! $hasOwnImage) {
+            if (trim((string) $url) === '') {
                 $issues[] = $this->issue(
                     'warn',
                     'missing_og_image',

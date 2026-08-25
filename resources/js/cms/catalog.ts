@@ -14,6 +14,7 @@ export const contactFormProps = z.object({
     submitLabel: z.string(),
     successMessage: z.string(),
     action: z.string(),
+    honeypotField: z.string().optional(),
     fields: z.array(
         z.object({
             name: z.string(),

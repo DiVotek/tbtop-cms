@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo;
 
+use Closure;
 use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
@@ -383,11 +384,29 @@ class SeoResolver
      * Renders only the title, for duplicate checks that must follow the same
      * template rules without paying for a full SEO resolution.
      *
-     * @param  list<Breadcrumb>  $breadcrumbs
+     * Breadcrumbs arrive as a closure because these callers render one title
+     * per page across the whole site, and resolving a page's ancestors costs
+     * a recursive CTE plus a page_slugs read. Only {parent} needs them, and
+     * most templates do not use it — so the closure runs only when the
+     * template actually references it.
+     *
+     * @param  Closure(): list<Breadcrumb>  $breadcrumbs
      */
-    public function renderedTitle(Page $page, string $base, string $locale, array $breadcrumbs = []): string
+    public function renderedTitle(Page $page, string $base, string $locale, Closure $breadcrumbs): string
     {
-        return $this->title($page, $base, $locale, $breadcrumbs);
+        $template = $this->templates->title($page->type, $locale);
+
+        if ($template === '') {
+            return $this->titleWithSuffix($base);
+        }
+
+        return $this->renderTemplate(
+            $template,
+            ['{title}' => $base],
+            $locale,
+            $page,
+            str_contains($template, '{parent}') ? $breadcrumbs() : [],
+        );
     }
 
     /**

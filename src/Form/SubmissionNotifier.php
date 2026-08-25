@@ -43,6 +43,21 @@ class SubmissionNotifier
 
     public function notify(FormSubmission $submission, Page $page): void
     {
+        $claimed = FormSubmission::query()
+            ->whereKey($submission->getKey())
+            ->where('status', SubmissionStatus::Pending->value)
+            ->update(['status' => SubmissionStatus::Processing->value]);
+
+        if ($claimed !== 1) {
+            return;
+        }
+
+        $submission->refresh();
+        $this->notifyClaimed($submission, $page);
+    }
+
+    public function notifyClaimed(FormSubmission $submission, Page $page): void
+    {
         $errors = [
             ...$this->notifyBell($submission),
             ...$this->notifyMail($submission, $page),
@@ -50,12 +65,30 @@ class SubmissionNotifier
         ];
 
         if ($errors === []) {
-            $submission->forceFill(['status' => SubmissionStatus::Handled, 'handled_at' => $submission->handled_at ?? now(), 'error' => null])->save();
+            $this->finish($submission, [
+                'status' => SubmissionStatus::Handled->value,
+                'handled_at' => $submission->handled_at ?? now(),
+                'error' => null,
+            ]);
 
             return;
         }
 
-        $submission->forceFill(['status' => SubmissionStatus::Failed, 'error' => implode(' | ', $errors)])->save();
+        $this->finish($submission, [
+            'status' => SubmissionStatus::Failed->value,
+            'error' => implode(' | ', $errors),
+        ]);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function finish(FormSubmission $submission, array $attributes): void
+    {
+        FormSubmission::query()
+            ->whereKey($submission->getKey())
+            ->where('status', SubmissionStatus::Processing->value)
+            ->update($attributes);
+
+        $submission->refresh();
     }
 
     /** @return list<string> */

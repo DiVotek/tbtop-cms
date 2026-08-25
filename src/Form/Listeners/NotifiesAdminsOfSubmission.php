@@ -7,7 +7,6 @@ namespace Tbtop\Cms\Form\Listeners;
 use Illuminate\Contracts\Foundation\Application;
 use Tbtop\Cms\Form\Events\SubmissionReceived;
 use Tbtop\Cms\Form\SubmissionNotifier;
-use Tbtop\Cms\Form\SubmissionStatus;
 
 /**
  * Runs the bell/mail/telegram fan-out for every stored submission, deferred
@@ -44,12 +43,6 @@ final class NotifiesAdminsOfSubmission
             // delivery contract and takes precedence: a successful
             // bell/mail/telegram fan-out must not silently paper over it by
             // overwriting the row back to Handled.
-            $submission->refresh();
-
-            if ($submission->status !== SubmissionStatus::Pending) {
-                return;
-            }
-
             $this->app->make(SubmissionNotifier::class)->notify($submission, $page);
         });
     }

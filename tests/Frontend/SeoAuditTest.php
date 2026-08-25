@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Frontend\Seo\SeoAudit;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -29,6 +30,17 @@ function seoAuditIssuesFor(string $issueKey): array
         seoAuditIssues(),
         static fn (array $row): bool => $row['issue'] === __('tbtop-cms::seo_report.issues.' . $issueKey . '.label'),
     ));
+}
+
+function createAuditOgImage(): Media
+{
+    return Media::create([
+        'name' => 'og.jpg',
+        'disk' => 'public',
+        'path' => 'media/og.jpg',
+        'mime' => 'image/jpeg',
+        'size' => 100,
+    ]);
 }
 
 it('reports missing_title as a fail when a published page has no own title in the locale', function (): void {
@@ -115,11 +127,32 @@ it('reports missing_og_image as a warn when neither the page nor the site defaul
 });
 
 it('does not report missing_og_image when the site has a default og image configured', function (): void {
-    app(Settings::class)->set('seo.default_og_image', '1');
+    app(Settings::class)->set('seo.default_og_image', (string) createAuditOgImage()->getKey());
 
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'image' => null, 'seo' => []]);
 
     expect(seoAuditIssuesFor('missing_og_image'))->toBeEmpty();
+});
+
+it('reports missing_og_image when the site default references missing media', function (): void {
+    app(Settings::class)->set('seo.default_og_image', '999999');
+
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'image' => null, 'seo' => []]);
+
+    expect(seoAuditIssuesFor('missing_og_image'))->toHaveCount(1);
+});
+
+it('reports missing_og_image when a page override references missing media', function (): void {
+    app(Settings::class)->set('seo.default_og_image', (string) createAuditOgImage()->getKey());
+
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'image' => null,
+        'seo' => ['og_image' => '999999'],
+    ]);
+
+    expect(seoAuditIssuesFor('missing_og_image'))->toHaveCount(1);
 });
 
 it('reports noindex as a warn for a published page marked not indexable', function (): void {
@@ -160,7 +193,7 @@ it('reports missing_translation as a warn when an active frontend locale has no 
 });
 
 it('reports no issues for a fully optimized published page', function (): void {
-    app(Settings::class)->set('seo.default_og_image', '1');
+    app(Settings::class)->set('seo.default_og_image', (string) createAuditOgImage()->getKey());
 
     Page::factory()->create([
         'status' => PageStatus::Published,

@@ -313,13 +313,15 @@ class UsersPage extends AdminPage
     private function create(ActionCtx $ctx): Effects
     {
         try {
-            $user = UserForm::create($ctx->form, $this->userModel());
+            $model = $this->userModel();
+            (new $model)->getConnection()->transaction(function () use ($ctx, $model): void {
+                $user = UserForm::create($ctx->form, $model);
+                $id = $user->getKey();
+                AdminAccess::grant(is_int($id) ? $id : (string) $id);
+            });
         } catch (ValidationException $e) {
             return self::haltWithErrors($e);
         }
-
-        $id = $user->getKey();
-        AdminAccess::grant(is_int($id) ? $id : (string) $id);
 
         return Effects::make()->notify(__('tbtop-cms::users.actions.created'))->closeModal()->refreshTable();
     }

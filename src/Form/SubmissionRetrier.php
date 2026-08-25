@@ -39,7 +39,7 @@ class SubmissionRetrier
         $claimed = FormSubmission::query()
             ->whereKey($submission->getKey())
             ->where('status', SubmissionStatus::Failed->value)
-            ->update(['status' => SubmissionStatus::Pending->value]);
+            ->update(['status' => SubmissionStatus::Processing->value]);
 
         if ($claimed !== 1) {
             return;
@@ -73,7 +73,7 @@ class SubmissionRetrier
             }
         }
 
-        $this->notifier->notify($submission, $page);
+        $this->notifier->notifyClaimed($submission, $page);
         $submission->refresh();
 
         if ($submission->status === SubmissionStatus::Failed) {
@@ -86,17 +86,21 @@ class SubmissionRetrier
             return;
         }
 
-        $submission->forceFill([
-            'status' => SubmissionStatus::Handled,
-            'error' => null,
-        ])->save();
+        $this->finish($submission, SubmissionStatus::Handled, null);
     }
 
     private function markFailed(FormSubmission $submission, string $error): void
     {
-        $submission->forceFill([
-            'status' => SubmissionStatus::Failed,
-            'error' => $error,
-        ])->save();
+        $this->finish($submission, SubmissionStatus::Failed, $error);
+    }
+
+    private function finish(FormSubmission $submission, SubmissionStatus $status, ?string $error): void
+    {
+        FormSubmission::query()
+            ->whereKey($submission->getKey())
+            ->where('status', SubmissionStatus::Processing->value)
+            ->update(['status' => $status->value, 'error' => $error]);
+
+        $submission->refresh();
     }
 }

@@ -137,7 +137,9 @@ class AuditLogPage extends AdminPage
     /** @return list<array{value: int|string, label: string}> */
     private function authorOptions(): array
     {
-        $ids = CmsUserProfile::query()->pluck('user_id');
+        $ids = CmsUserProfile::query()->pluck('user_id')->merge(
+            Activity::query()->inLog('tbtop-cms')->whereNotNull('causer_id')->distinct()->pluck('causer_id'),
+        );
 
         return AuthorNames::lookup($ids)->map(
             static fn (Model $user): array => [

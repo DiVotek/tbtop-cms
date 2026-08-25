@@ -26,6 +26,7 @@ return [
     ],
     'delivery' => [
         'pending' => 'Очікує',
+        'processing' => 'Надсилається',
         'handled' => 'Доставлено',
         'failed' => 'Помилка',
     ],

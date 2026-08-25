@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
@@ -213,6 +214,30 @@ it('warns when a title-omitting template makes distinct page titles collide', fu
     $page = Page::factory()->create(['name' => ['en' => 'Two'], 'title' => ['en' => 'Two']]);
 
     expect(checkByKey(checklistFor($page), 'duplicate_title')['status'])->toBe('warn');
+});
+
+it('resolves no ancestors per page when the title template omits {parent}', function (): void {
+    // The duplicate check renders every other page's title, and rendering
+    // {parent} costs a recursive ancestor CTE per page. Templates without
+    // {parent} must not pay it — this pins the count so an eager
+    // breadcrumb resolve cannot creep back in as a silent N+1.
+    app(Settings::class)->set('seo.title_template', '{title} {sep} {site_name}');
+
+    foreach (range(1, 5) as $i) {
+        $parent = Page::factory()->create(['type' => 'category', 'name' => ['en' => "C{$i}"]]);
+        Page::factory()->create(['type' => 'article', 'parent_id' => $parent->id, 'name' => ['en' => "A{$i}"]]);
+    }
+
+    $page = Page::factory()->create(['name' => ['en' => 'Mine']]);
+
+    DB::enableQueryLog();
+    checklistFor($page);
+
+    $ancestorQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains($query['query'], 'WITH RECURSIVE'))
+        ->count();
+
+    expect($ancestorQueries)->toBe(0);
 });
 
 it('detects a duplicate that only collides further down the title cascade', function (): void {

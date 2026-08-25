@@ -37,6 +37,20 @@ it('does not re-query pages on a second request when the cache is warm', functio
     expect($countBefore)->toBe(0);
 });
 
+it('isolates cached sitemap documents by request origin', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
+
+    $indexA = $this->get('http://a.example/sitemap.xml')->assertOk()->getContent();
+    $chunkA = $this->get('http://a.example/sitemap-1.xml')->assertOk()->getContent();
+    $indexB = $this->get('http://b.example/sitemap.xml')->assertOk()->getContent();
+    $chunkB = $this->get('http://b.example/sitemap-1.xml')->assertOk()->getContent();
+
+    expect($indexA)->toContain('http://a.example/sitemap-1.xml')
+        ->and($chunkA)->toContain('http://a.example/')
+        ->and($indexB)->toContain('http://b.example/sitemap-1.xml')->not->toContain('a.example')
+        ->and($chunkB)->toContain('http://b.example/')->not->toContain('a.example');
+});
+
 it('invalidates the cached sitemap when a page is saved', function (): void {
     $existing = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
 

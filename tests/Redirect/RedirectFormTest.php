@@ -41,6 +41,12 @@ it('rejects a redirect that closes a loop', function (): void {
     RedirectForm::save(['from_path' => 'a', 'to_path' => 'b', 'locale' => 'en', 'status_code' => '301']);
 })->throws(ValidationException::class);
 
+it('rejects a global redirect that closes a locale-specific loop', function (): void {
+    Redirect::create(['locale' => 'en', 'from_path' => 'a', 'to_path' => 'b', 'status_code' => 301]);
+
+    RedirectForm::save(['from_path' => 'b', 'to_path' => 'a', 'locale' => '', 'status_code' => '301']);
+})->throws(ValidationException::class);
+
 it('rejects an unsupported status code', function (): void {
     RedirectForm::save(['from_path' => 'x', 'to_path' => 'y', 'locale' => '', 'status_code' => '307']);
 })->throws(ValidationException::class);

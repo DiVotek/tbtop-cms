@@ -9,6 +9,9 @@ export function ContactForm({ props }: { props: ContactFormProps }) {
     const initial: Record<string, string> = Object.fromEntries(
         props.fields.map((field): [string, string] => [field.name, ""]),
     );
+    if (props.honeypotField) {
+        initial[props.honeypotField] = "";
+    }
     const form = useForm<Record<string, string>>(initial);
     const [sent, setSent] = useState(false);
 
@@ -39,6 +42,18 @@ export function ContactForm({ props }: { props: ContactFormProps }) {
                 </p>
             ) : null}
             {props.heading ? <h2>{props.heading}</h2> : null}
+            {props.honeypotField ? (
+                <div aria-hidden="true" style={{ position: "absolute", left: "-9999px" }}>
+                    <input
+                        type="text"
+                        name={props.honeypotField}
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={form.data[props.honeypotField] ?? ""}
+                        onChange={(event) => form.setData(props.honeypotField!, event.target.value)}
+                    />
+                </div>
+            ) : null}
             {props.fields.map((field) => (
                 <label key={field.name} className="cms-contact-form__field">
                     <span>{field.label}</span>
