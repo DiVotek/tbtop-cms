@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Frontend\Seo;
 
 use Illuminate\Support\Collection;
+use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -29,6 +30,7 @@ final class SeoAudit
     public function __construct(
         private readonly Languages $languages,
         private readonly Settings $settings,
+        private readonly MediaUrlResolver $mediaUrlResolver,
     ) {}
 
     /** @return list<Issue> */
@@ -183,21 +185,18 @@ final class SeoAudit
     private function missingOgImages($pages): array
     {
         $globalDefault = $this->settings->get('seo.default_og_image');
-        $hasGlobalDefault = is_string($globalDefault) && $globalDefault !== '';
-
-        if ($hasGlobalDefault) {
-            return [];
-        }
 
         $issues = [];
 
         foreach ($pages as $page) {
             $seo = is_array($page->seo) ? $page->seo : [];
             $override = $seo['og_image'] ?? null;
-            $hasOwnImage = (is_string($override) && $override !== '')
-                || ($page->image !== null && $page->image !== '');
+            $image = is_string($override) && $override !== ''
+                ? $override
+                : ($page->image !== null && $page->image !== '' ? $page->image : $globalDefault);
+            $url = is_string($image) && $image !== '' ? $this->mediaUrlResolver->resolve($image) : null;
 
-            if (! $hasOwnImage) {
+            if (trim((string) $url) === '') {
                 $issues[] = $this->issue(
                     'warn',
                     'missing_og_image',

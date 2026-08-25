@@ -36,7 +36,7 @@ class SitemapController
     {
         $this->guard();
 
-        $xml = $this->cache->rememberLive(self::INDEX_KEY, function (): string {
+        $xml = $this->cache->rememberLive(self::INDEX_KEY . ':' . $this->originKey(), function (): string {
             $count = $this->entries->chunkCount();
 
             $locs = [];
@@ -63,7 +63,7 @@ class SitemapController
         }
 
         $xml = $this->cache->rememberLive(
-            self::CHUNK_KEY . $chunk,
+            self::CHUNK_KEY . $this->originKey() . ':' . $chunk,
             fn (): string => $this->renderer->render($this->entries->build($chunk)),
         );
 
@@ -84,5 +84,10 @@ class SitemapController
     private function xml(string $xml): Response
     {
         return response()->make($xml, 200, ['Content-Type' => 'application/xml']);
+    }
+
+    private function originKey(): string
+    {
+        return hash('sha256', request()->getSchemeAndHttpHost());
     }
 }

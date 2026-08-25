@@ -175,10 +175,9 @@ it('filters non-URL entries out of the emitted sameAs structured data', function
 
     $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
 
-    // Scoped to the ld+json payloads: the raw setting also rides along in
-    // the serialized cms.settings prop (forFrontend() ships all non-secret
-    // settings), where it is inert JSON — only the structured data must be
-    // clean.
+    // Scoped to the ld+json payloads: the raw public SEO setting also rides
+    // along in the serialized cms.settings prop, where it is inert JSON —
+    // only the structured data must be clean.
     preg_match_all('#<script[^>]*application/ld\+json[^>]*>(.*?)</script>#s', $html, $matches);
     $jsonLd = implode("\n", $matches[1]);
 

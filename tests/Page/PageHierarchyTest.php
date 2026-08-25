@@ -79,6 +79,20 @@ it('rejects category nesting beyond depth 3', function (): void {
         ->toThrow(DomainException::class);
 });
 
+it('rejects moving a subtree when a descendant would exceed its maximum depth', function (): void {
+    $newRoot = Page::factory()->category()->create();
+    $subtreeRoot = Page::factory()->category()->create();
+    $child = Page::factory()->category()->create(['parent_id' => $subtreeRoot->id]);
+    $grandchild = Page::factory()->category()->create(['parent_id' => $child->id]);
+
+    expect(fn () => $subtreeRoot->update(['parent_id' => $newRoot->id]))
+        ->toThrow(DomainException::class);
+
+    expect($subtreeRoot->fresh()->parent_id)->toBeNull()
+        ->and($child->fresh()->parent_id)->toBe($subtreeRoot->id)
+        ->and($grandchild->fresh()->parent_id)->toBe($child->id);
+});
+
 it('allows an article under a depth-3 category', function (): void {
     $c1 = Page::factory()->category()->create();
     $c2 = Page::factory()->category()->create(['parent_id' => $c1->id]);

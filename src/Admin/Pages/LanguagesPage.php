@@ -20,7 +20,6 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\LanguageForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Audit\AuditContext;
-use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Models\Language;
 
 class LanguagesPage extends AdminPage
@@ -171,10 +170,6 @@ class LanguagesPage extends AdminPage
                 $language = Language::query()->find($ctx->row['id'] ?? null);
                 $language?->delete();
 
-                if ($language instanceof Language) {
-                    event(new LanguagesChanged);
-                }
-
                 return Effects::make()->notify(__('tbtop-cms::languages.actions.deleted'))->refreshTable();
             },
             'languageDelete',
@@ -200,8 +195,6 @@ class LanguagesPage extends AdminPage
             return Effects::make()->notify($e->getMessage(), 'error');
         }
 
-        event(new LanguagesChanged);
-
         return Effects::make()->notify(__('tbtop-cms::languages.actions.restored'))->refreshTable();
     }
 
@@ -226,8 +219,6 @@ class LanguagesPage extends AdminPage
         } catch (DomainException $e) {
             return Effects::make()->notify($e->getMessage(), 'error');
         }
-
-        event(new LanguagesChanged);
 
         return Effects::make()->notify(__('tbtop-cms::languages.actions.force_deleted'))->refreshTable();
     }

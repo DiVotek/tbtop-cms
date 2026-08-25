@@ -51,6 +51,7 @@ return [
             'ok' => 'Кореневий вигляд існує і містить partial з head для cms.',
             'missing_view' => 'Налаштований кореневий вигляд ":view" не існує.',
             'missing_include' => 'У кореневому вигляді :path немає include для head cms.',
+            'include_after_head' => 'Include для head cms у :path розташовано після директиви head від Inertia.',
             'unreadable' => 'Кореневий вигляд за шляхом :path існує, але його не вдалося прочитати.',
             'hints' => [
                 'missing_view' => 'Створіть resources/views/:view.blade.php (стандартний scaffold-вигляд Laravel/Inertia) або вкажіть у tbtop-cms.render.root_view існуючий вигляд.',

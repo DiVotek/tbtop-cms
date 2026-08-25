@@ -18,8 +18,8 @@ use Tbtop\Cms\Health\HealthStatus;
  *
  * The include has to sit above the Inertia head tag (`<x-inertia::head>` on
  * Inertia 3, `@inertiaHead` on Inertia 2) so the package's tags win the
- * reconciliation; the check only confirms the line is present, since parsing
- * Blade to prove ordering is far more machinery than the failure warrants.
+ * reconciliation. A positional source check covers the documented directives
+ * without requiring a full Blade parser.
  */
 final class InertiaRootViewCheck implements HealthCheck
 {
@@ -28,6 +28,9 @@ final class InertiaRootViewCheck implements HealthCheck
     private const string DEFAULT_ROOT_VIEW = 'app';
 
     private const string REQUIRED_INCLUDE = "@include('tbtop-cms::head')";
+
+    /** @var list<string> */
+    private const array INERTIA_HEAD_DIRECTIVES = ['@inertiaHead', '<x-inertia::head>'];
 
     public function id(): string
     {
@@ -77,6 +80,23 @@ final class InertiaRootViewCheck implements HealthCheck
                 messageReplace: ['path' => $path],
                 hintKey: 'tbtop-cms::health.checks.inertia_root_view.hints.missing_include',
             );
+        }
+
+        $includePosition = strpos($contents, self::REQUIRED_INCLUDE);
+
+        foreach (self::INERTIA_HEAD_DIRECTIVES as $directive) {
+            $directivePosition = strpos($contents, $directive);
+
+            if ($directivePosition !== false && $includePosition > $directivePosition) {
+                return new HealthCheckResult(
+                    checkId: $this->id(),
+                    status: HealthStatus::Error,
+                    labelKey: 'tbtop-cms::health.checks.inertia_root_view.label',
+                    messageKey: 'tbtop-cms::health.checks.inertia_root_view.include_after_head',
+                    messageReplace: ['path' => $path],
+                    hintKey: 'tbtop-cms::health.checks.inertia_root_view.hints.missing_include',
+                );
+            }
         }
 
         return new HealthCheckResult(

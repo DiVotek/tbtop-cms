@@ -32,7 +32,7 @@ final class TelegramClient
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$token}/{$method}", $params);
         } catch (ConnectionException $e) {
-            throw new TelegramApiException("Could not reach Telegram: {$e->getMessage()}", previous: $e);
+            throw new TelegramApiException('Could not reach Telegram.', previous: $e);
         }
 
         $body = $response->json();
@@ -97,7 +97,7 @@ final class TelegramClient
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$token}/getUpdates", $params);
         } catch (ConnectionException $e) {
-            throw new TelegramApiException("Could not reach Telegram: {$e->getMessage()}", previous: $e);
+            throw new TelegramApiException('Could not reach Telegram.', previous: $e);
         }
 
         $body = $response->json();

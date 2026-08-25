@@ -30,6 +30,10 @@ final class SeedsLocaleFromProfile
 
         if ($profile !== null && is_string($profile->locale) && $profile->locale !== '') {
             session(['tbtop.locale' => $profile->locale]);
+
+            return;
         }
+
+        session()->forget('tbtop.locale');
     }
 }

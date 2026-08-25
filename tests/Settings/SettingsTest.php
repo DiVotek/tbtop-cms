@@ -47,16 +47,23 @@ it('invalidates the cache on save', function (): void {
     expect((new Settings)->get('site.name'))->toBe('B');
 });
 
-it('excludes secret keys from the frontend payload', function (): void {
+it('exports only public site and SEO settings to the frontend', function (): void {
     $settings = new Settings;
     $settings->set('site.name', 'My Site');
+    $settings->set('seo.default_description', 'Public description');
+    $settings->set('notifications.mail.recipients', 'ops@example.test');
+    $settings->set('mail.host', 'smtp.internal.test');
+    $settings->set('mail.username', 'mailer');
     $settings->set('mail.password', 'hunter2');
+    $settings->set('notifications.telegram.chat_ids', '123456789 # Ops');
+    $settings->set('notifications.telegram.bot_token', 'bot-token');
 
     $public = $settings->forFrontend();
 
-    expect($public)->toHaveKey('site.name')
-        ->and($public['site.name'])->toBe('My Site')
-        ->and($public)->not->toHaveKey('mail.password');
+    expect($public)->toEqual([
+        'seo.default_description' => 'Public description',
+        'site.name' => 'My Site',
+    ]);
 });
 
 it('stores secret values encrypted at rest', function (): void {

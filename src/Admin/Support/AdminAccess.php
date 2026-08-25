@@ -23,16 +23,18 @@ final class AdminAccess
 {
     public static function grant(int | string $userId): void
     {
-        $profile = CmsUserProfile::query()->firstOrCreate(['user_id' => $userId]);
+        DB::transaction(function () use ($userId): void {
+            $profile = CmsUserProfile::query()->firstOrCreate(['user_id' => $userId]);
 
-        if (! $profile->wasRecentlyCreated) {
-            return;
-        }
+            if (! $profile->wasRecentlyCreated) {
+                return;
+            }
 
-        self::markFirstOwner($profile);
+            self::markFirstOwner($profile);
 
-        Event::dispatch(new CmsAccessGranted($userId));
-        self::logAccess($userId, 'access_granted', (bool) $profile->is_owner);
+            Event::dispatch(new CmsAccessGranted($userId));
+            self::logAccess($userId, 'access_granted', (bool) $profile->is_owner);
+        });
     }
 
     /**

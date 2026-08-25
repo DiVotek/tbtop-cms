@@ -35,7 +35,7 @@ class SubmissionMail extends Mailable
     {
         $rows = [];
         foreach ($this->submission->payload as $key => $value) {
-            $rows[] = '<p><strong>' . e((string) $key) . ':</strong> ' . nl2br(e((string) $value)) . '</p>';
+            $rows[] = '<p><strong>' . e((string) $key) . ':</strong> ' . nl2br(e($this->formatValue($value))) . '</p>';
         }
 
         $meta = '<p><strong>' . e(__('tbtop-cms::notifications.mail.fields.page')) . ':</strong> ' . e($this->pageName) . '</p>'
@@ -45,6 +45,17 @@ class SubmissionMail extends Mailable
         $link = '<p><a href="' . e($this->detailUrl()) . '">' . e(__('tbtop-cms::notifications.mail.view_submission')) . '</a></p>';
 
         return implode("\n", $rows) . $meta . $link;
+    }
+
+    private function formatValue(mixed $value): string
+    {
+        if (! is_array($value) && ! is_object($value)) {
+            return (string) $value;
+        }
+
+        $encoded = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return $encoded === false ? '[unsupported value]' : $encoded;
     }
 
     private function submittedAt(): string

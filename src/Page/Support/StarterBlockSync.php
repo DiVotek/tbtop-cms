@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Support;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockEnvelope;
@@ -62,25 +63,29 @@ final class StarterBlockSync
             'affected_pages' => count($pages),
         ];
 
-        $audit->batch(function () use ($audit, $context, $pages, $starter, $category): void {
-            $audit->during('starter_blocks_applied', $context, function () use ($pages, $starter): void {
-                foreach ($pages as $page) {
-                    $page->content = self::mergeBlocks(BlockEnvelope::blocksOf($page->content), $starter);
-                    $page->save();
+        DB::transaction(function () use ($audit, $context, $pages, $starter, $category): void {
+            $audit->batch(function () use ($audit, $context, $pages, $starter, $category): void {
+                $audit->during('starter_blocks_applied', $context, function () use ($pages, $starter): void {
+                    foreach ($pages as $page) {
+                        $page->content = self::mergeBlocks(BlockEnvelope::blocksOf($page->content), $starter);
+                        $page->save();
+                    }
+                });
 
-                    event(new PageSaved($page, false));
-                }
+                $audit->log(
+                    $category,
+                    'starter_blocks_applied',
+                    is_string($category->name) && $category->name !== ''
+                        ? $category->name
+                        : 'Page #' . $category->getKey(),
+                    context: $context,
+                );
             });
-
-            $audit->log(
-                $category,
-                'starter_blocks_applied',
-                is_string($category->name) && $category->name !== ''
-                    ? $category->name
-                    : 'Page #' . $category->getKey(),
-                context: $context,
-            );
         });
+
+        foreach ($pages as $page) {
+            event(new PageSaved($page, false));
+        }
 
         return count($pages);
     }

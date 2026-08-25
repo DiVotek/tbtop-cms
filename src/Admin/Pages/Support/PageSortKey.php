@@ -92,6 +92,10 @@ class PageSortKey
             return "substr('{$zeros}' || {$column}, -{$width})";
         }
 
+        if (self::driver() === 'pgsql') {
+            return "LPAD(CAST({$column} AS TEXT), {$width}, '0')";
+        }
+
         return "LPAD({$column}, {$width}, '0')";
     }
 
