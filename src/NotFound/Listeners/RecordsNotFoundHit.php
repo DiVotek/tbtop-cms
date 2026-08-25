@@ -8,6 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
+use Tbtop\Cms\NotFound\Models\NotFoundHit;
 use Tbtop\Cms\NotFound\Support\NotFoundNoise;
 use Tbtop\Cms\Settings\Settings;
 
@@ -65,8 +66,9 @@ final class RecordsNotFoundHit
         $now = now();
         $referer = $this->truncate($event->referer, 2048);
         $userAgent = $this->truncate($event->userAgent, 512);
+        $table = (new NotFoundHit)->getTable();
 
-        DB::table('tbtop_not_found_hits')->upsert(
+        DB::table($table)->upsert(
             [[
                 'locale' => $event->locale,
                 'path' => $event->path,
@@ -82,7 +84,10 @@ final class RecordsNotFoundHit
             ]],
             ['locale', 'path_hash'],
             [
-                'hits' => DB::raw('tbtop_not_found_hits.hits + 1'),
+                // Qualified: inside ON CONFLICT DO UPDATE, postgres sees both the
+                // target row and the excluded pseudo-table, and rejects a bare
+                // `hits` as ambiguous. $table is the model's own name, not input.
+                'hits' => DB::raw("{$table}.hits + 1"),
                 'last_seen_at' => $now,
                 'last_referer' => $referer,
                 'last_user_agent' => $userAgent,
