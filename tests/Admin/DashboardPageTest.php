@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Form\LeadStatus;
@@ -91,6 +92,43 @@ it('shows the dashboard to an admin user', function (): void {
     actingAsDashboardAdmin();
 
     $this->get('/admin/dashboard', ['X-Inertia' => 'true'])->assertOk();
+});
+
+it('omits submission widgets and data endpoints without the submissions ability', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.submissions', static fn (): bool => false);
+    actingAsDashboardAdmin();
+    submissionOn(LeadStatus::New, now());
+
+    $structure = $this->get('/admin/dashboard', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->json('props.structure');
+
+    $stats = [];
+    $sections = [];
+    $charts = [];
+    collectDashboardNodesByKind($structure, 'stat', $stats);
+    collectDashboardNodesByKind($structure, 'section', $sections);
+    collectDashboardNodesByKind($structure, 'chart:donut', $charts);
+    collectDashboardNodesByKind($structure, 'chart:area', $charts);
+
+    expect(collect($stats)->pluck('label'))->not->toContain(__('tbtop-cms::dashboard.stats.submissions_new'))
+        ->and(collect($sections)->pluck('title'))->not->toContain(__('tbtop-cms::dashboard.recent.submissions_title'))
+        ->and($charts)->toBeEmpty();
+
+    $this->getJson('/admin/dashboard/data/leads-by-status')->assertNotFound();
+    $this->getJson('/admin/dashboard/data/submissions-daily')->assertNotFound();
+});
+
+it('shows submission widgets with the submissions ability', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.submissions', static fn (): bool => true);
+    actingAsDashboardAdmin();
+
+    $values = dashboardStatValues();
+
+    expect($values)->toHaveKey(__('tbtop-cms::dashboard.stats.submissions_new'));
+    $this->getJson('/admin/dashboard/data/leads-by-status')->assertOk();
 });
 
 it('redirects a guest away from the dashboard', function (): void {
