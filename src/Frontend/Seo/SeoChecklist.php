@@ -243,7 +243,6 @@ class SeoChecklist
         foreach ($others as $other) {
             $otherTitle = $this->resolver->renderedTitle(
                 $other,
-                $this->metaTitleBase($other, $locale),
                 $locale,
                 fn (): array => $this->breadcrumbs->forPage($other, $locale),
             );
@@ -254,11 +253,6 @@ class SeoChecklist
         }
 
         return $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass'));
-    }
-
-    private function metaTitleBase(Page $page, string $locale): string
-    {
-        return PageOwnSeo::title($page, PageOwnSeo::blob($page), $locale);
     }
 
     /**

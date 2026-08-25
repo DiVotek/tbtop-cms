@@ -135,11 +135,8 @@ final class SeoAudit
             $byTitle = [];
 
             foreach ($pages as $page) {
-                $seo = is_array($page->seo) ? $page->seo : [];
-                $base = $this->ownTitle($page, $seo, $locale);
                 $title = $this->resolver->renderedTitle(
                     $page,
-                    $base,
                     $locale,
                     fn (): array => $this->breadcrumbs->forPage($page, $locale),
                 );

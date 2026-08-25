@@ -380,7 +380,8 @@ class SeoResolver
 
     /**
      * Renders only the title, for duplicate checks that must follow the same
-     * template rules without paying for a full SEO resolution.
+     * template rules without paying for a full SEO resolution. Derives its
+     * own base the same way resolve() does, so callers don't re-derive it.
      *
      * Breadcrumbs arrive as a closure because these callers render one title
      * per page across the whole site, and resolving a page's ancestors costs
@@ -390,8 +391,9 @@ class SeoResolver
      *
      * @param  Closure(): list<Breadcrumb>  $breadcrumbs
      */
-    public function renderedTitle(Page $page, string $base, string $locale, Closure $breadcrumbs): string
+    public function renderedTitle(Page $page, string $locale, Closure $breadcrumbs): string
     {
+        $base = PageOwnSeo::title($page, PageOwnSeo::blob($page), $locale);
         $template = $this->templates->title($page->type, $locale);
 
         if ($template === '') {
