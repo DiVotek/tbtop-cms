@@ -79,6 +79,12 @@ class RedirectResolver
             return $url;
         }
 
-        return $url . '?' . $query;
+        $fragmentPosition = strpos($url, '#');
+
+        if ($fragmentPosition === false) {
+            return $url . '?' . $query;
+        }
+
+        return substr($url, 0, $fragmentPosition) . '?' . $query . substr($url, $fragmentPosition);
     }
 }
