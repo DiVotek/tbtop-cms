@@ -18,6 +18,17 @@ class RedirectCycle
             return;
         }
 
+        $locales = $locale === null
+            ? [null, ...Redirect::query()->whereNotNull('locale')->distinct()->pluck('locale')->all()]
+            : [$locale];
+
+        foreach ($locales as $candidateLocale) {
+            self::assertAcyclicForLocale($candidateLocale, $from, $to, $id);
+        }
+    }
+
+    private static function assertAcyclicForLocale(?string $locale, string $from, string $to, ?int $id): void
+    {
         $seen = [$from];
         $current = RedirectPath::normalize($to);
 
