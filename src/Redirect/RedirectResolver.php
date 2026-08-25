@@ -26,6 +26,11 @@ class RedirectResolver
         }
 
         $target = $this->follow($redirect, $from, $locale);
+
+        if ($target === null) {
+            return null;
+        }
+
         $url = RedirectPath::isExternal($target) ? $target : $this->pageUrl->build($target, $locale);
 
         return redirect()->to($this->withQuery($url, $request), $redirect->status_code);
@@ -38,7 +43,7 @@ class RedirectResolver
         return $specific ?? Redirect::query()->whereNull('locale')->where('from_path', $from)->first();
     }
 
-    private function follow(Redirect $redirect, string $from, string $locale): string
+    private function follow(Redirect $redirect, string $from, string $locale): ?string
     {
         $seen = [$from];
 
@@ -48,7 +53,12 @@ class RedirectResolver
             }
 
             $to = RedirectPath::normalize($redirect->to_path);
-            $next = in_array($to, $seen, true) ? null : $this->match($to, $locale);
+
+            if (in_array($to, $seen, true)) {
+                return null;
+            }
+
+            $next = $this->match($to, $locale);
 
             if (! $next instanceof Redirect) {
                 return $to;
@@ -58,7 +68,7 @@ class RedirectResolver
             $redirect = $next;
         }
 
-        return RedirectPath::normalize($redirect->to_path);
+        return null;
     }
 
     private function withQuery(string $url, Request $request): string
