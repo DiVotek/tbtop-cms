@@ -88,6 +88,28 @@ it('lists every page ability in CmsAbilities::ALL', function (): void {
     expect(CmsAbilities::ALL)->each->toBeIn($pageAbilities);
 });
 
+// Coverage guard. Page::can() defaults to null, so a page that simply omits
+// it inherits "no gate" and reads identically to a deliberate choice — the
+// drift guard above cannot see it, because array_filter drops the nulls.
+// Listing the open pages here forces that decision to be stated: a new
+// section page ships gated or fails this test.
+it('gates every admin page that is not deliberately public', function (): void {
+    config(['tbtop-cms.roles' => true]);
+
+    $publicPages = ['login', 'dashboard', 'profile'];
+
+    /** @var array<string, class-string<AdminPage>> $pages */
+    $pages = config('tbtop-cms.admin.pages', []);
+
+    $ungated = array_keys(array_filter(
+        $pages,
+        static fn (string $page): bool => $page::can() === null,
+    ));
+
+    expect(array_values(array_diff($ungated, $publicPages)))->toBe([])
+        ->and(array_values(array_diff($publicPages, $ungated)))->toBe([]);
+});
+
 // Grant/revoke domain events (agreed addition 5): dispatched exactly once on
 // an actual change, never on a no-op, and never through the content-cache
 // path — access is not frontend content.
