@@ -142,32 +142,20 @@ final class OgPreview
      */
     private static function draftOf(Page $page, array $locales, array $deps): Page
     {
-        $draft = $page->replicate();
-        $draft->setRelations($page->getRelations());
-        $draft->exists = true;
-        $draft->setAttribute($page->getKeyName(), $page->getKey());
-
-        $seo = is_array($page->seo) ? $page->seo : [];
-
-        foreach ($locales as $locale) {
-            // seo_* overlays feed the fallback cascade og:title/og:description
-            // resolve through when their own override is empty (see build()).
-            $map = ['og_title' => 'og_title', 'og_description' => 'og_description', 'title' => 'seo_title', 'description' => 'seo_description'];
-            foreach ($map as $key => $dep) {
-                $value = $deps["{$dep}.{$locale}"] ?? null;
-
-                if ($value !== null) {
-                    $existing = is_array($seo[$key] ?? null) ? $seo[$key] : [];
-                    $seo[$key] = [...$existing, $locale => $value];
-                }
-            }
-        }
+        // seo_* overlays feed the fallback cascade og:title/og:description
+        // resolve through when their own override is empty (see build()).
+        $draft = PageSeoDraft::make(
+            $page,
+            $deps,
+            ['og_title' => 'og_title', 'og_description' => 'og_description', 'title' => 'seo_title', 'description' => 'seo_description'],
+            $locales,
+        );
 
         if (array_key_exists('og_image', $deps)) {
+            $seo = is_array($draft->seo) ? $draft->seo : [];
             $seo['og_image'] = $deps['og_image'];
+            $draft->seo = $seo;
         }
-
-        $draft->seo = $seo;
 
         return $draft;
     }

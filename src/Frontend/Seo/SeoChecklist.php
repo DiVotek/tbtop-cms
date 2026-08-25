@@ -256,14 +256,9 @@ class SeoChecklist
         return $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass'));
     }
 
-    /** Mirrors SeoResolver::metaTitle()'s cascade, which is private there. */
     private function metaTitleBase(Page $page, string $locale): string
     {
-        $seo = is_array($page->seo) ? $page->seo : [];
-
-        return LocalizedSeo::value($seo['title'] ?? null, $locale)
-            ?: (string) $page->getTranslation('title', $locale)
-            ?: (string) $page->getTranslation('name', $locale);
+        return PageOwnSeo::title($page, PageOwnSeo::blob($page), $locale);
     }
 
     /**

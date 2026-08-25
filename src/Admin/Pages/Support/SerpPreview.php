@@ -156,24 +156,11 @@ final class SerpPreview
      */
     private static function draftOf(Page $page, string $locale, array $deps): Page
     {
-        $draft = $page->replicate();
-        $draft->setRelations($page->getRelations());
-        $draft->exists = true;
-        $draft->setAttribute($page->getKeyName(), $page->getKey());
-
-        $seo = is_array($page->seo) ? $page->seo : [];
-
-        foreach (['title' => 'seo_title', 'description' => 'seo_description', 'canonical' => 'seo_canonical'] as $key => $dep) {
-            $value = $deps["{$dep}.{$locale}"] ?? null;
-
-            if ($value !== null) {
-                $existing = is_array($seo[$key] ?? null) ? $seo[$key] : [];
-                $seo[$key] = [...$existing, $locale => $value];
-            }
-        }
-
-        $draft->seo = $seo;
-
-        return $draft;
+        return PageSeoDraft::make(
+            $page,
+            $deps,
+            ['title' => 'seo_title', 'description' => 'seo_description', 'canonical' => 'seo_canonical'],
+            [$locale],
+        );
     }
 }
