@@ -7,7 +7,6 @@ namespace Tbtop\Cms\Page\Support;
 use DomainException;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Audit\AuditContext;
-use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageRevision;
 
@@ -121,8 +120,6 @@ class PageRevisionWriter
         } finally {
             $page->pendingRestore = false;
         }
-
-        event(new PageSaved($page, false));
     }
 
     /** @return array<string, mixed> */

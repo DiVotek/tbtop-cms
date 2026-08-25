@@ -121,6 +121,53 @@ it('does not raise PageSaved when the save fails on a lock_version conflict', fu
     Event::assertNotDispatched(PageSaved::class);
 });
 
+// --- Page: dispatch is bound to the write, not to the caller ---
+
+it('raises PageSaved when a page is written directly, without going through PageForm', function (): void {
+    Event::fake([PageSaved::class]);
+
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Direct']]);
+
+    Event::assertDispatched(PageSaved::class, fn (PageSaved $e): bool => $e->page->is($page) && $e->wasCreated === true);
+});
+
+it('raises PageSaved(wasCreated: false) when an existing page is updated directly', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Direct']]);
+    Event::fake([PageSaved::class]);
+
+    $page->update(['name' => ['en' => 'Renamed']]);
+
+    Event::assertDispatched(PageSaved::class, fn (PageSaved $e): bool => $e->wasCreated === false);
+});
+
+it('raises the publish transition when status changes on a direct write', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Direct']]);
+    Event::fake([PagePublished::class, PageUnpublished::class]);
+
+    $page->update(['status' => PageStatus::Published]);
+    Event::assertDispatched(PagePublished::class, fn (PagePublished $e): bool => $e->page->is($page));
+
+    $page->update(['status' => PageStatus::Draft]);
+    Event::assertDispatched(PageUnpublished::class, fn (PageUnpublished $e): bool => $e->page->is($page));
+});
+
+it('raises PageSaved once per page write, not once per caller layer', function (): void {
+    Event::fake([PageSaved::class]);
+
+    PageForm::save(['name' => ['en' => 'Once'], 'title' => ['en' => ''], 'slug' => ['en' => ''], 'type' => 'page', 'parent_id' => 'none']);
+
+    Event::assertDispatchedTimes(PageSaved::class, 1);
+});
+
+it('does not raise PageSaved for a save that changes nothing', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Idle']]);
+    Event::fake([PageSaved::class]);
+
+    $page->save();
+
+    Event::assertNotDispatched(PageSaved::class);
+});
+
 // --- Page: other save-adjacent write points ---
 
 it('raises PageSaved(wasCreated: false) when a page revision is restored', function (): void {

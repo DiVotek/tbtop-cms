@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Page\Observers;
 
 use DomainException;
+use Illuminate\Support\Facades\DB;
+use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Events\PagePublished;
+use Tbtop\Cms\Page\Events\PageSaved;
+use Tbtop\Cms\Page\Events\PageUnpublished;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageHierarchy;
@@ -23,6 +28,82 @@ class PageObserver
         $page->pendingSlugOverrides = [];
 
         $this->slugs->sync($page, $overrides);
+    }
+
+    /**
+     * PageSaved is bound to the write rather than to each caller: the content
+     * cache bump rides on it (CmsServiceProvider::wireContentCacheInvalidation()),
+     * so a caller-side dispatch left every other write path serving stale
+     * content with no error. Same move as LanguagesChanged into LanguageObserver.
+     *
+     * created()/updated() rather than saved(): wasRecentlyCreated stays true
+     * for the rest of the request, so a page created and then updated in one
+     * request cannot be told apart from inside saved().
+     */
+    public function created(Page $page): void
+    {
+        self::dispatch($page, wasCreated: true, statusBefore: null);
+    }
+
+    public function updated(Page $page): void
+    {
+        // lock_version is bumped by saving() on every real update, so it is
+        // never the only change for a write that touched something.
+        if (array_keys($page->getChanges()) === ['lock_version']) {
+            return;
+        }
+
+        self::dispatch(
+            $page,
+            wasCreated: false,
+            statusBefore: $page->wasChanged('status') ? $page->getOriginal('status') : null,
+        );
+    }
+
+    /**
+     * afterCommit so a caller batching writes in a transaction
+     * (StarterBlockSync::apply()) emits only once the rows commit; outside a
+     * transaction Laravel runs the callback immediately.
+     */
+    private static function dispatch(Page $page, bool $wasCreated, mixed $statusBefore): void
+    {
+        DB::afterCommit(static function () use ($page, $wasCreated, $statusBefore): void {
+            event(new PageSaved($page, $wasCreated));
+
+            self::dispatchPublishTransition($page, $wasCreated, $statusBefore);
+        });
+    }
+
+    /** $statusBefore is null when this write did not change status. */
+    private static function dispatchPublishTransition(Page $page, bool $wasCreated, mixed $statusBefore): void
+    {
+        $isPublished = $page->status === PageStatus::Published;
+
+        if ($wasCreated) {
+            if ($isPublished) {
+                event(new PagePublished($page));
+            }
+
+            return;
+        }
+
+        if ($statusBefore === null) {
+            return;
+        }
+
+        $wasPublished = self::asStatus($statusBefore) === PageStatus::Published;
+
+        if ($isPublished && ! $wasPublished) {
+            event(new PagePublished($page));
+        } elseif ($wasPublished && ! $isPublished) {
+            event(new PageUnpublished($page));
+        }
+    }
+
+    /** getOriginal() returns the cast enum or the raw column value depending on the write path. */
+    private static function asStatus(mixed $status): ?PageStatus
+    {
+        return $status instanceof PageStatus ? $status : PageStatus::tryFrom((string) $status);
     }
 
     public function creating(Page $page): void

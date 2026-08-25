@@ -6,7 +6,6 @@ namespace Tbtop\Cms\Page\Support;
 
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Page\Enums\PageStatus;
-use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -52,8 +51,6 @@ final class PageDuplicator
             ['source_page_id' => $source->getKey()],
             static fn (): bool => $copy->save(),
         );
-
-        event(new PageSaved($copy, wasCreated: true));
 
         return $copy;
     }
