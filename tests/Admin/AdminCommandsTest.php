@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use Tbtop\Cms\Admin\Events\CmsAccessGranted;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\ContractAdminUser;
@@ -29,6 +31,18 @@ it('creates the admin idempotently', function (): void {
 
     expect(AdminUser::where('email', 'a@example.com')->count())->toBe(1)
         ->and(CmsUserProfile::count())->toBe(1);
+});
+
+it('rolls back a newly created user when granting access fails', function (): void {
+    Event::listen(CmsAccessGranted::class, static fn (): never => throw new RuntimeException('Grant failed.'));
+
+    expect(fn () => $this->artisan('cms:admin:create', [
+        'email' => 'failed@example.com',
+        '--password' => 'password123',
+    ]))->toThrow(RuntimeException::class, 'Grant failed.');
+
+    expect(AdminUser::where('email', 'failed@example.com')->exists())->toBeFalse()
+        ->and(CmsUserProfile::count())->toBe(0);
 });
 
 it('rejects creating a user with a password shorter than 8 characters', function (): void {
