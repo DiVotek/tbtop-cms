@@ -10,6 +10,7 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Mail\SubmissionMail;
@@ -119,6 +120,28 @@ it('marks a submission handled from the bell channel alone when mail and telegra
     $submission = FormSubmission::query()->sole();
     expect($submission->status)->toBe(SubmissionStatus::Handled)
         ->and($submission->error)->toBeNull();
+});
+
+it('allows only one stale notification attempt to claim a pending submission', function (): void {
+    Mail::fake();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    $page = notifierContactPage();
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada'],
+        'status' => SubmissionStatus::Pending,
+    ]);
+    $concurrentAttempt = FormSubmission::query()->findOrFail($submission->getKey());
+
+    app(SubmissionNotifier::class)->notify($submission, $page);
+    app(SubmissionNotifier::class)->notify($concurrentAttempt, $page);
+
+    Mail::assertSentCount(1);
+    expect($submission->refresh()->status)->toBe(SubmissionStatus::Handled);
 });
 
 // -----------------------------------------------------------------------

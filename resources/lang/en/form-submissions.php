@@ -26,6 +26,7 @@ return [
     ],
     'delivery' => [
         'pending' => 'Pending',
+        'processing' => 'Sending',
         'handled' => 'Sent',
         'failed' => 'Failed',
     ],
