@@ -6,6 +6,10 @@ namespace Tbtop\Cms\Richtext;
 
 class RichtextNodeRenderer
 {
+    private const MAX_DEPTH = 64;
+
+    private const MAX_NODES = 10000;
+
     /** @var array<string, string> */
     private const ALIGNMENTS = [
         'center' => 'center',
@@ -21,6 +25,18 @@ class RichtextNodeRenderer
     /** @param array<string, mixed> $node */
     public function renderChildren(array $node): string
     {
+        $nodeCount = 0;
+
+        return $this->renderChildrenWithinLimits($node, 0, $nodeCount);
+    }
+
+    /** @param array<string, mixed> $node */
+    private function renderChildrenWithinLimits(array $node, int $depth, int &$nodeCount): string
+    {
+        if ($depth >= self::MAX_DEPTH) {
+            return '';
+        }
+
         $children = $node['children'] ?? null;
 
         if (! is_array($children)) {
@@ -31,7 +47,12 @@ class RichtextNodeRenderer
 
         foreach ($children as $child) {
             if (is_array($child)) {
-                $html .= $this->renderNode($child);
+                if ($nodeCount >= self::MAX_NODES) {
+                    break;
+                }
+
+                $nodeCount++;
+                $html .= $this->renderNode($child, $depth + 1, $nodeCount);
             }
         }
 
@@ -39,35 +60,35 @@ class RichtextNodeRenderer
     }
 
     /** @param array<string, mixed> $node */
-    private function renderNode(array $node): string
+    private function renderNode(array $node, int $depth, int &$nodeCount): string
     {
         $type = $node['type'] ?? null;
 
         return match ($type) {
-            'paragraph' => $this->wrapBlock('p', $node),
-            'heading' => $this->renderHeading($node),
-            'quote' => $this->wrapBlock('blockquote', $node),
-            'list' => $this->renderList($node),
-            'listitem' => $this->wrapBlock('li', $node),
-            'code' => '<pre><code>' . $this->renderChildren($node) . '</code></pre>',
+            'paragraph' => $this->wrapBlock('p', $node, $depth, $nodeCount),
+            'heading' => $this->renderHeading($node, $depth, $nodeCount),
+            'quote' => $this->wrapBlock('blockquote', $node, $depth, $nodeCount),
+            'list' => $this->renderList($node, $depth, $nodeCount),
+            'listitem' => $this->wrapBlock('li', $node, $depth, $nodeCount),
+            'code' => '<pre><code>' . $this->renderChildrenWithinLimits($node, $depth, $nodeCount) . '</code></pre>',
             'linebreak' => '<br>',
             'text' => $this->textRenderer->render($node),
-            'link', 'autolink' => $this->linkRenderer->render($node, $this->renderChildren($node)),
-            default => $this->renderChildren($node),
+            'link', 'autolink' => $this->linkRenderer->render($node, $this->renderChildrenWithinLimits($node, $depth, $nodeCount)),
+            default => $this->renderChildrenWithinLimits($node, $depth, $nodeCount),
         };
     }
 
     /** @param array<string, mixed> $node */
-    private function renderHeading(array $node): string
+    private function renderHeading(array $node, int $depth, int &$nodeCount): string
     {
         $tag = $node['tag'] ?? '';
         $tag = is_string($tag) && preg_match('/^h[1-6]$/', $tag) === 1 ? $tag : 'p';
 
-        return $this->wrapBlock($tag, $node);
+        return $this->wrapBlock($tag, $node, $depth, $nodeCount);
     }
 
     /** @param array<string, mixed> $node */
-    private function renderList(array $node): string
+    private function renderList(array $node, int $depth, int &$nodeCount): string
     {
         $isOrdered = ($node['listType'] ?? null) === 'number';
         $tag = $isOrdered ? 'ol' : 'ul';
@@ -75,15 +96,15 @@ class RichtextNodeRenderer
 
         $attr = $isOrdered && is_int($start) && $start > 1 ? ' start="' . $start . '"' : '';
 
-        return "<{$tag}{$attr}>" . $this->renderChildren($node) . "</{$tag}>";
+        return "<{$tag}{$attr}>" . $this->renderChildrenWithinLimits($node, $depth, $nodeCount) . "</{$tag}>";
     }
 
     /** @param array<string, mixed> $node */
-    private function wrapBlock(string $tag, array $node): string
+    private function wrapBlock(string $tag, array $node, int $depth, int &$nodeCount): string
     {
         $attr = $this->alignmentAttribute($node);
 
-        return "<{$tag}{$attr}>" . $this->renderChildren($node) . "</{$tag}>";
+        return "<{$tag}{$attr}>" . $this->renderChildrenWithinLimits($node, $depth, $nodeCount) . "</{$tag}>";
     }
 
     /** @param array<string, mixed> $node */
