@@ -45,6 +45,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! $this->hasLegacyCmsSchema()) {
+            return;
+        }
+
         foreach (self::RENAMES as $old => $new) {
             if (Schema::hasTable($old) && ! Schema::hasTable($new)) {
                 Schema::rename($old, $new);
@@ -54,10 +58,28 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! $this->hasPrefixedCmsSchema()) {
+            return;
+        }
+
         foreach (self::RENAMES as $old => $new) {
             if (Schema::hasTable($new) && ! Schema::hasTable($old)) {
                 Schema::rename($new, $old);
             }
         }
+    }
+
+    private function hasLegacyCmsSchema(): bool
+    {
+        return Schema::hasColumns('pages', ['type', 'content', 'is_indexable'])
+            && Schema::hasColumns('page_slugs', ['page_id', 'locale', 'path'])
+            && Schema::hasColumns('languages', ['locale', 'is_default', 'is_frontend_active']);
+    }
+
+    private function hasPrefixedCmsSchema(): bool
+    {
+        return Schema::hasColumns('tbtop_pages', ['type', 'content', 'is_indexable'])
+            && Schema::hasColumns('tbtop_page_slugs', ['page_id', 'locale', 'path'])
+            && Schema::hasColumns('tbtop_languages', ['locale', 'is_default', 'is_frontend_active']);
     }
 };
