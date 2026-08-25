@@ -203,6 +203,24 @@ it('creates a user, grants access, defaults the name to the email, and sets a ve
     Event::assertDispatched(CmsAccessGranted::class, fn (CmsAccessGranted $e): bool => $e->userId === $user->id);
 });
 
+it('rolls back a newly created user when granting access fails', function (): void {
+    $actor = makeUsersPageActor('actor@example.com');
+    Event::listen(CmsAccessGranted::class, static fn (): never => throw new RuntimeException('Grant failed.'));
+    test()->withoutExceptionHandling();
+
+    expect(fn () => test()->postJson('/admin/users/actions/userCreateSave', [
+        'payload' => ['form' => [
+            'email' => 'failed@example.com',
+            'name' => 'Failed',
+            'password' => 'password123',
+        ]],
+    ]))->toThrow(RuntimeException::class, 'Grant failed.');
+
+    expect(AdminUser::where('email', 'failed@example.com')->exists())->toBeFalse()
+        ->and(CmsUserProfile::where('user_id', $actor->id)->exists())->toBeTrue()
+        ->and(CmsUserProfile::count())->toBe(1);
+});
+
 it('rejects creating a user with a duplicate email and creates no user', function (): void {
     makeUsersPageActor('actor@example.com');
     makeTargetUser('taken@example.com');

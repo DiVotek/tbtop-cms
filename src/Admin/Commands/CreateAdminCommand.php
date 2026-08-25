@@ -39,14 +39,17 @@ class CreateAdminCommand extends Command
                 'name' => (string) ($this->option('name') ?: $email),
                 'password' => Hash::make($password),
             ]);
-            $user->save();
+            $user->getConnection()->transaction(function () use ($user): void {
+                $user->save();
+                $this->grantAccess($user);
+            });
 
             if (! $providedPassword) {
                 $this->info("Generated password: {$password}");
             }
+        } else {
+            $this->grantAccess($user);
         }
-
-        $this->grantAccess($user);
 
         if ($this->overridesProfileAccess($user)) {
             $this->warn("{$email} implements CmsAdmin; access is controlled by canAccessCmsAdmin(), not this profile row.");
