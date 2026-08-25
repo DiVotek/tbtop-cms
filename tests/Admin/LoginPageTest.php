@@ -100,6 +100,15 @@ it('keeps the default locale when the profile has none set', function (): void {
     expect(session('tbtop.locale'))->toBeNull();
 });
 
+it('clears a previous user locale when the profile has none set', function (): void {
+    makeLoginableAdmin();
+    session(['tbtop.locale' => 'uk']);
+
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+
+    expect(session()->has('tbtop.locale'))->toBeFalse();
+});
+
 it('carries the page title and a single breadcrumb from translations', function (): void {
     $response = test()->get('/admin/login', ['X-Inertia' => 'true'])->assertOk();
 
