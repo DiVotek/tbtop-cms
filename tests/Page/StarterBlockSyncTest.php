@@ -254,3 +254,28 @@ it('saves each touched page and raises PageSaved(wasCreated: false) so publish c
 
     Event::assertDispatched(PageSaved::class, fn (PageSaved $e): bool => $e->page->is($article) && $e->wasCreated === false);
 });
+
+it('rolls back every touched page and raises no PageSaved event when a later save fails', function (): void {
+    $category = Page::factory()->category()->create([
+        'starter_blocks' => ['article' => [['id' => 'kept', 'kind' => 'Hero']]],
+    ]);
+    $original = [
+        ['id' => 'removed', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Keep me'], 'tpl_id' => 'gone'],
+    ];
+    $first = Page::factory()->article()->create(['parent_id' => $category->id, 'content' => $original]);
+    $second = Page::factory()->article()->create(['parent_id' => $category->id, 'content' => $original]);
+
+    Event::fake([PageSaved::class]);
+    Page::updating(function (Page $page) use ($second): void {
+        if ($page->is($second)) {
+            throw new RuntimeException('Second descendant save failed.');
+        }
+    });
+
+    expect(fn (): int => (new StarterBlockSync)->apply($category, 'article'))
+        ->toThrow(RuntimeException::class, 'Second descendant save failed.');
+
+    expect($first->refresh()->content)->toBe($original)
+        ->and($second->refresh()->content)->toBe($original);
+    Event::assertNotDispatched(PageSaved::class);
+});
