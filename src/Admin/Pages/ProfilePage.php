@@ -12,6 +12,8 @@ use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Admin\Support\ProfileActions;
 use Tbtop\Cms\Admin\Support\ProfileForms;
 
+// Deliberately no can() override: open to any authenticated admin, gated by
+// EnsureCmsAdmin rather than a tbtop-cms.* ability. See SectionAbilitiesTest.
 class ProfilePage extends Page
 {
     public static function path(): string

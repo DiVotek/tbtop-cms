@@ -17,6 +17,8 @@ use Tbtop\Admin\Panels\CurrentPanel;
 use Tbtop\Admin\Panels\PanelConfig;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 
+// Deliberately no can() override: must be reachable unauthenticated, gated
+// by the guest middleware below instead. See SectionAbilitiesTest.
 class LoginPage extends Page
 {
     public static function path(): string

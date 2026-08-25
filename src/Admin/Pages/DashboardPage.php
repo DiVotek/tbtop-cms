@@ -16,6 +16,8 @@ use Tbtop\Cms\Admin\Pages\Support\DashboardStats;
 use Tbtop\Cms\Admin\Pages\Support\DashboardSystem;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 
+// Deliberately no can() override: open to any authenticated admin, gated by
+// EnsureCmsAdmin rather than a tbtop-cms.* ability. See SectionAbilitiesTest.
 class DashboardPage extends Page
 {
     public static function path(): string
