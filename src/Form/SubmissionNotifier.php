@@ -41,8 +41,21 @@ class SubmissionNotifier
         private readonly TelegramSubmissionNotifier $telegram,
     ) {}
 
-    public function notify(FormSubmission $submission, Page $page): void
+    public function notify(FormSubmission $submission, Page $page, bool $claimed = false): void
     {
+        if (! $claimed) {
+            $claimed = FormSubmission::query()
+                ->whereKey($submission->getKey())
+                ->where('status', SubmissionStatus::Pending->value)
+                ->update(['status' => SubmissionStatus::Processing->value]);
+
+            if ($claimed !== 1) {
+                return;
+            }
+
+            $submission->refresh();
+        }
+
         $errors = [
             ...$this->notifyBell($submission),
             ...$this->notifyMail($submission, $page),

@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Form;
 enum SubmissionStatus: string
 {
     case Pending = 'pending';
+    case Processing = 'processing';
     case Handled = 'handled';
     case Failed = 'failed';
 }

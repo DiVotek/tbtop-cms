@@ -39,7 +39,7 @@ class SubmissionRetrier
         $claimed = FormSubmission::query()
             ->whereKey($submission->getKey())
             ->where('status', SubmissionStatus::Failed->value)
-            ->update(['status' => SubmissionStatus::Pending->value]);
+            ->update(['status' => SubmissionStatus::Processing->value]);
 
         if ($claimed !== 1) {
             return;
@@ -73,7 +73,7 @@ class SubmissionRetrier
             }
         }
 
-        $this->notifier->notify($submission, $page);
+        $this->notifier->notify($submission, $page, claimed: true);
         $submission->refresh();
 
         if ($submission->status === SubmissionStatus::Failed) {
