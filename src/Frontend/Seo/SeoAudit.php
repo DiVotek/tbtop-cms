@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Frontend\Seo;
 
 use Illuminate\Support\Collection;
 use Tbtop\Cms\Block\MediaUrlResolver;
+use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -31,6 +32,8 @@ final class SeoAudit
         private readonly Languages $languages,
         private readonly Settings $settings,
         private readonly MediaUrlResolver $mediaUrlResolver,
+        private readonly SeoResolver $resolver,
+        private readonly Breadcrumbs $breadcrumbs,
     ) {}
 
     /** @return list<Issue> */
@@ -115,11 +118,10 @@ final class SeoAudit
     }
 
     /**
-     * Mirrors SeoChecklist::duplicateTitleCheck()'s cascade and its choice to
-     * stop before the site-wide template/suffix: the template can never turn
-     * two distinct bases into a collision or split a real one, so applying it
-     * here would cost N page loads worth of settings reads for no different
-     * an answer.
+     * Mirrors SeoChecklist::duplicateTitleCheck(): compares rendered titles,
+     * because a template that omits {title} turns distinct bases into one
+     * identical <title>. Title-only rendering with lazy breadcrumbs keeps
+     * this off the per-page ancestor query unless {parent} is in play.
      *
      * @param  Collection<int, Page>  $pages
      * @param  list<string>  $locales
@@ -134,7 +136,13 @@ final class SeoAudit
 
             foreach ($pages as $page) {
                 $seo = is_array($page->seo) ? $page->seo : [];
-                $title = $this->ownTitle($page, $seo, $locale);
+                $base = $this->ownTitle($page, $seo, $locale);
+                $title = $this->resolver->renderedTitle(
+                    $page,
+                    $base,
+                    $locale,
+                    fn (): array => $this->breadcrumbs->forPage($page, $locale),
+                );
 
                 if ($title === '') {
                     continue;
@@ -242,7 +250,7 @@ final class SeoAudit
     {
         return Page::query()
             ->live()
-            ->select(['id', 'name', 'title', 'summary', 'seo', 'image', 'is_indexable'])
+            ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'name', 'title', 'summary', 'seo', 'image', 'is_indexable'])
             ->get();
     }
 

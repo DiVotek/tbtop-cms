@@ -102,6 +102,15 @@ it('does not report duplicate_title for pages with distinct titles', function ()
     expect(seoAuditIssuesFor('duplicate_title'))->toBeEmpty();
 });
 
+it('reports duplicates when a title-omitting template makes distinct titles collide', function (): void {
+    app(Settings::class)->set('site.name', 'Acme');
+    app(Settings::class)->set('seo.title_template', '{site_name}');
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'One'], 'title' => ['en' => 'One']]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Two'], 'title' => ['en' => 'Two']]);
+
+    expect(seoAuditIssuesFor('duplicate_title'))->toHaveCount(2);
+});
+
 it('reports missing_og_image as a warn when neither the page nor the site default has an image', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,
