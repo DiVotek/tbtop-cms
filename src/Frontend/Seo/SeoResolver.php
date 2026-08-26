@@ -355,9 +355,7 @@ class SeoResolver
      */
     private function metaTitle(Page $page, array $seo, string $locale): string
     {
-        return LocalizedSeo::value($seo['title'] ?? null, $locale)
-            ?: (string) $page->getTranslation('title', $locale)
-            ?: (string) $page->getTranslation('name', $locale);
+        return PageOwnSeo::title($page, $seo, $locale);
     }
 
     /**
@@ -382,7 +380,8 @@ class SeoResolver
 
     /**
      * Renders only the title, for duplicate checks that must follow the same
-     * template rules without paying for a full SEO resolution.
+     * template rules without paying for a full SEO resolution. Derives its
+     * own base the same way resolve() does, so callers don't re-derive it.
      *
      * Breadcrumbs arrive as a closure because these callers render one title
      * per page across the whole site, and resolving a page's ancestors costs
@@ -392,8 +391,9 @@ class SeoResolver
      *
      * @param  Closure(): list<Breadcrumb>  $breadcrumbs
      */
-    public function renderedTitle(Page $page, string $base, string $locale, Closure $breadcrumbs): string
+    public function renderedTitle(Page $page, string $locale, Closure $breadcrumbs): string
     {
+        $base = PageOwnSeo::title($page, PageOwnSeo::blob($page), $locale);
         $template = $this->templates->title($page->type, $locale);
 
         if ($template === '') {
@@ -632,10 +632,7 @@ class SeoResolver
     /** @param  array<string, mixed>  $seo */
     private static function namesAnImage(Page $page, array $seo): bool
     {
-        $override = $seo['og_image'] ?? null;
-
-        return (is_string($override) && $override !== '')
-            || ($page->image !== null && $page->image !== '');
+        return PageOwnSeo::namesImage($page, $seo);
     }
 
     /**
@@ -732,7 +729,6 @@ class SeoResolver
      */
     private function ownDescription(Page $page, array $seo, string $locale): string
     {
-        return LocalizedSeo::value($seo['description'] ?? null, $locale)
-            ?: (string) $page->getTranslation('summary', $locale);
+        return PageOwnSeo::description($page, $seo, $locale);
     }
 }

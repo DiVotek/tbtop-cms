@@ -23,9 +23,6 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\ArticleSchemaType;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Enums\SchemaType;
-use Tbtop\Cms\Page\Events\PagePublished;
-use Tbtop\Cms\Page\Events\PageSaved;
-use Tbtop\Cms\Page\Events\PageUnpublished;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
@@ -511,9 +508,6 @@ class PageForm
             throw ValidationException::withMessages([$field => $e->getMessage()]);
         }
 
-        event(new PageSaved($page, $isCreate));
-        self::eventPublishTransition($page, $statusBefore);
-
         return $page;
     }
 
@@ -602,24 +596,6 @@ class PageForm
         }
 
         return is_array($page->starter_blocks) ? $page->starter_blocks : [];
-    }
-
-    /**
-     * Compares the status this save started from against what actually
-     * persisted, so a create-published page and a draft->published update
-     * both raise PagePublished, and only an update leaving Published raises
-     * PageUnpublished.
-     */
-    private static function eventPublishTransition(Page $page, ?PageStatus $statusBefore): void
-    {
-        $wasPublished = $statusBefore === PageStatus::Published;
-        $isPublished = $page->status === PageStatus::Published;
-
-        if ($isPublished && ! $wasPublished) {
-            event(new PagePublished($page));
-        } elseif ($wasPublished && ! $isPublished) {
-            event(new PageUnpublished($page));
-        }
     }
 
     /**

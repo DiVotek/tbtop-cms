@@ -36,16 +36,10 @@ class SubmissionRetrier
 
     public function retry(FormSubmission $submission): void
     {
-        $claimed = FormSubmission::query()
-            ->whereKey($submission->getKey())
-            ->where('status', SubmissionStatus::Failed->value)
-            ->update(['status' => SubmissionStatus::Processing->value]);
-
-        if ($claimed !== 1) {
+        if (! SubmissionClaim::take($submission, SubmissionStatus::Failed)) {
             return;
         }
 
-        $submission->refresh();
         $page = $submission->page_id !== null ? Page::query()->find($submission->page_id) : null;
 
         if (! $page instanceof Page) {
@@ -96,11 +90,6 @@ class SubmissionRetrier
 
     private function finish(FormSubmission $submission, SubmissionStatus $status, ?string $error): void
     {
-        FormSubmission::query()
-            ->whereKey($submission->getKey())
-            ->where('status', SubmissionStatus::Processing->value)
-            ->update(['status' => $status->value, 'error' => $error]);
-
-        $submission->refresh();
+        SubmissionClaim::release($submission, ['status' => $status->value, 'error' => $error]);
     }
 }

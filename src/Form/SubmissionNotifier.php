@@ -43,19 +43,14 @@ class SubmissionNotifier
 
     public function notify(FormSubmission $submission, Page $page): void
     {
-        $claimed = FormSubmission::query()
-            ->whereKey($submission->getKey())
-            ->where('status', SubmissionStatus::Pending->value)
-            ->update(['status' => SubmissionStatus::Processing->value]);
-
-        if ($claimed !== 1) {
+        if (! SubmissionClaim::take($submission, SubmissionStatus::Pending)) {
             return;
         }
 
-        $submission->refresh();
         $this->notifyClaimed($submission, $page);
     }
 
+    /** Assumes the caller already holds the claim (SubmissionClaim::take). */
     public function notifyClaimed(FormSubmission $submission, Page $page): void
     {
         $errors = [
@@ -65,7 +60,7 @@ class SubmissionNotifier
         ];
 
         if ($errors === []) {
-            $this->finish($submission, [
+            SubmissionClaim::release($submission, [
                 'status' => SubmissionStatus::Handled->value,
                 'handled_at' => $submission->handled_at ?? now(),
                 'error' => null,
@@ -74,21 +69,10 @@ class SubmissionNotifier
             return;
         }
 
-        $this->finish($submission, [
+        SubmissionClaim::release($submission, [
             'status' => SubmissionStatus::Failed->value,
             'error' => implode(' | ', $errors),
         ]);
-    }
-
-    /** @param array<string, mixed> $attributes */
-    private function finish(FormSubmission $submission, array $attributes): void
-    {
-        FormSubmission::query()
-            ->whereKey($submission->getKey())
-            ->where('status', SubmissionStatus::Processing->value)
-            ->update($attributes);
-
-        $submission->refresh();
     }
 
     /** @return list<string> */

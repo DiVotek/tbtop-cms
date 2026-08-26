@@ -135,11 +135,8 @@ final class SeoAudit
             $byTitle = [];
 
             foreach ($pages as $page) {
-                $seo = is_array($page->seo) ? $page->seo : [];
-                $base = $this->ownTitle($page, $seo, $locale);
                 $title = $this->resolver->renderedTitle(
                     $page,
-                    $base,
                     $locale,
                     fn (): array => $this->breadcrumbs->forPage($page, $locale),
                 );
@@ -197,11 +194,16 @@ final class SeoAudit
         $issues = [];
 
         foreach ($pages as $page) {
-            $seo = is_array($page->seo) ? $page->seo : [];
+            $seo = PageOwnSeo::blob($page);
             $override = $seo['og_image'] ?? null;
-            $image = is_string($override) && $override !== ''
-                ? $override
-                : ($page->image !== null && $page->image !== '' ? $page->image : $globalDefault);
+
+            // A page that named an image has made its choice, and a broken
+            // id is still that choice — ogImageDetails() publishes nothing
+            // rather than the site default, so folding the default in here
+            // would report a page as fine while its card renders blank.
+            $image = PageOwnSeo::namesImage($page, $seo)
+                ? (is_string($override) && $override !== '' ? $override : $page->image)
+                : $globalDefault;
             $url = is_string($image) && $image !== '' ? $this->mediaUrlResolver->resolve($image) : null;
 
             if (trim((string) $url) === '') {
@@ -263,27 +265,16 @@ final class SeoAudit
         );
     }
 
-    /**
-     * Mirrors SeoResolver::metaTitle()'s cascade — own values, no template.
-     *
-     * @param  array<string, mixed>  $seo
-     */
+    /** @param  array<string, mixed>  $seo */
     private function ownTitle(Page $page, array $seo, string $locale): string
     {
-        return LocalizedSeo::value($seo['title'] ?? null, $locale)
-            ?: (string) $page->getTranslation('title', $locale)
-            ?: (string) $page->getTranslation('name', $locale);
+        return PageOwnSeo::title($page, $seo, $locale);
     }
 
-    /**
-     * Mirrors SeoResolver::ownDescription()'s cascade — the description cascade minus its site-wide-filler last rung.
-     *
-     * @param  array<string, mixed>  $seo
-     */
+    /** @param  array<string, mixed>  $seo */
     private function ownDescription(Page $page, array $seo, string $locale): string
     {
-        return LocalizedSeo::value($seo['description'] ?? null, $locale)
-            ?: (string) $page->getTranslation('summary', $locale);
+        return PageOwnSeo::description($page, $seo, $locale);
     }
 
     /** A human label for the row: the same title→name cascade the checklist uses, falling back to a placeholder for a page with neither in this locale. */

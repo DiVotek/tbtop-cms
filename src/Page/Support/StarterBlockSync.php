@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockEnvelope;
-use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -82,10 +81,6 @@ final class StarterBlockSync
                 );
             });
         });
-
-        foreach ($pages as $page) {
-            event(new PageSaved($page, false));
-        }
 
         return count($pages);
     }
