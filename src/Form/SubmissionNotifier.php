@@ -4,42 +4,41 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form;
 
-use Tbtop\Admin\Notifications\Notification;
-use Tbtop\Admin\Notifications\NotificationAction;
-use Tbtop\Cms\Admin\Support\AdminUsers;
 use Tbtop\Cms\Form\Models\FormSubmission;
-use Tbtop\Cms\Form\Support\LeadIdentity;
-use Tbtop\Cms\Mail\CmsMailer;
-use Tbtop\Cms\Mail\Recipients;
-use Tbtop\Cms\Mail\SubmissionMail;
+use Tbtop\Cms\Form\Notifications\FormSubmissionPayloadFactory;
+use Tbtop\Cms\Form\Notifications\FormSubmissionRecipients;
+use Tbtop\Cms\Notifications\Models\NotificationLog;
+use Tbtop\Cms\Notifications\NotificationLogStatus;
+use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
-use Tbtop\Cms\Telegram\ChatIds;
-use Tbtop\Cms\Telegram\TelegramSubmissionNotifier;
-use Throwable;
 
 /**
- * Fan-out for a new (or retried) submission: a database notification for
- * every admin (always, no opt-out — SPEC decision for this rework), plus
- * mail and Telegram when their respective settings are enabled. Shared by
- * NotifiesAdminsOfSubmission (the SubmissionReceived listener, the normal
- * path) and SubmissionRetrier (replays the same fan-out after a submission
- * was previously marked Failed) so both write the exact same delivery
- * status from the exact same rule.
+ * Thin caller over Notifications::send('form.submission', ...): builds the
+ * recipient list and payload, sends, and turns the per-channel outcome
+ * (Notifications::send() is synchronous — see its docblock) into
+ * FormSubmission's status. Shared by NotifiesAdminsOfSubmission (the
+ * SubmissionReceived listener, the normal path) and SubmissionRetrier
+ * (replays the same fan-out after a submission was previously marked
+ * Failed) so both write the exact same delivery status from the exact same
+ * rule.
  *
  * Status semantics: Handled when every enabled channel succeeds — including
  * when no optional channel is enabled at all (bell-only is a complete,
  * successful fan-out, not a degraded one). Failed, with every channel's
  * error joined into one message, as soon as any enabled channel throws; a
  * disabled channel is skipped silently and never contributes an error.
+ * Notifications::send() itself never throws a per-channel failure (it logs
+ * it to notification_log and moves on to the next channel/recipient) — this
+ * class reads the log rows written during its own send() call to recover
+ * those errors, since it is the only caller that needs the per-delivery
+ * outcome back rather than just the log table. Reading the log rather than
+ * listening for NotificationFailed avoids mutating the shared event
+ * dispatcher for the duration of one call.
  */
 class SubmissionNotifier
 {
-    public function __construct(
-        private readonly Settings $settings,
-        private readonly CmsMailer $mailer,
-        private readonly TelegramSubmissionNotifier $telegram,
-    ) {}
+    public function __construct(private readonly Settings $settings) {}
 
     public function notify(FormSubmission $submission, Page $page): void
     {
@@ -53,10 +52,11 @@ class SubmissionNotifier
     /** Assumes the caller already holds the claim (SubmissionClaim::take). */
     public function notifyClaimed(FormSubmission $submission, Page $page): void
     {
+        $built = FormSubmissionRecipients::build($this->settings, $submission->locale);
+
         $errors = [
-            ...$this->notifyBell($submission),
-            ...$this->notifyMail($submission, $page),
-            ...$this->notifyTelegram($submission, $page),
+            ...$this->misconfigurationErrors($built),
+            ...$this->send($submission, $page, $built),
         ];
 
         if ($errors === []) {
@@ -76,84 +76,39 @@ class SubmissionNotifier
     }
 
     /** @return list<string> */
-    private function notifyBell(FormSubmission $submission): array
+    private function misconfigurationErrors(FormSubmissionRecipients $built): array
     {
-        $admins = AdminUsers::all();
+        $errors = [];
 
-        if ($admins->isEmpty()) {
-            return [];
+        if ($built->mailMisconfigured) {
+            $errors[] = __('tbtop-cms::notifications.errors.mail_no_recipients');
         }
 
-        try {
-            Notification::make()
-                ->title(__('tbtop-cms::notifications.bell.title'))
-                ->body(LeadIdentity::label($submission->payload) ?? __('tbtop-cms::form-submissions.values.lead_unknown'))
-                ->info()
-                ->actions([
-                    NotificationAction::make(__('tbtop-cms::notifications.bell.view'))
-                        ->url(route('tbtop.cms.form-submission-page', ['submission' => $submission->id])),
-                ])
-                ->sendToDatabase($admins);
-        } catch (Throwable $e) {
-            return [__('tbtop-cms::notifications.errors.bell', ['error' => $e->getMessage()])];
+        if ($built->telegramMisconfigured) {
+            $errors[] = __('tbtop-cms::notifications.errors.telegram_not_configured');
         }
 
-        return [];
+        return $errors;
     }
 
     /** @return list<string> */
-    private function notifyMail(FormSubmission $submission, Page $page): array
+    private function send(FormSubmission $submission, Page $page, FormSubmissionRecipients $built): array
     {
-        if (! $this->settings->get('notifications.mail.enabled')) {
+        if ($built->recipients === []) {
             return [];
         }
 
-        $recipients = Recipients::parse($this->settings->get('notifications.mail.recipients'));
+        $payload = FormSubmissionPayloadFactory::make($submission, $page);
+        $sinceId = (int) (NotificationLog::query()->max('id') ?? 0);
 
-        // Enabled with nothing to send to is a misconfiguration, not a
-        // success — reporting it keeps the delivery status honest instead of
-        // showing "Handled" while nobody was mailed.
-        if ($recipients === []) {
-            return [__('tbtop-cms::notifications.errors.mail_no_recipients')];
-        }
+        Notifications::send('form.submission', $payload, $built->recipients);
 
-        try {
-            $this->mailer->send(new SubmissionMail($submission, $this->pageName($page)), $recipients);
-        } catch (Throwable $e) {
-            return [__('tbtop-cms::notifications.errors.mail', ['error' => $e->getMessage()])];
-        }
-
-        return [];
-    }
-
-    /** @return list<string> */
-    private function notifyTelegram(FormSubmission $submission, Page $page): array
-    {
-        if (! $this->settings->get('notifications.telegram.enabled')) {
-            return [];
-        }
-
-        $token = $this->settings->get('notifications.telegram.bot_token');
-        $chatIds = ChatIds::parse($this->settings->get('notifications.telegram.chat_ids'));
-
-        // Same honesty rule as mail: enabled without a token or without any
-        // chat to deliver to must surface as a failure, not a silent skip.
-        if (! is_string($token) || trim($token) === '' || $chatIds === []) {
-            return [__('tbtop-cms::notifications.errors.telegram_not_configured')];
-        }
-
-        $errors = $this->telegram->notify($token, $chatIds, $submission, $this->pageName($page));
-
-        return array_map(
-            static fn (string $error): string => __('tbtop-cms::notifications.errors.telegram', ['error' => $error]),
-            $errors,
-        );
-    }
-
-    private function pageName(Page $page): string
-    {
-        $name = $page->name;
-
-        return is_string($name) && trim($name) !== '' ? $name : __('tbtop-cms::form-submissions.values.page_number', ['id' => $page->getKey()]);
+        return NotificationLog::query()
+            ->where('id', '>', $sinceId)
+            ->where('type', 'form.submission')
+            ->where('status', NotificationLogStatus::Failed)
+            ->get()
+            ->map(fn (NotificationLog $log): string => __("tbtop-cms::notifications.errors.{$log->channel}", ['error' => (string) $log->error]))
+            ->all();
     }
 }
