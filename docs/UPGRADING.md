@@ -24,3 +24,70 @@ constraint names (e.g. an index created as `pages_type_index` stays named
 that way after the table becomes `tbtop_pages`). This is left as-is on
 upgraded databases — nothing in the package references index names by
 string, so it's cosmetic only.
+
+## Notification type and channel registry
+
+A host that changes nothing needs no changes: `form.submission` (the
+contact-form fan-out) still sends the same bell/mail/Telegram notifications
+from the same `notifications.mail.*` / `notifications.telegram.*` settings,
+and `NotificationSettingsPage` still edits them. Run
+
+```bash
+php artisan migrate
+```
+
+for the new `tbtop_notification_log` table (one row per channel delivery
+attempt: type, channel, recipient, locale, status, error, sent_at).
+
+This is for a host or package that wants to send its own notifications
+through the same infrastructure instead of calling Laravel's notification
+system directly.
+
+**Register a channel** — a delivery mechanism (SMS, a webhook, a push
+service) implementing `Tbtop\Cms\Notifications\Contracts\Channel`:
+
+```php
+use Tbtop\Cms\Notifications\Notifications;
+
+Notifications::channel(MyChannel::class);
+```
+
+**Register a type** — what gets sent, to whom, and with which templates:
+
+```php
+use Tbtop\Cms\Notifications\{Audience, Format, Notifications, TypeDefinition};
+
+Notifications::type(
+    TypeDefinition::make('order.placed')
+        ->label('Order placed')
+        ->group('orders')
+        ->payload(OrderPlacedPayload::class)          // readonly DTO; public props become template variables
+        ->templates([
+            Format::Html->value => 'orders::notifications.placed.html',
+            Format::Short->value => 'orders::notifications.placed.short',
+        ])
+        ->audiences([Audience::Customer, Audience::Staff])
+        ->defaultChannels(['mail']),                  // merchant can add more from NotificationSettingsPage later
+);
+```
+
+**Send** — from a domain event listener, once you have the recipients:
+
+```php
+use Tbtop\Cms\Notifications\{Audience, Notifications, Recipient};
+
+Notifications::send('order.placed', new OrderPlacedPayload($order), [
+    new Recipient(Audience::Customer, $order->locale, email: $order->email),
+]);
+```
+
+`Notifications::send()` is synchronous: it renders and delivers to every
+enabled, supporting channel for every recipient, writes a
+`tbtop_notification_log` row and dispatches `NotificationSent` or
+`NotificationFailed` per delivery, and only returns once every one of those
+has happened. One channel throwing does not stop the others — it's logged
+as failed and the rest still run. This is deliberate: a caller that needs
+the outcome (did it send? what failed?) can't get that from a call that
+returns before delivery happens. If you don't need the outcome and want the
+call off the request/response path, run it from a queued job or listener
+yourself — `send()` will not queue it for you.
