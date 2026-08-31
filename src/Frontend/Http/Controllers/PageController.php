@@ -49,14 +49,19 @@ class PageController
             return $this->notFound($path, $locale, $request);
         }
 
-        $type = $this->pageTypes->get($page->type);
-        $source = $type->source($page);
+        // pages.type is unconstrained, so a page outlives its type's
+        // registration; it still renders its stored content.
+        $type = $this->pageTypes->has($page->type) ? $this->pageTypes->get($page->type) : null;
+        $isSourceBacked = $type?->isSourceBacked() === true;
+
+        // source() is a host database call — only source-backed types pay it.
+        $source = $isSourceBacked ? $type->source($page) : null;
 
         // A source-backed type whose source() resolves to null (deleted,
         // unpublished on this channel) has nothing to render: same outcome
         // as an unpublished page — the sync normally retires the page first,
         // this is defense-in-depth for the gap between the two.
-        if ($type->isSourceBacked() && $source === null) {
+        if ($isSourceBacked && $source === null) {
             return $this->notFound($path, $locale, $request);
         }
 
@@ -67,7 +72,7 @@ class PageController
     {
         $redirect = $this->redirects->resolve($path, $locale, $request);
 
-        if ($redirect instanceof RedirectResponse) {
+        if ($redirect !== null) {
             return $redirect;
         }
 
@@ -91,9 +96,9 @@ class PageController
     }
 
     /** @return array<string, mixed> */
-    private function props(Page $page, string $locale, string $path, PageTypeInterface $type, ?object $source): array
+    private function props(Page $page, string $locale, string $path, ?PageTypeInterface $type, ?object $source): array
     {
-        $content = $page->content ?? $type->template($page) ?? [];
+        $content = $page->content ?? $type?->template($page) ?? [];
         $resolved = $this->forms->bind($this->blocks->resolve($content, $page, $source), $page);
         // Not live covers draft, scheduled (published_at in the future), and
         // expired (unpublish_at in the past): reaching this page at all with

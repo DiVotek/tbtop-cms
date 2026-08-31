@@ -940,24 +940,11 @@ class PageForm
         self::guardStatus((string) ($form['status'] ?? PageStatus::Draft->value));
     }
 
-    /**
-     * Reads $page->type post-fill (fillAttributes() has already run by the
-     * time save() calls this): for a create it is whatever the form (or, for
-     * a source-backed create — which the UI never offers — its default)
-     * resolved to; for an update it is the existing type, since a source-
-     * backed page's type select is hidden and fillAttributes() falls back to
-     * the current value when the form omits the key.
-     */
+    /** An unsaved or unregistered-type page is never source-backed. */
     private static function isSourceBacked(Page $page): bool
     {
-        // getAttribute(), not the ->type property: the model's @property
-        // docblock claims string, but the raw attribute is unset (null) on a
-        // brand-new, not-yet-filled Page, and both new call sites below now
-        // run before fill() has set it (see guardTypeAndStatus()/
-        // fillAttributes()) — trusting the docblock here would either throw
-        // passing null into PageTypeRegistry::has()'s string param, or (with
-        // an is_string() guard) get flagged by PHPStan as an always-true
-        // check against a type it believes can never be null.
+        // getAttribute(), not ->type: callers run before fill(), where the
+        // attribute is still unset despite the model's `string` docblock.
         $type = $page->getAttribute('type');
         if (! is_string($type) || $type === '') {
             return false;
