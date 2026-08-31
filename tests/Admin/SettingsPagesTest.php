@@ -99,7 +99,7 @@ it('splits the SEO settings into one tab per topic, indexing first', function ()
             __('tbtop-cms::settings.seo.tabs.type_templates'),
             __('tbtop-cms::settings.seo.tabs.social'),
             __('tbtop-cms::settings.seo.tabs.identity'),
-            __('tbtop-cms::settings.seo.tabs.analytics'),
+            __('tbtop-cms::settings.seo.tabs.integrations'),
             __('tbtop-cms::settings.seo.tabs.not_found'),
         ]);
 });
@@ -123,8 +123,6 @@ it('keeps every settings field reachable after the regrouping', function (): voi
         'seo_default_og_image',
         'seo_twitter_card',
         'seo_identity_type',
-        'seo_identity_name',
-        'seo_identity_logo',
         'seo_identity_same_as',
         'seo_gtm_container_id',
         'seo_verification_google',
@@ -171,8 +169,6 @@ it('labels SEO identity/GTM fields from translations', function (): void {
         ->and($labels['seo_verification_google'])->toBe(__('tbtop-cms::settings.seo.fields.verification_google'))
         ->and($labels['seo_verification_bing'])->toBe(__('tbtop-cms::settings.seo.fields.verification_bing'))
         ->and($labels['seo_identity_type'])->toBe(__('tbtop-cms::settings.seo.fields.identity_type'))
-        ->and($labels['seo_identity_name'])->toBe(__('tbtop-cms::settings.seo.fields.identity_name'))
-        ->and($labels['seo_identity_logo'])->toBe(__('tbtop-cms::settings.seo.fields.identity_logo'))
         ->and($labels['seo_identity_same_as'])->toBe(__('tbtop-cms::settings.seo.fields.identity_same_as'))
         ->and($labels['seo_twitter_card'])->toBe(__('tbtop-cms::settings.seo.fields.twitter_card'));
 

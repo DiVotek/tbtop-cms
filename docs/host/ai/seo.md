@@ -84,12 +84,12 @@ Field-by-field:
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
-| Site identity (Organization/Person) | `Settings` (`seo.identity.*`) | SEO settings → *Identity* tab |
+| Site identity (Organization/Person) | `Settings` (`seo.identity.*`) | SEO settings → *Identity* tab exposes type and profile links (sameAs) only; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win) |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
 | Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
-| GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Analytics* tab (accepts bare id or the full install snippet) |
-| Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Analytics* tab (accepts bare token or the pasted `<meta>` tag) |
+| GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Integrations* tab (accepts bare id or the full install snippet) |
+| Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Integrations* tab (accepts bare token or the pasted `<meta>` tag) |
 | 404 log toggle / retention | `Settings` (`seo.not_found.enabled`, `seo.not_found.retention_days`) | SEO settings → *Not found* tab |
 | Sitemap enabled at all, chunk-size fresh-install default, 404 noise patterns, 404 auto-prune schedule | `config/tbtop-cms.php` (`seo.sitemap.enabled`/`.per_chunk`, `not_found.ignore`, `not_found.auto_prune`) | Host config only — no admin UI |
 
@@ -153,7 +153,9 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
      still emits correct, valid structured data.
 4. **Identity** (`JsonLd::identity()`) — an `Organization` or `Person` node
    from `seo.identity.*` settings (type/name/logo/sameAs), or nothing when
-   `seo.identity.type` is `none`.
+   `seo.identity.type` is `none`. Name and logo fall back to the site's own
+   `site.name`/`site.logo` when no `seo.identity.name`/`seo.identity.logo`
+   is set.
 
 **What the host cannot add**: there is no hook or filter to append nodes to
 this list, and `SeoResolver`'s return shape and `SitemapController`/

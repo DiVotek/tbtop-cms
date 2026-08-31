@@ -303,7 +303,15 @@ class SeoResolver
             $name = (string) $this->settings->get('site.name', '');
         }
 
+        // The Identity tab no longer exposes name/logo fields directly, so
+        // both fall back to the site's own identity — a saved seo.identity.*
+        // value from before that change, or written by a script, still wins.
         $logoId = $this->settings->get('seo.identity.logo');
+
+        if (! is_string($logoId) || $logoId === '') {
+            $logoId = $this->settings->get('site.logo');
+        }
+
         $logo = AbsoluteUrl::make(
             is_string($logoId) && $logoId !== '' ? $this->mediaUrlResolver->resolve($logoId) : null,
         );

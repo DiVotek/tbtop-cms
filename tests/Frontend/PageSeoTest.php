@@ -421,6 +421,34 @@ it('resolves seo.identity.logo to a public url on the Organization object', func
     expect($identity['logo'])->toBe(url(Storage::disk('public')->url('media/org-logo.png')));
 });
 
+it('falls the identity logo back to site.logo when seo.identity.logo is empty', function (): void {
+    $siteLogo = media('site-logo.png');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    app(Settings::class)->set('seo.identity.name', 'Acme Inc');
+    app(Settings::class)->set('site.logo', (string) $siteLogo->getKey());
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
+    $identity = collect($jsonLd)->firstWhere('@type', 'Organization');
+
+    expect($identity['logo'])->toBe(url(Storage::disk('public')->url('media/site-logo.png')));
+});
+
+it('prefers a saved seo.identity.logo over site.logo when both are set', function (): void {
+    $identityLogo = media('org-logo.png');
+    $siteLogo = media('site-logo.png');
+    app(Settings::class)->set('seo.identity.type', 'organization');
+    app(Settings::class)->set('seo.identity.name', 'Acme Inc');
+    app(Settings::class)->set('seo.identity.logo', (string) $identityLogo->getKey());
+    app(Settings::class)->set('site.logo', (string) $siteLogo->getKey());
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
+    $identity = collect($jsonLd)->firstWhere('@type', 'Organization');
+
+    expect($identity['logo'])->toBe(url(Storage::disk('public')->url('media/org-logo.png')));
+});
+
 it('resolves seo correctly after restoring a revision snapshot that carries a legacy scalar-shaped seo payload', function (): void {
     Language::factory()->create(['locale' => 'uk']);
     $page = Page::factory()->create([

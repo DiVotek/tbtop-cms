@@ -19,12 +19,6 @@ return [
     'seo' => [
         'title' => 'SEO settings',
         'subtitle' => 'Default metadata used across the site unless a page overrides it.',
-        'sections' => [
-            'gtm' => 'Google Tag Manager',
-            'identity' => 'Identity',
-            'not_found' => '404 log',
-            'type_templates' => 'Templates per page type',
-        ],
         // Tabs: each fits on one screen. Indexing comes first — it is the
         // master switch robots.txt and the sitemap both answer to.
         'tabs' => [
@@ -33,7 +27,7 @@ return [
             'type_templates' => 'Per page type',
             'social' => 'Social networks',
             'identity' => 'Identity',
-            'analytics' => 'Analytics',
+            'integrations' => 'Integrations',
             'not_found' => '404 log',
         ],
         'fields' => [
@@ -41,7 +35,7 @@ return [
             'title_template' => 'Title template',
             'title_separator' => 'Title separator',
             'description_template' => 'Description template',
-            'default_description' => 'Default description',
+            'default_description' => 'Fallback description',
             'default_og_image' => 'Default OG image',
             'indexing_enabled' => 'Allow search engines to index this site',
             'sitemap_per_chunk' => 'URLs per sitemap file',
@@ -51,8 +45,6 @@ return [
             'verification_google' => 'Google verification',
             'verification_bing' => 'Bing verification',
             'identity_type' => 'Identity type',
-            'identity_name' => 'Name',
-            'identity_logo' => 'Logo',
             'identity_same_as' => 'Profile links',
             'not_found_enabled' => 'Record missed paths',
             'not_found_retention_days' => 'Retention (days)',
@@ -63,7 +55,6 @@ return [
             'title_suffix' => ' — Site Name',
             'title_template' => '{title} {sep} {site_name}',
             'description_template' => '{description} {sep} {site_name}',
-            'identity_name' => 'Defaults to the site name',
             // The example has to use directives the field accepts — Disallow
             // is rejected here, and showing it as the sample would suggest
             // something the form will not save.
@@ -76,9 +67,9 @@ return [
         'helpers' => [
             'title_template' => 'Placeholders: {title}, {site_name}, {sep}, {parent}, {date}. Leave empty to keep the legacy title suffix behavior.',
             'title_separator' => 'Substituted for {sep} in the title and description templates.',
-            'description_template' => 'Placeholders: {description}, {site_name}, {sep}, {parent}, {date}. Applied to every page\'s meta description; leave empty to use descriptions as they are.',
+            'description_template' => 'Placeholders: {description}, {site_name}, {sep}, {parent}, {date}. Applied to every page\'s meta description — including the fallback description below when a page has none of its own; leave empty to use descriptions as they are.',
             'type_templates' => 'A type\'s template overrides the site-wide one above. An empty field means "same as the site", not an empty title. {parent} is the parent category\'s name and {date} the publication date; when a page has neither, the stray separator is removed for you.',
-            'default_description' => 'Used when a page has neither its own meta description nor a summary.',
+            'default_description' => 'Shown on pages with no description of their own; the description template above is also applied on top of it.',
             'default_og_image' => 'Shown when a shared page has no OG image of its own and no page image.',
             'twitter_card' => 'How links to this site are presented when shared on X (Twitter).',
             'indexing_enabled' => 'When off, robots.txt disallows crawling, the sitemap is disabled, and every page gets a noindex meta tag.',
@@ -88,7 +79,6 @@ return [
             'verification_google' => 'Paste the verification token or the full <meta name="google-site-verification" …> tag from Google Search Console — either works. Can be left empty if the site is verified another way (DNS record, Google Tag Manager, Analytics).',
             'verification_bing' => 'Paste the verification token or the full <meta name="msvalidate.01" …> tag from Bing Webmaster Tools — either works. Can be left empty if the site is verified another way (DNS record, Google Tag Manager, Analytics).',
             'identity_type' => 'Adds an Organization/Person structured-data object to every page — search engines may use it for the knowledge panel.',
-            'identity_logo' => 'Logo for the knowledge panel (organizations only).',
             'identity_same_as' => 'Type a profile URL (e.g. social media, Wikipedia) and press Enter to add it.',
             'not_found_enabled' => 'When off, requests that resolve to nothing are still 404s — they just stop being recorded in the 404 log.',
             'not_found_retention_days' => 'Rows not seen within this many days are deleted by the cms:not-found:prune command. The host must schedule it; it does not run on its own.',
