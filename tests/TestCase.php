@@ -7,6 +7,8 @@ namespace Tbtop\Cms\Tests;
 use Inertia\Middleware as InertiaMiddleware;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 class TestCase extends Orchestra
 {
@@ -14,6 +16,9 @@ class TestCase extends Orchestra
 
     protected function setUp(): void
     {
+        BlockRegistry::flushExtensions();
+        PageTypeRegistry::flushExtensions();
+
         parent::setUp();
 
         // The panel runs Inertia\Middleware, which answers an X-Inertia GET with

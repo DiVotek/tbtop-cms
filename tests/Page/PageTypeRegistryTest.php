@@ -48,3 +48,50 @@ it('rejects an empty type key', function (): void {
 
     expect(fn () => (new PageTypeRegistry)->keys())->toThrow(InvalidArgumentException::class);
 });
+
+it('returns a page type registered by an extension', function (): void {
+    PageTypeRegistry::extend(fn (): array => [FaqPageType::class]);
+
+    $registry = new PageTypeRegistry;
+
+    expect($registry->has('faq'))->toBeTrue()
+        ->and($registry->get('faq'))->toBeInstanceOf(FaqPageType::class)
+        ->and($registry->keys())->toContain('faq')
+        ->and(array_keys($registry->all()))->toContain('faq');
+});
+
+it('registers two extensions in order after the built-ins', function (): void {
+    PageTypeRegistry::extend(fn (): array => [FaqPageType::class]);
+
+    expect((new PageTypeRegistry)->keys())->toBe(['page', 'category', 'article', 'faq']);
+});
+
+it('rejects a duplicate type key coming from an extension', function (): void {
+    PageTypeRegistry::extend(fn (): array => [PageType::class]);
+
+    expect(fn () => (new PageTypeRegistry)->keys())->toThrow(InvalidArgumentException::class);
+});
+
+it('does not invoke the extension callable until the registry is first used', function (): void {
+    $calls = 0;
+    PageTypeRegistry::extend(function () use (&$calls): array {
+        $calls++;
+
+        return [FaqPageType::class];
+    });
+
+    $registry = new PageTypeRegistry;
+
+    expect($calls)->toBe(0);
+
+    $registry->keys();
+
+    expect($calls)->toBe(1);
+});
+
+it('does not see an extension registered before flushExtensions()', function (): void {
+    PageTypeRegistry::extend(fn (): array => [FaqPageType::class]);
+    PageTypeRegistry::flushExtensions();
+
+    expect((new PageTypeRegistry)->has('faq'))->toBeFalse();
+});
