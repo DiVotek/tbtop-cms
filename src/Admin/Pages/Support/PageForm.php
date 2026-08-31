@@ -645,7 +645,7 @@ class PageForm
             // hides the type select — its type is owned by the sync, not
             // editorially chosen): keep the page's existing type rather than
             // reading a missing key as ''.
-            'type' => (string) ($form['type'] ?? ($page->exists ? $page->type : '')),
+            'type' => (string) ($form['type'] ?? (self::isSourceBacked($page) ? $page->type : '')),
             'parent_id' => $parentId,
             'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
             // Create form never sends these (PageEditSidebar is edit-only),
@@ -915,10 +915,25 @@ class PageForm
             return;
         }
 
-        $type = (string) ($form['type'] ?? ($page->exists ? $page->type : ''));
-        if (! app(PageTypeRegistry::class)->has($type)) {
+        $type = (string) ($form['type'] ?? (self::isSourceBacked($page) ? $page->type : ''));
+        $registry = app(PageTypeRegistry::class);
+
+        if (! $registry->has($type)) {
             throw ValidationException::withMessages([
                 'type' => __('tbtop-cms::pages.validation.type_unregistered', ['type' => $type]),
+            ]);
+        }
+
+        // Creating a page of a source-backed type by hand, or retyping an
+        // existing content-only page into one, is not allowed — the
+        // storefront sync owns creation for these types (see
+        // PageTypeRegistry::isSourceBacked()). A page already saved with
+        // this exact type is left alone: the editor omits the type field
+        // entirely for a source-backed page (PageEditSidebar), so this only
+        // ever rejects a request built outside that form.
+        if ($registry->isSourceBacked($type) && $type !== $page->type) {
+            throw ValidationException::withMessages([
+                'type' => __('tbtop-cms::pages.validation.type_source_backed', ['type' => $type]),
             ]);
         }
 
@@ -935,7 +950,22 @@ class PageForm
      */
     private static function isSourceBacked(Page $page): bool
     {
-        return app(PageTypeRegistry::class)->has($page->type) && app(PageTypeRegistry::class)->isSourceBacked($page->type);
+        // getAttribute(), not the ->type property: the model's @property
+        // docblock claims string, but the raw attribute is unset (null) on a
+        // brand-new, not-yet-filled Page, and both new call sites below now
+        // run before fill() has set it (see guardTypeAndStatus()/
+        // fillAttributes()) — trusting the docblock here would either throw
+        // passing null into PageTypeRegistry::has()'s string param, or (with
+        // an is_string() guard) get flagged by PHPStan as an always-true
+        // check against a type it believes can never be null.
+        $type = $page->getAttribute('type');
+        if (! is_string($type) || $type === '') {
+            return false;
+        }
+
+        $registry = app(PageTypeRegistry::class);
+
+        return $registry->has($type) && $registry->isSourceBacked($type);
     }
 
     private static function guardStatus(string $status): void

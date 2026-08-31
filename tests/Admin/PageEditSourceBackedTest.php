@@ -126,6 +126,58 @@ it('leaves content null on save for a source-backed page', function (): void {
         ->and($page->type)->toBe('sourced');
 });
 
+it('rejects creating a page with a source-backed type submitted by hand', function (): void {
+    $countBefore = Page::query()->count();
+
+    test()->actingAs(sourceBackedAdmin(), 'web')->postJson('/admin/pages/actions/pageCreateSave', [
+        'payload' => [
+            'form' => [
+                'name' => ['en' => 'Hand-made Thing'],
+                'title' => ['en' => ''],
+                'slug' => ['en' => 'hand-made-thing'],
+                'type' => 'sourced',
+                'parent_id' => 'none',
+            ],
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors(['type']);
+
+    expect(Page::query()->count())->toBe($countBefore);
+});
+
+it('rejects retyping an existing content-only page into a source-backed type', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+    ]);
+
+    test()->actingAs(sourceBackedAdmin(), 'web')
+        ->from("/admin/pages/{$page->id}/edit")
+        ->post(
+            "/admin/pages/{$page->id}/edit/forms/pageEditor",
+            [
+                'name' => ['en' => 'About'],
+                'title' => ['en' => ''],
+                'slug' => ['en' => 'about'],
+                'heading' => ['en' => ''],
+                'summary' => ['en' => ''],
+                'type' => 'sourced',
+                'parent_id' => 'none',
+                'status' => PageStatus::Published->value,
+                'sort_order' => 0,
+                'seo_title' => ['en' => ''],
+                'seo_description' => ['en' => ''],
+                'seo_focus_keyword' => ['en' => ''],
+                'og_title' => ['en' => ''],
+                'og_description' => ['en' => ''],
+                'og_image' => '',
+                'is_indexable' => true,
+            ],
+        )->assertSessionHasErrors('type');
+
+    expect($page->refresh()->type)->toBe('page');
+});
+
 it('still shows block editing for a plain content-only page', function (): void {
     config()->set('tbtop-cms.pages.types', []);
     $page = Page::create([
