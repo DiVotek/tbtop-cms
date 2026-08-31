@@ -26,6 +26,11 @@ composer refactor    # Rector (apply)
 composer serve       # Boot the Workbench app for manual review
 ```
 
+Headless verification: write a one-off Pest test on the existing TestCase
+(load workbench via `WithWorkbench` where needed). The standalone
+`vendor/orchestra/testbench-core/testbench` binary is broken in this repo —
+do not use it.
+
 `:changed` variants (`composer test:all:changed`, `lint:changed`, `analyse:changed`, …)
 run the same tools against git-changed PHP files — prefer them during development.
 

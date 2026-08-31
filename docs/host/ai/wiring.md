@@ -61,6 +61,12 @@ that group.
 host's own `/about`, `/contact`, `/pricing` routes 404 if declared afterward,
 and `/` 500s until the CMS has a seeded home page to resolve.
 
+**In package tests (workbench), `frontendRoutes()` is not registered.** The
+workbench's `routes/web.php` skips it while `runningUnitTests()` is true, so
+a Pest test hitting `GET /...` 404s even with everything wired correctly.
+Register it explicitly in the test: `app(\Tbtop\Cms\Cms::class)->frontendRoutes();`
+before the request.
+
 **The `welcome`/`home` trap on a fresh `laravel new --react` app.** The
 starter kit's own `Route::inertia('/', 'welcome')->name('home')` matches `/`
 first and permanently shadows the CMS's seeded home page, `frontendRoutes()`
