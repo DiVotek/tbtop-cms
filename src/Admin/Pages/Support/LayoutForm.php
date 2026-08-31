@@ -5,20 +5,12 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Str;
-use Tbtop\Admin\Dsl\Node;
-use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Fields\BlockContent;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\Models\Layout;
 
 class LayoutForm
 {
-    /** @return list<Node> */
-    public static function fields(S $s): array
-    {
-        return [BlockContent::make($s)];
-    }
-
     /** @param array<string, mixed> $form */
     public static function save(array $form, string $slot): Layout
     {
