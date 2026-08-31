@@ -157,5 +157,13 @@ return [
                 'array' => 'An array session never survives a redirect, so logging in and every flash message silently fail. This driver is meant for tests — set SESSION_DRIVER to file, database, or redis.',
             ],
         ],
+        'agent_docs_pointer' => [
+            'label' => 'Agent docs pointer',
+            'ok' => 'The host\'s AGENTS.md or CLAUDE.md points an agent at the host-builder guide.',
+            'missing' => 'Neither AGENTS.md nor CLAUDE.md points an agent at the host-builder guide.',
+            'hints' => [
+                'missing' => 'Add this line to your AGENTS.md or CLAUDE.md (checked: :candidates) so an agent finds the guide: "Building on tbtop/cms → read vendor/tbtop/cms/docs/host/ai/README.md first."',
+            ],
+        ],
     ],
 ];

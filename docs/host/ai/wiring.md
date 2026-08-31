@@ -35,7 +35,8 @@ What each step actually does:
   failures (missing tables, missing routes, missing content) instead of the
   one thing you actually skipped. `handle()` prints `nextSteps()` on success —
   frontend routes, the head include, the `@cms` alias, the admin-blocks
-  import, Tailwind `@source`, and deleting `public/robots.txt` — because
+  import, Tailwind `@source`, deleting `public/robots.txt`, and adding the
+  agent-docs pointer line to `AGENTS.md`/`CLAUDE.md` (see below) — because
   every one of those edits a file this package does not own (host build
   config, host root view, host Vite entry); writing them automatically would
   be a package silently mutating an application it doesn't understand. Every
@@ -466,5 +467,7 @@ admin-blocks/admin-page/Tailwind-`@source` heuristics above (`JsWiringCheck`
 — file-based, never escalates past a warning), a media-disk write round-trip,
 mail/Telegram settings completeness, `tbtop/admin` vs `@tbtop/inertia-admin`
 version drift, `robots.txt` absence, both route names above, scheduler
-liveness, and a `cookie`/`array` session driver (drops large page-editor
-flash payloads past ~4KB silently).
+liveness, a `cookie`/`array` session driver (drops large page-editor
+flash payloads past ~4KB silently), and whether the host's `AGENTS.md`/
+`CLAUDE.md` points an agent at this guide (`AgentDocsPointerCheck` — also
+never escalates past a warning).
