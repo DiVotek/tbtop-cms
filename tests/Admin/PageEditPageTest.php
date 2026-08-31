@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Admin\Dsl\S;
-use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\OgPreview;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Cms;
@@ -16,6 +15,7 @@ use Tbtop\Cms\Redirect\Models\Redirect;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
+use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
 
 uses(RefreshDatabase::class);
@@ -26,23 +26,6 @@ beforeEach(function (): void {
     config(['tbtop-cms.blocks.types' => [SimpleBlock::class]]);
     Language::factory()->default()->create(['locale' => 'en']);
 });
-
-function makePageEditAdmin(): AdminUser
-{
-    $user = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
-    CmsUserProfile::query()->forceCreate(['user_id' => $user->id]);
-
-    return $user;
-}
-
-/** @return array<string, mixed> */
-function pageEditStructure(int $id): array
-{
-    return test()->actingAs(makePageEditAdmin(), 'web')
-        ->get("/admin/pages/{$id}/edit", ['X-Inertia' => 'true'])
-        ->assertOk()
-        ->json();
-}
 
 /** @param array<string, mixed> $blocks */
 function pageWithBlocks(array $blocks = []): Page
@@ -58,14 +41,14 @@ function pageWithBlocks(array $blocks = []): Page
 it('shows the edit page to an admin user with the record prefilled', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About Us']]);
 
-    $json = pageEditStructure($page->id);
+    $json = PageEditHelpers::structure($page->id);
 
     expect($json['component'])->toBe('admin/page')
         ->and($json['props']['data']['pageEditor']['name'])->toBe(['en' => 'About Us']);
 });
 
 it('returns 404 for a page that does not exist', function (): void {
-    test()->actingAs(makePageEditAdmin(), 'web')
+    test()->actingAs(PageEditHelpers::admin(), 'web')
         ->get('/admin/pages/999999/edit', ['X-Inertia' => 'true'])
         ->assertNotFound();
 });
@@ -81,7 +64,7 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
         ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Hi']],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
 
     expect($tabs)->toHaveCount(4)
         ->and($tabs[0]['label'])->toBe('General')
@@ -104,7 +87,7 @@ it('sends every check to the checklist block, split into required and optional',
         ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Hi']],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
 
     $nodes = [];
     collectNodesByKind($tabs[1]['body'], 'cms:seoChecklist', $nodes);
@@ -150,7 +133,7 @@ it('resolves the checklist for every admin-active locale, not just the default',
         'name' => ['en' => '', 'uk' => 'Про нас'],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
     $nodes = [];
     collectNodesByKind($tabs[1]['body'], 'cms:seoChecklist', $nodes);
 
@@ -168,7 +151,7 @@ it('carries the og deps for every locale and the shared og_image dep on the ogPr
     Language::factory()->create(['locale' => 'uk']);
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About', 'uk' => 'Про нас']]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
     $regions = [];
     collectNodesByKind($tabs[1]['body'], 'liveRegion', $regions);
     $ogRegion = collect($regions)->firstWhere('name', 'ogPreview');
@@ -235,7 +218,7 @@ it('prefixes block fields with block_{id}_ inside the block tab', function (): v
         ['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Hi', 'body' => 'Text']],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
     $blockTab = $tabs[2];
     $names = [];
     collectFieldNames($blockTab['body'], $names);
@@ -249,7 +232,7 @@ it('orders block tabs by sort, not by their position in content', function (): v
         ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 1, 'data' => ['heading' => 'Second saved']],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
 
     // Both blocks share the label "Simple", so identify each tab by the
     // block_{id}_sort field it carries rather than by label text.
@@ -268,7 +251,7 @@ it('preserves the translatable flag and required rule when renaming a block fiel
         ['id' => 'hero1', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Welcome']]],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
     $titleField = collect($tabs[2]['body']['options']['children'])->firstWhere('name', 'block_hero1_title');
 
     expect($titleField)->not->toBeNull()
@@ -281,9 +264,9 @@ it('round-trips a translatable block field through save', function (): void {
         ['id' => 'hero1', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Welcome']]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'block_hero1_title' => ['en' => 'Updated'], 'block_hero1_active' => true],
+        [...PageEditHelpers::baseEditPayload(), 'block_hero1_title' => ['en' => 'Updated'], 'block_hero1_active' => true],
     )->assertRedirect();
 
     expect($page->refresh()->content[0]['data'])->toBe(['title' => ['en' => 'Updated']]);
@@ -291,7 +274,7 @@ it('round-trips a translatable block field through save', function (): void {
 
 it('delivers server-side validation errors to the Inertia page after a rejected save', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
-    $admin = makePageEditAdmin();
+    $admin = PageEditHelpers::admin();
 
     // The editor submits through Inertia's router: a failed validation is a
     // redirect back, and the client only learns about it from props.errors on
@@ -301,7 +284,7 @@ it('delivers server-side validation errors to the Inertia page after a rejected 
         ->from("/admin/pages/{$page->id}/edit")
         ->post(
             "/admin/pages/{$page->id}/edit/forms/pageEditor",
-            [...baseEditPayload(), 'name' => ['en' => '']],
+            [...PageEditHelpers::baseEditPayload(), 'name' => ['en' => '']],
             ['X-Inertia' => 'true'],
         )
         ->assertRedirect("/admin/pages/{$page->id}/edit");
@@ -321,10 +304,10 @@ it('preserves a block whose kind is no longer registered instead of crashing on 
         ['id' => 'ghost1', 'kind' => 'Ghost', 'active' => true, 'sort' => 1, 'data' => ['legacy' => 'value']],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'name' => ['en' => 'Renamed via save'],
             'block_blk1_heading' => 'Hi', 'block_blk1_active' => true, 'block_blk1_sort' => 0,
         ],
@@ -343,9 +326,9 @@ it('round-trips the rich-text body through save as a per-locale map', function (
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
     $lexical = ['root' => ['type' => 'root', 'children' => []]];
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'body' => ['en' => $lexical]],
+        [...PageEditHelpers::baseEditPayload(), 'body' => ['en' => $lexical]],
     )->assertRedirect();
 
     expect($page->refresh()->getTranslation('body', 'en'))->toBe($lexical);
@@ -354,7 +337,7 @@ it('round-trips the rich-text body through save as a per-locale map', function (
 it('keeps the sidebar cards for status/type/parent/sort_order out of the General tab', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($page->id)['props']['structure'], 'form');
     $grid = findNodeByKind($form, 'grid');
 
     expect($grid)->not->toBeNull();
@@ -375,7 +358,7 @@ it('keeps the sidebar cards for status/type/parent/sort_order out of the General
 it('puts status and is_indexable together in the sidebar Publication card', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($page->id)['props']['structure'], 'form');
     $grid = findNodeByKind($form, 'grid');
     $sidebar = $grid['options']['children'][1];
     $publicationCard = $sidebar['options']['children'][0];
@@ -387,7 +370,7 @@ it('puts status and is_indexable together in the sidebar Publication card', func
 it('renders a hidden lock_version field before the status bar, then the status bar with a status badge', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($page->id)['props']['structure'], 'form');
     $lockVersionField = $form['options']['children'][0];
     $statusBar = $form['options']['children'][1];
 
@@ -412,7 +395,7 @@ it('badges a scheduled page as Scheduled and shows a note with the publish datet
         'published_at' => $publishedAt,
     ]);
 
-    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($page->id)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][1];
 
     $badge = findNodeByKind($statusBar, 'displayValue');
@@ -438,7 +421,7 @@ it('badges an expired page as Expired', function (): void {
         'unpublish_at' => now()->subDay(),
     ]);
 
-    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($page->id)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][1];
 
     $badge = findNodeByKind($statusBar, 'displayValue');
@@ -448,7 +431,7 @@ it('badges an expired page as Expired', function (): void {
 it('includes breadcrumbs linking back to the pages list', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About Us']]);
 
-    $breadcrumbs = pageEditStructure($page->id)['props']['breadcrumbs'];
+    $breadcrumbs = PageEditHelpers::structure($page->id)['props']['breadcrumbs'];
 
     expect($breadcrumbs)->toHaveCount(3)
         ->and($breadcrumbs[1]['label'])->toBe('Pages')
@@ -459,7 +442,7 @@ it('includes breadcrumbs linking back to the pages list', function (): void {
 it('saves general and SEO fields including the seo json column', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')->post(
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
             'name' => ['en' => 'About Updated'],
@@ -508,7 +491,7 @@ it('placeholders seo_title/seo_description/og_title/og_description with the comp
         'summary' => ['en' => 'A short summary.'],
     ]);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
     $seoTitle = findFieldByName($tabs[1]['body'], 'seo_title');
     $seoDescription = findFieldByName($tabs[1]['body'], 'seo_description');
 
@@ -519,9 +502,9 @@ it('placeholders seo_title/seo_description/og_title/og_description with the comp
 it('rejects an invalid seo_canonical URL for the default locale', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'seo_canonical' => ['en' => 'not-a-url']],
+        [...PageEditHelpers::baseEditPayload(), 'seo_canonical' => ['en' => 'not-a-url']],
     )->assertSessionHasErrors('seo_canonical.en');
 });
 
@@ -529,9 +512,9 @@ it('rejects an invalid seo_canonical URL for a non-default locale', function ():
     Language::factory()->create(['locale' => 'uk']);
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'seo_canonical' => ['en' => '', 'uk' => 'not-a-url']],
+        [...PageEditHelpers::baseEditPayload(), 'seo_canonical' => ['en' => '', 'uk' => 'not-a-url']],
     )->assertSessionHasErrors('seo_canonical.uk');
 });
 
@@ -539,9 +522,9 @@ it('accepts a valid seo_canonical URL for a non-default locale', function (): vo
     Language::factory()->create(['locale' => 'uk']);
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'seo_canonical' => ['en' => '', 'uk' => 'https://example.com/uk-canonical']],
+        [...PageEditHelpers::baseEditPayload(), 'seo_canonical' => ['en' => '', 'uk' => 'https://example.com/uk-canonical']],
     )->assertRedirect()->assertSessionHasNoErrors();
 
     expect($page->refresh()->seo['canonical'])->toBe(['en' => '', 'uk' => 'https://example.com/uk-canonical']);
@@ -552,29 +535,29 @@ it('rejects a seo_canonical URL with a non-http(s) scheme', function (): void {
     // scheme that parses as a valid URL but is never a legitimate canonical.
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'seo_canonical' => ['en' => 'ftp://example.com/file']],
+        [...PageEditHelpers::baseEditPayload(), 'seo_canonical' => ['en' => 'ftp://example.com/file']],
     )->assertSessionHasErrors('seo_canonical.en');
 });
 
 it('rejects a seo_canonical URL with a javascript scheme', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'seo_canonical' => ['en' => 'javascript:alert(1)']],
+        [...PageEditHelpers::baseEditPayload(), 'seo_canonical' => ['en' => 'javascript:alert(1)']],
     )->assertSessionHasErrors('seo_canonical.en');
 });
 
 it('round-trips the new SEO keys back into the edit form via loadRow', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
-    $session = test()->actingAs(makePageEditAdmin(), 'web');
+    $session = test()->actingAs(PageEditHelpers::admin(), 'web');
 
     $session->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'seo_focus_keyword' => ['en' => 'widgets'],
             'og_title' => ['en' => 'OG title'],
             'og_description' => ['en' => 'OG description'],
@@ -597,10 +580,10 @@ it('round-trips two blocks through save: data, active, and order are preserved',
         ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 1, 'data' => ['heading' => 'Two', 'body' => 'Second']],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'block_blk1_heading' => 'One Updated',
             'block_blk1_body' => 'First Updated',
             'block_blk1_active' => true,
@@ -631,10 +614,10 @@ it('reorders the envelope when block_{id}_sort is changed on save', function ():
         ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 1, 'data' => ['heading' => 'Two']],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'block_blk1_heading' => 'One',
             'block_blk1_active' => true,
             'block_blk1_sort' => 5,
@@ -659,7 +642,7 @@ it('reads a legacy envelope without sort in its stored order, then assigns sort 
 
     expect($page->content[0])->not->toHaveKey('sort');
 
-    $admin = makePageEditAdmin();
+    $admin = PageEditHelpers::admin();
     $session = test()->actingAs($admin, 'web');
 
     $tabsJson = $session->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json();
@@ -673,7 +656,7 @@ it('reads a legacy envelope without sort in its stored order, then assigns sort 
     $session->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'block_blk1_heading' => 'One',
             'block_blk1_active' => true,
             'block_blk1_sort' => 0,
@@ -693,9 +676,9 @@ it('reads a legacy envelope without sort in its stored order, then assigns sort 
 it('adds a new block via pageBlockAdd_{kind} as inactive so it does not leak into public render', function (): void {
     $page = pageWithBlocks();
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Simple",
-        ['payload' => ['form' => [...baseEditPayload(), 'name' => ['en' => 'Renamed']]]],
+        ['payload' => ['form' => [...PageEditHelpers::baseEditPayload(), 'name' => ['en' => 'Renamed']]]],
     );
 
     $response->assertOk();
@@ -717,10 +700,10 @@ it('appends a new block after the highest existing sort', function (): void {
         ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'sort' => 7, 'data' => ['heading' => 'Two']],
     ]);
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/actions/pageBlockAdd_Simple",
         ['payload' => ['form' => [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'block_blk1_heading' => 'One',
             'block_blk1_active' => true,
             'block_blk1_sort' => 3,
@@ -744,10 +727,10 @@ it('removes a block via pageBlockRemove_{id} and keeps the other blocks intact',
         ['id' => 'blk2', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Two']],
     ]);
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$page->id}/edit/actions/pageBlockRemove_blk1",
         ['payload' => ['form' => [
-            ...baseEditPayload(),
+            ...PageEditHelpers::baseEditPayload(),
             'block_blk1_heading' => 'One',
             'block_blk1_active' => true,
             'block_blk2_heading' => 'Two',
@@ -768,7 +751,7 @@ it('removes a block via pageBlockRemove_{id} and keeps the other blocks intact',
 it('keeps header actions empty now that view-on-site lives in the status bar', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $headerActions = test()->actingAs(makePageEditAdmin(), 'web')
+    $headerActions = test()->actingAs(PageEditHelpers::admin(), 'web')
         ->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
         ->assertOk()->json('props.headerActions') ?? [];
 
@@ -778,7 +761,7 @@ it('keeps header actions empty now that view-on-site lives in the status bar', f
 it('places view-on-site and a top save action in the status bar', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $form = findNodeByKind(pageEditStructure($page->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($page->id)['props']['structure'], 'form');
     // children[0] is the hidden lock_version field (see the "renders a
     // hidden lock_version field..." test) — the status bar is the next one.
     $statusBar = $form['options']['children'][1];
@@ -790,7 +773,7 @@ it('places view-on-site and a top save action in the status bar', function (): v
 it('hides delete from the form footer for system pages', function (): void {
     $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
 
-    $form = findNodeByKind(pageEditStructure($system->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($system->id)['props']['structure'], 'form');
     $footerActions = footerActionNames($form);
 
     expect($footerActions)->toBe(['cancel', 'save']);
@@ -799,7 +782,7 @@ it('hides delete from the form footer for system pages', function (): void {
 it('omits the slug field from the General tab for the root system page', function (): void {
     $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
 
-    $tabs = editFormTabs($system->id);
+    $tabs = PageEditHelpers::formTabs($system->id);
     $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
 
     expect($generalFieldNames)->not->toContain('slug');
@@ -808,7 +791,7 @@ it('omits the slug field from the General tab for the root system page', functio
 it('saves the system page with no slug key in the payload and keeps its slug/path empty', function (): void {
     $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$system->id}/edit/forms/pageEditor",
         [
             'name' => ['en' => 'Home Updated'],
@@ -842,7 +825,7 @@ it('saves the system page with no slug key in the payload and keeps its slug/pat
 it('ignores a slug override submitted for the system page and keeps its slug/path empty', function (): void {
     $system = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Home'], 'is_system' => true]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->post(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
         "/admin/pages/{$system->id}/edit/forms/pageEditor",
         [
             'name' => ['en' => 'Home Updated'],
@@ -876,7 +859,7 @@ it('ignores a slug override submitted for the system page and keeps its slug/pat
 it('shows the preview-link action in the status bar for a draft page', function (): void {
     $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
 
-    $form = findNodeByKind(pageEditStructure($draft->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($draft->id)['props']['structure'], 'form');
     // children[0] is the hidden lock_version field — see the "renders a
     // hidden lock_version field..." test.
     $statusBar = $form['options']['children'][1];
@@ -888,7 +871,7 @@ it('shows the preview-link action in the status bar for a draft page', function 
 /** @return array<string, mixed> */
 function previewLinkNode(int $pageId): array
 {
-    $form = findNodeByKind(pageEditStructure($pageId)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($pageId)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][1];
     foreach ($statusBar['options']['children'] as $child) {
         if (($child['name'] ?? null) === 'pagePreviewLink') {
@@ -918,7 +901,7 @@ it('returns a copyToClipboard effect with the signed preview URL from the Copy a
     app(Cms::class)->frontendRoutes();
     $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')
         ->postJson("/admin/pages/{$draft->id}/edit/actions/pagePreviewLinkCopy", ['payload' => []])
         ->assertOk();
 
@@ -933,7 +916,7 @@ it('returns a copyToClipboard effect with the signed preview URL from the Copy a
 it('omits the preview-link action from the status bar for a live published page', function (): void {
     $published = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live page']]);
 
-    $form = findNodeByKind(pageEditStructure($published->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($published->id)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][1];
     $names = array_column($statusBar['options']['children'], 'name');
 
@@ -948,7 +931,7 @@ it('shows the preview-link action for a scheduled page (published_at in the futu
         'published_at' => now()->addDay(),
     ]);
 
-    $form = findNodeByKind(pageEditStructure($scheduled->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($scheduled->id)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][1];
     $names = array_column($statusBar['options']['children'], 'name');
 
@@ -963,7 +946,7 @@ it('shows the preview-link action for an expired page (unpublish_at in the past)
         'unpublish_at' => now()->subDay(),
     ]);
 
-    $form = findNodeByKind(pageEditStructure($expired->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($expired->id)['props']['structure'], 'form');
     $statusBar = $form['options']['children'][1];
     $names = array_column($statusBar['options']['children'], 'name');
 
@@ -973,7 +956,7 @@ it('shows the preview-link action for an expired page (unpublish_at in the past)
 it('keeps delete in the form footer for regular pages', function (): void {
     $regular = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $form = findNodeByKind(pageEditStructure($regular->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($regular->id)['props']['structure'], 'form');
     $footerActions = footerActionNames($form);
 
     expect($footerActions)->toBe(['pageEditDelete', 'cancel', 'save']);
@@ -982,7 +965,7 @@ it('keeps delete in the form footer for regular pages', function (): void {
 it('deletes a regular page and redirects to the list', function (): void {
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')
         ->postJson("/admin/pages/{$page->id}/edit/actions/pageEditDelete", ['payload' => []]);
 
     $response->assertOk();
@@ -1000,7 +983,7 @@ it('hides and unregisters the delete action for a page that has children, instea
     // once canDelete() omits deleteAction($s), pageEditDelete is never added
     // to collectedActions(), so the route resolves to a clean 404 instead of
     // reaching PageObserver's DomainException at all.
-    $response = test()->actingAs(makePageEditAdmin(), 'web')
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')
         ->postJson("/admin/pages/{$category->id}/edit/actions/pageEditDelete", ['payload' => []]);
 
     $response->assertNotFound();
@@ -1011,44 +994,11 @@ it('hides delete from the form footer for a page that has children', function ()
     $category = Page::factory()->category()->create();
     Page::factory()->article()->create(['parent_id' => $category->id]);
 
-    $form = findNodeByKind(pageEditStructure($category->id)['props']['structure'], 'form');
+    $form = findNodeByKind(PageEditHelpers::structure($category->id)['props']['structure'], 'form');
     $footerActions = footerActionNames($form);
 
     expect($footerActions)->toBe(['cancel', 'save']);
 });
-
-/** @return array<string, mixed> Minimal valid general/SEO payload for the pageEditor form. */
-function baseEditPayload(): array
-{
-    return [
-        'name' => ['en' => 'About Us'],
-        'title' => ['en' => ''],
-        'slug' => ['en' => 'about-us'],
-        'heading' => ['en' => ''],
-        'summary' => ['en' => ''],
-        'type' => 'page',
-        'parent_id' => 'none',
-        'status' => PageStatus::Published->value,
-        'sort_order' => 0,
-        'seo_title' => ['en' => ''],
-        'seo_description' => ['en' => ''],
-        'seo_focus_keyword' => ['en' => ''],
-        'og_title' => ['en' => ''],
-        'og_description' => ['en' => ''],
-        'og_image' => '',
-        'is_indexable' => true,
-    ];
-}
-
-/** @return list<array<string, mixed>> */
-function editFormTabs(int $pageId): array
-{
-    $form = findNodeByKind(pageEditStructure($pageId)['props']['structure'], 'form');
-    $tabsNode = findNodeByKind($form, 'tabs');
-    expect($tabsNode)->not->toBeNull();
-
-    return $tabsNode['options']['tabs'];
-}
 
 /**
  * Action names inside the form footer's flex node (delete/spacer/save) —

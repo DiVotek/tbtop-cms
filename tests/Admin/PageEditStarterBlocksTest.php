@@ -7,6 +7,7 @@ use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
 
 uses(RefreshDatabase::class);
@@ -21,7 +22,7 @@ beforeEach(function (): void {
 it('shows the Starter blocks section for a category page', function (): void {
     $category = Page::factory()->category()->create(['name' => ['en' => 'Blog']]);
 
-    $tabs = editFormTabs($category->id);
+    $tabs = PageEditHelpers::formTabs($category->id);
     $sections = [];
     collectNodesByKind($tabs[0]['body'], 'section', $sections);
 
@@ -38,7 +39,7 @@ it('omits the Starter blocks section for an article page', function (): void {
     $category = Page::factory()->category()->create();
     $article = Page::factory()->article()->create(['parent_id' => $category->id]);
 
-    $tabs = editFormTabs($article->id);
+    $tabs = PageEditHelpers::formTabs($article->id);
     $sections = [];
     collectNodesByKind($tabs[0]['body'], 'section', $sections);
 
@@ -52,7 +53,7 @@ it('omits the Starter blocks section for an article page', function (): void {
 it('omits the Starter blocks section for a plain page', function (): void {
     $page = Page::factory()->create(['type' => 'page']);
 
-    $tabs = editFormTabs($page->id);
+    $tabs = PageEditHelpers::formTabs($page->id);
     $sections = [];
     collectNodesByKind($tabs[0]['body'], 'section', $sections);
 
@@ -66,7 +67,7 @@ it('omits the Starter blocks section for a plain page', function (): void {
 it('shows a muted empty-state message and no block rows when a starter has no blocks yet', function (): void {
     $category = Page::factory()->category()->create();
 
-    $tabs = editFormTabs($category->id);
+    $tabs = PageEditHelpers::formTabs($category->id);
     $texts = [];
     collectNodesByKind($tabs[0]['body'], 'displayText', $texts);
 
@@ -81,7 +82,7 @@ it('frames the block list in a bordered card section', function (): void {
         'starter_blocks' => ['article' => [['id' => 't1', 'kind' => 'Simple']]],
     ]);
 
-    $tabs = editFormTabs($category->id);
+    $tabs = PageEditHelpers::formTabs($category->id);
     $sections = [];
     collectNodesByKind($tabs[0]['body'], 'section', $sections);
 
@@ -92,7 +93,7 @@ it('frames the block list in a bordered card section', function (): void {
 it('lists one "+ kind" add action per registered block kind', function (): void {
     $category = Page::factory()->category()->create();
 
-    $tabs = editFormTabs($category->id);
+    $tabs = PageEditHelpers::formTabs($category->id);
     $actions = [];
     collectNodesByKind($tabs[0]['body'], 'action', $actions);
     $names = array_column($actions, 'name');
@@ -109,7 +110,7 @@ it('lists a row per starter block with move and remove actions, uniquely named p
         ],
     ]);
 
-    $tabs = editFormTabs($category->id);
+    $tabs = PageEditHelpers::formTabs($category->id);
     $actions = [];
     collectNodesByKind($tabs[0]['body'], 'action', $actions);
     $names = array_column($actions, 'name');
@@ -134,7 +135,7 @@ it('lists a row per starter block with move and remove actions, uniquely named p
 it('adds a block to the article starter via pageStarterBlockAdd_article_{kind} and redirects back', function (): void {
     $category = Page::factory()->category()->create();
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Simple",
         ['payload' => []],
     );
@@ -155,7 +156,7 @@ it('appends a second added block after the first, in the same starter', function
         'starter_blocks' => ['article' => [['id' => 'a1', 'kind' => 'Simple']]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Hero",
         ['payload' => []],
     )->assertOk();
@@ -170,7 +171,7 @@ it('removes a starter block via pageStarterBlockRemove_{type}_{id}', function ()
         'starter_blocks' => ['article' => [['id' => 'a1', 'kind' => 'Simple'], ['id' => 'a2', 'kind' => 'Hero']]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockRemove_article_a1",
         ['payload' => []],
     )->assertOk();
@@ -188,7 +189,7 @@ it('moves a starter block up, swapping it with its predecessor', function (): vo
         ]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockMoveUp_article_a2",
         ['payload' => []],
     )->assertOk();
@@ -206,7 +207,7 @@ it('moves a starter block down, swapping it with its successor', function (): vo
         ]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockMoveDown_article_a1",
         ['payload' => []],
     )->assertOk();
@@ -221,7 +222,7 @@ it('keeps the category starter untouched when a block is added to the article st
         'starter_blocks' => ['category' => [['id' => 'c1', 'kind' => 'Simple']]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Hero",
         ['payload' => []],
     )->assertOk();
@@ -238,7 +239,7 @@ it('leaves the page\'s own content and every other column untouched — only sta
         'content' => [['id' => 'existing-block', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Keep me']]],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Hero",
         ['payload' => []],
     )->assertOk();
@@ -267,7 +268,7 @@ it('adds a starter block even when the page\'s own content has an invalid requir
         ],
     ]);
 
-    $response = test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    $response = test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Simple",
         ['payload' => []],
     );
@@ -284,7 +285,7 @@ it('removes a starter block even when the page\'s own content has an invalid req
         ],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockRemove_article_a1",
         ['payload' => []],
     )->assertOk();
@@ -300,7 +301,7 @@ it('moves a starter block even when the page\'s own content has an invalid requi
         ],
     ]);
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockMoveUp_article_a2",
         ['payload' => []],
     )->assertOk();
@@ -320,7 +321,7 @@ it('does not bump lock_version when a starter-block action saves', function (): 
     $category = Page::factory()->category()->create();
     $lockVersionBefore = $category->refresh()->lock_version;
 
-    test()->actingAs(makePageEditAdmin(), 'web')->postJson(
+    test()->actingAs(PageEditHelpers::admin(), 'web')->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Simple",
         ['payload' => []],
     )->assertOk();
@@ -331,7 +332,7 @@ it('does not bump lock_version when a starter-block action saves', function (): 
 it('does not make a concurrent form save with the original lock_version bounce off a false conflict', function (): void {
     $category = Page::factory()->category()->create();
     $originalLockVersion = $category->lock_version;
-    $session = test()->actingAs(makePageEditAdmin(), 'web');
+    $session = test()->actingAs(PageEditHelpers::admin(), 'web');
 
     $session->postJson(
         "/admin/pages/{$category->id}/edit/actions/pageStarterBlockAdd_article_Simple",
@@ -342,7 +343,7 @@ it('does not make a concurrent form save with the original lock_version bounce o
     // lock_version captured) BEFORE the starter-block action ran elsewhere.
     $session->post(
         "/admin/pages/{$category->id}/edit/forms/pageEditor",
-        [...baseEditPayload(), 'lock_version' => $originalLockVersion, 'name' => ['en' => 'Saved after starter add']],
+        [...PageEditHelpers::baseEditPayload(), 'lock_version' => $originalLockVersion, 'name' => ['en' => 'Saved after starter add']],
     )->assertRedirect()->assertSessionHasNoErrors();
 
     expect($category->refresh()->getTranslation('name', 'en'))->toBe('Saved after starter add');
@@ -354,11 +355,11 @@ it('hides the Apply action for an empty starter and shows it once the starter ha
         'starter_blocks' => ['article' => [['id' => 't1', 'kind' => 'Simple']]],
     ]);
 
-    // One shared admin session for both fetches — editFormTabs()/
-    // pageEditStructure() creates a fresh admin (fixed email) on every call,
+    // One shared admin session for both fetches — PageEditHelpers::formTabs()/
+    // PageEditHelpers::structure() creates a fresh admin (fixed email) on every call,
     // so calling it twice in one test would collide on the email unique
     // constraint.
-    $session = test()->actingAs(makePageEditAdmin(), 'web');
+    $session = test()->actingAs(PageEditHelpers::admin(), 'web');
     $tabsFor = static function (int $pageId) use ($session): array {
         $form = findNodeByKind(
             $session->get("/admin/pages/{$pageId}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'),
