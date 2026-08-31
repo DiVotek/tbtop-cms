@@ -270,7 +270,8 @@ page editor's SEO tab (`PageForm::seoFields()` → `seoChecklistSection()`,
 client component `resources/js/cms/admin/seoChecklist.tsx`, needs
 `@cms/admin/blocks` imported — see wiring.md). Checks, each `pass`/`warn`/
 `fail`, `required` ones affecting result-list appearance
-(`title`, `description`, `indexable`, `canonical`, `duplicate_title`):
+(`title`, `description`, `indexable`, `canonical`, `duplicate_title`,
+`duplicate_description`):
 
 - **title / description** — presence only (`ownTitle`/`ownDescription`,
   pre-template), `fail` when empty. Length is not checked here — the
@@ -286,11 +287,14 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
 - **focus_keyword checks** (4, only when `seo.focus_keyword` is set for the
   locale) — presence of the keyword in the **rendered** title, rendered
   description, `heading`, and slug. `focus_keyword` itself warns when empty.
-- **duplicate_title** — compares this page's rendered title against every
-  other page's rendered title (via `renderedTitle()`, breadcrumbs resolved
+- **duplicate_title / duplicate_description** — compares this page's rendered
+  title/description against every other page's rendered title/description
+  (via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
   lazily only if the template uses `{parent}`) — `warn` on a collision,
-  including collisions a template that omits `{title}` can create even
-  between pages with distinct own titles.
+  including collisions a template that omits `{title}`/`{description}` can
+  create even between pages with distinct own values. Empty short-circuits
+  to `pass` (nothing to collide with). Both checks share a single cursor
+  pass over the other pages rather than scanning twice.
 
 **`SeoAudit::run()`** — the site-wide report (`SeoReportPage`, admin nav
 group "content", gated behind the `tbtop-cms.redirects` ability). One query for every *live* page (`Page::query()->live()` — a scheduled or
@@ -298,10 +302,11 @@ expired page is excluded), then plain PHP, deliberately never calling
 `SeoResolver::resolve()` per page (would build alternates/JSON-LD/every OG
 field × pages × locales). Issues: `missing_title`/`missing_description`
 (fail), `missing_translation` (warn — no own `title`/`name` in a locale,
-fallback disabled), `duplicate_title` (warn, locale-scoped), `missing_og_image`
-(warn), `noindex` (warn, locale-independent). Falls back to a plain
-key/value list when `pdo_sqlite` is unavailable (the DSL table needs an
-in-memory sqlite connection to render).
+fallback disabled), `duplicate_title`/`duplicate_description` (warn,
+locale-scoped, built in one pass per locale over the already-loaded pages),
+`missing_og_image` (warn), `noindex` (warn, locale-independent). Falls back
+to a plain key/value list when `pdo_sqlite` is unavailable (the DSL table
+needs an in-memory sqlite connection to render).
 
 ## 404 log
 

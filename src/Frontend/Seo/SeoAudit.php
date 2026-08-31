@@ -19,10 +19,11 @@ use Tbtop\Cms\Settings\Settings;
  * alternates, JSON-LD objects, and every og:/twitter: field for a single
  * page's render. Multiplied by (pages × active locales) for a report this
  * would mean hundreds of resolutions per load on a site of any size — the
- * same cost SeoChecklist::duplicateTitleCheck() avoids by re-deriving just
- * the title cascade instead of calling resolve(). This class re-derives the
- * few cascades it needs (own title, own description, own og:image) the same
- * way, straight from one Page query's already-hydrated columns.
+ * same cost SeoChecklist::duplicateChecks() avoids by re-deriving just the
+ * title/description cascades instead of calling resolve(). This class
+ * re-derives the few cascades it needs (own title, own description, own
+ * og:image) the same way, straight from one Page query's already-hydrated
+ * columns.
  *
  * @phpstan-type Issue array{severity: 'warn'|'fail', issue: string, pageId: int, page: string, locale: string, detail: string, sortKey: string}
  */
@@ -45,7 +46,7 @@ final class SeoAudit
         $issues = [];
 
         array_push($issues, ...$this->missingTranslationAndTitleAndDescription($pages, $locales));
-        array_push($issues, ...$this->duplicateTitles($pages, $locales));
+        array_push($issues, ...$this->duplicateTitlesAndDescriptions($pages, $locales));
         array_push($issues, ...$this->missingOgImages($pages));
         array_push($issues, ...$this->noindexed($pages));
 
@@ -118,60 +119,83 @@ final class SeoAudit
     }
 
     /**
-     * Mirrors SeoChecklist::duplicateTitleCheck(): compares rendered titles,
-     * because a template that omits {title} turns distinct bases into one
-     * identical <title>. Title-only rendering with lazy breadcrumbs keeps
-     * this off the per-page ancestor query unless {parent} is in play.
+     * Mirrors SeoChecklist::duplicateChecks(): compares rendered titles and
+     * rendered descriptions, because a template that omits {title}/
+     * {description} turns distinct bases into one identical value.
+     * Title/description-only rendering with lazy breadcrumbs keeps this off
+     * the per-page ancestor query unless {parent} is in play.
+     *
+     * One pass over $pages builds both groupings (by title, by description)
+     * rather than two — the report already holds every page in memory, so a
+     * second full loop plus a second call to the resolver would only double
+     * the rendering cost for no extra information.
      *
      * @param  Collection<int, Page>  $pages
      * @param  list<string>  $locales
      * @return list<Issue>
      */
-    private function duplicateTitles($pages, array $locales): array
+    private function duplicateTitlesAndDescriptions($pages, array $locales): array
     {
         $issues = [];
 
         foreach ($locales as $locale) {
             $byTitle = [];
+            $byDescription = [];
 
             foreach ($pages as $page) {
-                $title = $this->resolver->renderedTitle(
-                    $page,
-                    $locale,
-                    fn (): array => $this->breadcrumbs->forPage($page, $locale),
-                );
+                $breadcrumbs = fn (): array => $this->breadcrumbs->forPage($page, $locale);
 
-                if ($title === '') {
-                    continue;
+                $title = $this->resolver->renderedTitle($page, $locale, $breadcrumbs);
+
+                if ($title !== '') {
+                    $byTitle[$title][] = $page;
                 }
 
-                $byTitle[$title][] = $page;
+                $description = $this->resolver->renderedDescription($page, $locale, $breadcrumbs);
+
+                if ($description !== '') {
+                    $byDescription[$description][] = $page;
+                }
             }
 
-            foreach ($byTitle as $title => $group) {
-                if (count($group) < 2) {
-                    continue;
-                }
+            array_push($issues, ...$this->duplicateGroupIssues($byTitle, $locale, 'duplicate_title'));
+            array_push($issues, ...$this->duplicateGroupIssues($byDescription, $locale, 'duplicate_description'));
+        }
 
-                foreach ($group as $page) {
-                    $others = array_values(array_filter(
-                        $group,
-                        static fn (Page $other): bool => $other->getKey() !== $page->getKey(),
-                    ));
+        return $issues;
+    }
 
-                    $otherLabels = array_map(fn (Page $other): string => $this->label($other, $locale), $others);
+    /**
+     * @param  array<string, list<Page>>  $groups  Rendered value => pages sharing it.
+     * @return list<Issue>
+     */
+    private function duplicateGroupIssues(array $groups, string $locale, string $issueKey): array
+    {
+        $issues = [];
 
-                    $issues[] = $this->issue(
-                        'warn',
-                        'duplicate_title',
-                        (int) $page->getKey(),
-                        $this->label($page, $locale),
-                        $locale,
-                        __('tbtop-cms::seo_report.issues.duplicate_title.detail', [
-                            'pages' => implode(', ', $otherLabels),
-                        ]),
-                    );
-                }
+        foreach ($groups as $group) {
+            if (count($group) < 2) {
+                continue;
+            }
+
+            foreach ($group as $page) {
+                $others = array_values(array_filter(
+                    $group,
+                    static fn (Page $other): bool => $other->getKey() !== $page->getKey(),
+                ));
+
+                $otherLabels = array_map(fn (Page $other): string => $this->label($other, $locale), $others);
+
+                $issues[] = $this->issue(
+                    'warn',
+                    $issueKey,
+                    (int) $page->getKey(),
+                    $this->label($page, $locale),
+                    $locale,
+                    __('tbtop-cms::seo_report.issues.' . $issueKey . '.detail', [
+                        'pages' => implode(', ', $otherLabels),
+                    ]),
+                );
             }
         }
 

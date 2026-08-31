@@ -41,6 +41,10 @@ return [
             'label' => 'Duplicate title',
             'detail' => 'Same title as: :pages.',
         ],
+        'duplicate_description' => [
+            'label' => 'Duplicate description',
+            'detail' => 'Same description as: :pages.',
+        ],
         'missing_og_image' => [
             'label' => 'Missing OG image',
             'detail' => 'No OG image resolves for this page — not on the page, and no site-wide default is configured.',

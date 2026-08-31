@@ -261,3 +261,36 @@ it('keeps the duplicate check aligned with the title the resolver renders', func
     expect(app(SeoResolver::class)->resolve($page, 'en')['title'])->toBe('Same | Acme')
         ->and(checkByKey(checklistFor($page), 'duplicate_title')['status'])->toBe('warn');
 });
+
+it('does not warn about a duplicate description when every other page has a distinct rendered description', function (): void {
+    Page::factory()->create(['name' => ['en' => 'Other'], 'summary' => ['en' => 'Their summary.']]);
+    $page = Page::factory()->create(['name' => ['en' => 'Mine'], 'summary' => ['en' => 'My summary.']]);
+
+    expect(checkByKey(checklistFor($page), 'duplicate_description')['status'])->toBe('pass');
+});
+
+it('passes the duplicate description check when the page has no description at all', function (): void {
+    $page = Page::factory()->create(['name' => ['en' => 'Mine'], 'summary' => ['en' => ''], 'seo' => []]);
+
+    expect(checkByKey(checklistFor($page), 'duplicate_description')['status'])->toBe('pass');
+});
+
+it('warns when a description-omitting template makes distinct page descriptions collide', function (): void {
+    app(Settings::class)->set('seo.description_template', 'Read more on our site.');
+    Page::factory()->create(['name' => ['en' => 'One'], 'summary' => ['en' => 'About one.']]);
+    $page = Page::factory()->create(['name' => ['en' => 'Two'], 'summary' => ['en' => 'About two.']]);
+
+    expect(checkByKey(checklistFor($page), 'duplicate_description')['status'])->toBe('warn');
+});
+
+it('warns when two pages with no own description share the site-wide default description', function (): void {
+    // The main real-world case this check exists for: a set of empty pages
+    // all falling back to seo.default_description resolve to the exact same
+    // meta description, which is duplicate content even though neither page
+    // "did" anything wrong on its own.
+    app(Settings::class)->set('seo.default_description', 'A default for the whole site.');
+    Page::factory()->create(['name' => ['en' => 'One'], 'summary' => ['en' => ''], 'seo' => []]);
+    $page = Page::factory()->create(['name' => ['en' => 'Two'], 'summary' => ['en' => ''], 'seo' => []]);
+
+    expect(checkByKey(checklistFor($page), 'duplicate_description')['status'])->toBe('warn');
+});

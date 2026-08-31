@@ -303,6 +303,7 @@ return [
             'focus_keyword_in_heading' => 'Keyword in heading (H1)',
             'focus_keyword_in_slug' => 'Keyword in slug',
             'duplicate_title' => 'Unique title',
+            'duplicate_description' => 'Unique description',
         ],
         // Length is reported by the preview meters, which measure the title in
         // pixels — these say only whether the value exists.
@@ -352,6 +353,10 @@ return [
         'duplicate_title' => [
             'warn' => 'Another page resolves to the same meta title in this locale.',
             'pass' => 'No other page shares this meta title in this locale.',
+        ],
+        'duplicate_description' => [
+            'warn' => 'Another page resolves to the same meta description in this locale.',
+            'pass' => 'No other page shares this meta description in this locale.',
         ],
     ],
 ];

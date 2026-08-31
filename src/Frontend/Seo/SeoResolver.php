@@ -437,6 +437,39 @@ class SeoResolver
         return $this->renderTemplate($template, ['{description}' => $base], $locale, $page, $breadcrumbs);
     }
 
+    /**
+     * Renders only the description, mirroring renderedTitle() for duplicate
+     * checks that must follow the same template rules without paying for a
+     * full SEO resolution. Derives its own base through the same private
+     * description() cascade resolve() uses, so this and resolve() share one
+     * implementation of the base rather than two copies drifting apart; the
+     * template step below is descriptionWithTemplate()'s logic with lazy
+     * breadcrumbs, same relationship renderedTitle() has to title().
+     *
+     * Breadcrumbs arrive lazily for the same reason as renderedTitle(): only
+     * a template referencing {parent} needs the ancestor query.
+     *
+     * @param  Closure(): list<Breadcrumb>  $breadcrumbs
+     */
+    public function renderedDescription(Page $page, string $locale, Closure $breadcrumbs): string
+    {
+        $seo = PageOwnSeo::blob($page);
+        $base = $this->description($page, $seo, $locale);
+        $template = $this->templates->description($page->type, $locale);
+
+        if ($template === '') {
+            return $base;
+        }
+
+        return $this->renderTemplate(
+            $template,
+            ['{description}' => $base],
+            $locale,
+            $page,
+            str_contains($template, '{parent}') ? $breadcrumbs() : [],
+        );
+    }
+
     private function titleWithSuffix(string $base): string
     {
         $suffix = (string) $this->settings->get('seo.title_suffix', '');
