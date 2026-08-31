@@ -11,7 +11,7 @@ use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
-use Tbtop\Cms\Mail\SubmissionMail;
+use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -202,7 +202,7 @@ it('re-runs the notification fan-out on retry and can flip failed to handled via
     $submission->refresh();
 
     expect($submission->status)->toBe(SubmissionStatus::Handled);
-    Mail::assertSent(SubmissionMail::class, fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('ops@example.test'));
 });
 
 it('re-runs the bell fan-out on retry, notifying every current admin', function (): void {

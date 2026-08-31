@@ -175,11 +175,14 @@ it('hides the password tab and form when disabled in config', function (): void 
         __('tbtop-cms::profile.sections.preferences'),
     ]);
 
+    // X-Inertia keeps the 404 an Inertia response: without it Laravel renders
+    // the error page through the panel's root view, whose @vite needs a built
+    // workbench manifest that neither CI nor a fresh checkout has.
     test()->post('/admin/profile/forms/password', [
         'current_password' => PROFILE_PASSWORD,
         'password' => 'brand-new-pass-1',
         'password_confirmation' => 'brand-new-pass-1',
-    ])->assertNotFound();
+    ], ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 /** @return array<string, mixed> */

@@ -10,7 +10,7 @@ use Tbtop\Cms\Cms;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
-use Tbtop\Cms\Mail\SubmissionMail;
+use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -71,7 +71,7 @@ it('handles a valid submission and mails the recipient', function (): void {
         'message' => 'Hello there',
     ])->assertRedirect();
 
-    Mail::assertSent(SubmissionMail::class, fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('ops@example.test'));
 });
 
 it('rejects a submission that fails server-side validation', function (): void {
@@ -372,7 +372,7 @@ it('still persists and delivers a submission when the honeypot field is left emp
         'website' => '',
     ])->assertRedirect();
 
-    Mail::assertSent(SubmissionMail::class, fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('ops@example.test'));
     expect(FormSubmission::query()->count())->toBe(1);
 });
 
@@ -387,6 +387,6 @@ it('bypasses the honeypot check entirely when disabled via config', function ():
         'website' => 'https://spam.example.test',
     ])->assertRedirect();
 
-    Mail::assertSent(SubmissionMail::class);
+    Mail::assertSent(RenderedMail::class);
     expect(FormSubmission::query()->count())->toBe(1);
 });

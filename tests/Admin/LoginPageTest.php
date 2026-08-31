@@ -33,7 +33,7 @@ function makeLoginableAdmin(): AdminUser
 it('authenticates and redirects on valid credentials', function (): void {
     makeLoginableAdmin();
 
-    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect(url('/admin/dashboard'));
 
     expect(auth('web')->check())->toBeTrue();
 });
@@ -92,7 +92,7 @@ it('clears the failure count on a successful login', function (): void {
 
     submitLoginForm(['email' => 'a@example.com', 'password' => 'wrong'])->assertInvalid(['email']);
     submitLoginForm(['email' => 'a@example.com', 'password' => 'wrong'])->assertInvalid(['email']);
-    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect(url('/admin/dashboard'));
 
     expect(RateLimiter::attempts('a@example.com|127.0.0.1'))->toBe(0);
 });
@@ -101,7 +101,7 @@ it('applies the profile locale to the admin panel right after login', function (
     $user = AdminUser::create(['name' => 'A', 'email' => 'a@example.com', 'password' => 'correct-password']);
     CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'locale' => 'uk']);
 
-    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect(url('/admin/dashboard'));
 
     test()->get('/admin/dashboard', ['X-Inertia' => 'true'])->assertOk();
     expect(app()->getLocale())->toBe('uk');
@@ -110,7 +110,7 @@ it('applies the profile locale to the admin panel right after login', function (
 it('keeps the default locale when the profile has none set', function (): void {
     makeLoginableAdmin();
 
-    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect(url('/admin/dashboard'));
 
     expect(session('tbtop.locale'))->toBeNull();
 });
@@ -119,9 +119,15 @@ it('clears a previous user locale when the profile has none set', function (): v
     makeLoginableAdmin();
     session(['tbtop.locale' => 'uk']);
 
-    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])->assertRedirect(url('/admin/dashboard'));
 
     expect(session()->has('tbtop.locale'))->toBeFalse();
+});
+
+it('redirects an already-authenticated admin away from the login page', function (): void {
+    test()->actingAs(makeLoginableAdmin(), 'web');
+
+    test()->get('/admin/login')->assertRedirect(url('/admin/dashboard'));
 });
 
 it('carries the page title and a single breadcrumb from translations', function (): void {
