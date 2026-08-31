@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Fields\BlockContent;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
  * Folds the per-block-tab form fields (`block_{id}_{field}`,
- * `block_{id}_active`) back into {@see BlockContentField::toEnvelope()}'s
+ * `block_{id}_active`) back into {@see BlockContent::toEnvelope()}'s
  * expected row shape (`{id, kind, active, ...flatData}`) for PageEditPage,
  * so PageForm::save() folds them through the same tested envelope guard
  * (unregistered kind, id fallback) as the create form and Layout forms use.
@@ -26,7 +27,7 @@ final class PageEditBlocks
 {
     /**
      * Rows are re-sorted by the (possibly form-edited) `sort` value before
-     * returning, so BlockContentField::toEnvelope() persists the envelope
+     * returning, so BlockContent::toEnvelope() persists the envelope
      * already ordered — PageForm::save() never needs a second sort pass.
      *
      * @param  array<string, mixed>  $form

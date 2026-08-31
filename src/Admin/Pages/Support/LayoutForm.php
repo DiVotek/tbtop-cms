@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 use Illuminate\Support\Str;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Fields\BlockContent;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\Models\Layout;
 
@@ -15,7 +16,7 @@ class LayoutForm
     /** @return list<Node> */
     public static function fields(S $s): array
     {
-        return [BlockContentField::make($s)];
+        return [BlockContent::make($s)];
     }
 
     /** @param array<string, mixed> $form */
@@ -23,7 +24,7 @@ class LayoutForm
     {
         $layout = Layout::query()->updateOrCreate(
             ['slot' => $slot],
-            ['content' => BlockContentField::toEnvelope($form['content'] ?? null)],
+            ['content' => BlockContent::toEnvelope($form['content'] ?? null)],
         );
 
         event(new LayoutSaved($layout));
@@ -36,7 +37,7 @@ class LayoutForm
     {
         $layout = Layout::query()->where('slot', $slot)->first();
 
-        return ['content' => BlockContentField::toRows($layout?->content)];
+        return ['content' => BlockContent::toRows($layout?->content)];
     }
 
     public static function label(string $slot): string
