@@ -304,9 +304,25 @@ field × pages × locales). Issues: `missing_title`/`missing_description`
 (fail), `missing_translation` (warn — no own `title`/`name` in a locale,
 fallback disabled), `duplicate_title`/`duplicate_description` (warn,
 locale-scoped, built in one pass per locale over the already-loaded pages),
-`missing_og_image` (warn), `noindex` (warn, locale-independent). Falls back
-to a plain key/value list when `pdo_sqlite` is unavailable (the DSL table
-needs an in-memory sqlite connection to render).
+`missing_og_image` (warn), `noindex` (warn, locale-independent).
+
+`SeoReportPage` renders as two tabs. **Overview**: a summary alert, four KPI
+stat cards (pages scanned, pages with issues, failures, warnings — each with
+a sparkline once at least two days of snapshot history exist), a donut chart
+of issues by severity, a bar chart of issues by type, and a line chart of the
+last 90 days of snapshot history (fail/warn/pages-with-issues). **Details**:
+one collapsible per page with issues (fail-containing pages first, then by
+issue count), each holding a list of that page's issues.
+
+**Daily snapshots** (`tbtop_seo_audit_snapshots`, one row per calendar day,
+`Tbtop\Cms\Seo\Models\SeoAuditSnapshot`) back the Overview sparklines and
+history chart. `php artisan cms:seo:snapshot` runs the audit and
+upserts/updates today's row via `SeoAuditSnapshotWriter` — it is **not**
+auto-scheduled by the package, so a host wanting daily history needs its own
+cron entry for it. As a fallback so history still accumulates without cron,
+`SeoReportPage::view()` also writes/updates today's snapshot on every page
+load — coarser (at most as often as the report is opened), but sufficient to
+build a trend over time on a low-traffic admin.
 
 ## 404 log
 

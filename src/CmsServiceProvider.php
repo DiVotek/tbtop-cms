@@ -67,6 +67,7 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
 use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
 use Tbtop\Cms\Redirect\RedirectResolver;
+use Tbtop\Cms\Seo\Commands\SnapshotSeoAuditCommand;
 use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Telegram\TelegramClient;
@@ -108,12 +109,14 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_18_000000_create_activity_log_table')
             ->hasMigration('2026_08_27_000000_create_notification_log_table')
             ->hasMigration('2026_08_31_000001_update_pages_add_source_table')
+            ->hasMigration('2026_08_31_000002_create_seo_audit_snapshots_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
                 GrantAdminCommand::class,
                 RevokeAdminCommand::class,
                 PruneNotFoundHitsCommand::class,
+                SnapshotSeoAuditCommand::class,
                 DoctorCommand::class,
             ])
             ->runsMigrations();
