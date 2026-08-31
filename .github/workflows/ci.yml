@@ -81,8 +81,10 @@ jobs:
         with:
           dependency-versions: highest
 
+      # Pinned: fidry/cpu-core-counter reads the runner's restricted CPU
+      # affinity and picks 2, while ubuntu-latest actually has 4 vCPU.
       - name: Execute tests
-        run: vendor/bin/pest --ci --parallel
+        run: vendor/bin/pest --ci --parallel --processes=4
 
   frontend:
     name: Frontend
