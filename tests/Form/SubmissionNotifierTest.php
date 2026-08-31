@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
@@ -14,6 +15,11 @@ use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Mail\SubmissionMail;
+use Tbtop\Cms\Notifications\Audience;
+use Tbtop\Cms\Notifications\Channels\RenderedMail;
+use Tbtop\Cms\Notifications\Events\NotificationSent;
+use Tbtop\Cms\Notifications\Models\NotificationLog;
+use Tbtop\Cms\Notifications\NotificationLogStatus;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -195,10 +201,43 @@ it('mails every configured recipient when enabled', function (): void {
         'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
     ])->assertRedirect();
 
-    Mail::assertSent(
-        SubmissionMail::class,
-        fn (SubmissionMail $mail): bool => $mail->hasTo('ops@example.test') && $mail->hasTo('sales@example.test'),
-    );
+    // Each configured recipient is now its own Recipient in the
+    // notification registry, so delivery is one message per address
+    // (RenderedMail, via MailChannel) rather than one message addressed to
+    // both — see SubmissionNotifierTest deviations in the cms-3 PR.
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('ops@example.test'));
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('sales@example.test'));
+});
+
+it('stays handled when a concurrent caller writes an unrelated failed log row', function (): void {
+    Mail::fake();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    $page = notifierContactPage();
+
+    // A concurrent request's failed delivery, landing in the shared log
+    // while this submission's own fan-out is in flight — the window a
+    // watermark query over notification_log cannot exclude.
+    Event::listen(NotificationSent::class, function (): void {
+        NotificationLog::query()->create([
+            'type' => 'form.submission',
+            'channel' => 'mail',
+            'audience' => Audience::Staff,
+            'recipient' => 'someone-else@example.test',
+            'locale' => 'en',
+            'status' => NotificationLogStatus::Failed,
+            'error' => 'a concurrent submission failed',
+        ]);
+    });
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+
+    expect($submission->status)->toBe(SubmissionStatus::Handled)
+        ->and($submission->error)->toBeNull();
 });
 
 it('renders structured submission values safely in mail', function (): void {
