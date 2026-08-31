@@ -10,9 +10,12 @@ use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
+use Tbtop\Cms\Admin\Pages\Support\LayoutEditBlocks;
+use Tbtop\Cms\Admin\Pages\Support\LayoutEditBlockTabs;
 use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
+use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Layout\Slots;
 
 class LayoutEditPage extends Page
@@ -48,13 +51,14 @@ class LayoutEditPage extends Page
     public function view(S $s): Node
     {
         $slot = $this->slot();
+        $layout = $this->layoutRow($slot);
         $footer = EditFooter::build($s, $this->listUrl(), $this->saveAction($s));
 
         $form = $s->form('layoutEditor', [
-            ...LayoutForm::fields($s),
+            $s->tabs(LayoutEditBlockTabs::build($s, $slot, $layout)),
             $footer,
         ])
-            ->record(LayoutForm::loadRow($slot))
+            ->record(LayoutEditBlockTabs::recordValues($layout))
             ->onSubmit($this->save(...));
 
         return $s->stack([$form]);
@@ -68,7 +72,10 @@ class LayoutEditPage extends Page
 
     private function save(ActionCtx $ctx): Effects
     {
-        LayoutForm::save($ctx->form, $this->slot());
+        $slot = $this->slot();
+        $rows = LayoutEditBlocks::toRows($ctx->form, $this->layoutRow($slot));
+
+        LayoutForm::save([...$ctx->form, 'content' => $rows], $slot);
 
         return Effects::make()->notify(__('tbtop-cms::layout.actions.saved'));
     }
@@ -81,6 +88,11 @@ class LayoutEditPage extends Page
         abort_unless(in_array($slot, Slots::all(), true), 404);
 
         return $slot;
+    }
+
+    private function layoutRow(string $slot): ?Layout
+    {
+        return Layout::query()->where('slot', $slot)->first();
     }
 
     private function listUrl(): string

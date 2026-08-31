@@ -9,6 +9,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 
 uses(RefreshDatabase::class);
 
@@ -86,6 +87,7 @@ it('shows the layout edit page with the slot label capitalized', function (): vo
 });
 
 it('prefills the edit page with the existing slot record', function (): void {
+    config(['tbtop-cms.blocks.types' => [HeroBlock::class]]);
     Layout::query()->create([
         'slot' => Slots::FOOTER,
         'content' => [['id' => 'a', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => 'Hi']]],
@@ -94,7 +96,7 @@ it('prefills the edit page with the existing slot record', function (): void {
     $this->actingAs(makeLayoutAdmin(), 'web')
         ->get('/admin/layout/' . Slots::FOOTER . '/edit', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.data.layoutEditor.content.0.title', 'Hi');
+        ->assertJsonPath('props.data.layoutEditor.block_a_title.en', 'Hi');
 });
 
 it('returns 404 for an unknown slot in the edit url', function (): void {
