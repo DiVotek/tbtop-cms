@@ -55,26 +55,29 @@ update any reference to the old class name.
 
 ## Pages can be backed by a source (source-backed page types)
 
-`tbtop_pages` gains two nullable columns, `source_type` and `source_id`
-(indexed together), plus three new `PageTypeInterface` methods:
+`tbtop_pages` gains one nullable column, `source_id` (indexed together with
+the existing `type` column — the page's own `type` already identifies which
+kind of source it is, so there is no separate `source_type` column), plus
+three new `PageTypeInterface` methods:
 
 ```php
-public function sourceType(): ?string;
+public function isSourceBacked(): bool;
 public function source(Page $page): ?object;
 public function template(Page $page): ?array;
 ```
 
-`Tbtop\Cms\Page\Types\BasePageType` implements all three as `null`, so
-`PageType`, `CategoryType`, `ArticleType` and any host type that already
-extends it keep working unchanged — the interface growth is backward
-compatible. A host type that implements `PageTypeInterface` directly
-(without extending `BasePageType`) must add the three methods itself.
+`Tbtop\Cms\Page\Types\BasePageType` implements `isSourceBacked()` as
+`false` and `source()`/`template()` as `null`, so `PageType`, `CategoryType`,
+`ArticleType` and any host type that already extends it keep working
+unchanged — the interface growth is backward compatible. A host type that
+implements `PageTypeInterface` directly (without extending `BasePageType`)
+must add the three methods itself.
 
-A type opts into being source-backed by returning a non-null `sourceType()`
-(e.g. `'product'`) and loading its domain object from `(source_type,
-source_id)` in `source()`. `PageTypeRegistry` gains `isSourceBacked(string
-$key): bool` and `sourceBackedKeys(): list<string>` to query this without a
-`Page` instance.
+A type opts into being source-backed by returning `true` from
+`isSourceBacked()` and loading its domain object from `(type, source_id)`
+in `source()` — the type already knows what kind of source it loads.
+`PageTypeRegistry` gains `isSourceBacked(string $key): bool` and
+`sourceBackedKeys(): list<string>` to query this without a `Page` instance.
 
 On the frontend, `page.content === null` now means "render the type's
 template": `PageController` calls `$type->template($page)` when content is
@@ -86,12 +89,12 @@ callers are unaffected). A source-backed page whose `source()` resolves to
 like an unpublished page.
 
 In the page editor, a source-backed page shows a read-only "Source" card
-(type, source_type, source_id, and the source's string form when it is
-`Stringable`) instead of the type select, and hides block editing entirely
-— `content` is left untouched on save, so it stays `null` and keeps
-rendering the template. The create form and the edit sidebar's type select
-both exclude source-backed types: creating or retyping one by hand is not
-supported, a host that syncs pages from another source owns that.
+(type, source_id, and the source's string form when it is `Stringable`)
+instead of the type select, and hides block editing entirely — `content` is
+left untouched on save, so it stays `null` and keeps rendering the template.
+The create form and the edit sidebar's type select both exclude
+source-backed types: creating or retyping one by hand is rejected server-side
+too, a host that syncs pages from another source owns that.
 
 ## Notification type and channel registry
 

@@ -79,7 +79,6 @@ return [
         'summary' => 'Опис',
         'body' => 'Контент',
         'type' => 'Тип',
-        'source_type' => 'Тип джерела',
         'source_id' => 'ID джерела',
         'source_label' => 'Джерело',
         'parent' => 'Батьківська',

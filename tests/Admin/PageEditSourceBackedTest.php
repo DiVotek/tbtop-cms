@@ -40,7 +40,6 @@ it('excludes source-backed types from the create form options', function (): voi
 it('hides the block editor tabs and shows the Source card for a source-backed page', function (): void {
     $page = Page::create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'thing-1',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Thing One'],
@@ -61,7 +60,6 @@ it('hides the block editor tabs and shows the Source card for a source-backed pa
     collectNodesByKind($form, 'displayKeyValue', $keyValues);
     expect($keyValues)->toHaveCount(1)
         ->and($keyValues[0]['options']['entries'])->toMatchArray([
-            'Source type' => 'thing',
             'Source ID' => 'thing-1',
             'Source' => 'Thing #thing-1',
         ]);
@@ -70,7 +68,6 @@ it('hides the block editor tabs and shows the Source card for a source-backed pa
 it('does not offer the type select for a source-backed page', function (): void {
     $page = Page::create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'thing-1',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Thing One'],
@@ -90,7 +87,6 @@ it('does not offer the type select for a source-backed page', function (): void 
 it('leaves content null on save for a source-backed page', function (): void {
     $page = Page::create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'thing-1',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Thing One'],

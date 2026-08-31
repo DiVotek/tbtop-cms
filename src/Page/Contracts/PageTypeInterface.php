@@ -20,12 +20,16 @@ interface PageTypeInterface
     /** Max nesting depth for container types; leaf types are not depth-checked. */
     public function maxDepth(): int;
 
-    /** The source_type value this type owns ('product', 'variant', ...); null for content-only types. */
-    public function sourceType(): ?string;
+    /**
+     * True for a type whose pages are created by an external source and
+     * rendered from source()/template(); such pages cannot be created by
+     * hand in cms.
+     */
+    public function isSourceBacked(): bool;
 
     /**
-     * The domain object this page shows, loaded by (source_type, source_id);
-     * null for content-only types and when the source no longer exists.
+     * The domain object this page shows, loaded by (type, source_id); null
+     * for content-only types and when the source no longer exists.
      * Available to every block as ResolveContext::$source.
      */
     public function source(Page $page): ?object;

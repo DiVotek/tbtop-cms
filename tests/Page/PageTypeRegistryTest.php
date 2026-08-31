@@ -100,17 +100,17 @@ it('does not see an extension registered before flushExtensions()', function ():
     expect((new PageTypeRegistry)->has('faq'))->toBeFalse();
 });
 
-it('returns null sourceType/source/template for every built-in type', function (): void {
+it('reports isSourceBacked/source/template as false/null for every built-in type', function (): void {
     $page = new Page(['type' => 'page']);
 
     foreach ([new PageType, new CategoryType, new ArticleType] as $type) {
-        expect($type->sourceType())->toBeNull()
+        expect($type->isSourceBacked())->toBeFalse()
             ->and($type->source($page))->toBeNull()
             ->and($type->template($page))->toBeNull();
     }
 });
 
-it('reports a type source-backed only when sourceType() is non-null', function (): void {
+it('reports a type source-backed only when the type itself says so', function (): void {
     config()->set('tbtop-cms.pages.types', [SourcedType::class]);
     $registry = new PageTypeRegistry;
 

@@ -32,7 +32,7 @@ class PageFormOptions
         $options = [];
 
         foreach ($registry->all() as $type) {
-            if (! $includeSourceBacked && $type->sourceType() !== null) {
+            if (! $includeSourceBacked && $type->isSourceBacked()) {
                 continue;
             }
 

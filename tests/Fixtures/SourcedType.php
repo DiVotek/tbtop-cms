@@ -8,11 +8,10 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Types\BasePageType;
 
 /**
- * Source-backed page type fixture (S3 acceptance tests): source_type
- * 'thing', source() loaded by source_id — 'missing' simulates a deleted
- * source, resolving to null so PageController's 404 branch is exercised.
- * template() returns one Hero block, standing in for a real storefront
- * kind template.
+ * Source-backed page type fixture (S3 acceptance tests): source() loaded by
+ * source_id — 'missing' simulates a deleted source, resolving to null so
+ * PageController's 404 branch is exercised. template() returns one Hero
+ * block, standing in for a real storefront kind template.
  */
 class SourcedType extends BasePageType
 {
@@ -22,9 +21,9 @@ class SourcedType extends BasePageType
     }
 
     #[\Override]
-    public function sourceType(): ?string
+    public function isSourceBacked(): bool
     {
-        return 'thing';
+        return true;
     }
 
     #[\Override]

@@ -12,9 +12,9 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
  * Read-only "Source" card in PageEditSidebar for a source-backed page: the
- * type label, source_type/source_id the page was created from, and — when
- * the type's source() returns a Stringable — its display label. No link to
- * an external admin (dropped from the contract for this slice).
+ * type label, source_id the page was created from, and — when the type's
+ * source() returns a Stringable — its display label. No link to an external
+ * admin (dropped from the contract for this slice).
  */
 final class PageEditSourceCard
 {
@@ -26,7 +26,6 @@ final class PageEditSourceCard
         return $s->section(['title' => __('tbtop-cms::pages.sections.source'), 'variant' => 'card'], [
             $s->displayKeyValue([
                 __('tbtop-cms::pages.fields.type') => PageFormOptions::typeLabelFor($type->key(), $type->label()),
-                __('tbtop-cms::pages.fields.source_type') => (string) $page->source_type,
                 __('tbtop-cms::pages.fields.source_id') => (string) $page->source_id,
                 ...($source instanceof Stringable ? [__('tbtop-cms::pages.fields.source_label') => (string) $source] : []),
             ]),

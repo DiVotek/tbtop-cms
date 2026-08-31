@@ -56,7 +56,7 @@ class PageController
         // unpublished on this channel) has nothing to render: same outcome
         // as an unpublished page — the sync normally retires the page first,
         // this is defense-in-depth for the gap between the two.
-        if ($type->sourceType() !== null && $source === null) {
+        if ($type->isSourceBacked() && $source === null) {
             return $this->notFound($path, $locale, $request);
         }
 

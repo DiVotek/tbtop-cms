@@ -31,9 +31,9 @@ abstract class BasePageType implements PageTypeInterface
     }
 
     /** Content-only by default; a source-backed type overrides this. */
-    public function sourceType(): ?string
+    public function isSourceBacked(): bool
     {
-        return null;
+        return false;
     }
 
     public function source(Page $page): ?object

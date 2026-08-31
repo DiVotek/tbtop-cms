@@ -73,7 +73,7 @@ class PageTypeRegistry
 
     public function isSourceBacked(string $type): bool
     {
-        return $this->get($type)->sourceType() !== null;
+        return $this->get($type)->isSourceBacked();
     }
 
     /** @return list<string> */
@@ -83,7 +83,7 @@ class PageTypeRegistry
 
         return array_values(array_map(
             static fn (PageTypeInterface $type): string => $type->key(),
-            array_filter($this->types, static fn (PageTypeInterface $type): bool => $type->sourceType() !== null),
+            array_filter($this->types, static fn (PageTypeInterface $type): bool => $type->isSourceBacked()),
         ));
     }
 

@@ -24,7 +24,6 @@ beforeEach(function (): void {
 it('renders the type template when a source-backed page has no content', function (): void {
     Page::factory()->create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'thing-1',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Thing One'],
@@ -40,7 +39,6 @@ it('renders the type template when a source-backed page has no content', functio
 it('renders explicit content instead of the template when the source-backed page has content', function (): void {
     Page::factory()->create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'thing-1',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Thing One'],
@@ -58,7 +56,6 @@ it('renders explicit content instead of the template when the source-backed page
 it('404s a source-backed page whose source no longer exists', function (): void {
     Page::factory()->create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'missing',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Gone Thing'],
@@ -71,7 +68,6 @@ it('404s a source-backed page whose source no longer exists', function (): void 
 it('exposes the source to a block resolved on a source-backed page', function (): void {
     Page::factory()->create([
         'type' => 'sourced',
-        'source_type' => 'thing',
         'source_id' => 'thing-1',
         'status' => PageStatus::Published,
         'name' => ['en' => 'Thing One'],

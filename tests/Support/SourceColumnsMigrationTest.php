@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
-it('adds source_type and source_id to tbtop_pages after migrate', function (): void {
-    expect(Schema::hasColumn('tbtop_pages', 'source_type'))->toBeTrue()
-        ->and(Schema::hasColumn('tbtop_pages', 'source_id'))->toBeTrue();
+it('adds source_id to tbtop_pages after migrate, with no separate source_type column', function (): void {
+    expect(Schema::hasColumn('tbtop_pages', 'source_id'))->toBeTrue()
+        ->and(Schema::hasColumn('tbtop_pages', 'source_type'))->toBeFalse();
 });
