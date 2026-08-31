@@ -76,9 +76,15 @@ Notifications::type(
 ```php
 use Tbtop\Cms\Notifications\{Audience, Notifications, Recipient};
 
-Notifications::send('order.placed', new OrderPlacedPayload($order), [
+$deliveries = Notifications::send('order.placed', new OrderPlacedPayload($order), [
     new Recipient(Audience::Customer, $order->locale, email: $order->email),
 ]);
+
+foreach ($deliveries as $delivery) {
+    if ($delivery->failed()) {
+        // $delivery->channel, $delivery->recipient, $delivery->error
+    }
+}
 ```
 
 `Notifications::send()` is synchronous: it renders and delivers to every
@@ -91,3 +97,11 @@ the outcome (did it send? what failed?) can't get that from a call that
 returns before delivery happens. If you don't need the outcome and want the
 call off the request/response path, run it from a queued job or listener
 yourself — `send()` will not queue it for you.
+
+It returns one `Delivery` per attempted (recipient, channel) pair, in
+dispatch order, each carrying the channel key, the recipient, a `Sent` or
+`Failed` status and the error. Use that return value to decide your own
+state — do not reconstruct it by querying `tbtop_notification_log`: the log
+is shared by every concurrent request and has no column tying a row to the
+entity that triggered the send, so a window query there will pick up another
+caller's failures.

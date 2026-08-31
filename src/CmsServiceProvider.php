@@ -48,6 +48,7 @@ use Tbtop\Cms\Notifications\Channels\BellChannel;
 use Tbtop\Cms\Notifications\Channels\MailChannel;
 use Tbtop\Cms\Notifications\Channels\TelegramChannel;
 use Tbtop\Cms\Notifications\Contracts\TemplateStore;
+use Tbtop\Cms\Notifications\DeliveryRecorder;
 use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\NotificationRegistry;
 use Tbtop\Cms\Notifications\Notifications;
@@ -137,6 +138,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(SubmissionNotifier::class);
         $this->app->scoped(AuditContext::class);
         $this->app->singleton(NotificationRegistry::class);
+        $this->app->scoped(DeliveryRecorder::class);
         $this->app->scoped(TemplateRenderer::class);
         $this->app->bind(TemplateStore::class, NullTemplateStore::class);
         $this->registerAdminPanel();

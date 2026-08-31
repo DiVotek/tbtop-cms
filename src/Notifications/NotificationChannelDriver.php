@@ -24,6 +24,7 @@ final readonly class NotificationChannelDriver
         private NotificationRegistry $registry,
         private Settings $settings,
         private Dispatcher $events,
+        private DeliveryRecorder $recorder,
     ) {}
 
     public function send(object $notifiable, TemplatedNotification $notification): void
@@ -45,6 +46,14 @@ final readonly class NotificationChannelDriver
         } catch (Throwable $e) {
             $log->forceFill(['status' => NotificationLogStatus::Failed, 'error' => $e->getMessage()])->save();
 
+            $this->recorder->record(new Delivery(
+                $notification->type,
+                $notification->channelKey,
+                $recipient,
+                NotificationLogStatus::Failed,
+                $e->getMessage(),
+            ));
+
             $this->events->dispatch(new NotificationFailed(
                 $notification->type,
                 $notification->channelKey,
@@ -56,6 +65,13 @@ final readonly class NotificationChannelDriver
         }
 
         $log->forceFill(['status' => NotificationLogStatus::Sent, 'sent_at' => now()])->save();
+
+        $this->recorder->record(new Delivery(
+            $notification->type,
+            $notification->channelKey,
+            $recipient,
+            NotificationLogStatus::Sent,
+        ));
 
         $this->events->dispatch(new NotificationSent($notification->type, $notification->channelKey, $recipient));
     }

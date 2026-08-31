@@ -7,8 +7,7 @@ namespace Tbtop\Cms\Form;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Notifications\FormSubmissionPayloadFactory;
 use Tbtop\Cms\Form\Notifications\FormSubmissionRecipients;
-use Tbtop\Cms\Notifications\Models\NotificationLog;
-use Tbtop\Cms\Notifications\NotificationLogStatus;
+use Tbtop\Cms\Notifications\Delivery;
 use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -29,12 +28,13 @@ use Tbtop\Cms\Settings\Settings;
  * error joined into one message, as soon as any enabled channel throws; a
  * disabled channel is skipped silently and never contributes an error.
  * Notifications::send() itself never throws a per-channel failure (it logs
- * it to notification_log and moves on to the next channel/recipient) — this
- * class reads the log rows written during its own send() call to recover
- * those errors, since it is the only caller that needs the per-delivery
- * outcome back rather than just the log table. Reading the log rather than
- * listening for NotificationFailed avoids mutating the shared event
- * dispatcher for the duration of one call.
+ * it to notification_log and moves on to the next channel/recipient) — it
+ * returns one Delivery per attempted (recipient, channel) pair instead, and
+ * this class turns the failed ones into the error message. The return value
+ * is the only sound source: notification_log is shared by every concurrent
+ * request and has no column tying a row to the submission that caused it, so
+ * reading it back by id window attributed a concurrent submission's failure
+ * to this one.
  */
 class SubmissionNotifier
 {
@@ -99,16 +99,15 @@ class SubmissionNotifier
         }
 
         $payload = FormSubmissionPayloadFactory::make($submission, $page);
-        $sinceId = (int) (NotificationLog::query()->max('id') ?? 0);
 
-        Notifications::send('form.submission', $payload, $built->recipients);
+        $deliveries = Notifications::send('form.submission', $payload, $built->recipients);
 
-        return NotificationLog::query()
-            ->where('id', '>', $sinceId)
-            ->where('type', 'form.submission')
-            ->where('status', NotificationLogStatus::Failed)
-            ->get()
-            ->map(fn (NotificationLog $log): string => __("tbtop-cms::notifications.errors.{$log->channel}", ['error' => (string) $log->error]))
-            ->all();
+        return array_values(array_map(
+            fn (Delivery $delivery): string => __(
+                "tbtop-cms::notifications.errors.{$delivery->channel}",
+                ['error' => (string) $delivery->error],
+            ),
+            array_filter($deliveries, fn (Delivery $delivery): bool => $delivery->failed()),
+        ));
     }
 }

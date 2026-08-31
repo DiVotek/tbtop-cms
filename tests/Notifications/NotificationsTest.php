@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Tbtop\Cms\Notifications\Audience;
+use Tbtop\Cms\Notifications\Delivery;
 use Tbtop\Cms\Notifications\Events\NotificationFailed;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
 use Tbtop\Cms\Notifications\Format;
@@ -126,4 +127,42 @@ it('logs one channel as failed and dispatches NotificationFailed while other cha
         NotificationFailed::class,
         fn (NotificationFailed $event): bool => $event->channel === 'recording' && str_contains($event->error, 'refused'),
     );
+});
+
+it('returns one delivery per attempted recipient and channel, carrying each outcome', function (): void {
+    RecordingChannel::$throwForEmail = 'ana@example.test';
+    $recipient = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+
+    $deliveries = Notifications::send('test.recorded', new TestNotificationPayload('hi'), [$recipient]);
+
+    expect($deliveries)->toHaveCount(2);
+
+    $byChannel = collect($deliveries)->keyBy(fn (Delivery $delivery): string => $delivery->channel);
+
+    expect($byChannel['recording']->status)->toBe(NotificationLogStatus::Failed)
+        ->and($byChannel['recording']->failed())->toBeTrue()
+        ->and($byChannel['recording']->error)->toContain('refused ana@example.test')
+        ->and($byChannel['recording']->recipient->email)->toBe('ana@example.test')
+        ->and($byChannel['recording-short']->status)->toBe(NotificationLogStatus::Sent)
+        ->and($byChannel['recording-short']->failed())->toBeFalse()
+        ->and($byChannel['recording-short']->error)->toBeNull();
+});
+
+it('reports only its own deliveries when an unrelated failed row shares the log', function (): void {
+    NotificationLog::query()->create([
+        'type' => 'test.recorded',
+        'channel' => 'recording',
+        'audience' => Audience::Customer,
+        'recipient' => 'someone-else@example.test',
+        'locale' => 'en',
+        'status' => NotificationLogStatus::Failed,
+        'error' => 'a concurrent caller failed',
+    ]);
+
+    $recipient = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+
+    $deliveries = Notifications::send('test.recorded', new TestNotificationPayload('hi'), [$recipient]);
+
+    expect(array_filter($deliveries, fn (Delivery $delivery): bool => $delivery->failed()))->toBeEmpty()
+        ->and($deliveries)->toHaveCount(2);
 });

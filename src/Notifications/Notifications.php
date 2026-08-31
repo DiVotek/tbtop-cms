@@ -29,6 +29,12 @@ use Tbtop\Cms\Settings\Settings;
  * caller's concern: run send() from inside a queued job or listener (as
  * SubmissionNotifier already defers its own call via app()->terminating())
  * when the caller doesn't need the outcome back.
+ *
+ * That outcome is the return value: exactly the deliveries this call made.
+ * Callers must not reconstruct it by re-reading notification_log — the log
+ * is shared by every concurrent request and carries no correlation to the
+ * entity that triggered a send, so a window query there attributes another
+ * caller's failure to this one.
  */
 final class Notifications
 {
@@ -43,8 +49,11 @@ final class Notifications
         app(NotificationRegistry::class)->registerChannel($channel);
     }
 
-    /** @param list<Recipient> $recipients */
-    public static function send(string $typeKey, object $payload, array $recipients): void
+    /**
+     * @param  list<Recipient>  $recipients
+     * @return list<Delivery> one entry per attempted (recipient, channel) pair, in dispatch order
+     */
+    public static function send(string $typeKey, object $payload, array $recipients): array
     {
         $registry = app(NotificationRegistry::class);
         $type = $registry->type($typeKey);
@@ -61,35 +70,44 @@ final class Notifications
         $templateStore = app(TemplateStore::class);
         $channelKeys = self::enabledChannels($typeKey, $type, $settings);
 
-        foreach ($recipients as $recipient) {
-            if (! in_array($recipient->audience, $type->audienceValues(), true)) {
-                continue;
+        $recorder = app(DeliveryRecorder::class);
+        $recorder->begin();
+
+        try {
+            foreach ($recipients as $recipient) {
+                if (! in_array($recipient->audience, $type->audienceValues(), true)) {
+                    continue;
+                }
+
+                foreach ($channelKeys as $channelKey) {
+                    if (! $registry->hasChannel($channelKey)) {
+                        continue;
+                    }
+
+                    $channel = $registry->channel($channelKey);
+
+                    if (! $channel->supports($recipient)) {
+                        continue;
+                    }
+
+                    $view = $templateStore->override($typeKey, $channel->format(), $recipient->locale)
+                        ?? $type->templateFor($channel->format());
+
+                    if ($view === null) {
+                        continue;
+                    }
+
+                    $rendered = $renderer->render($view, $payload, $recipient->locale);
+                    $notifiable = $recipient->notifiable ?? new AnonymousNotifiable;
+
+                    NotificationFacade::sendNow($notifiable, new TemplatedNotification($typeKey, $channelKey, $rendered, $recipient));
+                }
             }
-
-            foreach ($channelKeys as $channelKey) {
-                if (! $registry->hasChannel($channelKey)) {
-                    continue;
-                }
-
-                $channel = $registry->channel($channelKey);
-
-                if (! $channel->supports($recipient)) {
-                    continue;
-                }
-
-                $view = $templateStore->override($typeKey, $channel->format(), $recipient->locale)
-                    ?? $type->templateFor($channel->format());
-
-                if ($view === null) {
-                    continue;
-                }
-
-                $rendered = $renderer->render($view, $payload, $recipient->locale);
-                $notifiable = $recipient->notifiable ?? new AnonymousNotifiable;
-
-                NotificationFacade::sendNow($notifiable, new TemplatedNotification($typeKey, $channelKey, $rendered, $recipient));
-            }
+        } finally {
+            $deliveries = $recorder->end();
         }
+
+        return $deliveries;
     }
 
     /** @return list<string> */
