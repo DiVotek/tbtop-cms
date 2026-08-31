@@ -23,6 +23,7 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
 /**
  * @property int $id
  * @property string $type
+ * @property string|null $source_id
  * @property int|null $parent_id
  * @property PageStatus $status
  * @property Carbon|null $published_at
@@ -68,6 +69,7 @@ class Page extends Model
      */
     protected $fillable = [
         'type',
+        'source_id',
         'parent_id',
         'status',
         'published_at',

@@ -15,6 +15,7 @@ final readonly class ResolveContext
         public ?Page $page = null,
         private ?MediaUrlResolver $mediaUrlResolver = null,
         private ?RichtextHtmlRenderer $richtextHtmlRenderer = null,
+        public ?object $source = null,
     ) {}
 
     public function mediaUrl(string | int $id): ?string

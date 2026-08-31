@@ -24,6 +24,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
  * Dedicated full-page editor for a single page record: a status bar (badge,
@@ -128,26 +129,42 @@ class PageEditPage extends AdminPage
             ]),
             $footer,
         ])
-            ->record([...PageForm::loadRow($this->pageId()), ...PageEditBlockTabs::recordValues($page)])
+            ->record([
+                ...PageForm::loadRow($this->pageId()),
+                ...($this->isSourceBacked($page) ? [] : PageEditBlockTabs::recordValues($page)),
+            ])
             ->onSubmit($this->save(...));
 
         return $s->stack([$form]);
     }
 
-    /** @return list<array{label: string, body: mixed, badge?: string}> */
+    /**
+     * A source-backed page's content is owned by its type's template, not by
+     * an editor: no per-block tabs, no starter blocks (which only apply to a
+     * category type anyway), no "+ Add block" tab.
+     *
+     * @return list<array{label: string, body: mixed, badge?: string}>
+     */
     private function tabs(S $s, Page $page): array
     {
+        $isSourceBacked = $this->isSourceBacked($page);
+
         return [
             [
                 'label' => __('tbtop-cms::pages.tabs_edit.general'),
                 'body' => $s->stack([
                     ...PageForm::generalFields($s, ! $page->is_system),
-                    ...PageEditStarterBlocks::build($s, $page),
+                    ...($isSourceBacked ? [] : PageEditStarterBlocks::build($s, $page)),
                 ]),
             ],
             ['label' => __('tbtop-cms::pages.tabs_edit.seo'), 'body' => $s->stack(PageForm::seoFields($s, $page))],
-            ...PageEditBlockTabs::build($s, $page),
+            ...($isSourceBacked ? [] : PageEditBlockTabs::build($s, $page)),
         ];
+    }
+
+    private function isSourceBacked(Page $page): bool
+    {
+        return app(PageTypeRegistry::class)->isSourceBacked($page->type);
     }
 
     private function saveAction(S $s, string $name): ActionBuilder

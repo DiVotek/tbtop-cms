@@ -8,6 +8,8 @@ use Tbtop\Cms\Block\BlockResolutionException;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\BrokenBlock;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
+use Tbtop\Cms\Tests\Fixtures\SourceAwareBlock;
+use Tbtop\Cms\Tests\Fixtures\SourcedThing;
 
 uses(RefreshDatabase::class);
 
@@ -15,7 +17,7 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     Language::factory()->create(['locale' => 'uk']);
     app()->setLocale('en');
-    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, BrokenBlock::class]);
+    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, BrokenBlock::class, SourceAwareBlock::class]);
 });
 
 it('resolves a block with locale-flattened props', function (): void {
@@ -115,6 +117,16 @@ it('throws on an unknown kind when strict mode is enabled', function (): void {
         ['id' => 'a', 'kind' => 'Ghost', 'active' => true, 'data' => []],
     ]);
 })->throws(BlockResolutionException::class);
+
+it('exposes the resolve() $source argument on the ResolveContext passed to each block', function (): void {
+    $source = new SourcedThing('thing-1');
+
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'SourceAware', 'active' => true, 'data' => []],
+    ], source: $source);
+
+    expect($out[0]->props)->toBe(['source' => 'Thing #thing-1']);
+});
 
 it('throws with the original error as previous when strict mode is enabled', function (): void {
     config()->set('tbtop-cms.blocks.strict', true);

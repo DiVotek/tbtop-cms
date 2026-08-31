@@ -18,7 +18,9 @@ use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
+use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Redirect\RedirectResolver;
 
 class PageController
@@ -31,6 +33,7 @@ class PageController
         private readonly PageSpecAssembler $assembler,
         private readonly SeoResolver $seo,
         private readonly FormActionBinder $forms,
+        private readonly PageTypeRegistry $pageTypes,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -43,18 +46,39 @@ class PageController
         $page = $this->resolver->resolve($path, $locale, $previewAccess);
 
         if (! $page instanceof Page) {
-            $redirect = $this->redirects->resolve($path, $locale, $request);
-
-            if ($redirect !== null) {
-                return $redirect;
-            }
-
-            event(new PageNotFound($path, $locale, $request->headers->get('referer'), $request->userAgent()));
-
-            throw new NotFoundHttpException;
+            return $this->notFound($path, $locale, $request);
         }
 
-        return Inertia::render($this->component(), $this->props($page, $locale, $path));
+        // pages.type is unconstrained, so a page outlives its type's
+        // registration; it still renders its stored content.
+        $type = $this->pageTypes->has($page->type) ? $this->pageTypes->get($page->type) : null;
+        $isSourceBacked = $type?->isSourceBacked() === true;
+
+        // source() is a host database call — only source-backed types pay it.
+        $source = $isSourceBacked ? $type->source($page) : null;
+
+        // A source-backed type whose source() resolves to null (deleted,
+        // unpublished on this channel) has nothing to render: same outcome
+        // as an unpublished page — the sync normally retires the page first,
+        // this is defense-in-depth for the gap between the two.
+        if ($isSourceBacked && $source === null) {
+            return $this->notFound($path, $locale, $request);
+        }
+
+        return Inertia::render($this->component(), $this->props($page, $locale, $path, $type, $source));
+    }
+
+    private function notFound(string $path, string $locale, Request $request): RedirectResponse
+    {
+        $redirect = $this->redirects->resolve($path, $locale, $request);
+
+        if ($redirect !== null) {
+            return $redirect;
+        }
+
+        event(new PageNotFound($path, $locale, $request->headers->get('referer'), $request->userAgent()));
+
+        throw new NotFoundHttpException;
     }
 
     /**
@@ -72,9 +96,10 @@ class PageController
     }
 
     /** @return array<string, mixed> */
-    private function props(Page $page, string $locale, string $path): array
+    private function props(Page $page, string $locale, string $path, ?PageTypeInterface $type, ?object $source): array
     {
-        $resolved = $this->forms->bind($this->blocks->resolve($page->content ?? [], $page), $page);
+        $content = $page->content ?? $type?->template($page) ?? [];
+        $resolved = $this->forms->bind($this->blocks->resolve($content, $page, $source), $page);
         // Not live covers draft, scheduled (published_at in the future), and
         // expired (unpublish_at in the past): reaching this page at all with
         // any of those means the caller has preview access (PageResolver's

@@ -107,6 +107,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_17_000001_update_pages_add_starter_blocks_table')
             ->hasMigration('2026_08_18_000000_create_activity_log_table')
             ->hasMigration('2026_08_27_000000_create_notification_log_table')
+            ->hasMigration('2026_08_31_000001_update_pages_add_source_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

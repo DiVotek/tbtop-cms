@@ -71,6 +71,26 @@ class PageTypeRegistry
         return array_keys($this->types);
     }
 
+    /**
+     * False for an unregistered type: pages.type is unconstrained, so a page
+     * outlives its type's registration and must stay editable and renderable.
+     */
+    public function isSourceBacked(string $type): bool
+    {
+        return $this->has($type) && $this->get($type)->isSourceBacked();
+    }
+
+    /** @return list<string> */
+    public function sourceBackedKeys(): array
+    {
+        $this->boot();
+
+        return array_values(array_map(
+            static fn (PageTypeInterface $type): string => $type->key(),
+            array_filter($this->types, static fn (PageTypeInterface $type): bool => $type->isSourceBacked()),
+        ));
+    }
+
     private function boot(): void
     {
         if ($this->booted) {

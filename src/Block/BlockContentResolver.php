@@ -29,12 +29,12 @@ class BlockContentResolver
      * @param  array<int, mixed>  $content
      * @return list<ResolvedBlock>
      */
-    public function resolve(array $content, ?Page $page = null): array
+    public function resolve(array $content, ?Page $page = null, ?object $source = null): array
     {
         $locale = app()->getLocale();
         $fallback = $this->languages->defaultLocale();
         $locales = array_column($this->languages->all(), 'locale');
-        $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver);
+        $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver, source: $source);
         $strict = (bool) config('tbtop-cms.blocks.strict', false);
 
         $resolved = [];

@@ -65,6 +65,7 @@ return [
         'social' => 'Social networks',
         'image' => 'Image',
         'schema' => 'Structured data',
+        'source' => 'Source',
     ],
     'fields' => [
         'name' => 'Name',
@@ -78,6 +79,8 @@ return [
         'summary' => 'Summary',
         'body' => 'Content',
         'type' => 'Type',
+        'source_id' => 'Source ID',
+        'source_label' => 'Source',
         'parent' => 'Parent',
         'status' => 'Status',
         'published_at' => 'Publish at',
@@ -237,6 +240,7 @@ return [
     'validation' => [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
+        'type_source_backed' => 'Pages of type :type are created by their source, not by hand.',
         'status_invalid' => 'Status [:status] is not a valid page status.',
         'delete_has_children' => 'This page has child pages — move or delete them first.',
         'delete_system' => 'System pages cannot be deleted.',
