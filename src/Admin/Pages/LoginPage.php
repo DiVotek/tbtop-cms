@@ -9,16 +9,16 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
-use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Admin\Panels\CurrentPanel;
 use Tbtop\Admin\Panels\PanelConfig;
+use Tbtop\Cms\Admin\Http\Middleware\RedirectIfCmsAuthenticated;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 
 // Deliberately no can() override: must be reachable unauthenticated, gated
-// by the guest middleware below instead. See SectionAbilitiesTest.
+// by the guest-redirect middleware below instead. See SectionAbilitiesTest.
 class LoginPage extends Page
 {
     public static function path(): string
@@ -35,7 +35,7 @@ class LoginPage extends Page
     /** @return list<string>|null */
     public static function middleware(PanelConfig $panel): ?array
     {
-        return ['web', 'guest:' . $panel->getGuard()];
+        return ['web', RedirectIfCmsAuthenticated::class . ':' . $panel->getGuard()];
     }
 
     #[\Override]
@@ -141,7 +141,7 @@ class LoginPage extends Page
         return CurrentPanel::current()?->brand() ?? __('tbtop-admin::admin.nav.title');
     }
 
-    private function authenticate(ActionCtx $ctx): Effects
+    private function authenticate(ActionCtx $ctx): string
     {
         $guard = (string) config('tbtop-cms.admin.guard', 'web');
         $remember = (bool) ($ctx->form['remember'] ?? false);
@@ -182,6 +182,6 @@ class LoginPage extends Page
         $ctx->request->session()->regenerate();
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
 
-        return Effects::make()->redirect(url($prefix . '/dashboard'));
+        return url($prefix . '/dashboard');
     }
 }
