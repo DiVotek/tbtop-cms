@@ -81,9 +81,9 @@ jobs:
         with:
           dependency-versions: highest
 
-      # Let paratest size the pool. Pinning --processes=4 to match the
-      # runner's advertised vCPU was measured slower (74s vs 65s): the two
-      # cores it detects are the ones actually usable.
+      # Let paratest size the pool. Pinning --processes=4 was tried and showed
+      # no gain, but run-to-run variance on the runner is wide (65-85s for the
+      # same commit), so treat that as inconclusive rather than as evidence.
       - name: Execute tests
         run: vendor/bin/pest --ci --parallel
 
