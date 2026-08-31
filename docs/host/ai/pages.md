@@ -77,7 +77,13 @@ extension registered after boot has latched is stored but never read
 (`src/Page/PageTypeRegistry.php`). Duplicate keys across config and every
 extension throw `InvalidArgumentException` at boot.
 
-`PageTypeRegistry::isSourceBacked($type)` returns `false` for an
+`PageTypeRegistry` instance methods (`has()`, `get()`, `all()`, `keys()`,
+`isSourceBacked()`) — call them on the resolved instance
+(`app(PageTypeRegistry::class)->isSourceBacked($type)`); they are not
+static, and a static call fails. Only `extend()` and
+`flushExtensions()` are static.
+
+`isSourceBacked()` returns `false` for an
 unregistered type rather than throwing — `pages.type` is an unconstrained
 string column, so a page outlives its type's registration (a host removed
 the class from config) and must still render its stored content instead of
@@ -147,6 +153,12 @@ writer. It runs automatically from `PageObserver::saved()` on **every**
 `Page::save()` — a host never calls it directly except when seeding wants to
 force a specific slug (see Seeding below) or after a manual
 `Languages`/locale change (`backfillLocale()`).
+
+**No language rows → no slugs → 404.** `sync()` writes slug rows only for
+locales that exist in the languages table. In a fresh database with no
+languages seeded, saving a page produces an empty `tbtop_page_slugs` table,
+`pathFor()` returns `null`, and the page does not resolve (404). Seed
+languages before creating pages — this bites most often in tests.
 
 - A non-empty slug override (from `Page::$pendingSlugOverrides`, keyed by
   locale) always wins over the stored/derived slug, for both new and

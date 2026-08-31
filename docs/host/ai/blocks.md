@@ -15,7 +15,7 @@ A block is three things, in three places, kept in sync by hand:
 
 | Layer | Where | Owns |
 |---|---|---|
-| PHP class | extends `Tbtop\Cms\Block\Block`, registered in `tbtop-cms.blocks.types` (or via `BlockRegistry::extend()`) | `kind()`, the editor form, `resolve()` — untrusted input to typed props |
+| PHP class | extends `Tbtop\Cms\Block\Block`, registered in `tbtop-cms.blocks.types` (or `BlockRegistry::extend()` for programmatic registration) | `kind()`, the editor form, `resolve()` — untrusted input to typed props |
 | Zod schema | host's `resources/js/cms/catalog.ts`, keyed by `kind()` under `components` | the prop *contract* the renderer validates against |
 | React component | host's `resources/js/cms/registry.tsx`, keyed by the same `kind()` | presentation |
 
@@ -36,7 +36,7 @@ abstract methods:
 
 - **`kind(): string`** — the wire identifier stored in the envelope and
   matched against the catalog/registry keys. Must be non-empty and unique
-  across the registry (`BlockRegistry::register()` throws otherwise, see
+  across the registry (a duplicate kind throws `InvalidArgumentException`, see
   `tests/Block/BlockRegistryTest.php`).
 - **`form(S $s): array`** — the editor form, in tbtop/admin's field DSL. See
   [Form DSL for blocks](#form-dsl-for-blocks) below.
@@ -112,7 +112,10 @@ by every reader that touches this column *without* going through
 guarantee "a list of arrays," nothing about shape.
 
 **`BlockContentResolver::resolve()`** (`src/Block/BlockContentResolver.php`)
-is the single path from stored envelope to renderable blocks. Per entry, in
+is the single path from stored envelope to renderable blocks. **Hosts never
+call it directly** — the package invokes it internally during page render
+(via `PageSpecAssembler`); a block author only implements `Block::resolve()`
+and receives already-flattened data (called during page and layout render). Per entry, in
 order:
 
 1. Sort by `sort` (missing `sort` — legacy content saved before the field
@@ -295,6 +298,19 @@ are the client's half of the three-layer contract:
   block still renders (see `ContactModalContext.tsx`'s `NOOP` value in
   divotek_com_ua). The package's `ResolveContext`/props contract has no
   concept of cross-block client state — it's resolved entirely client-side.
+
+## Server-side / Blade rendering
+
+The three-layer rule above covers blocks rendered through the json-render
+React pipeline. A host that renders a block server-side instead (plain
+Blade) owns the whole path itself: the package resolves props via
+`BlockContentResolver` but ships **no Blade view convention, no view
+registration, and no automatic blade fallback** — a block without a
+catalog/registry entry does not fall back to a Blade template. To render
+server-side, resolve the envelope yourself (or read `ResolvedBlock`s the
+package assembled) and render your own `resources/views/...` template keyed
+however your host likes. Treat this as a host-side escape hatch, not a
+supported alternative to the catalog/registry contract.
 
 ## Layout blocks
 
