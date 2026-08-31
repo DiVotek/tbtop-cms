@@ -8,10 +8,30 @@ use InvalidArgumentException;
 
 class BlockRegistry
 {
+    /** @var list<callable(): list<class-string>> */
+    private static array $extensions = [];
+
     /** @var array<string, Block> */
     private array $blocks = [];
 
     private bool $booted = false;
+
+    /**
+     * @param  callable(): list<class-string>  $extension  invoked once, on the registry's first use
+     *
+     * Must run before the singleton's first get()/has()/all()/kinds() call —
+     * an extension registered after boot() has latched is stored but never read.
+     */
+    public static function extend(callable $extension): void
+    {
+        self::$extensions[] = $extension;
+    }
+
+    /** Test isolation; the cms TestCase calls it between cases. */
+    public static function flushExtensions(): void
+    {
+        self::$extensions = [];
+    }
 
     public function get(string $kind): Block
     {
@@ -58,6 +78,12 @@ class BlockRegistry
 
         foreach ($custom as $class) {
             $this->register($class);
+        }
+
+        foreach (self::$extensions as $extension) {
+            foreach ($extension() as $class) {
+                $this->register($class);
+            }
         }
 
         $this->booted = true;

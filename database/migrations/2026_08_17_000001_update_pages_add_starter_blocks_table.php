@@ -11,7 +11,7 @@ return new class extends Migration
     /**
      * Section starter blocks: a category-only JSON bag shaped
      * `['article' => <block envelope>, 'category' => <block envelope>]`,
-     * each envelope the same shape as `content` (see BlockContentField).
+     * each envelope the same shape as `content` (see Admin\Fields\BlockContent).
      * Nullable/absent for every non-category page, and for a category that
      * has not set either starter yet.
      */

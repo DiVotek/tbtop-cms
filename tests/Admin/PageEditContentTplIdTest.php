@@ -22,7 +22,7 @@ beforeEach(function (): void {
 
 /**
  * The critical round-trip check called out in the starter-blocks brief:
- * tpl_id is not a declared BlockContentField sub-field, so the admin
+ * tpl_id is not a declared BlockContent sub-field, so the admin
  * FormSubmitController's server-side $request->validate() strips it from
  * every content row before PageForm::save() ever sees the submitted form —
  * confirmed by inspecting RuleWalker::collect(), which only emits a rule per

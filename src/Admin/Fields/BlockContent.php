@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tbtop\Cms\Admin\Pages\Support;
+namespace Tbtop\Cms\Admin\Fields;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -12,8 +12,10 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
 
 /**
- * Builds the Pages "Blocks" repeater and maps its rows to and from the stored
- * {id, kind, active, sort, data} block envelope.
+ * Builds the "Blocks" repeater and maps its rows to and from the stored
+ * {id, kind, active, sort, data} block envelope. Public API: also used by
+ * hosts (e.g. the storefront's template settings page) that need a block
+ * editor field outside cms's own page/layout forms.
  *
  * v1 targets a single registered block kind: every registered block's form
  * fields are unioned into one flat repeater, so two kinds declaring the same
@@ -26,9 +28,9 @@ use Tbtop\Cms\Block\BlockRegistry;
  * UI here) — toEnvelope() only preserves a `sort` a caller already placed on
  * the row (e.g. PageEditBlocks::toRows()), it never assigns one.
  */
-class BlockContentField
+final class BlockContent
 {
-    public static function make(S $s): Node
+    public static function make(S $s, string $name = 'content'): Node
     {
         $fields = [
             $s->text('id')->meta('hidden', true),
@@ -38,7 +40,7 @@ class BlockContentField
         ];
 
         return $s->section(['title' => __('tbtop-cms::pages.blocks.section_title')], [
-            $s->repeater('content')->label(__('tbtop-cms::pages.blocks.section_title'))->fields($fields),
+            $s->repeater($name)->label(__('tbtop-cms::pages.blocks.section_title'))->fields($fields),
         ]);
     }
 

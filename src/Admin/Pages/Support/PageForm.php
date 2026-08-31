@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Fields\BlockContent;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockEnvelope;
 use Tbtop\Cms\Frontend\Breadcrumbs;
@@ -536,7 +537,7 @@ class PageForm
             return app(StarterBlocks::class)->contentFor($page);
         }
 
-        $envelope = BlockContentField::toEnvelope($form['content'] ?? null);
+        $envelope = BlockContent::toEnvelope($form['content'] ?? null);
 
         return $isCreate ? $envelope : self::withCarriedTplIds($envelope, $contentBefore);
     }
@@ -545,7 +546,7 @@ class PageForm
      * Re-attaches each block's tpl_id (starter-block provenance — see
      * StarterBlocks/StarterBlockSync) by matching the persisted 'id'.
      *
-     * tpl_id is not a declared BlockContentField sub-field, so it carries no
+     * tpl_id is not a declared BlockContent sub-field, so it carries no
      * validation rule; Illuminate\Http\Request::validate() (FormSubmit
      * Controller) drops any form key without one before PageForm::save()
      * ever sees it — the admin repeater's client state keeps tpl_id on rows
@@ -809,7 +810,7 @@ class PageForm
             'sort_order' => $page->sort_order,
             'paths' => $page->slugs->pluck('path', 'locale')->all(),
             'slug' => $page->slugs->pluck('slug', 'locale')->all(),
-            'content' => BlockContentField::toRows($page->content),
+            'content' => BlockContent::toRows($page->content),
             'image' => (string) ($page->image ?? ''),
             // Passed through raw (scalar or locale map) rather than cast to
             // string: TranslatableRecord::normalize() expands a legacy
