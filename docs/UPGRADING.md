@@ -52,3 +52,43 @@ the block-content editor field outside cms's own page/layout forms.
 `make()` gains an optional `$name` parameter (default `'content'`) to mount
 the repeater under a different form field. There is no compatibility shim —
 update any reference to the old class name.
+
+## Pages can be backed by a source (source-backed page types)
+
+`tbtop_pages` gains two nullable columns, `source_type` and `source_id`
+(indexed together), plus three new `PageTypeInterface` methods:
+
+```php
+public function sourceType(): ?string;
+public function source(Page $page): ?object;
+public function template(Page $page): ?array;
+```
+
+`Tbtop\Cms\Page\Types\BasePageType` implements all three as `null`, so
+`PageType`, `CategoryType`, `ArticleType` and any host type that already
+extends it keep working unchanged — the interface growth is backward
+compatible. A host type that implements `PageTypeInterface` directly
+(without extending `BasePageType`) must add the three methods itself.
+
+A type opts into being source-backed by returning a non-null `sourceType()`
+(e.g. `'product'`) and loading its domain object from `(source_type,
+source_id)` in `source()`. `PageTypeRegistry` gains `isSourceBacked(string
+$key): bool` and `sourceBackedKeys(): list<string>` to query this without a
+`Page` instance.
+
+On the frontend, `page.content === null` now means "render the type's
+template": `PageController` calls `$type->template($page)` when content is
+null, and passes the resolved `source()` through to every block via a new
+`ResolveContext::$source` property (`BlockContentResolver::resolve()` gains
+a matching `?object $source` parameter, appended last so existing positional
+callers are unaffected). A source-backed page whose `source()` resolves to
+`null` (the underlying record was deleted or is unpublished) 404s exactly
+like an unpublished page.
+
+In the page editor, a source-backed page shows a read-only "Source" card
+(type, source_type, source_id, and the source's string form when it is
+`Stringable`) instead of the type select, and hides block editing entirely
+— `content` is left untouched on save, so it stays `null` and keeps
+rendering the template. The create form and the edit sidebar's type select
+both exclude source-backed types: creating or retyping one by hand is not
+supported, a host that syncs pages from another source owns that.
