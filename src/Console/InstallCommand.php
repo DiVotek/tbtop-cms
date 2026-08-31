@@ -146,6 +146,11 @@ class InstallCommand extends Command
         $this->line('     under public/ before any route runs, so it shadows the dynamic /robots.txt.');
         $this->newLine();
 
+        $this->line('  7. Point an agent building on this host at the host-builder guide — add this line');
+        $this->line('     to your AGENTS.md or CLAUDE.md:');
+        $this->line('       Building on tbtop/cms → read vendor/tbtop/cms/docs/host/ai/README.md first.');
+        $this->newLine();
+
         $this->line('  Then run `php artisan cms:doctor` — it verifies each step above.');
     }
 }

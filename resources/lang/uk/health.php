@@ -157,5 +157,13 @@ return [
                 'array' => 'Сесія array не переживає редирект, тому вхід у панель і всі flash-повідомлення мовчки не спрацьовують. Цей драйвер призначений для тестів — встановіть SESSION_DRIVER у file, database або redis.',
             ],
         ],
+        'agent_docs_pointer' => [
+            'label' => 'Вказівник на гайд для агента',
+            'ok' => 'AGENTS.md або CLAUDE.md хоста вказує агенту на гайд для збірки хоста.',
+            'missing' => 'Ані AGENTS.md, ані CLAUDE.md не вказує агенту на гайд для збірки хоста.',
+            'hints' => [
+                'missing' => 'Додайте цей рядок у ваш AGENTS.md або CLAUDE.md (перевірено: :candidates), щоб агент знайшов гайд: "Building on tbtop/cms → read vendor/tbtop/cms/docs/host/ai/README.md first."',
+            ],
+        ],
     ],
 ];
