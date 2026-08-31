@@ -29,6 +29,7 @@ use Tbtop\Cms\Console\DoctorCommand;
 use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Form\Events\SubmissionReceived;
 use Tbtop\Cms\Form\Listeners\NotifiesAdminsOfSubmission;
+use Tbtop\Cms\Form\Notifications\FormSubmissionPayload;
 use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Frontend\Http\Middleware\EnableSsr;
 use Tbtop\Cms\Frontend\PageResolver;
@@ -42,6 +43,18 @@ use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\NotFound\Commands\PruneNotFoundHitsCommand;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\NotFound\Listeners\RecordsNotFoundHit;
+use Tbtop\Cms\Notifications\Audience;
+use Tbtop\Cms\Notifications\Channels\BellChannel;
+use Tbtop\Cms\Notifications\Channels\MailChannel;
+use Tbtop\Cms\Notifications\Channels\TelegramChannel;
+use Tbtop\Cms\Notifications\Contracts\TemplateStore;
+use Tbtop\Cms\Notifications\DeliveryRecorder;
+use Tbtop\Cms\Notifications\Format;
+use Tbtop\Cms\Notifications\NotificationRegistry;
+use Tbtop\Cms\Notifications\Notifications;
+use Tbtop\Cms\Notifications\Support\NullTemplateStore;
+use Tbtop\Cms\Notifications\TemplateRenderer;
+use Tbtop\Cms\Notifications\TypeDefinition;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PagePublished;
 use Tbtop\Cms\Page\Events\PageRestored;
@@ -58,7 +71,6 @@ use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Telegram\TelegramClient;
 use Tbtop\Cms\Telegram\TelegramInvites;
-use Tbtop\Cms\Telegram\TelegramSubmissionNotifier;
 
 class CmsServiceProvider extends PackageServiceProvider
 {
@@ -94,6 +106,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_17_000000_drop_cms_templates_table')
             ->hasMigration('2026_08_17_000001_update_pages_add_starter_blocks_table')
             ->hasMigration('2026_08_18_000000_create_activity_log_table')
+            ->hasMigration('2026_08_27_000000_create_notification_log_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -122,9 +135,12 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(CmsCache::class);
         $this->app->scoped(TelegramClient::class);
         $this->app->scoped(TelegramInvites::class);
-        $this->app->scoped(TelegramSubmissionNotifier::class);
         $this->app->scoped(SubmissionNotifier::class);
         $this->app->scoped(AuditContext::class);
+        $this->app->singleton(NotificationRegistry::class);
+        $this->app->scoped(DeliveryRecorder::class);
+        $this->app->scoped(TemplateRenderer::class);
+        $this->app->bind(TemplateStore::class, NullTemplateStore::class);
         $this->registerAdminPanel();
     }
 
@@ -139,6 +155,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wirePageRevisions();
         $this->wireContentCacheInvalidation();
         $this->wireLocaleSeeding();
+        $this->wireNotificationRegistry();
         $this->wireSubmissionNotifications();
         $this->wireNotFoundLogging();
         $this->wireNotFoundPruneSchedule();
@@ -344,6 +361,40 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireSubmissionNotifications(): void
     {
         Event::listen(SubmissionReceived::class, NotifiesAdminsOfSubmission::class);
+    }
+
+    /**
+     * Registers cms's own built-in channels and its one built-in type
+     * (form.submission) with Notifications, the same way a host or another
+     * package would from its own service provider — see Notifications'
+     * class docblock for the registry this feeds.
+     *
+     * defaultChannels() lists all three built-ins, but mail/telegram
+     * participation for form.submission is actually decided per-recipient
+     * by FormSubmissionRecipients from the existing notifications.mail.enabled
+     * / notifications.telegram.enabled toggles, not by a
+     * notifications.form.submission.channels setting (there is none yet —
+     * see FormSubmissionRecipients' docblock) — so every host that has never
+     * touched notification settings keeps its exact current behavior.
+     */
+    private function wireNotificationRegistry(): void
+    {
+        Notifications::channel(MailChannel::class);
+        Notifications::channel(TelegramChannel::class);
+        Notifications::channel(BellChannel::class);
+
+        Notifications::type(
+            TypeDefinition::make('form.submission')
+                ->label(__('tbtop-cms::notifications.bell.title'))
+                ->group('forms')
+                ->payload(FormSubmissionPayload::class)
+                ->templates([
+                    Format::Html->value => 'tbtop-cms::notifications.form-submission.html',
+                    Format::Short->value => 'tbtop-cms::notifications.form-submission.short',
+                ])
+                ->audiences([Audience::Staff])
+                ->defaultChannels(['bell', 'mail', 'telegram']),
+        );
     }
 
     private function wireNotFoundLogging(): void
