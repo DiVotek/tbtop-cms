@@ -13,7 +13,7 @@ use Tbtop\Cms\Health\HealthStatus;
  * public/robots.txt is served by the webserver before any Laravel route
  * runs, so its mere presence permanently shadows the dynamic
  * `tbtop-cms.robots` route — the SEO settings page's indexing toggle then
- * silently has no effect. See README "public/robots.txt must not exist".
+ * silently has no effect. See docs/host/ai/wiring.md, "public/robots.txt must not exist".
  */
 final class RobotsTxtCheck implements HealthCheck
 {
