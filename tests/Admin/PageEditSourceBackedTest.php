@@ -8,6 +8,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\SourcedType;
@@ -192,4 +193,22 @@ it('still shows block editing for a plain content-only page', function (): void 
     $tabs = $tabsNode['options']['tabs'];
 
     expect(array_column($tabs, 'label'))->toBe(['General', 'SEO', 'Hero', '+ Add block']);
+});
+
+it('opens the editor for a page whose type is no longer registered', function (): void {
+    $page = Page::create([
+        'type' => 'sourced',
+        'source_id' => 'thing-1',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Thing One'],
+    ]);
+
+    // The host dropped the type from config; the row stays and must remain
+    // editable — the sidebar and the tab builder both ask the registry.
+    config()->set('tbtop-cms.pages.types', []);
+    app()->forgetInstance(PageTypeRegistry::class);
+
+    test()->actingAs(sourceBackedAdmin(), 'web')
+        ->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])
+        ->assertOk();
 });
