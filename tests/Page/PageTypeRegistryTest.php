@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Types\ArticleType;
+use Tbtop\Cms\Page\Types\CategoryType;
 use Tbtop\Cms\Page\Types\PageType;
 use Tbtop\Cms\Tests\Fixtures\EmptyKeyPageType;
 use Tbtop\Cms\Tests\Fixtures\FaqPageType;
+use Tbtop\Cms\Tests\Fixtures\SourcedType;
 
 it('registers the built-in page types', function (): void {
     $registry = new PageTypeRegistry;
@@ -94,4 +98,29 @@ it('does not see an extension registered before flushExtensions()', function ():
     PageTypeRegistry::flushExtensions();
 
     expect((new PageTypeRegistry)->has('faq'))->toBeFalse();
+});
+
+it('returns null sourceType/source/template for every built-in type', function (): void {
+    $page = new Page(['type' => 'page']);
+
+    foreach ([new PageType, new CategoryType, new ArticleType] as $type) {
+        expect($type->sourceType())->toBeNull()
+            ->and($type->source($page))->toBeNull()
+            ->and($type->template($page))->toBeNull();
+    }
+});
+
+it('reports a type source-backed only when sourceType() is non-null', function (): void {
+    config()->set('tbtop-cms.pages.types', [SourcedType::class]);
+    $registry = new PageTypeRegistry;
+
+    expect($registry->isSourceBacked('sourced'))->toBeTrue()
+        ->and($registry->isSourceBacked('page'))->toBeFalse();
+});
+
+it('lists only source-backed keys in sourceBackedKeys()', function (): void {
+    config()->set('tbtop-cms.pages.types', [SourcedType::class]);
+    $registry = new PageTypeRegistry;
+
+    expect($registry->sourceBackedKeys())->toBe(['sourced']);
 });
