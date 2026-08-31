@@ -64,6 +64,12 @@ class SeoSettingsPage extends SettingsPageBase
      * legacy-suffix site and one that never opens this page again must keep
      * rendering titles exactly as before. Never migrated/deleted.
      *
+     * seo_identity_name/seo_identity_logo stay mapped the same way: a site's
+     * name/logo now come from the site settings page by default (see
+     * SeoResolver::identity()'s fallback to site.name/site.logo), so the
+     * fields below it were dropped from the Identity tab — but a value saved
+     * here before that change, or written by a script, must keep resolving.
+     *
      * @return array<string, string>
      */
     protected function map(): array
@@ -187,7 +193,7 @@ class SeoSettingsPage extends SettingsPageBase
                 ['label' => __('tbtop-cms::settings.seo.tabs.type_templates'), 'children' => $this->typeTemplateFields($s)],
                 ['label' => __('tbtop-cms::settings.seo.tabs.social'), 'children' => $this->socialFields($s)],
                 ['label' => __('tbtop-cms::settings.seo.tabs.identity'), 'children' => $this->identityFields($s)],
-                ['label' => __('tbtop-cms::settings.seo.tabs.analytics'), 'children' => $this->analyticsFields($s)],
+                ['label' => __('tbtop-cms::settings.seo.tabs.integrations'), 'children' => $this->integrationsFields($s)],
                 ['label' => __('tbtop-cms::settings.seo.tabs.not_found'), 'children' => $this->notFoundFields($s)],
             ]),
         ];
@@ -276,18 +282,13 @@ class SeoSettingsPage extends SettingsPageBase
                 ])
                 ->helperText(__('tbtop-cms::settings.seo.helpers.identity_type'))
                 ->rules('nullable|in:none,organization,person'),
-            $s->text('seo_identity_name')->label(__('tbtop-cms::settings.seo.fields.identity_name'))
-                ->placeholder(__('tbtop-cms::settings.seo.placeholders.identity_name'))->rules('nullable|max:255'),
-            $s->media('seo_identity_logo')->label(__('tbtop-cms::settings.seo.fields.identity_logo'))
-                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_logo'))
-                ->variant('preview'),
             $s->tags('seo_identity_same_as')->label(__('tbtop-cms::settings.seo.fields.identity_same_as'))
                 ->rules('nullable|array')->helperText(__('tbtop-cms::settings.seo.helpers.identity_same_as')),
         ];
     }
 
     /** @return list<Field|Node|TextBlock> */
-    private function analyticsFields(S $s): array
+    private function integrationsFields(S $s): array
     {
         return [
             $s->text('seo_gtm_container_id')->label(__('tbtop-cms::settings.seo.fields.gtm_container_id'))

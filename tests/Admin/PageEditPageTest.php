@@ -103,13 +103,13 @@ it('sends every check to the checklist block, split into required and optional',
     // don't fire — the rest are always present.
     expect(array_column($checks, 'key'))->toBe([
         'title', 'description', 'og_image', 'indexable',
-        'canonical', 'hreflang', 'focus_keyword', 'duplicate_title',
+        'canonical', 'hreflang', 'focus_keyword', 'duplicate_title', 'duplicate_description',
     ]);
 
     // The split is what gives the list a reading order; without it the block
     // renders one flat run and the grouping headings sit over nothing.
     $required = array_column(array_filter($checks, static fn (array $c): bool => $c['required']), 'key');
-    expect($required)->toBe(['title', 'description', 'indexable', 'canonical', 'duplicate_title']);
+    expect($required)->toBe(['title', 'description', 'indexable', 'canonical', 'duplicate_title', 'duplicate_description']);
 
     // Status words are translated server-side — the block renders text nodes
     // and has no locale of its own.

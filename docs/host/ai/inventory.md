@@ -52,7 +52,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 
 ## 2. Artisan commands
 
-Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `src/NotFound/Commands/`, and their registration/scheduling in `CmsServiceProvider`.
+Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `src/NotFound/Commands/`, `src/Seo/Commands/`, and their registration/scheduling in `CmsServiceProvider`.
 
 | Command | Signature/options | Purpose | Scheduled? |
 |---|---|---|---|
@@ -62,8 +62,9 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
 | `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `CmsServiceProvider::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
+| `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
 
-All six registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
+All seven registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
 Two more schedule entries exist but are not Artisan commands owned by this package:
 - `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `CmsServiceProvider::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
@@ -281,6 +282,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_not_found_hits` | `src/NotFound/Models/NotFoundHit.php` | Yes | |
 | `activity_log` (name configurable via `activitylog.table_name`) | `spatie/laravel-activitylog`, wired by `src/Audit/Concerns/LogsCmsActivity.php` | No | package publishes spatie's migration itself; guarded no-op if the host already has the table |
 | `tbtop_notification_log` | `src/Notifications/Models/NotificationLog.php` | Yes | |
+| `tbtop_seo_audit_snapshots` | `src/Seo/Models/SeoAuditSnapshot.php` | Yes | One row per calendar day (`captured_on`, unique); written by `cms:seo:snapshot` and on every `SeoReportPage` load |
 
 **User-key column shape** — `src/Support/UserKeyColumn.php::define(Blueprint $table, string $column)` declares a `user_id`/`created_by`/`updated_by`-shaped column matching the host's configured user model (`tbtop-cms.admin.model`) primary-key type: `ulid()` if the model uses `HasUlids`, `uuid()` if `HasUuids`, `unsignedBigInteger()` for a plain auto-incrementing int PK (also the fallback if the model class can't be resolved). Throws `RuntimeException` for any other key shape — lets int-PK and UUID/ULID-PK hosts both migrate and write successfully.
 

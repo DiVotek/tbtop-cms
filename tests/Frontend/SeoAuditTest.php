@@ -111,6 +111,36 @@ it('reports duplicates when a title-omitting template makes distinct titles coll
     expect(seoAuditIssuesFor('duplicate_title'))->toHaveCount(2);
 });
 
+it('reports duplicate_description as a warn when two published pages share the same own description in a locale', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Alpha'], 'title' => ['en' => 'Alpha'], 'summary' => ['en' => 'Same summary.']]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Beta'], 'title' => ['en' => 'Beta'], 'summary' => ['en' => 'Same summary.']]);
+
+    $rows = seoAuditIssuesFor('duplicate_description');
+    $alphaRow = collect($rows)->firstWhere('page', 'Alpha');
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows[0]['severity'])->toBe('warn')
+        ->and($alphaRow['detail'])->toContain('Beta');
+});
+
+it('does not report duplicate_description for pages with distinct descriptions', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'One'], 'title' => ['en' => 'One'], 'summary' => ['en' => 'First summary.']]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Two'], 'title' => ['en' => 'Two'], 'summary' => ['en' => 'Second summary.']]);
+
+    expect(seoAuditIssuesFor('duplicate_description'))->toBeEmpty();
+});
+
+it('reports duplicate_description for two pages with no own description sharing the site-wide default', function (): void {
+    // The main real-world scenario: a batch of pages with nothing of their
+    // own all fall back to the same seo.default_description and end up
+    // publishing identical meta descriptions.
+    app(Settings::class)->set('seo.default_description', 'A default for the whole site.');
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'One'], 'title' => ['en' => 'One'], 'summary' => ['en' => ''], 'seo' => []]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Two'], 'title' => ['en' => 'Two'], 'summary' => ['en' => ''], 'seo' => []]);
+
+    expect(seoAuditIssuesFor('duplicate_description'))->toHaveCount(2);
+});
+
 it('reports missing_og_image as a warn when neither the page nor the site default has an image', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,

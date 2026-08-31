@@ -84,12 +84,12 @@ Field-by-field:
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
-| Site identity (Organization/Person) | `Settings` (`seo.identity.*`) | SEO settings → *Identity* tab |
+| Site identity (Organization/Person) | `Settings` (`seo.identity.*`) | SEO settings → *Identity* tab exposes type and profile links (sameAs) only; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win) |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
 | Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
-| GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Analytics* tab (accepts bare id or the full install snippet) |
-| Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Analytics* tab (accepts bare token or the pasted `<meta>` tag) |
+| GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Integrations* tab (accepts bare id or the full install snippet) |
+| Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Integrations* tab (accepts bare token or the pasted `<meta>` tag) |
 | 404 log toggle / retention | `Settings` (`seo.not_found.enabled`, `seo.not_found.retention_days`) | SEO settings → *Not found* tab |
 | Sitemap enabled at all, chunk-size fresh-install default, 404 noise patterns, 404 auto-prune schedule | `config/tbtop-cms.php` (`seo.sitemap.enabled`/`.per_chunk`, `not_found.ignore`, `not_found.auto_prune`) | Host config only — no admin UI |
 
@@ -153,7 +153,9 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
      still emits correct, valid structured data.
 4. **Identity** (`JsonLd::identity()`) — an `Organization` or `Person` node
    from `seo.identity.*` settings (type/name/logo/sameAs), or nothing when
-   `seo.identity.type` is `none`.
+   `seo.identity.type` is `none`. Name and logo fall back to the site's own
+   `site.name`/`site.logo` when no `seo.identity.name`/`seo.identity.logo`
+   is set.
 
 **What the host cannot add**: there is no hook or filter to append nodes to
 this list, and `SeoResolver`'s return shape and `SitemapController`/
@@ -268,7 +270,8 @@ page editor's SEO tab (`PageForm::seoFields()` → `seoChecklistSection()`,
 client component `resources/js/cms/admin/seoChecklist.tsx`, needs
 `@cms/admin/blocks` imported — see wiring.md). Checks, each `pass`/`warn`/
 `fail`, `required` ones affecting result-list appearance
-(`title`, `description`, `indexable`, `canonical`, `duplicate_title`):
+(`title`, `description`, `indexable`, `canonical`, `duplicate_title`,
+`duplicate_description`):
 
 - **title / description** — presence only (`ownTitle`/`ownDescription`,
   pre-template), `fail` when empty. Length is not checked here — the
@@ -284,11 +287,14 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
 - **focus_keyword checks** (4, only when `seo.focus_keyword` is set for the
   locale) — presence of the keyword in the **rendered** title, rendered
   description, `heading`, and slug. `focus_keyword` itself warns when empty.
-- **duplicate_title** — compares this page's rendered title against every
-  other page's rendered title (via `renderedTitle()`, breadcrumbs resolved
+- **duplicate_title / duplicate_description** — compares this page's rendered
+  title/description against every other page's rendered title/description
+  (via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
   lazily only if the template uses `{parent}`) — `warn` on a collision,
-  including collisions a template that omits `{title}` can create even
-  between pages with distinct own titles.
+  including collisions a template that omits `{title}`/`{description}` can
+  create even between pages with distinct own values. Empty short-circuits
+  to `pass` (nothing to collide with). Both checks share a single cursor
+  pass over the other pages rather than scanning twice.
 
 **`SeoAudit::run()`** — the site-wide report (`SeoReportPage`, admin nav
 group "content", gated behind the `tbtop-cms.redirects` ability). One query for every *live* page (`Page::query()->live()` — a scheduled or
@@ -296,10 +302,27 @@ expired page is excluded), then plain PHP, deliberately never calling
 `SeoResolver::resolve()` per page (would build alternates/JSON-LD/every OG
 field × pages × locales). Issues: `missing_title`/`missing_description`
 (fail), `missing_translation` (warn — no own `title`/`name` in a locale,
-fallback disabled), `duplicate_title` (warn, locale-scoped), `missing_og_image`
-(warn), `noindex` (warn, locale-independent). Falls back to a plain
-key/value list when `pdo_sqlite` is unavailable (the DSL table needs an
-in-memory sqlite connection to render).
+fallback disabled), `duplicate_title`/`duplicate_description` (warn,
+locale-scoped, built in one pass per locale over the already-loaded pages),
+`missing_og_image` (warn), `noindex` (warn, locale-independent).
+
+`SeoReportPage` renders as two tabs. **Overview**: a summary alert, four KPI
+stat cards (pages scanned, pages with issues, failures, warnings — each with
+a sparkline once at least two days of snapshot history exist), a donut chart
+of issues by severity, a bar chart of issues by type, and a line chart of the
+last 90 days of snapshot history (fail/warn/pages-with-issues). **Details**:
+one collapsible per page with issues (fail-containing pages first, then by
+issue count), each holding a list of that page's issues.
+
+**Daily snapshots** (`tbtop_seo_audit_snapshots`, one row per calendar day,
+`Tbtop\Cms\Seo\Models\SeoAuditSnapshot`) back the Overview sparklines and
+history chart. `php artisan cms:seo:snapshot` runs the audit and
+upserts/updates today's row via `SeoAuditSnapshotWriter` — it is **not**
+auto-scheduled by the package, so a host wanting daily history needs its own
+cron entry for it. As a fallback so history still accumulates without cron,
+`SeoReportPage::view()` also writes/updates today's snapshot on every page
+load — coarser (at most as often as the report is opened), but sufficient to
+build a trend over time on a low-traffic admin.
 
 ## 404 log
 

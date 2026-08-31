@@ -5,16 +5,28 @@ declare(strict_types=1);
 return [
     'title' => 'SEO report',
     'subtitle' => 'Site-wide SEO issues across every published page and active locale.',
-    'columns' => [
-        'severity' => 'Severity',
-        'issue' => 'Issue',
-        'page' => 'Page',
-        'locale' => 'Locale',
-        'detail' => 'Detail',
+    'tabs' => [
+        'overview' => 'Overview',
+        'details' => 'Details',
     ],
     'severities' => [
         'warn' => 'Warning',
         'fail' => 'Fail',
+    ],
+    'stats' => [
+        'pages_scanned' => 'Pages scanned',
+        'pages_with_issues' => 'Pages with issues',
+    ],
+    'charts' => [
+        'by_severity' => 'Issues by severity',
+        'by_issue_type' => 'Issues by type',
+        'history' => 'Issue history',
+        'history_caption' => 'History accumulates from the first time this report is opened, plus any scheduled cms:seo:snapshot runs.',
+        'issue_count' => 'Count',
+    ],
+    'page_group' => [
+        'fail_count' => ':count failure|:count failures',
+        'warn_count' => ':count warning|:count warnings',
     ],
     'empty' => [
         'title' => 'No issues found',
@@ -23,9 +35,6 @@ return [
     'summary' => [
         'clean' => 'No SEO issues found across published pages.',
         'problems' => ':count problem(s) on :pages page(s).',
-    ],
-    'page' => [
-        'sqlite_missing' => 'The table view needs the sqlite PHP extension (pdo_sqlite), which this server does not have — showing the plain report instead. Install pdo_sqlite to get the full table.',
     ],
     'untitled_page' => 'Untitled page #:id',
     'issues' => [
@@ -40,6 +49,10 @@ return [
         'duplicate_title' => [
             'label' => 'Duplicate title',
             'detail' => 'Same title as: :pages.',
+        ],
+        'duplicate_description' => [
+            'label' => 'Duplicate description',
+            'detail' => 'Same description as: :pages.',
         ],
         'missing_og_image' => [
             'label' => 'Missing OG image',

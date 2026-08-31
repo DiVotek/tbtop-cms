@@ -56,7 +56,7 @@ class SeoChecklist
             $this->canonicalCheck($resolved['canonical']),
             $this->hreflangCheck($page),
             ...$this->focusKeywordChecks($page, $seo, $locale, $resolved),
-            $this->duplicateTitleCheck($page, $resolved['title'], $locale),
+            ...$this->duplicateChecks($page, $resolved['title'], $resolved['description'], $locale),
         ];
     }
 
@@ -213,46 +213,77 @@ class SeoChecklist
     }
 
     /**
-     * Compares the RENDERED title, not each page's base: a template is free
-     * to drop {title} entirely (e.g. plain "{site_name}"), which collapses
-     * two distinct bases into one identical <title> — the exact collision
-     * this check exists to report.
+     * Compares the RENDERED title and description, not each page's base: a
+     * template is free to drop {title}/{description} entirely (e.g. plain
+     * "{site_name}"), which collapses distinct bases into one identical
+     * value — the exact collision these checks exist to report.
      *
      * Still avoids a full resolve() per page, which would also build every
-     * page's alternates and JSON-LD objects. renderedTitle() takes the
-     * breadcrumbs lazily, so the per-page ancestor query only runs for
-     * templates that actually reference {parent}.
+     * page's alternates and JSON-LD objects. renderedTitle()/
+     * renderedDescription() take the breadcrumbs lazily, so the per-page
+     * ancestor query only runs for templates that actually reference
+     * {parent}.
      *
-     * Only the columns the cascade reads are hydrated, and drafts count:
-     * a duplicate that is about to be published is exactly what this warns
+     * One cursor pass covers both checks rather than two: they compare
+     * against the same set of other pages, so a second full table scan would
+     * only double the query cost for no extra information.
+     *
+     * Only the columns both cascades read are hydrated, and drafts count: a
+     * duplicate that is about to be published is exactly what this warns
      * about.
      *
-     * @return Check
+     * @return list<Check>
      */
-    private function duplicateTitleCheck(Page $page, string $title, string $locale): array
+    private function duplicateChecks(Page $page, string $title, string $description, string $locale): array
     {
-        if ($title === '') {
-            return $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass'));
-        }
+        // An empty value needs no scan: there is nothing to collide with, and
+        // the presence checks above already flag it.
+        $checkTitle = $title !== '';
+        $checkDescription = $description !== '';
+        $titleDuplicate = false;
+        $descriptionDuplicate = false;
 
-        $others = Page::query()
-            ->whereKeyNot($page->getKey())
-            ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'seo', 'title', 'name'])
-            ->cursor();
+        if ($checkTitle || $checkDescription) {
+            $others = Page::query()
+                ->whereKeyNot($page->getKey())
+                ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'seo', 'title', 'name', 'summary'])
+                ->cursor();
 
-        foreach ($others as $other) {
-            $otherTitle = $this->resolver->renderedTitle(
-                $other,
-                $locale,
-                fn (): array => $this->breadcrumbs->forPage($other, $locale),
-            );
+            foreach ($others as $other) {
+                if ($checkTitle && ! $titleDuplicate) {
+                    $otherTitle = $this->resolver->renderedTitle(
+                        $other,
+                        $locale,
+                        fn (): array => $this->breadcrumbs->forPage($other, $locale),
+                    );
 
-            if ($otherTitle === $title) {
-                return $this->check('duplicate_title', 'warn', __('tbtop-cms::pages.seo_checklist.duplicate_title.warn'));
+                    $titleDuplicate = $otherTitle === $title;
+                }
+
+                if ($checkDescription && ! $descriptionDuplicate) {
+                    $otherDescription = $this->resolver->renderedDescription(
+                        $other,
+                        $locale,
+                        fn (): array => $this->breadcrumbs->forPage($other, $locale),
+                    );
+
+                    $descriptionDuplicate = $otherDescription === $description;
+                }
+
+                if ((! $checkTitle || $titleDuplicate) && (! $checkDescription || $descriptionDuplicate)) {
+                    break;
+                }
             }
         }
 
-        return $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass'));
+        return [
+            $titleDuplicate
+                ? $this->check('duplicate_title', 'warn', __('tbtop-cms::pages.seo_checklist.duplicate_title.warn'))
+                : $this->check('duplicate_title', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_title.pass')),
+            $descriptionDuplicate
+                ? $this->check('duplicate_description', 'warn', __('tbtop-cms::pages.seo_checklist.duplicate_description.warn'))
+                : $this->check('duplicate_description', 'pass', __('tbtop-cms::pages.seo_checklist.duplicate_description.pass')),
+        ];
     }
 
     /**
@@ -266,7 +297,7 @@ class SeoChecklist
      * optional one is a suggestion. Deliberately not a score — see the note on
      * scoring in the SEO gap analysis.
      */
-    private const array REQUIRED_KEYS = ['title', 'description', 'indexable', 'canonical', 'duplicate_title'];
+    private const array REQUIRED_KEYS = ['title', 'description', 'indexable', 'canonical', 'duplicate_title', 'duplicate_description'];
 
     /**
      * @param  'pass'|'warn'|'fail'  $status
