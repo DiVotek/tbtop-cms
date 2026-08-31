@@ -1050,25 +1050,6 @@ function editFormTabs(int $pageId): array
     return $tabsNode['options']['tabs'];
 }
 
-/** @param array<string, mixed> $node @return array<string, mixed>|null */
-function findNodeByKind(array $node, string $kind): ?array
-{
-    if (($node['kind'] ?? null) === $kind) {
-        return $node;
-    }
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (! is_array($child)) {
-            continue;
-        }
-        $found = findNodeByKind($child, $kind);
-        if ($found !== null) {
-            return $found;
-        }
-    }
-
-    return null;
-}
-
 /**
  * Action names inside the form footer's flex node (delete/spacer/save) —
  * the LAST flex node in the tree, to avoid matching the status bar's flex.
@@ -1098,35 +1079,6 @@ function footerActionNames(?array $form): array
 }
 
 /**
- * @param  array<string, mixed>  $node
- * @param  list<array<string, mixed>>  $out
- */
-function collectNodesByKind(array $node, string $kind, array &$out): void
-{
-    if (($node['kind'] ?? null) === $kind) {
-        $out[] = $node;
-    }
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (is_array($child)) {
-            collectNodesByKind($child, $kind, $out);
-        }
-    }
-    foreach ((array) ($node['options']['tabs'] ?? []) as $tab) {
-        if (is_array($tab) && isset($tab['body']) && is_array($tab['body'])) {
-            collectNodesByKind($tab['body'], $kind, $out);
-        }
-    }
-    // A liveRegion node (SerpPreview/OgPreview) carries its render output
-    // under options.initial rather than options.children — the wire shape
-    // LiveRegionBuilder::toNode() produces for the page's first paint.
-    foreach ((array) ($node['options']['initial'] ?? []) as $initial) {
-        if (is_array($initial)) {
-            collectNodesByKind($initial, $kind, $out);
-        }
-    }
-}
-
-/**
  * The first field with this `name` at any depth. Fields sit inside layout
  * wrappers (the SEO tab lays them out in a grid beside the checklist), so a
  * firstWhere() over the top-level children finds nothing.
@@ -1147,24 +1099,4 @@ function findFieldByName(array $node, string $name): ?array
     }
 
     return null;
-}
-
-/**
- * Recursively collects every field `name` under a node, regardless of
- * nesting depth — the active/sort pair lives inside a nested flex row, so a
- * flat array_column() over the top-level children misses them.
- *
- * @param  array<string, mixed>  $node
- * @param  list<string>  $names
- */
-function collectFieldNames(array $node, array &$names): void
-{
-    if (isset($node['name']) && is_string($node['name'])) {
-        $names[] = $node['name'];
-    }
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (is_array($child)) {
-            collectFieldNames($child, $names);
-        }
-    }
 }
