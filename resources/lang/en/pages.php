@@ -65,6 +65,7 @@ return [
         'social' => 'Social networks',
         'image' => 'Image',
         'schema' => 'Structured data',
+        'source' => 'Source',
     ],
     'fields' => [
         'name' => 'Name',
@@ -78,6 +79,9 @@ return [
         'summary' => 'Summary',
         'body' => 'Content',
         'type' => 'Type',
+        'source_type' => 'Source type',
+        'source_id' => 'Source ID',
+        'source_label' => 'Source',
         'parent' => 'Parent',
         'status' => 'Status',
         'published_at' => 'Publish at',

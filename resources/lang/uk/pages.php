@@ -65,6 +65,7 @@ return [
         'social' => 'Соцмережі',
         'image' => 'Зображення',
         'schema' => 'Структуровані дані',
+        'source' => 'Джерело',
     ],
     'fields' => [
         'name' => 'Назва',
@@ -78,6 +79,9 @@ return [
         'summary' => 'Опис',
         'body' => 'Контент',
         'type' => 'Тип',
+        'source_type' => 'Тип джерела',
+        'source_id' => 'ID джерела',
+        'source_label' => 'Джерело',
         'parent' => 'Батьківська',
         'status' => 'Статус',
         'published_at' => 'Опублікувати',

@@ -52,8 +52,11 @@ class PageForm
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.settings')], [
                 // The generic page is what most creates are; category/article
-                // are the deliberate picks.
-                $s->select('type')->label(__('tbtop-cms::pages.fields.type'))->required()->options(PageFormOptions::types())
+                // are the deliberate picks. Source-backed types are excluded:
+                // creating one manually is not allowed, the storefront sync
+                // owns creation (see PageTypeRegistry::isSourceBacked()).
+                $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
+                    ->required()->options(PageFormOptions::types(includeSourceBacked: false))
                     ->default(app(PageType::class)->key()),
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
                     ->query(static fn (): Builder => self::parentQuery())
@@ -470,8 +473,18 @@ class PageForm
         $contentBefore = $isCreate ? [] : BlockEnvelope::blocksOf($page->content);
 
         $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
-        $page->content = self::fillContent($page, $form, $contentBefore, $isCreate);
-        $page->starter_blocks = self::fillStarterBlocks($page, $form);
+
+        // A source-backed page's content is owned by its type's template
+        // (PageTypeInterface::template()), never by this form — the editor
+        // hides the block tabs (see PageEditPage), but PageEditBlocks::toRows()
+        // still computes a 'content' form key from whatever it read off the
+        // page, and that must not overwrite the null that means "render the
+        // template". content (and starter_blocks, which only a category uses)
+        // stay exactly as stored.
+        if (! self::isSourceBacked($page)) {
+            $page->content = self::fillContent($page, $form, $contentBefore, $isCreate);
+            $page->starter_blocks = self::fillStarterBlocks($page, $form);
+        }
 
         // Left unconditional rather than gated on ! $page->is_system: the
         // edit form never submits a 'slug' key for the root system page
@@ -628,7 +641,11 @@ class PageForm
 
         return [
             ...$attributes,
-            'type' => (string) ($form['type'] ?? ''),
+            // Omitted entirely for a source-backed page (PageEditSidebar
+            // hides the type select — its type is owned by the sync, not
+            // editorially chosen): keep the page's existing type rather than
+            // reading a missing key as ''.
+            'type' => (string) ($form['type'] ?? ($page->exists ? $page->type : '')),
             'parent_id' => $parentId,
             'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
             // Create form never sends these (PageEditSidebar is edit-only),
@@ -898,7 +915,7 @@ class PageForm
             return;
         }
 
-        $type = (string) ($form['type'] ?? '');
+        $type = (string) ($form['type'] ?? ($page->exists ? $page->type : ''));
         if (! app(PageTypeRegistry::class)->has($type)) {
             throw ValidationException::withMessages([
                 'type' => __('tbtop-cms::pages.validation.type_unregistered', ['type' => $type]),
@@ -906,6 +923,19 @@ class PageForm
         }
 
         self::guardStatus((string) ($form['status'] ?? PageStatus::Draft->value));
+    }
+
+    /**
+     * Reads $page->type post-fill (fillAttributes() has already run by the
+     * time save() calls this): for a create it is whatever the form (or, for
+     * a source-backed create — which the UI never offers — its default)
+     * resolved to; for an update it is the existing type, since a source-
+     * backed page's type select is hidden and fillAttributes() falls back to
+     * the current value when the form omits the key.
+     */
+    private static function isSourceBacked(Page $page): bool
+    {
+        return app(PageTypeRegistry::class)->has($page->type) && app(PageTypeRegistry::class)->isSourceBacked($page->type);
     }
 
     private static function guardStatus(string $status): void

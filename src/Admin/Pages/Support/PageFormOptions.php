@@ -18,12 +18,24 @@ class PageFormOptions
      */
     public const NO_PARENT = 'none';
 
-    /** @return list<array{value: string, label: string}> */
-    public static function types(): array
+    /**
+     * $includeSourceBacked is false for every caller that lets an admin pick
+     * a type by hand (the create form, the edit sidebar): a source-backed
+     * type's page is owned by its sync — manually creating or retyping one
+     * bypasses source()/template() being wired up at all.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public static function types(bool $includeSourceBacked = true): array
     {
+        $registry = app(PageTypeRegistry::class);
         $options = [];
 
-        foreach (app(PageTypeRegistry::class)->all() as $type) {
+        foreach ($registry->all() as $type) {
+            if (! $includeSourceBacked && $type->sourceType() !== null) {
+                continue;
+            }
+
             $options[] = ['value' => $type->key(), 'label' => self::typeLabel($type->key(), $type->label())];
         }
 

@@ -11,6 +11,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
  * The right sidebar column on PageEditPage: publication status, hierarchy
@@ -21,6 +22,8 @@ final class PageEditSidebar
 {
     public static function build(S $s, Page $page): Node
     {
+        $isSourceBacked = app(PageTypeRegistry::class)->isSourceBacked($page->type);
+
         return $s->stack([
             $s->section(['title' => __('tbtop-cms::pages.sections.publication'), 'variant' => 'card'], [
                 $s->select('status')->label(__('tbtop-cms::pages.fields.status'))
@@ -30,8 +33,14 @@ final class PageEditSidebar
                 ...self::schedulingFields($s),
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.structure'), 'variant' => 'card'], [
-                $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
-                    ->required()->options(PageFormOptions::types()),
+                // The type select is not offered for a source-backed page —
+                // its type is owned by the sync, not editorially chosen —
+                // and content-only pages never see a source-backed type as
+                // an option (PageTypeRegistry::isSourceBacked()).
+                ...($isSourceBacked ? [] : [
+                    $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
+                        ->required()->options(PageFormOptions::types(includeSourceBacked: false)),
+                ]),
                 // Excludes the page itself and its descendants — placing it
                 // under its own subtree is a cycle PageForm::guardParent()
                 // rejects on submit; excluding here keeps the picker from
@@ -46,6 +55,7 @@ final class PageEditSidebar
             $s->section(['title' => __('tbtop-cms::pages.sections.image'), 'variant' => 'card'], [
                 $s->media('image')->label(__('tbtop-cms::pages.fields.image'))->variant('preview'),
             ]),
+            ...($isSourceBacked ? [PageEditSourceCard::build($s, $page)] : []),
         ]);
     }
 
