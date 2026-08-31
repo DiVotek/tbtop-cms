@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Layout\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 
 /**
  * @property int $id
  * @property string $slot
  * @property array<int, array<string, mixed>>|null $content
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class Layout extends Model
 {
