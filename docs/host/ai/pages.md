@@ -1,0 +1,432 @@
+# Pages
+
+> Part of the host-builder guide. Start at [./README.md](./README.md).
+
+This file owns the `Page` model, page types and hierarchy rules, slugs/URLs,
+redirects, source-backed pages, revisions, preview links, layout slots, and
+seeding pages. Block content *inside* a page is owned by
+[./blocks.md](./blocks.md); the `seo` column's fields by
+[./seo.md](./seo.md); routes/middleware/`Cms::frontendRoutes()` wiring by
+[./wiring.md](./wiring.md).
+
+## The `Page` model
+
+`src/Page/Models/Page.php`, table `tbtop_pages`.
+
+Translatable (spatie/laravel-translatable, `$translatable`), stored as
+`['uk' => 'Головна', 'en' => 'Home', ...]` per locale: `name`, `title`,
+`heading`, `summary`, `body`. Read/write a locale with
+`getTranslation('name', $locale)` / `setTranslations('name', [...])`, or
+assign the whole array through `fill()`/mass assignment.
+
+Plain (not translatable): `type`, `source_id`, `parent_id`, `status`,
+`published_at`, `unpublish_at`, `content` (array cast, block envelope — see
+blocks.md), `starter_blocks` (array cast, per-child-type starter structure
+— see Starter blocks below), `image` (a media id, not a URL — resolve with
+`MediaUrlResolver`), `seo` (array cast — see seo.md), `is_indexable`,
+`is_system`, `sort_order`, `lock_version` (optimistic-lock counter, bumped
+by `PageObserver::saving()` on every real update — not mass-assignable).
+
+`created_by`/`updated_by` are stamped by `TracksAuthors`, never
+mass-assigned. Every field a seeder needs is in `$fillable`.
+
+### Status and "live"
+
+`PageStatus` (`src/Page/Enums/PageStatus.php`) is only `Draft` / `Published`
+— the author's stored intent. Scheduling layers on top via
+`published_at`/`unpublish_at`, both nullable datetimes. What actually shows
+on the frontend is never `status` alone:
+
+- `Page::scopeLive()` — the query scope every frontend-facing read uses
+  (`PageResolver`, `SitemapEntryBuilder`, `FormSubmitController`): status is
+  `published` AND (`published_at` is null or in the past) AND
+  (`unpublish_at` is null or in the future).
+- `Page::isLive()` — the same rule for an already-loaded instance.
+- `Page::displayState()` — the admin's derived read model
+  (`PageDisplayState`: `Draft`/`Scheduled`/`Published`/`Expired`), folding
+  the schedule into the plain status for the pages list and dashboard.
+
+Publish now: leave `published_at`/`unpublish_at` null and set `status` to
+`Published`. Schedule a future go-live or go-dark by setting the datetime
+columns; no separate "scheduled" status value exists. A host writing pages
+outside the admin only needs `scopeLive()`/`isLive()` itself if it
+re-implements a frontend read path — `PageResolver` already applies it.
+
+## Page types
+
+`PageTypeInterface` (`src/Page/Contracts/PageTypeInterface.php`): `key()`,
+`label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, plus the
+source-backed trio below. `BasePageType` (`src/Page/Types/BasePageType.php`)
+gives every method a content-only, leaf-type default (`allowedChildren()`
+`[]`, `requiresParent()` `false`, `maxDepth()` `1`, not source-backed) — a
+host type extends it and overrides only what differs.
+
+Built-ins, all in `src/Page/Types/`:
+
+| Type | `allowedChildren()` | `requiresParent()` | `maxDepth()` |
+|---|---|---|---|
+| `PageType` (`page`) | `[]` | `false` | `1` (default) |
+| `CategoryType` (`category`) | `['category', 'article']` | `false` | `3` |
+| `ArticleType` (`article`) | `[]` | `true` | `1` (default) |
+
+Register a host type via `config('tbtop-cms.pages.types')` (a list of
+class-strings) or `PageTypeRegistry::extend(fn (): array => [...])` — the
+same pattern `BlockRegistry::extend()` uses (see blocks.md). `extend()` must
+run before the registry's first `get()`/`has()`/`all()`/`keys()` call: an
+extension registered after boot has latched is stored but never read
+(`src/Page/PageTypeRegistry.php`). Duplicate keys across config and every
+extension throw `InvalidArgumentException` at boot.
+
+`PageTypeRegistry::isSourceBacked($type)` returns `false` for an
+unregistered type rather than throwing — `pages.type` is an unconstrained
+string column, so a page outlives its type's registration (a host removed
+the class from config) and must still render its stored content instead of
+500ing. `PageController` and the admin edit page both rely on this.
+
+### The `CategoryType` gotcha
+
+`CategoryType::allowedChildren()` is hard-coded to `['category', 'article']`
+— nothing else. A services page, a portfolio grid, a landing-page section:
+none of these are `article`, so a plain `category` cannot parent them. Both
+real hosts hit this and both solved it the same way: a host-owned container
+type.
+
+`autofocus/app/Cms/PageTypes/SectionType.php` (key `section`, children
+`['service', 'guide']`, `maxDepth() = 2`) parents its `ServiceType` and
+`ArticleType` (key `guide`), both `requiresParent() = true` leaves.
+`divotek_com_ua/app/Cms/PageTypes/SectionType.php` does the same for its
+services/portfolio/blog tree (children `['page', 'article', 'section']`,
+`maxDepth() = 3`, sections can nest).
+
+The rule: a section needing children that are not built-in
+`category`/`article` gets a host `SectionType` (or similarly named
+container) rather than an attempt to reconfigure `CategoryType` — its
+`allowedChildren()` is not configurable, only overridable by subclassing
+`BasePageType` directly. `PageHierarchy::assert()`
+(`src/Page/Support/PageHierarchy.php`) enforces `allowedChildren()`,
+`requiresParent()`, and `maxDepth()` on every create/parent-or-type change,
+walking the full ancestor chain and descendant tree — a violation throws
+`DomainException` from the `creating`/`updating` observer hooks, not just a
+form-level warning.
+
+### Starter blocks
+
+A category can define `starter_blocks: {article: [...], category: [...]}`
+— structure only (`{id, kind}`, no `data`) per child type, edited on the
+category's own edit page. `StarterBlocks::contentFor()`
+(`src/Page/Support/StarterBlocks.php`) seeds a brand-new child's `content`
+from it at create time only: walking up from the immediate parent
+(inclusive), the nearest ancestor category whose *own* starter for that
+child type is non-empty wins — closer beats farther, and an ancestor with
+no starter of its own is transparent, not a dead end. Only `article` and
+`category` children inherit anything (`page` has no starter-block slot). A
+new category with no ancestor starter falls back to copying its immediate
+parent's own content *structure* (kind + order, not text).
+
+`StarterBlockSync::apply()` (`src/Page/Support/StarterBlockSync.php`) is the
+"apply to existing" action: force-syncs a category's current starter onto
+every already-existing descendant of that type, in the same scope
+`contentFor()` would have used at creation (stops descending into a
+subcategory with its own starter for that type). The sync is structural
+only: a page block whose `tpl_id` still exists in the starter is left
+completely untouched (content belongs to the page, not the starter); a
+`tpl_id` no longer present is dropped with its content; a starter element
+with no matching page block is inserted **inactive** with empty data (an
+empty block must never go live uninvited); a block added directly on the
+page, with no `tpl_id`, is never touched.
+
+## Slugs and URLs
+
+One `PageSlug` row per `(page, locale)` (`src/Page/Models/PageSlug.php`,
+table `tbtop_page_slugs`): `slug` (this page's own segment) and `path` (the
+full parent-joined path, no leading/trailing slash). `Page::pathFor($locale)`
+reads it off the `slugs` relation.
+
+`PageSlugWriter::sync()` (`src/Page/Support/PageSlugWriter.php`) is the only
+writer. It runs automatically from `PageObserver::saved()` on **every**
+`Page::save()` — a host never calls it directly except when seeding wants to
+force a specific slug (see Seeding below) or after a manual
+`Languages`/locale change (`backfillLocale()`).
+
+- A non-empty slug override (from `Page::$pendingSlugOverrides`, keyed by
+  locale) always wins over the stored/derived slug, for both new and
+  existing rows — this is what makes an existing page's slug editable. An
+  empty/missing override keeps the current slug, or falls back to a
+  name-derived, `Str::slug()`-ed base for a locale with no row yet.
+- Collisions get a numeric suffix (`-2`, `-3`, ...), retried up to 100
+  attempts against a `UniqueConstraintViolationException` race.
+- Changing a parent's slug cascades: every descendant is re-synced so its
+  `path` stays joined correctly.
+- **System pages are exempt.** `is_system` pages ignore any slug override
+  outright — their URL is not author-editable, matching their
+  status/type/parent locks (see `PageObserver::guardSystemStatus()`).
+
+### The home page
+
+The root `is_system` page (`is_system = true`, `parent_id = null`) maps to
+the **empty path** — `PageSlugWriter::slugBase()` returns `''` for it, so
+its `PageSlug.path` is `''`, and `PageResolver::resolve('', $locale)` finds
+it for `/`. There is no separate "home page" flag or config key read at
+request time; `is_system` + no parent *is* the home-page identity. A seeder
+locates the existing home page by that combination
+(`Page::where('is_system', true)->where('type', 'page')->first()`), never by
+slug.
+
+### Building a URL
+
+`PageUrl::build($path, $locale)` (`src/Page/PageUrl.php`) applies the
+locale-prefix rule: the default locale gets no prefix (`/about`); every
+other active locale is prefixed (`/en/about`). `SetLanguage` middleware
+does the inverse on the way in — it redirects a request that explicitly
+prefixes the *default* locale (`/uk/about` when `uk` is default) down to
+the un-prefixed canonical URL, so there is exactly one canonical path per
+(page, locale).
+
+Use the `Cms` facade (`src/Facades/Cms.php` / `src/Cms.php`) rather than
+`PageUrl`/`PageResolver` directly from host code:
+
+```php
+Cms::resolve(string $path, ?string $locale = null): ?Page   // path → live Page, current locale by default
+Cms::url(Page $page, ?string $locale = null): string        // Page → locale-prefixed path
+Cms::breadcrumbs(Page $page, ?string $locale = null): array // list<{label, path, url}>, ancestor chain
+```
+
+`Cms::resolve()` only ever returns a *live* page (no `$withDrafts` param
+exposed) — it delegates to `PageResolver::resolve($path, $locale, false)`.
+`Cms::breadcrumbs()` walks `AncestorChain::forPage()` (root-first, self
+excluded) and labels each ancestor with its `title` falling back to `name`,
+current locale falling back to the default locale.
+
+### Redirects
+
+`src/Redirect/*`. `Redirect` (table `tbtop_redirects`): `locale` (nullable
+— a locale-specific row is tried before a locale-`null` fallback row),
+`from_path`, `to_path`, `status_code`, `is_auto`.
+
+**Automatic**, on every slug change: `PageSlugRedirects` observer
+(`src/Redirect/Observers/PageSlugRedirects.php`), wired independently of
+`PageObserver` in `CmsServiceProvider::wireRedirectMaintenance()`. On
+`PageSlug::updated()` with a changed `path`, `RedirectWriter::recordMove()`
+retargets any existing auto-redirect that pointed at the *old* path (a
+chain of moves collapses to one hop, not N) and upserts a new `from → to`
+auto row, `301`, `is_auto = true`. On `PageSlug::saved()`,
+`RedirectWriter::clearAt()` deletes any redirect whose `from_path` equals the
+saved slug's path, unconditionally — a slug moved back onto a previously
+redirected-from path must resolve to the page, not loop through its own
+stale redirect.
+
+**Manual**, via the admin Redirects page: a host or editor adds rows
+directly, `is_auto = false`.
+
+**External targets** (`to_path` starting `http://`, `https://`, or `//`,
+tolerant of backslash-for-slash browser normalization —
+`RedirectPath::isExternal()`) are rejected at the admin form layer unless
+their host is listed, case-insensitive exact match, in
+`config('tbtop-cms.redirects.allowed_external_hosts')`
+(`src/Admin/Pages/Support/RedirectValidator.php`) — an empty list (the
+default) blocks every external target. The check runs on the admin form
+save, not inside `RedirectResolver` — a redirect written outside the
+validated form path is not re-checked at resolve time.
+
+**Resolution order**, in `PageController::__invoke()`
+(`src/Frontend/Http/Controllers/PageController.php`): page lookup
+(`PageResolver::resolve()`) → if not found, redirect lookup
+(`RedirectResolver::resolve()`, following up to 10 chained hops, cycle-safe)
+→ if neither, fire `PageNotFound` and throw a 404. A source-backed page
+whose `source()` resolves to `null` also falls through this same
+not-found → redirect → 404 path (see Source-backed pages).
+
+## Preview access and preview links
+
+`PageController::hasPreviewAccess()` grants draft visibility to two callers:
+an authenticated admin (`CurrentAdmin::canAccess()` — the same rule
+`EnsureCmsAdmin` enforces on panel routes, independent of the host's regular
+end-user guard) or a request carrying a valid Laravel signed URL
+(`$request->hasValidSignature()`). Anyone else gets the published-only
+lookup — an unpublished path 404s (or falls back to a redirect) for them.
+
+`PreviewLink::for(Page $page, string $locale)` (`src/Frontend/PreviewLink.php`)
+builds that signed URL against the same `tbtop-cms.page` named route the
+frontend uses, applying `PageUrl`'s locale-prefix rule so a
+non-default-locale draft doesn't 404 against the default-locale path. TTL:
+`config('tbtop-cms.preview.link_ttl_hours', 72)`.
+
+The `isPreview` prop is `! $page->isLive()` — true for draft, not-yet-
+scheduled, and past-`unpublish_at` alike, since reaching the page at all
+with any of those means the caller already had preview access.
+`PageController` also forces `seo.noindex = true` whenever `isPreview` is
+true, regardless of the page's own indexability settings.
+
+## Source-backed pages
+
+A page type can be backed by a domain object the host owns elsewhere (a
+product, a listing — anything with its own table). Three methods on
+`PageTypeInterface`, all defaulted to off by `BasePageType`:
+
+```php
+isSourceBacked(): bool;          // true = pages of this type are created externally, never by hand in cms
+source(Page $page): ?object;     // loads the domain object by (type, source_id); null if gone
+template(Page $page): ?array;    // block content to render when $page->content is null
+```
+
+`Page::$source_id` (nullable string, `(type, source_id)` indexed — not
+unique, nothing stops two pages claiming the same source) identifies which
+domain object a source-backed page shows. There is no `source_type`
+column: `type` already says what kind of source it is.
+
+Render path (`PageController::props()`): `$content = $page->content ??
+$type->template($page) ?? []` — an explicit `content` on the page always
+wins over the template (a host can still hand-edit a source-backed page's
+content by writing the column directly; the *form* is what's locked, not
+the column). `source($page)` is resolved once per request and handed to
+every block as `ResolveContext::$source`; a source-backed type whose
+`source()` returns null (deleted, unpublished on the source's own side)
+renders the same not-found → redirect → 404 path as an unpublished page —
+defense in depth for the window between the source disappearing and the
+sync retiring the page.
+
+Editor behavior: `PageEditPage`/`PageEditSidebar` hide the block-content
+tabs, starter blocks, and type select for a source-backed page and show a
+read-only Source card instead (type label, `source_id`, and the source's
+`Stringable` form when available —
+`src/Admin/Pages/Support/PageEditSourceCard.php`). `PageForm::save()`
+skips writing `content`/`starter_blocks` entirely rather than writing null
+— the stored value (template fallback trigger, or a host-written override)
+survives untouched. Creating a page of a source-backed type, or retyping an
+existing page into one, is rejected **server-side** in `PageForm`, not just
+hidden in the UI.
+
+`tbtop-ecom/docs/storefront-cms-contract.md` documents the intended host
+usage pattern — a storefront package registering `ProductType`,
+`VariantType`, `CollectionType` via `PageTypeRegistry::extend()`, each
+loading its aggregate by `source_id` and rendering one shared per-kind
+template. Treat it as the pattern to follow, not as a description of what
+has landed — at the time of writing it is a frozen-contract planning doc
+for an unbuilt package, though its `PageTypeInterface` snippet matches what
+actually shipped (`.changes/feat-source-backed-pages.md`).
+
+**Assumptions worth knowing:** `source_id` is trusted to be set by the
+host's own sync — nothing here writes it or enforces a source-backed page
+has one; `source($page)` must handle a null `source_id` itself.
+`template()` is called on every render with no caching between the call
+and block resolution — an expensive template build costs a full request.
+
+## Revisions
+
+Config-gated content-snapshot history per page, `config('tbtop-cms.revisions.keep', 25)`
+— the retention cap *and* the on/off switch in one setting. `0` or `null`
+disables the feature entirely, including the very first create snapshot.
+Wired as a second, independent `Page` observer
+(`src/Page/Observers/PageRevisions.php`, registered in
+`CmsServiceProvider::wirePageRevisions()`, deliberately separate from
+`PageObserver` so turning revisions off can never risk the structural
+hierarchy/slug guards).
+
+`PageRevisionWriter::snapshot()` fires on every `Page::save()` that changes
+an "editorial" field (`name`, `title`, `heading`, `summary`, `body`,
+`image`, `content`, `seo`, `is_indexable`) — a sort-order-only drag reorder
+or a bare status toggle does not create a revision. Deliberately excluded:
+`status`, `type`, `parent_id`, `sort_order` — workflow/structural state
+`restore()` never touches, so restoring old content can never resurrect an
+old status or move the page in the tree. Every save keeps only the newest
+`keep` rows per page.
+
+## Layout slots
+
+`src/Layout/*`. Exactly two slots, `Slots::HEADER` / `Slots::FOOTER`
+(`src/Layout/Slots.php`) — no third slot, no way to register one. One
+`Layout` row per slot (table `tbtop_layouts`, unique on `slot`), holding a
+block-content envelope in `content` — same shape as `Page::$content` (see
+blocks.md), edited on the admin Layouts page.
+
+`LayoutResolver::resolve()` (`src/Layout/LayoutResolver.php`) returns
+`array<string, list<ResolvedBlock>>` keyed by slot, resolved through the
+same `BlockContentResolver` pages use, and exposes it as `cms.layout` via
+`ShareCmsProps` middleware, not per-page. A missing `tbtop_layouts` table
+(mid-migration) or a null-content row resolves to an empty list for that
+slot rather than erroring.
+
+Seed a layout with a plain `updateOrCreate` keyed by `slot`:
+`Layout::query()->updateOrCreate(['slot' => Slots::HEADER], ['content' =>
+HeaderBlocks::content()])`.
+
+## Seeding content
+
+The recommended way to load a site's content is idempotent PHP seeders, not
+clicking through the admin — every real host does this. The pattern (from
+`divotek_com_ua/database/seeders/Concerns/SeedsPages.php`,
+`HomePageSeeder.php`, `LayoutSeeder.php`):
+
+- **Key by slug, not id.** Find an existing page by
+  `whereHas('slugs', fn ($q) => $q->where('slug', $slug))`, or the home page
+  by `is_system` + no parent — never by a hard-coded primary key, so a
+  seeder is safe to re-run against a database that already has the row.
+- **`updateOrCreate`-style `fill()` + `save()`.** `PageObserver::saved()`
+  runs `PageSlugWriter::sync()` automatically on every save, so a seeder
+  normally does not need to call it. Call `PageSlugWriter::sync($page,
+  ['uk' => $slug, 'en' => $slug])` explicitly only to *force* a specific
+  slug on first creation (an author-chosen override) rather than let it
+  derive from `name`.
+- **Translatable columns as a locale map.** `name`, `title`,
+  `summary` (etc.) take `['uk' => '...', 'en' => '...']` directly through
+  `fill()`.
+- **`content` is a plain PHP array of block envelopes** — see blocks.md for
+  the `{id, kind, data, sort, active}` shape; a seeder builds a
+  `list<array<string, mixed>>` and assigns it like any other fillable field.
+
+The package's own `PageSeeder` (`database/seeders/PageSeeder.php`, run by
+`cms:install`, verified against `tests/Page/PageSeederTest.php`) follows
+exactly this shape for the home page — `Page::firstOrCreate(['is_system' =>
+true, 'type' => 'page'], [...])` — reading `name`/`title` from
+`config('tbtop-cms.pages.home')` and the default locale from
+`Languages::defaultLocale()`. `cms:install` also runs `LanguageSeeder`,
+which upserts every row in `config('tbtop-cms.languages.seed')` by `locale`
+(`firstOrCreate`, so a second run is a no-op). A host seeds further content
+the same way, from its own `DatabaseSeeder` or a dedicated `cms:seed`-style
+command — nothing restricts seeding to `cms:install`'s two seeders.
+
+## Cache: what a host must do
+
+Every domain write that changes frontend-visible content already bumps the
+shared content-cache version — `InvalidatesContentCache`
+(`src/Cache/InvalidatesContentCache.php`) is registered in
+`CmsServiceProvider::wireContentCacheInvalidation()` against `PageSaved`,
+`PagePublished`, `PageUnpublished`, `PageDeleted`, `PageRestored`,
+`LayoutSaved`, `SettingsSaved`, `LanguagesChanged`. A host that writes
+`Page`/`Layout` rows through the normal Eloquent model — `save()`, mass
+update through the model, seeders included — gets this for free; the
+observers dispatching these events fire regardless of caller.
+
+A host only needs to bump the cache itself
+(`app(\Tbtop\Cms\Cache\CmsCache::class)->bump()`) if it writes to
+`tbtop_pages`/`tbtop_layouts` through a path that bypasses Eloquent events
+entirely — a raw `DB::table(...)->update(...)`, a direct SQL data fix.
+Plain Eloquent seeders and admin edits need nothing extra.
+
+One gap the events do **not** cover: `published_at`/`unpublish_at` crossing
+its threshold with no write happening at that instant —
+`PagePublished`/`PageUnpublished` fire on the *status transition at save
+time*, not on live visibility actually changing. `CmsCache::rememberLive()`
+caps its TTL to the nearest upcoming schedule transition for exactly this
+reason (`NextScheduleTransition`) — cached reads that depend on live scope
+should use `rememberLive()`, not `remember()`, to stay correct across an
+unattended schedule boundary.
+
+## Events
+
+`src/Page/Events/*`, raised from `PageObserver`'s `created()`/`updated()`
+hooks inside `DB::afterCommit()` — a batched write inside a transaction
+(e.g. `StarterBlockSync::apply()`) fires once per page, only after commit:
+
+- `PageSaved(Page $page, bool $wasCreated)` — every finished save, create or
+  update, regardless of what changed.
+- `PagePublished(Page $page)` — status transitions into `Published`, on
+  create or update.
+- `PageUnpublished(Page $page)` — status transitions out of `Published` on
+  update.
+- `PageDeleted(Page $page, bool $forced)` — soft or forced delete.
+- `PageRestored(Page $page)` — a soft-deleted page restored.
+
+`PagePublished`/`PageUnpublished` fire on the **status column transition**,
+not on live-visibility change — see the Cache section above for what that
+means for scheduled pages.

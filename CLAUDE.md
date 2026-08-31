@@ -46,4 +46,12 @@ src/        # Package code (Tbtop\Cms)
 config/     # tbtop-cms.php published config
 tests/      # Pest tests (boundary by default)
 workbench/  # Testbench host app for manual review
+docs/host/ai/  # Host-builder guide for agents; docs/ stays for package-internal notes
 ```
+
+## Docs
+
+`docs/host/ai/` is verified against `src/`. A PR that changes a host-facing
+extension point — `Block`, `PageTypeInterface`, `Channel`, a config key, a
+command, a route, an Inertia prop, a `Settings` key — updates the matching
+file there (and `inventory.md`) in the same PR.

@@ -17,8 +17,8 @@ use Tbtop\Cms\Health\HealthStatus;
  * That route is always registered once tbtop/admin's own service provider
  * boots — it does not depend on host wiring. The frontend catch-all
  * ("tbtop-cms.page") is different: the host must call Cms::frontendRoutes()
- * itself from its own routes/web.php (see README "Host application
- * requirements"), so a missing frontend route is a real, common integration
+ * itself from its own routes/web.php (see docs/host/ai/wiring.md, "Frontend
+ * routes"), so a missing frontend route is a real, common integration
  * gap this check exists to catch.
  */
 final class RoutesRegisteredCheck implements HealthCheck
