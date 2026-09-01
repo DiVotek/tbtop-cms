@@ -483,16 +483,15 @@ class NotificationSettingsPage extends SettingsPageBase
     /** @return array<string, string> */
     private function templateRecordValues(): array
     {
-        $map = Fields::fieldMap(app(NotificationRegistry::class), self::adminLocales());
-
         $rows = NotificationTemplate::query()->get()->keyBy(
             static fn (NotificationTemplate $row): string => $row->type . '|' . $row->format->value . '|' . $row->locale,
         );
 
         $values = [];
-        foreach ($map as $fieldName => [$typeKey, $format, $locale, $part]) {
+        foreach (Fields::slots(app(NotificationRegistry::class), self::adminLocales()) as [$typeKey, $format, $locale]) {
             $row = $rows->get("{$typeKey}|{$format->value}|{$locale}");
-            $values[$fieldName] = $row === null ? '' : (string) $row->{$part};
+            $values[Fields::subjectField($typeKey, $format, $locale)] = $row === null ? '' : $row->subject;
+            $values[Fields::bodyField($typeKey, $format, $locale)] = $row === null ? '' : $row->body;
         }
 
         return $values;
@@ -594,23 +593,15 @@ class NotificationSettingsPage extends SettingsPageBase
      */
     private function templatePairs(array $form): array
     {
-        $map = Fields::fieldMap(app(NotificationRegistry::class), self::adminLocales());
-
         $pairs = [];
-        $seen = [];
-        foreach ($map as $fieldName => [$typeKey, $format, $locale, $part]) {
-            $key = "{$typeKey}|{$format->value}|{$locale}";
-            if (isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-
+        foreach (Fields::slots(app(NotificationRegistry::class), self::adminLocales()) as [$typeKey, $format, $locale]) {
             $subjectField = Fields::subjectField($typeKey, $format, $locale);
             $bodyField = Fields::bodyField($typeKey, $format, $locale);
-            $subject = self::stringField($form, $subjectField);
-            $body = self::stringField($form, $bodyField);
 
-            $pairs[] = [$typeKey, $format, $locale, $subjectField, $bodyField, $subject, $body];
+            $pairs[] = [
+                $typeKey, $format, $locale, $subjectField, $bodyField,
+                self::stringField($form, $subjectField), self::stringField($form, $bodyField),
+            ];
         }
 
         return $pairs;

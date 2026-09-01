@@ -89,27 +89,26 @@ final class NotificationTemplateFields
     }
 
     /**
-     * Server-side field-name -> (type, format, locale, part) map, rebuilt
-     * fresh every request from the registry and the active admin locales —
-     * never parsed back out of a field name.
+     * Every (type, format, locale) slot an editor exists for, rebuilt fresh
+     * every request from the registry and the active admin locales — field
+     * names are derived from a slot, never parsed back out of a posted key.
      *
      * @param  list<string>  $locales
-     * @return array<string, array{0: string, 1: Format, 2: string, 3: 'subject'|'body'}>
+     * @return list<array{0: string, 1: Format, 2: string}>
      */
-    public static function fieldMap(NotificationRegistry $registry, array $locales): array
+    public static function slots(NotificationRegistry $registry, array $locales): array
     {
-        $map = [];
+        $slots = [];
 
         foreach ($registry->types() as $type) {
             foreach (self::formatsFor($type) as $format) {
                 foreach ($locales as $locale) {
-                    $map[self::subjectField($type->key(), $format, $locale)] = [$type->key(), $format, $locale, 'subject'];
-                    $map[self::bodyField($type->key(), $format, $locale)] = [$type->key(), $format, $locale, 'body'];
+                    $slots[] = [$type->key(), $format, $locale];
                 }
             }
         }
 
-        return $map;
+        return $slots;
     }
 
     /** The built-in view's Blade source, or '' when the view cannot be resolved. */

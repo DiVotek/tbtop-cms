@@ -189,6 +189,26 @@ it('renders a stored template override instead of the built-in view', function (
         ->and($deliveries[0]['message']->body)->toContain('Overridden body: hi');
 });
 
+// A subject ending in a word character (the common case — no trailing echo)
+// once vanished: `@endsection` glued to it is not a directive for Blade's
+// `\B@` tokenizer, so the section never closed and the body swallowed it.
+it('keeps a plain-text override subject out of the body', function (): void {
+    NotificationTemplate::query()->create([
+        'type' => 'test.recorded',
+        'format' => Format::Text,
+        'locale' => 'en',
+        'subject' => 'Plain subject',
+        'body' => 'Body only',
+    ]);
+
+    Notifications::send('test.recorded', new TestNotificationPayload('hi'), [new Recipient(Audience::Customer, 'en', email: 'ana@example.test')]);
+
+    $message = RecordingChannel::deliveries()[0]['message'];
+
+    expect($message->subject)->toBe('Plain subject')
+        ->and(trim($message->body))->toBe('Body only');
+});
+
 it('does not apply a stored override registered for a different locale', function (): void {
     NotificationTemplate::query()->create([
         'type' => 'test.recorded',
