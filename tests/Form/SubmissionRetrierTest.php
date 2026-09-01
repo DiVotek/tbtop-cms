@@ -183,7 +183,7 @@ it('does not repeat a successful block delivery when retrying failed notificatio
 
 it('re-runs the notification fan-out on retry and can flip failed to handled via mail', function (): void {
     Mail::fake();
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
 
     $page = contactPageForRetry();
@@ -229,7 +229,7 @@ it('re-runs the bell fan-out on retry, notifying every current admin', function 
 
 it('keeps the submission failed with a joined error when the fan-out still fails on retry', function (): void {
     Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'still down'], 400)]);
-    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
     app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
     app(Settings::class)->set('notifications.telegram.chat_ids', '111');
 

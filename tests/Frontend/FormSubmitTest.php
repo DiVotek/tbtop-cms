@@ -26,7 +26,7 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     Mail::fake();
     app(Cms::class)->frontendRoutes();
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
 });
 

@@ -374,13 +374,10 @@ class CmsServiceProvider extends PackageServiceProvider
      * package would from its own service provider — see Notifications'
      * class docblock for the registry this feeds.
      *
-     * defaultChannels() lists all three built-ins, but mail/telegram
-     * participation for form.submission is actually decided per-recipient
-     * by FormSubmissionRecipients from the existing notifications.mail.enabled
-     * / notifications.telegram.enabled toggles, not by a
-     * notifications.form.submission.channels setting (there is none yet —
-     * see FormSubmissionRecipients' docblock) — so every host that has never
-     * touched notification settings keeps its exact current behavior.
+     * defaultChannels(['bell']) is the fallback Notifications::enabledChannels()
+     * returns until a merchant sets notifications.form.submission.channels
+     * via the settings page (cms-4) — so every host that has never touched
+     * notification settings keeps bell-only delivery, no mail, no telegram.
      */
     private function wireNotificationRegistry(): void
     {
@@ -398,7 +395,7 @@ class CmsServiceProvider extends PackageServiceProvider
                     Format::Short->value => 'tbtop-cms::notifications.form-submission.short',
                 ])
                 ->audiences([Audience::Staff])
-                ->defaultChannels(['bell', 'mail', 'telegram']),
+                ->defaultChannels(['bell']),
         );
     }
 
