@@ -167,7 +167,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
 | `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms) |
-| `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `NullTemplateStore` (no storage) |
+| `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `DatabaseTemplateStore` (backed by `tbtop_notification_templates`, strict locale match, no fallback) |
 | `HealthCheck` | `src/Health/HealthCheck.php` | `id(): string`, `run(): HealthCheckResult` | One diagnostic check; must not throw |
 | `LogsCmsActivity` (trait) | `src/Audit/Concerns/LogsCmsActivity.php` | Required: `auditFields(): list<string>`, `auditLabel(): string`. Overridable: `auditMarkerFields()`, `auditBlockFields()` (default `[]`) | Wires Spatie `LogsActivity` plus CMS audit enrichment onto a model |
 | `TracksAuthors` (trait) | `src/Support/Concerns/TracksAuthors.php` | None — just `use` it | Auto-stamps `created_by`/`updated_by` from `CurrentAdmin::user()` on model boot hooks; requires nullable, FK-less `created_by`/`updated_by` columns (see §9's user-key column shape) |
@@ -229,7 +229,6 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.not_found.enabled` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.retention_days` | `SeoSettingsPage` | no | yes |
 | `seo.type_templates.{type}.title` / `seo.type_templates.{type}.description` (per registered page type) | `SeoSettingsPage`, built dynamically from `PageTypeRegistry` via `SeoTemplates::key()` | no | yes |
-| `notifications.mail.enabled` | `NotificationSettingsPage` | no | no |
 | `notifications.mail.recipients` | `NotificationSettingsPage` | no | no |
 | `mail.host` | `NotificationSettingsPage` | no | no |
 | `mail.port` | `NotificationSettingsPage` | no | no |
@@ -238,11 +237,11 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `mail.encryption` | `NotificationSettingsPage` | no | no |
 | `mail.from_address` | `NotificationSettingsPage` | no | no |
 | `mail.from_name` | `NotificationSettingsPage` | no | no |
-| `notifications.telegram.enabled` | `NotificationSettingsPage` | no | no |
 | `notifications.telegram.bot_token` | `NotificationSettingsPage` | yes | no |
 | `notifications.telegram.chat_ids` | `NotificationSettingsPage` | no | no |
+| `notifications.{typeKey}.channels` (one row per registered type, e.g. `notifications.form.submission.channels`) | `NotificationSettingsPage`, one checkbox-list field per type generated from `NotificationRegistry` | no | no |
 
-`notifications.{typeKey}.channels` (`src/Notifications/Notifications.php`) is a per-notification-type channel override read in src, but no admin page in src writes it yet — treat it as read-only from application code, not merchant-editable.
+`notifications.mail.enabled` and `notifications.telegram.enabled` are legacy keys removed from `NotificationSettingsPage`'s UI and no longer read anywhere in `src/`; a pre-existing row in `tbtop_settings` is simply unused. `notifications.{typeKey}.channels` is the per-notification-type channel list `Notifications::enabledChannels()` reads — merchant-editable via the settings page's per-type checkbox list.
 
 ## 8. Section abilities (`CmsAbilities::ALL`)
 
@@ -283,6 +282,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `activity_log` (name configurable via `activitylog.table_name`) | `spatie/laravel-activitylog`, wired by `src/Audit/Concerns/LogsCmsActivity.php` | No | package publishes spatie's migration itself; guarded no-op if the host already has the table |
 | `tbtop_notification_log` | `src/Notifications/Models/NotificationLog.php` | Yes | |
 | `tbtop_seo_audit_snapshots` | `src/Seo/Models/SeoAuditSnapshot.php` | Yes | One row per calendar day (`captured_on`, unique); written by `cms:seo:snapshot` and on every `SeoReportPage` load |
+| `tbtop_notification_templates` | `src/Notifications/Models/NotificationTemplate.php` | Yes | Migration `2026_09_01_000000_create_notification_templates_table.php`; unique on `(type, format, locale)`; merchant-edited overrides, owner-only, no audit log |
 
 **User-key column shape** — `src/Support/UserKeyColumn.php::define(Blueprint $table, string $column)` declares a `user_id`/`created_by`/`updated_by`-shaped column matching the host's configured user model (`tbtop-cms.admin.model`) primary-key type: `ulid()` if the model uses `HasUlids`, `uuid()` if `HasUuids`, `unsignedBigInteger()` for a plain auto-incrementing int PK (also the fallback if the model class can't be resolved). Throws `RuntimeException` for any other key shape — lets int-PK and UUID/ULID-PK hosts both migrate and write successfully.
 

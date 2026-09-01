@@ -98,10 +98,11 @@ too, a host that syncs pages from another source owns that.
 
 ## Notification type and channel registry
 
-A host that changes nothing needs no changes: `form.submission` (the
-contact-form fan-out) still sends the same bell/mail/Telegram notifications
-from the same `notifications.mail.*` / `notifications.telegram.*` settings,
-and `NotificationSettingsPage` still edits them. Run
+A host that has never touched notification settings needs no changes:
+`form.submission` (the contact-form fan-out) keeps its original bell-only
+behavior. A host that *had* enabled mail or Telegram for form submissions
+needs one step — see "Merchant-editable templates and per-type channel
+lists" further below, which also covers this in full. Run
 
 ```bash
 php artisan migrate
@@ -176,3 +177,59 @@ state — do not reconstruct it by querying `tbtop_notification_log`: the log
 is shared by every concurrent request and has no column tying a row to the
 entity that triggered the send, so a window query there will pick up another
 caller's failures.
+
+## Merchant-editable templates and per-type channel lists
+
+Run
+
+```bash
+php artisan migrate
+```
+
+for the new `tbtop_notification_templates` table (one row per merchant
+override: type, format, locale, subject, body — unique on
+`(type, format, locale)`).
+
+**`TemplateStore` is now database-backed.** `NullTemplateStore` (the
+package's previous default binding, which always returned `null`) is
+removed; `Tbtop\Cms\Notifications\Contracts\TemplateStore` is now bound to
+`Tbtop\Cms\Notifications\Support\DatabaseTemplateStore`. A host that had
+rebound `TemplateStore` to its own implementation keeps working unchanged —
+the contract itself did not change. A host that referenced
+`Tbtop\Cms\Notifications\Support\NullTemplateStore` by class name (e.g. in a
+container binding or a test) must drop that reference; the class no longer
+exists.
+
+**`form.submission`'s legacy enabled flags are no longer read.**
+`notifications.mail.enabled` and `notifications.telegram.enabled` — the flat
+toggles `NotificationSettingsPage` used to write — are no longer consulted
+anywhere in `src/`. `form.submission` now resolves mail/telegram/bell
+participation the same way every other registered type does: from
+`Notifications::enabledChannels('form.submission')`, i.e.
+`notifications.form.submission.channels` in `Settings`, falling back to the
+type's registered default (`['bell']`) when unset. **A host that never
+touched notification settings keeps bell-only delivery** — the same
+behavior a fresh install always had. A host that relied on
+`notifications.mail.enabled` / `notifications.telegram.enabled` being `true`
+to get mail/Telegram delivery on form submissions must carry that opt-in
+over explicitly, e.g. from a migration or `AppServiceProvider::boot()`:
+
+```php
+app(\Tbtop\Cms\Settings\Settings::class)->set(
+    'notifications.form.submission.channels',
+    ['bell', 'mail'], // add 'telegram' too if it was enabled
+);
+```
+
+The old `notifications.mail.enabled` / `notifications.telegram.enabled` rows
+may stay in `tbtop_settings` — they're simply unused now, no migration
+removes them.
+
+**The settings page now generates per-type UI from the registry.**
+`NotificationSettingsPage` shows a "Channels" tab (mail transport, Telegram
+transport — unchanged) plus one tab per registered type's `group()`, each
+type getting a channel checkbox list (offering only channels whose format it
+has a template for) and, for owner admins only (`is_owner` on
+`tbtop_user_profiles`), a Blade template editor per format/locale with a
+reset-to-built-in action. A non-owner admin sees the channel checkboxes but
+no template fields.

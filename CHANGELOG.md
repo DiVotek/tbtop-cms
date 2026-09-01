@@ -290,3 +290,37 @@ Hosts that never published the config need no action.
 - The GTM container ID helper now notes that the cms frontend is a
   single-page app, so pageview tags need a History Change trigger in GTM to
   count client-side navigation.
+
+### Added — merchant-editable notification templates and per-type channel lists
+
+- Every registered notification type now gets a merchant-facing Blade
+  template override, stored per (type, format, locale) in the new
+  `tbtop_notification_templates` table and edited from
+  `NotificationSettingsPage` — owner admins (`is_owner`) only, since a
+  template executes as real Blade. An override is validated against a
+  stubbed payload before it's saved (`TemplateProbe`) so a broken template
+  is rejected at save time; a template that later fails to render at send
+  time falls back to the built-in view and logs a warning
+  (`notifications.template_override_failed`) instead of dropping the
+  channel.
+- `NotificationSettingsPage` now generates a channel checkbox list and
+  template editor per registered type straight from `NotificationRegistry`
+  — grouped into tabs by `TypeDefinition::group()` — instead of the page
+  hand-listing `form.submission`'s settings. A type offers only the
+  channels whose format it has a template for.
+- `Notifications::enabledChannels(string $typeKey): list<string>` is now
+  public — the supported way to read a type's effective channel list
+  (`notifications.{typeKey}.channels` in Settings, else the type's
+  registered default).
+
+### Removed — the legacy mail/Telegram enabled flags
+
+`notifications.mail.enabled` and `notifications.telegram.enabled` — the
+flat toggles `form.submission` used to read directly — are gone from
+`NotificationSettingsPage`'s UI and no longer consulted anywhere in `src/`.
+`form.submission` now resolves mail/Telegram/bell participation the same
+way every other registered type does, through
+`Notifications::enabledChannels('form.submission')`
+(`notifications.form.submission.channels`, defaulting to `['bell']`). See
+`docs/UPGRADING.md` for the one-liner to carry over a previous mail/Telegram
+opt-in.
