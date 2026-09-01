@@ -52,7 +52,7 @@ use Tbtop\Cms\Notifications\DeliveryRecorder;
 use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\NotificationRegistry;
 use Tbtop\Cms\Notifications\Notifications;
-use Tbtop\Cms\Notifications\Support\NullTemplateStore;
+use Tbtop\Cms\Notifications\Support\DatabaseTemplateStore;
 use Tbtop\Cms\Notifications\TemplateRenderer;
 use Tbtop\Cms\Notifications\TypeDefinition;
 use Tbtop\Cms\Page\Events\PageDeleted;
@@ -110,6 +110,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_27_000000_create_notification_log_table')
             ->hasMigration('2026_08_31_000001_update_pages_add_source_table')
             ->hasMigration('2026_08_31_000002_create_seo_audit_snapshots_table')
+            ->hasMigration('2026_09_01_000000_create_notification_templates_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -144,7 +145,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->singleton(NotificationRegistry::class);
         $this->app->scoped(DeliveryRecorder::class);
         $this->app->scoped(TemplateRenderer::class);
-        $this->app->bind(TemplateStore::class, NullTemplateStore::class);
+        $this->app->bind(TemplateStore::class, DatabaseTemplateStore::class);
         $this->registerAdminPanel();
     }
 

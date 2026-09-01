@@ -7,9 +7,10 @@ namespace Tbtop\Cms\Notifications\Contracts;
 use Tbtop\Cms\Notifications\Format;
 
 /**
- * Merchant-editable template lookup. cms-3 ships no storage for this (no
- * template editor yet — see NullTemplateStore); cms-4 backs it with
- * `tbtop_notification_templates` and wires NotificationSettingsPage to edit it.
+ * Merchant-editable template lookup, backed by
+ * `tbtop_notification_templates` (see DatabaseTemplateStore). A future
+ * template editor page wires into this store to let merchants edit
+ * overrides.
  */
 interface TemplateStore
 {

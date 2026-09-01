@@ -50,6 +50,12 @@ class NotificationRegistry
         return isset($this->types[$key]);
     }
 
+    /** @return array<string, TypeDefinition> in registration order */
+    public function types(): array
+    {
+        return $this->types;
+    }
+
     /**
      * $class is documented as plain class-string, not class-string<Channel>
      * — Notifications::channel()'s own signature already promises the
@@ -93,5 +99,11 @@ class NotificationRegistry
     public function hasChannel(string $key): bool
     {
         return isset($this->channels[$key]);
+    }
+
+    /** @return array<string, Channel> in registration order */
+    public function channels(): array
+    {
+        return $this->channels;
     }
 }

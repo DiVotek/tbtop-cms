@@ -5,12 +5,14 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Tbtop\Cms\Notifications\Audience;
 use Tbtop\Cms\Notifications\Delivery;
 use Tbtop\Cms\Notifications\Events\NotificationFailed;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
 use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\Models\NotificationLog;
+use Tbtop\Cms\Notifications\Models\NotificationTemplate;
 use Tbtop\Cms\Notifications\NotificationLogStatus;
 use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Notifications\Recipient;
@@ -165,4 +167,78 @@ it('reports only its own deliveries when an unrelated failed row shares the log'
 
     expect(array_filter($deliveries, fn (Delivery $delivery): bool => $delivery->failed()))->toBeEmpty()
         ->and($deliveries)->toHaveCount(2);
+});
+
+it('renders a stored template override instead of the built-in view', function (): void {
+    NotificationTemplate::query()->create([
+        'type' => 'test.recorded',
+        'format' => Format::Text,
+        'locale' => 'en',
+        'subject' => 'Override for {{ $message }}',
+        'body' => 'Overridden body: {{ $message }}',
+    ]);
+
+    $recipient = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+
+    Notifications::send('test.recorded', new TestNotificationPayload('hi'), [$recipient]);
+
+    $deliveries = RecordingChannel::deliveries();
+
+    expect($deliveries)->toHaveCount(1)
+        ->and($deliveries[0]['message']->subject)->toBe('Override for hi')
+        ->and($deliveries[0]['message']->body)->toContain('Overridden body: hi');
+});
+
+it('does not apply a stored override registered for a different locale', function (): void {
+    NotificationTemplate::query()->create([
+        'type' => 'test.recorded',
+        'format' => Format::Text,
+        'locale' => 'en',
+        'subject' => 'Override for {{ $message }}',
+        'body' => 'Overridden body: {{ $message }}',
+    ]);
+
+    $recipient = new Recipient(Audience::Customer, 'uk', email: 'ana@example.test');
+
+    Notifications::send('test.recorded', new TestNotificationPayload('hi'), [$recipient]);
+
+    $deliveries = RecordingChannel::deliveries();
+
+    expect($deliveries)->toHaveCount(1)
+        ->and($deliveries[0]['message']->subject)->toBe('Hello hi')
+        ->and($deliveries[0]['message']->body)->toContain('Body: hi');
+});
+
+it('falls back to the built-in view and logs a warning when a stored override fails to render', function (): void {
+    Log::spy();
+
+    NotificationTemplate::query()->create([
+        'type' => 'test.recorded',
+        'format' => Format::Text,
+        'locale' => 'en',
+        'subject' => 'Broken',
+        'body' => '@if($message)unclosed',
+    ]);
+
+    $recipient = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+
+    Notifications::send('test.recorded', new TestNotificationPayload('hi'), [$recipient]);
+
+    $deliveries = RecordingChannel::deliveries();
+
+    expect($deliveries)->toHaveCount(1)
+        ->and($deliveries[0]['message']->subject)->toBe('Hello hi')
+        ->and($deliveries[0]['message']->body)->toContain('Body: hi');
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(function (string $message, array $context): bool {
+            expect($message)->toBe('notifications.template_override_failed')
+                ->and($context['type'])->toBe('test.recorded')
+                ->and($context['format'])->toBe('text')
+                ->and($context['locale'])->toBe('en')
+                ->and($context['error'])->toBeString();
+
+            return true;
+        });
 });

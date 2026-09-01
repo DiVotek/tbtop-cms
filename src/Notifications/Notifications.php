@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Notifications;
 
 use Illuminate\Notifications\AnonymousNotifiable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use InvalidArgumentException;
 use Tbtop\Cms\Notifications\Contracts\Channel;
 use Tbtop\Cms\Notifications\Contracts\TemplateStore;
 use Tbtop\Cms\Settings\Settings;
+use Throwable;
 
 /**
  * Static façade over the container-bound NotificationRegistry — the
@@ -65,10 +67,9 @@ final class Notifications
             );
         }
 
-        $settings = app(Settings::class);
         $renderer = app(TemplateRenderer::class);
         $templateStore = app(TemplateStore::class);
-        $channelKeys = self::enabledChannels($typeKey, $type, $settings);
+        $channelKeys = self::enabledChannels($typeKey);
 
         $recorder = app(DeliveryRecorder::class);
         $recorder->begin();
@@ -90,14 +91,16 @@ final class Notifications
                         continue;
                     }
 
-                    $view = $templateStore->override($typeKey, $channel->format(), $recipient->locale)
-                        ?? $type->templateFor($channel->format());
+                    $override = $templateStore->override($typeKey, $channel->format(), $recipient->locale);
 
-                    if ($view === null) {
+                    $rendered = $override !== null
+                        ? self::renderWithFallback($renderer, $override, $type, $channel->format(), $payload, $recipient, $typeKey)
+                        : self::renderBuiltIn($renderer, $type, $channel->format(), $payload, $recipient);
+
+                    if ($rendered === null) {
                         continue;
                     }
 
-                    $rendered = $renderer->render($view, $payload, $recipient->locale);
                     $notifiable = $recipient->notifiable ?? new AnonymousNotifiable;
 
                     NotificationFacade::sendNow($notifiable, new TemplatedNotification($typeKey, $channelKey, $rendered, $recipient));
@@ -111,9 +114,10 @@ final class Notifications
     }
 
     /** @return list<string> */
-    private static function enabledChannels(string $typeKey, TypeDefinition $type, Settings $settings): array
+    public static function enabledChannels(string $typeKey): array
     {
-        $configured = $settings->get("notifications.{$typeKey}.channels");
+        $type = app(NotificationRegistry::class)->type($typeKey);
+        $configured = app(Settings::class)->get("notifications.{$typeKey}.channels");
 
         if (! is_array($configured)) {
             return $type->defaultChannelValues();
@@ -121,5 +125,43 @@ final class Notifications
 
         /** @var list<string> */
         return array_values(array_filter($configured, is_string(...)));
+    }
+
+    /**
+     * Renders the merchant's stored override; a failure falls back to the
+     * built-in view (logged as a warning) rather than dropping the channel.
+     */
+    private static function renderWithFallback(
+        TemplateRenderer $renderer,
+        string $override,
+        TypeDefinition $type,
+        Format $format,
+        object $payload,
+        Recipient $recipient,
+        string $typeKey,
+    ): ?Rendered {
+        try {
+            return $renderer->render($override, $payload, $recipient->locale);
+        } catch (Throwable $e) {
+            Log::warning('notifications.template_override_failed', [
+                'type' => $typeKey,
+                'format' => $format->value,
+                'locale' => $recipient->locale,
+                'error' => $e->getMessage(),
+            ]);
+
+            return self::renderBuiltIn($renderer, $type, $format, $payload, $recipient);
+        }
+    }
+
+    private static function renderBuiltIn(TemplateRenderer $renderer, TypeDefinition $type, Format $format, object $payload, Recipient $recipient): ?Rendered
+    {
+        $view = $type->templateFor($format);
+
+        if ($view === null) {
+            return null;
+        }
+
+        return $renderer->render($view, $payload, $recipient->locale);
     }
 }
