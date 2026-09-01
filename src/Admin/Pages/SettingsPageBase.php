@@ -83,6 +83,25 @@ abstract class SettingsPageBase extends Page
         return $form;
     }
 
+    /**
+     * Runs before SettingsForm::apply(); throw ValidationException to reject
+     * the submission (see SeoSettingsPage's guard* methods for the same
+     * mechanism from normalizeForm() — this hook exists for checks that need
+     * to run after normalizeForm() but before anything is persisted).
+     *
+     * @param  array<string, mixed>  $form
+     */
+    protected function validateForm(array $form): void {}
+
+    /**
+     * Runs after SettingsForm::apply() has persisted the mapped settings —
+     * for side effects on data this page owns outside map() (e.g. template
+     * rows keyed by fields that are deliberately not settings).
+     *
+     * @param  array<string, mixed>  $form
+     */
+    protected function afterSave(array $form): void {}
+
     private function saveAction(S $s): ActionBuilder
     {
         return $s->action('save')->label(__('tbtop-cms::settings.common.save'))
@@ -91,7 +110,11 @@ abstract class SettingsPageBase extends Page
 
     private function save(ActionCtx $ctx): Effects
     {
-        SettingsForm::apply($this->normalizeForm($ctx->form), $this->map(), app(Settings::class));
+        $form = $this->normalizeForm($ctx->form);
+        $this->validateForm($form);
+
+        SettingsForm::apply($form, $this->map(), app(Settings::class));
+        $this->afterSave($form);
 
         return Effects::make()->notify(__('tbtop-cms::settings.common.saved'));
     }

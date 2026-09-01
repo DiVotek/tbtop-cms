@@ -96,14 +96,26 @@ return [
     ],
     'notifications' => [
         'title' => 'Notification settings',
-        'subtitle' => 'Mail transport for the site and the recipients notified about new form submissions.',
+        'subtitle' => 'Channels and Blade templates per notification type, plus mail transport and Telegram delivery.',
         'sections' => [
-            'notifications' => 'Notifications',
             'mail_transport' => 'Mail transport',
             'telegram' => 'Telegram',
         ],
+        'tabs' => [
+            'channels' => 'Channels',
+        ],
+        'groups' => [
+            'forms' => 'Forms',
+            'orders' => 'Orders',
+            'inventory' => 'Inventory',
+            'other' => 'Other',
+        ],
+        'formats' => [
+            'html' => 'HTML email',
+            'text' => 'Plain text',
+            'short' => 'Short message',
+        ],
         'fields' => [
-            'mail_enabled' => 'Mail enabled',
             'recipients' => 'Recipients',
             'mail_host' => 'SMTP host',
             'mail_port' => 'SMTP port',
@@ -112,14 +124,17 @@ return [
             'mail_encryption' => 'Encryption',
             'mail_from_address' => 'From address',
             'mail_from_name' => 'From name',
-            'telegram_enabled' => 'Telegram enabled',
             'telegram_bot_token' => 'Bot token',
             'telegram_chat_ids' => 'Chat IDs',
+            'channels' => 'Delivery channels',
+            'subject' => 'Subject',
+            'body' => 'Body',
         ],
         'helpers' => [
             'recipients' => 'Type an address and press Enter to add it.',
             'mail_password' => 'Leave blank to keep the current value.',
             'telegram_chat_ids' => 'Type a chat ID and press Enter to add it; a label after # ("123456789 # Dima") is kept. "Create invite" below adds a chat with its name filled in automatically.',
+            'template' => 'Blade template source. Leave empty to use the built-in template. Available variables: :variables',
         ],
         'encryption' => [
             'none' => 'None',
@@ -144,6 +159,13 @@ return [
             'telegram_invite_pending' => 'No message from that invite yet. Open the link in Telegram, press Start, then check again.',
             'telegram_invite_check_failed' => 'Could not check the invite: :error',
             'telegram_invite_claimed' => 'Added chat ":chat" (:id) to the recipient list.',
+            'reset_template' => 'Reset to built-in',
+            'reset_template_confirm' => 'This removes your custom template and reverts to the built-in one. This cannot be undone.',
+            'template_reset' => 'Template reset to the built-in version.',
+        ],
+        'errors' => [
+            'template_invalid' => 'This template failed to render: :error',
+            'owner_only' => 'Only the site owner can edit notification templates.',
         ],
     ],
 ];

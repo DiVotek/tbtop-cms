@@ -26,9 +26,18 @@ final class DatabaseTemplateStore implements TemplateStore
         return self::compose($row->subject, $row->body);
     }
 
-    /** Shared wire format between this store, TemplateProbe and the admin editor: a subject section prepended to the body. */
+    /**
+     * Shared wire format between this store, TemplateProbe and the admin
+     * editor: a subject section prepended to the body. The newlines around
+     * $subject are load-bearing — Blade's directive tokenizer does not
+     * recognize `@section('subject')text@endsection` when the directive and
+     * `@endsection` are glued directly to the content with no whitespace
+     * between them; it falls through to literal text and the subject is
+     * lost. TemplateRenderer::render() trims the extracted section value, so
+     * the padding never reaches the stored/returned subject.
+     */
     public static function compose(string $subject, string $body): string
     {
-        return "@section('subject')" . $subject . "@endsection\n" . $body;
+        return "@section('subject')\n" . $subject . "\n@endsection\n" . $body;
     }
 }
