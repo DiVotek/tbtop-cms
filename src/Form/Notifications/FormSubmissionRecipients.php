@@ -7,20 +7,19 @@ namespace Tbtop\Cms\Form\Notifications;
 use Tbtop\Cms\Admin\Support\AdminUsers;
 use Tbtop\Cms\Mail\Recipients as MailRecipients;
 use Tbtop\Cms\Notifications\Audience;
+use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Notifications\Recipient;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Telegram\ChatIds;
 
 /**
- * Builds form.submission's Recipient list, gated by the same
- * notifications.mail.enabled / notifications.telegram.enabled flat toggles
- * NotificationSettingsPage has always written — form.submission has no
- * per-type channel list in Settings yet (that arrives with cms-4's
- * generated settings page), so mail/telegram participation is decided here
- * rather than through Notifications::send()'s generic enabledChannels()
- * gate. A recipient is simply never built for a disabled channel; the
- * registered channels' own supports() then only ever sees recipients meant
- * for them.
+ * Builds form.submission's Recipient list, gated by
+ * Notifications::enabledChannels('form.submission') — the same per-type
+ * channel list (notifications.form.submission.channels in Settings, else
+ * the type's registered default) every other notification type resolves
+ * through. A recipient is simply never built for a channel absent from
+ * that list; the registered channels' own supports() then only ever sees
+ * recipients meant for them.
  *
  * SubmissionNotifier surfaces a misconfigured-but-enabled channel (mail
  * enabled with no recipients, telegram enabled with no token/chat ids) as
@@ -39,15 +38,18 @@ final readonly class FormSubmissionRecipients
 
     public static function build(Settings $settings, string $locale): self
     {
+        $enabled = Notifications::enabledChannels('form.submission');
         $recipients = [];
 
-        foreach (AdminUsers::all() as $admin) {
-            $recipients[] = new Recipient(Audience::Staff, $locale, notifiable: $admin);
+        if (in_array('bell', $enabled, true)) {
+            foreach (AdminUsers::all() as $admin) {
+                $recipients[] = new Recipient(Audience::Staff, $locale, notifiable: $admin);
+            }
         }
 
         $mailMisconfigured = false;
 
-        if ((bool) $settings->get('notifications.mail.enabled')) {
+        if (in_array('mail', $enabled, true)) {
             $emails = MailRecipients::parse($settings->get('notifications.mail.recipients'));
             $mailMisconfigured = $emails === [];
 
@@ -58,7 +60,7 @@ final readonly class FormSubmissionRecipients
 
         $telegramMisconfigured = false;
 
-        if ((bool) $settings->get('notifications.telegram.enabled')) {
+        if (in_array('telegram', $enabled, true)) {
             $token = $settings->get('notifications.telegram.bot_token');
             $chatIds = ChatIds::parse($settings->get('notifications.telegram.chat_ids'));
             $telegramMisconfigured = ! is_string($token) || trim($token) === '' || $chatIds === [];

@@ -15,8 +15,8 @@ it('is ok when no notification channel is enabled', function (): void {
     expect($result->status)->toBe(HealthStatus::Ok);
 });
 
-it('warns when mail notifications are enabled without recipients or a from-address', function (): void {
-    app(Settings::class)->set('notifications.mail.enabled', true);
+it('warns when mail is in the channel list without recipients or a from-address', function (): void {
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
 
     $result = app(NotificationsConfiguredCheck::class)->run();
 
@@ -24,8 +24,8 @@ it('warns when mail notifications are enabled without recipients or a from-addre
         ->and($result->hint())->toContain(__('tbtop-cms::health.checks.notifications_configured.hints.mail_no_recipients'));
 });
 
-it('is ok when mail notifications are enabled with recipients and a from-address', function (): void {
-    app(Settings::class)->set('notifications.mail.enabled', true);
+it('is ok when mail is in the channel list with recipients and a from-address', function (): void {
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', 'admin@example.com');
     app(Settings::class)->set('mail.from_address', 'noreply@example.com');
 
@@ -34,8 +34,8 @@ it('is ok when mail notifications are enabled with recipients and a from-address
     expect($result->status)->toBe(HealthStatus::Ok);
 });
 
-it('warns when telegram notifications are enabled without a bot token or chat ids', function (): void {
-    app(Settings::class)->set('notifications.telegram.enabled', true);
+it('warns when telegram is in the channel list without a bot token or chat ids', function (): void {
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
 
     $result = app(NotificationsConfiguredCheck::class)->run();
 

@@ -7,15 +7,18 @@ namespace Tbtop\Cms\Health\Checks;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
+use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Settings\Settings;
 
 /**
- * Mail/Telegram notifications each have an independent enabled flag plus
- * the settings they need to actually deliver (see NotificationSettingsPage's
- * field map). SubmissionNotifier already reports a misconfigured channel as
- * a Failed submission per-occurrence (see its docblock), but only after a
- * form is actually submitted — this check surfaces the same misconfiguration
- * proactively, from the health page, before the first real submission hits it.
+ * Mail/Telegram each need settings beyond membership in form.submission's
+ * channel list to actually deliver (see NotificationSettingsPage's field
+ * map) — a channel is checked here only when it's in
+ * Notifications::enabledChannels('form.submission'). SubmissionNotifier
+ * already reports a misconfigured channel as a Failed submission
+ * per-occurrence (see its docblock), but only after a form is actually
+ * submitted — this check surfaces the same misconfiguration proactively,
+ * from the health page, before the first real submission hits it.
  */
 final class NotificationsConfiguredCheck implements HealthCheck
 {
@@ -55,7 +58,7 @@ final class NotificationsConfiguredCheck implements HealthCheck
     /** @return list<string> */
     private function mailProblems(): array
     {
-        if (! $this->isTruthy($this->settings->get('notifications.mail.enabled'))) {
+        if (! in_array('mail', Notifications::enabledChannels('form.submission'), true)) {
             return [];
         }
 
@@ -75,7 +78,7 @@ final class NotificationsConfiguredCheck implements HealthCheck
     /** @return list<string> */
     private function telegramProblems(): array
     {
-        if (! $this->isTruthy($this->settings->get('notifications.telegram.enabled'))) {
+        if (! in_array('telegram', Notifications::enabledChannels('form.submission'), true)) {
             return [];
         }
 
@@ -90,11 +93,6 @@ final class NotificationsConfiguredCheck implements HealthCheck
         }
 
         return $problems;
-    }
-
-    private function isTruthy(mixed $value): bool
-    {
-        return $value === true || $value === '1' || $value === 1;
     }
 
     private function isNonEmptyString(mixed $value): bool

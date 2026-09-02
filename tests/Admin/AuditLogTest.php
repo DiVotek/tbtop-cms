@@ -30,7 +30,12 @@ it('audits an administrative change without storing its secret value', function 
     ])->assertRedirect();
 
     $setting = Setting::query()->where('key', 'mail.password')->firstOrFail();
-    $activity = Activity::query()->sole();
+    // Not Activity::query()->sole(): this same POST also touches
+    // notifications.form.submission.channels (NotificationSettingsPage maps
+    // one channels__* field per registered type; it defaults to [] and, like
+    // any first-touch setting, gets its own audit row) — this test only
+    // cares about the secret-redaction behavior on mail.password.
+    $activity = Activity::query()->forSubject($setting)->sole();
 
     expect($activity->log_name)->toBe('tbtop-cms')
         ->and($activity->event)->toBe('created')

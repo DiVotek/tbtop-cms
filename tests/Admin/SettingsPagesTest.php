@@ -193,8 +193,7 @@ it('labels notification settings fields and helper text from translations', func
 
     $labels = settingsFieldLabels($structure);
 
-    expect($labels['notification_mail_enabled'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_enabled'))
-        ->and($labels['notification_mail_recipients'])->toBe(__('tbtop-cms::settings.notifications.fields.recipients'))
+    expect($labels['notification_mail_recipients'])->toBe(__('tbtop-cms::settings.notifications.fields.recipients'))
         ->and($labels['mail_host'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_host'))
         ->and($labels['mail_port'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_port'))
         ->and($labels['mail_username'])->toBe(__('tbtop-cms::settings.notifications.fields.mail_username'))

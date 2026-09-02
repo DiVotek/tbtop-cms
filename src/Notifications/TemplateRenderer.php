@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Notifications;
 
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\View;
 use Illuminate\View\View as ConcreteView;
 use InvalidArgumentException;
@@ -16,17 +17,26 @@ use LogicException;
  * is expected to define a `subject` section (`@section('subject', ...)`);
  * its absence just yields an empty subject — a short-format channel like
  * telegram or bell has no use for one.
+ *
+ * $template accepts either a registered view name or inline Blade source
+ * (a merchant-edited override — see DatabaseTemplateStore::compose()):
+ * a string that looks like a view name AND resolves via View::exists() is
+ * treated as one, otherwise it's compiled as inline source.
  */
 class TemplateRenderer
 {
-    public function render(string $view, object $payload, string $locale): Rendered
+    private const VIEW_NAME_PATTERN = '/^[A-Za-z0-9_\-:.\/]+$/';
+
+    public function render(string $template, object $payload, string $locale): Rendered
     {
         $previousLocale = App::getLocale();
         App::setLocale($locale);
 
         try {
             $data = get_object_vars($payload);
-            $instance = View::make($view, $data);
+            $instance = $this->isViewName($template)
+                ? View::make($template, $data)
+                : View::file($this->compiledInlinePath($template), $data);
 
             // Illuminate\Contracts\View\View only promises a zero-arg
             // render(): string; the section-capturing callback below is a
@@ -58,5 +68,22 @@ class TemplateRenderer
         if (! View::exists($view)) {
             throw new InvalidArgumentException("Notification view [{$view}] does not exist.");
         }
+    }
+
+    private function isViewName(string $template): bool
+    {
+        return preg_match(self::VIEW_NAME_PATTERN, $template) === 1 && View::exists($template);
+    }
+
+    /** Compiles inline Blade source to a stable, content-addressed file so repeated renders reuse it. */
+    private function compiledInlinePath(string $source): string
+    {
+        $path = rtrim((string) config('view.compiled'), '/') . '/tbtop-notification-' . hash('sha256', $source) . '.blade.php';
+
+        if (! File::exists($path)) {
+            File::put($path, $source);
+        }
+
+        return $path;
     }
 }

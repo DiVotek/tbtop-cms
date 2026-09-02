@@ -128,9 +128,26 @@ it('marks a submission handled from the bell channel alone when mail and telegra
         ->and($submission->error)->toBeNull();
 });
 
+it('ignores the legacy mail-enabled flag when no per-type channel list is set', function (): void {
+    Mail::fake();
+    notifierAdmin();
+    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    expect($submission->status)->toBe(SubmissionStatus::Handled)
+        ->and($submission->error)->toBeNull();
+    Mail::assertNothingSent();
+});
+
 it('allows only one stale notification attempt to claim a pending submission', function (): void {
     Mail::fake();
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
     $page = notifierContactPage();
     $submission = FormSubmission::query()->create([
@@ -157,7 +174,7 @@ it('allows only one stale notification attempt to claim a pending submission', f
 it('marks the submission failed when mail is enabled but no recipients are configured', function (): void {
     Mail::fake();
     notifierAdmin();
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', '');
     $page = notifierContactPage();
 
@@ -173,7 +190,7 @@ it('marks the submission failed when mail is enabled but no recipients are confi
 
 it('marks the submission failed when telegram is enabled but token or chat ids are missing', function (): void {
     notifierAdmin();
-    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
     app(Settings::class)->set('notifications.telegram.bot_token', 'a-token');
     app(Settings::class)->set('notifications.telegram.chat_ids', '');
     $page = notifierContactPage();
@@ -193,7 +210,7 @@ it('marks the submission failed when telegram is enabled but token or chat ids a
 
 it('mails every configured recipient when enabled', function (): void {
     Mail::fake();
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', "ops@example.test\nsales@example.test");
     $page = notifierContactPage();
 
@@ -211,7 +228,7 @@ it('mails every configured recipient when enabled', function (): void {
 
 it('stays handled when a concurrent caller writes an unrelated failed log row', function (): void {
     Mail::fake();
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
     $page = notifierContactPage();
 
@@ -263,9 +280,9 @@ it('renders structured submission values safely in mail', function (): void {
         ->toContain('<strong>note:</strong> </p>');
 });
 
-it('sends no mail when disabled even with recipients configured', function (): void {
+it('sends no mail when mail is not in the channel list even with recipients configured', function (): void {
     Mail::fake();
-    app(Settings::class)->set('notifications.mail.enabled', false);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
     $page = notifierContactPage();
 
@@ -282,7 +299,7 @@ it('sends no mail when disabled even with recipients configured', function (): v
 
 it('sends a telegram message per configured chat id', function (): void {
     Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
-    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
     app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
     app(Settings::class)->set('notifications.telegram.chat_ids', "111\n222");
     $page = notifierContactPage();
@@ -300,7 +317,7 @@ it('sends a telegram message per configured chat id', function (): void {
 
 it('marks the submission failed with an aggregated error when a telegram chat send fails', function (): void {
     Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'chat not found'], 400)]);
-    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
     app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
     app(Settings::class)->set('notifications.telegram.chat_ids', '111');
     $page = notifierContactPage();
@@ -317,7 +334,7 @@ it('marks the submission failed with an aggregated error when a telegram chat se
 it('does not persist the bot token when a telegram connection fails', function (): void {
     $token = 'SECRET-TOKEN';
     Http::fake(fn () => throw new ConnectionException("Could not connect to https://api.telegram.org/bot{$token}/sendMessage"));
-    app(Settings::class)->set('notifications.telegram.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
     app(Settings::class)->set('notifications.telegram.bot_token', $token);
     app(Settings::class)->set('notifications.telegram.chat_ids', '111');
     $page = notifierContactPage();
@@ -333,9 +350,9 @@ it('does not persist the bot token when a telegram connection fails', function (
         ->and($submission->error)->not->toContain('api.telegram.org/bot');
 });
 
-it('sends nothing over telegram when disabled', function (): void {
+it('sends nothing over telegram when telegram is not in the channel list', function (): void {
     Http::fake();
-    app(Settings::class)->set('notifications.telegram.enabled', false);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell']);
     app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
     app(Settings::class)->set('notifications.telegram.chat_ids', '111');
     $page = notifierContactPage();
@@ -353,9 +370,8 @@ it('sends nothing over telegram when disabled', function (): void {
 
 it('marks a submission failed with a joined error when mail fails while telegram succeeds', function (): void {
     Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail', 'telegram']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
-    app(Settings::class)->set('notifications.telegram.enabled', true);
     app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
     app(Settings::class)->set('notifications.telegram.chat_ids', '111');
     // No mail.host configured and no default mailer wired in the test
@@ -406,7 +422,7 @@ it('does not fan out when storage is disabled — nothing to track delivery stat
     Mail::fake();
     notifierAdmin();
     config()->set('tbtop-cms.forms.store', false);
-    app(Settings::class)->set('notifications.mail.enabled', true);
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
     app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
     $page = notifierContactPage();
 
