@@ -50,10 +50,14 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Deliberately a no-op: up() leaves an existing table alone, so the table
+     * may belong to the host (or another package) and hold its audit history.
+     * A migration cannot remember whether it was the one that created the
+     * table, so it never drops it — a host that wants it gone drops it itself.
+     */
     public function down(): void
     {
-        $model = app(ActivitylogConfig::activityModel());
-
-        Schema::connection($model->getConnectionName())->dropIfExists($model->getTable());
+        //
     }
 };
