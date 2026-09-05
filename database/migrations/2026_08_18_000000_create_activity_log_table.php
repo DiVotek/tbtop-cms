@@ -54,31 +54,42 @@ return new class extends Migration
         });
 
         // Ownership record: only a table this migration created is ours to
-        // drop on rollback. Lives in tbtop_settings (created earlier in this
-        // package's migration order) because the migrations table has no
-        // room for per-migration state.
+        // drop on rollback, and only that exact table — the record names the
+        // connection and table so a later activity_model change cannot point
+        // the rollback at somebody else's table. Lives in tbtop_settings
+        // (created earlier in this package's migration order) because the
+        // migrations table has no room for per-migration state.
         DB::table('tbtop_settings')->updateOrInsert(
             ['key' => self::OWNERSHIP_KEY],
-            ['value' => '1', 'created_at' => now(), 'updated_at' => now()],
+            [
+                'value' => json_encode(['connection' => $connection, 'table' => $table], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         );
     }
 
     /**
-     * Rollback drops the table only when the ownership record says this
-     * migration created it. A pre-existing table (host-owned, another
+     * Rollback drops exactly the table the ownership record names, and only
+     * when that record exists. A pre-existing table (host-owned, another
      * package's, or a custom activity model's) was skipped by up() and has no
      * record, so it is left untouched whatever it holds — a host that wants
-     * it gone drops it itself.
+     * it gone drops it itself. The currently configured activity model is
+     * deliberately not consulted here: it may have changed since migrate.
      */
     public function down(): void
     {
-        $owned = DB::table('tbtop_settings')->where('key', self::OWNERSHIP_KEY)->exists();
-        if (! $owned) {
+        $raw = DB::table('tbtop_settings')->where('key', self::OWNERSHIP_KEY)->value('value');
+        if (! is_string($raw)) {
             return;
         }
 
-        $model = app(ActivitylogConfig::activityModel());
-        Schema::connection($model->getConnectionName())->dropIfExists($model->getTable());
+        $owned = json_decode($raw, true);
+        if (is_array($owned) && is_string($owned['table'] ?? null)) {
+            $connection = is_string($owned['connection'] ?? null) ? $owned['connection'] : null;
+            Schema::connection($connection)->dropIfExists($owned['table']);
+        }
+
         DB::table('tbtop_settings')->where('key', self::OWNERSHIP_KEY)->delete();
     }
 };

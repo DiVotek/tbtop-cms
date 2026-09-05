@@ -34,6 +34,16 @@ it('rolls back a table it created, history included, and clears the ownership re
         ->and(DB::table('tbtop_settings')->where('key', ACTIVITY_LOG_OWNERSHIP_KEY)->exists())->toBeFalse();
 });
 
+it('rolls back only the table the ownership record names, not the currently configured one', function (): void {
+    DB::table('tbtop_settings')->where('key', ACTIVITY_LOG_OWNERSHIP_KEY)
+        ->update(['value' => json_encode(['connection' => null, 'table' => 'activity_log_previous'])]);
+
+    activityLogMigration()->down();
+
+    expect(Schema::hasTable('activity_log'))->toBeTrue()
+        ->and(DB::table('tbtop_settings')->where('key', ACTIVITY_LOG_OWNERSHIP_KEY)->exists())->toBeFalse();
+});
+
 it('leaves a table it did not create untouched on rollback', function (): void {
     // A host-owned table: present before this migration ran, so no record.
     DB::table('tbtop_settings')->where('key', ACTIVITY_LOG_OWNERSHIP_KEY)->delete();
