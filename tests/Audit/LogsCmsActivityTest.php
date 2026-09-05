@@ -72,9 +72,20 @@ it('summarizes a block field as a count and kinds rather than storing its conten
 
     $activity = Activity::query()->sole();
 
-    expect(data_get($activity->properties, 'attributes.content'))
+    expect(data_get($activity->attribute_changes, 'attributes.content'))
         ->toBe(['count' => 2, 'kinds' => ['Hero', 'Simple']])
-        ->and($activity->properties->toJson())->not->toContain('Not stored in the audit log');
+        ->and($activity->attribute_changes->toJson())->not->toContain('Not stored in the audit log');
+});
+
+it('does not resurrect the v4 properties.attributes/old shape', function (): void {
+    test()->actingAs(auditAdmin(), 'web');
+
+    Layout::query()->create(['slot' => 'header', 'content' => []]);
+
+    $activity = Activity::query()->sole();
+
+    expect($activity->properties->has('attributes'))->toBeFalse()
+        ->and($activity->properties->has('old'))->toBeFalse();
 });
 
 it('flags a block field whose order changed while its ids stayed the same', function (): void {

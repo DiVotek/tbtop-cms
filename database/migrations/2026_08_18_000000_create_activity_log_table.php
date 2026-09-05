@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Activitylog\Support\Config as ActivitylogConfig;
 
 return new class extends Migration
 {
@@ -14,13 +15,23 @@ return new class extends Migration
      * provider itself (see CmsServiceProvider) and writes to the log on every
      * page save, so the table has to exist without any host step. Guarded so
      * a host that already published spatie's migrations keeps its table
-     * untouched; the shape is spatie's current one (event and batch_uuid
-     * included, which upstream added in two later migrations).
+     * untouched; the shape is spatie's v5 one (attribute_changes column,
+     * batch_uuid removed — see UPGRADING.md).
+     *
+     * v5 dropped the activitylog.table_name / activitylog.database_connection
+     * config keys: the table name and connection now live on the Activity
+     * model itself (activitylog.activity_model, default
+     * Spatie\Activitylog\Models\Activity, both hardcoded to 'activity_log'
+     * on the default connection). A host wanting a different table/connection
+     * points activity_model at its own subclass; we read that resolved
+     * model's $table/getConnectionName() so this migration still lands in
+     * the right place.
      */
     public function up(): void
     {
-        $connection = config('activitylog.database_connection');
-        $table = (string) config('activitylog.table_name', 'activity_log');
+        $model = app(ActivitylogConfig::activityModel());
+        $connection = $model->getConnectionName();
+        $table = $model->getTable();
 
         if (Schema::connection($connection)->hasTable($table)) {
             return;
@@ -33,15 +44,16 @@ return new class extends Migration
             $table->nullableMorphs('subject');
             $table->string('event')->nullable();
             $table->nullableMorphs('causer');
+            $table->json('attribute_changes')->nullable();
             $table->json('properties')->nullable();
-            $table->uuid('batch_uuid')->nullable();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::connection(config('activitylog.database_connection'))
-            ->dropIfExists((string) config('activitylog.table_name', 'activity_log'));
+        $model = app(ActivitylogConfig::activityModel());
+
+        Schema::connection($model->getConnectionName())->dropIfExists($model->getTable());
     }
 };

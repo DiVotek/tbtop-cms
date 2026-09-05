@@ -279,7 +279,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_form_submission_comments` | `src/Form/Models/FormSubmissionComment.php` | Yes | `user_id` via `UserKeyColumn::define` |
 | `notifications` | Laravel's built-in notifications table, used by `src/Notifications/*` | No | UUID primary key, standard Laravel shape |
 | `tbtop_not_found_hits` | `src/NotFound/Models/NotFoundHit.php` | Yes | |
-| `activity_log` (name configurable via `activitylog.table_name`) | `spatie/laravel-activitylog`, wired by `src/Audit/Concerns/LogsCmsActivity.php` | No | package publishes spatie's migration itself; guarded no-op if the host already has the table |
+| `activity_log` (name/connection from the resolved `activitylog.activity_model`, `spatie/laravel-activitylog` v5) | `spatie/laravel-activitylog`, wired by `src/Audit/Concerns/LogsCmsActivity.php` | No | package publishes spatie's v5 migration itself (`attribute_changes` column, no `batch_uuid`); guarded no-op if the host already has the table |
 | `tbtop_notification_log` | `src/Notifications/Models/NotificationLog.php` | Yes | |
 | `tbtop_seo_audit_snapshots` | `src/Seo/Models/SeoAuditSnapshot.php` | Yes | One row per calendar day (`captured_on`, unique); written by `cms:seo:snapshot` and on every `SeoReportPage` load |
 | `tbtop_notification_templates` | `src/Notifications/Models/NotificationTemplate.php` | Yes | Migration `2026_09_01_000000_create_notification_templates_table.php`; unique on `(type, format, locale)`; merchant-edited overrides, owner-only, no audit log |

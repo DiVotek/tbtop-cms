@@ -41,10 +41,11 @@ it('audits an administrative change without storing its secret value', function 
         ->and($activity->event)->toBe('created')
         ->and($activity->subject->is($setting))->toBeTrue()
         ->and($activity->causer->is($admin))->toBeTrue()
-        ->and(data_get($activity->properties, 'attributes.value'))->toBe([
+        ->and(data_get($activity->attribute_changes, 'attributes.value'))->toBe([
             'changed' => true,
             'is_redacted' => true,
         ])
+        ->and($activity->attribute_changes->toJson())->not->toContain($secret)
         ->and($activity->properties->toJson())->not->toContain($secret);
 
     test()->get('/admin/audit-log', ['X-Inertia' => 'true'])->assertOk();
