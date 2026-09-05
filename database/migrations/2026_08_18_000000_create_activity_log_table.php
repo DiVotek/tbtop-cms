@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Activitylog\Support\Config as ActivitylogConfig;
 
@@ -51,13 +52,27 @@ return new class extends Migration
     }
 
     /**
-     * Deliberately a no-op: up() leaves an existing table alone, so the table
-     * may belong to the host (or another package) and hold its audit history.
-     * A migration cannot remember whether it was the one that created the
-     * table, so it never drops it — a host that wants it gone drops it itself.
+     * Rollback strategy: up() leaves an existing table alone, so the table may
+     * belong to the host (or another package) and hold its audit history, and
+     * a migration cannot remember whether it was the one that created it. The
+     * one safe distinction is data: a table that holds no rows is dropped (a
+     * fresh install rolls back cleanly), a table with rows is kept whoever
+     * created it — a host that wants the history gone drops it itself.
      */
     public function down(): void
     {
-        //
+        $model = app(ActivitylogConfig::activityModel());
+        $connection = $model->getConnectionName();
+        $table = $model->getTable();
+
+        if (! Schema::connection($connection)->hasTable($table)) {
+            return;
+        }
+
+        if (DB::connection($connection)->table($table)->exists()) {
+            return;
+        }
+
+        Schema::connection($connection)->drop($table);
     }
 };
