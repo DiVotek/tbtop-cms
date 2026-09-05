@@ -10,6 +10,9 @@ use Spatie\Activitylog\Support\Config as ActivitylogConfig;
 
 return new class extends Migration
 {
+    /** tbtop_settings key recording that this migration created the activity table. */
+    private const string OWNERSHIP_KEY = 'internal.activity_log_table_created_by_cms';
+
     /**
      * spatie/laravel-activitylog does not load its own migrations — it
      * expects the host to publish them. The CMS registers its service
@@ -49,30 +52,33 @@ return new class extends Migration
             $table->json('properties')->nullable();
             $table->timestamps();
         });
+
+        // Ownership record: only a table this migration created is ours to
+        // drop on rollback. Lives in tbtop_settings (created earlier in this
+        // package's migration order) because the migrations table has no
+        // room for per-migration state.
+        DB::table('tbtop_settings')->updateOrInsert(
+            ['key' => self::OWNERSHIP_KEY],
+            ['value' => '1', 'created_at' => now(), 'updated_at' => now()],
+        );
     }
 
     /**
-     * Rollback strategy: up() leaves an existing table alone, so the table may
-     * belong to the host (or another package) and hold its audit history, and
-     * a migration cannot remember whether it was the one that created it. The
-     * one safe distinction is data: a table that holds no rows is dropped (a
-     * fresh install rolls back cleanly), a table with rows is kept whoever
-     * created it — a host that wants the history gone drops it itself.
+     * Rollback drops the table only when the ownership record says this
+     * migration created it. A pre-existing table (host-owned, another
+     * package's, or a custom activity model's) was skipped by up() and has no
+     * record, so it is left untouched whatever it holds — a host that wants
+     * it gone drops it itself.
      */
     public function down(): void
     {
+        $owned = DB::table('tbtop_settings')->where('key', self::OWNERSHIP_KEY)->exists();
+        if (! $owned) {
+            return;
+        }
+
         $model = app(ActivitylogConfig::activityModel());
-        $connection = $model->getConnectionName();
-        $table = $model->getTable();
-
-        if (! Schema::connection($connection)->hasTable($table)) {
-            return;
-        }
-
-        if (DB::connection($connection)->table($table)->exists()) {
-            return;
-        }
-
-        Schema::connection($connection)->drop($table);
+        Schema::connection($model->getConnectionName())->dropIfExists($model->getTable());
+        DB::table('tbtop_settings')->where('key', self::OWNERSHIP_KEY)->delete();
     }
 };
