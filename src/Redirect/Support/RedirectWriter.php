@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Redirect\Support;
 
-use Spatie\Activitylog\ActivityLogger;
+use Spatie\Activitylog\Support\ActivityLogger;
 use Tbtop\Cms\Redirect\Models\Redirect;
 
 class RedirectWriter
@@ -18,7 +18,7 @@ class RedirectWriter
             return;
         }
 
-        app(ActivityLogger::class)->withoutLogs(function () use ($locale, $from, $to): void {
+        app(ActivityLogger::class)->withoutLogging(function () use ($locale, $from, $to): void {
             Redirect::query()
                 ->where('locale', $locale)
                 ->where('is_auto', true)

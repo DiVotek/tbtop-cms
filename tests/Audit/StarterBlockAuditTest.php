@@ -41,10 +41,12 @@ it('labels an apply-to-existing run as one batch of starter_blocks_applied entri
 
     $entries = Activity::query()->get();
 
+    $batchIds = $entries->map(fn (Activity $activity): mixed => data_get($activity->properties, 'batch'));
+
     expect($entries)->toHaveCount(2)
         ->and($entries->pluck('event')->unique()->all())->toBe(['starter_blocks_applied'])
-        ->and($entries->pluck('batch_uuid')->unique())->toHaveCount(1)
-        ->and($entries->pluck('batch_uuid')->first())->not->toBeNull();
+        ->and($batchIds->unique())->toHaveCount(1)
+        ->and($batchIds->first())->not->toBeNull();
 
     $categoryEntry = $entries->firstWhere('subject_id', $category->id);
     $pageEntry = $entries->firstWhere('subject_id', $article->id);

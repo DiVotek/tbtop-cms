@@ -51,6 +51,7 @@ class AuditActivityPage extends AdminPage
     {
         $activity = $this->activity();
         $properties = $activity->properties instanceof Collection ? $activity->properties : collect();
+        $changes = $activity->attribute_changes instanceof Collection ? $activity->attribute_changes : collect();
 
         return $s->stack([
             $s->section(['title' => __('tbtop-cms::audit.detail.summary'), 'variant' => 'card'], [
@@ -62,8 +63,8 @@ class AuditActivityPage extends AdminPage
                     __('tbtop-cms::audit.columns.subject') => (string) $properties->get('subject_label', ''),
                 ]),
             ]),
-            $this->changesSection($s, __('tbtop-cms::audit.detail.before'), (array) $properties->get('old', [])),
-            $this->changesSection($s, __('tbtop-cms::audit.detail.after'), (array) $properties->get('attributes', [])),
+            $this->changesSection($s, __('tbtop-cms::audit.detail.before'), (array) $changes->get('old', [])),
+            $this->changesSection($s, __('tbtop-cms::audit.detail.after'), (array) $changes->get('attributes', [])),
             $this->changesSection($s, __('tbtop-cms::audit.detail.context'), (array) $properties->get('context', [])),
         ]);
     }

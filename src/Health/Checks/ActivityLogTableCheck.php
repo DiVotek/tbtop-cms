@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Health\Checks;
 
 use Illuminate\Support\Facades\Schema;
+use Spatie\Activitylog\Support\Config as ActivitylogConfig;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
@@ -18,10 +19,12 @@ final class ActivityLogTableCheck implements HealthCheck
 
     public function run(): HealthCheckResult
     {
-        $table = (string) config('activitylog.table_name', 'activity_log');
-        $columns = ['event', 'properties', 'batch_uuid', 'subject_type', 'subject_id', 'causer_type', 'causer_id'];
-        $isReady = Schema::hasTable($table)
-            && collect($columns)->every(static fn (string $column): bool => Schema::hasColumn($table, $column));
+        $model = app(ActivitylogConfig::activityModel());
+        $connection = Schema::connection($model->getConnectionName());
+        $table = $model->getTable();
+        $columns = ['event', 'attribute_changes', 'properties', 'subject_type', 'subject_id', 'causer_type', 'causer_id'];
+        $isReady = $connection->hasTable($table)
+            && collect($columns)->every(static fn (string $column): bool => $connection->hasColumn($table, $column));
 
         return new HealthCheckResult(
             checkId: $this->id(),
