@@ -22,6 +22,7 @@ class BlockShowcase
      *     label: string,
      *     description: string|null,
      *     category: string|null,
+     *     placements: list<string>,
      *     fields: list<array{name: string, label: string, type: string, required: bool, translatable: bool}>
      * }
      */
@@ -32,6 +33,7 @@ class BlockShowcase
             'label' => $block->label(),
             'description' => $block->description(),
             'category' => $block->category(),
+            'placements' => $block->placements(),
             'fields' => self::fields($block),
         ];
     }

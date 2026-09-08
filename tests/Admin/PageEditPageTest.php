@@ -1048,5 +1048,13 @@ function findFieldByName(array $node, string $name): ?array
         }
     }
 
+    // A repeater's row fields (e.g. BlockContent::make()'s `content` field)
+    // sit under options.fields, not options.children.
+    foreach ((array) ($node['options']['fields'] ?? []) as $child) {
+        if (is_array($child) && ($found = findFieldByName($child, $name)) !== null) {
+            return $found;
+        }
+    }
+
     return null;
 }

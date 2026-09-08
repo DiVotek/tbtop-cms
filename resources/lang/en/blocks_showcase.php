@@ -22,7 +22,12 @@ return [
     'meta' => [
         'kind' => 'Kind',
         'category' => 'Category',
+        'placements' => 'Placements',
         'fields' => 'Fields',
+    ],
+    'placements' => [
+        'layout' => 'Layout',
+        'pages' => 'All pages',
     ],
     'table' => [
         'field' => 'Field',

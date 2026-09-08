@@ -172,7 +172,7 @@ final class PageEditBlockTabs
     private static function addBlockTab(S $s, Page $page, BlockRegistry $registry): array
     {
         $actions = [];
-        foreach (array_keys($registry->all()) as $kind) {
+        foreach (array_keys($registry->forPlacement($page->type)) as $kind) {
             $actions[] = self::addAction($s, $page, $kind);
         }
 

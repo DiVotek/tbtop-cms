@@ -43,6 +43,17 @@ abstract class Block
     }
 
     /**
+     * Page-type keys and/or Placement::LAYOUT. Default (Placement::PAGES)
+     * means every page type; a layout-only block returns [Placement::LAYOUT].
+     *
+     * @return list<string>
+     */
+    public function placements(): array
+    {
+        return [Placement::PAGES];
+    }
+
+    /**
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */

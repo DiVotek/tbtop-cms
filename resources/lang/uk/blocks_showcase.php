@@ -22,7 +22,12 @@ return [
     'meta' => [
         'kind' => 'Тип',
         'category' => 'Категорія',
+        'placements' => 'Розміщення',
         'fields' => 'Поля',
+    ],
+    'placements' => [
+        'layout' => 'Макет',
+        'pages' => 'Усі сторінки',
     ],
     'table' => [
         'field' => 'Поле',

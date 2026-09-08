@@ -67,6 +67,18 @@ class BlockRegistry
         return array_keys($this->blocks);
     }
 
+    /** @return array<string, Block> */
+    public function forPlacement(string $placement): array
+    {
+        $this->boot();
+
+        return array_filter(
+            $this->blocks,
+            static fn (Block $block): bool => in_array($placement, $block->placements(), true)
+                || ($placement !== Placement::LAYOUT && in_array(Placement::PAGES, $block->placements(), true)),
+        );
+    }
+
     private function boot(): void
     {
         if ($this->booted) {

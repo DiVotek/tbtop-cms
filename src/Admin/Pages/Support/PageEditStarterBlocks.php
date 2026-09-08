@@ -131,7 +131,7 @@ final class PageEditStarterBlocks
     private static function addActions(S $s, Page $page, string $type, BlockRegistry $registry): array
     {
         $actions = [];
-        foreach (array_keys($registry->all()) as $kind) {
+        foreach (array_keys($registry->forPlacement($type)) as $kind) {
             $actions[] = self::addAction($s, $page, $type, $kind);
         }
 

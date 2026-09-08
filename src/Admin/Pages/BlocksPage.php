@@ -12,9 +12,11 @@ use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\BlockShowcase;
 use Tbtop\Cms\Admin\Pages\Support\BlockShowcaseHtml;
 use Tbtop\Cms\Admin\Pages\Support\BlockUsage;
+use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Block\Placement;
 
 /**
  * Read-only showcase of the content blocks registered in the system. Blocks
@@ -116,7 +118,7 @@ class BlocksPage extends AdminPage
     }
 
     /**
-     * @param  array{kind: string, label: string, description: string|null, category: string|null, fields: list<array{name: string, label: string, type: string, required: bool, translatable: bool}>}  $info
+     * @param  array{kind: string, label: string, description: string|null, category: string|null, placements: list<string>, fields: list<array{name: string, label: string, type: string, required: bool, translatable: bool}>}  $info
      * @param  list<array{name: string, url: string|null}>  $usage
      */
     private function detailsAction(S $s, array $info, array $usage): ActionBuilder
@@ -128,7 +130,7 @@ class BlocksPage extends AdminPage
     }
 
     /**
-     * @param  array{kind: string, label: string, description: string|null, category: string|null, fields: list<array{name: string, label: string, type: string, required: bool, translatable: bool}>}  $info
+     * @param  array{kind: string, label: string, description: string|null, category: string|null, placements: list<string>, fields: list<array{name: string, label: string, type: string, required: bool, translatable: bool}>}  $info
      * @param  list<array{name: string, url: string|null}>  $usage
      */
     private function detailBody(S $s, array $info, array $usage): Node
@@ -164,7 +166,7 @@ class BlocksPage extends AdminPage
     }
 
     /**
-     * @param  array{kind: string, category: string|null, fields: list<mixed>}  $info
+     * @param  array{kind: string, category: string|null, placements: list<string>, fields: list<mixed>}  $info
      * @return array<string, string>
      */
     private function meta(array $info): array
@@ -173,8 +175,24 @@ class BlocksPage extends AdminPage
         if ($info['category'] !== null) {
             $meta[__('tbtop-cms::blocks_showcase.meta.category')] = $info['category'];
         }
+        $meta[__('tbtop-cms::blocks_showcase.meta.placements')] = $this->placementsLabel($info['placements']);
         $meta[__('tbtop-cms::blocks_showcase.meta.fields')] = (string) count($info['fields']);
 
         return $meta;
+    }
+
+    /** @param  list<string>  $placements */
+    private function placementsLabel(array $placements): string
+    {
+        return implode(', ', array_map($this->placementLabel(...), $placements));
+    }
+
+    private function placementLabel(string $placement): string
+    {
+        return match ($placement) {
+            Placement::LAYOUT => __('tbtop-cms::blocks_showcase.placements.layout'),
+            Placement::PAGES => __('tbtop-cms::blocks_showcase.placements.pages'),
+            default => PageFormOptions::typeLabelFor($placement, $placement),
+        };
     }
 }

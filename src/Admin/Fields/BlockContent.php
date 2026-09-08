@@ -30,11 +30,11 @@ use Tbtop\Cms\Block\BlockRegistry;
  */
 final class BlockContent
 {
-    public static function make(S $s, string $name = 'content'): Node
+    public static function make(S $s, string $name = 'content', ?string $placement = null): Node
     {
         $fields = [
             $s->text('id')->meta('hidden', true),
-            $s->select('kind')->label(__('tbtop-cms::pages.blocks.type'))->required()->options(self::kindOptions()),
+            $s->select('kind')->label(__('tbtop-cms::pages.blocks.type'))->required()->options(self::kindOptions($placement)),
             $s->boolean('active')->label(__('tbtop-cms::pages.blocks.active')),
             ...self::blockFields($s),
         ];
@@ -134,11 +134,14 @@ final class BlockContent
     }
 
     /** @return list<array{value: string, label: string}> */
-    private static function kindOptions(): array
+    private static function kindOptions(?string $placement): array
     {
+        $registry = app(BlockRegistry::class);
+        $kinds = $placement === null ? $registry->kinds() : array_keys($registry->forPlacement($placement));
+
         return array_map(
             static fn (string $kind): array => ['value' => $kind, 'label' => $kind],
-            app(BlockRegistry::class)->kinds(),
+            $kinds,
         );
     }
 

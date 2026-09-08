@@ -54,6 +54,11 @@ Hosts that never published the config need no action.
 
 ### Added
 
+- Block placements: `Block::placements()` restricts which admin surface
+  (a page type or `Placement::LAYOUT`) offers a block kind via
+  `BlockRegistry::forPlacement()`. Defaults to `Placement::PAGES` (every page
+  type), unchanged for existing blocks. Frontend rendering and a block's own
+  edit tab are unaffected — only the "add block" pickers are filtered.
 - Server-rendered `<head>`: title, description, canonical, full Open Graph
   (`og:type/url/site_name/locale/locale:alternate` plus the existing
   title/description/image), Twitter Card, hreflang (+ `x-default`), favicon,

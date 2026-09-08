@@ -49,6 +49,19 @@ Overridable, all with sane defaults:
   hides the line.
 - **`category(): ?string`** — showcase grouping bucket (e.g. `'content'`,
   `'forms'`). `null` (default) leaves the block ungrouped.
+- **`placements(): array`** — where the block may be added: a list of
+  page-type keys and/or `Tbtop\Cms\Block\Placement::LAYOUT`. Default is
+  `[Placement::PAGES]`, a wildcard meaning every page type (including a
+  host-registered one). `BlockRegistry::forPlacement(string $placement): array`
+  filters `all()` down to blocks that match — a block matches when the
+  placement is in its list, or when the placement isn't `Placement::LAYOUT`
+  and `Placement::PAGES` is in its list. The page editor calls
+  `forPlacement($page->type)`, the layout editor calls
+  `forPlacement(Placement::LAYOUT)`, both only for the "add block" picker —
+  this does not touch `resolve()`/rendering: existing content holding a kind
+  outside its current placements still resolves, renders, and keeps its own
+  edit tab (tabs are keyed by the block already saved on the page, looked up
+  via `has()`/`get()`, never filtered by placement).
 - **`resolve(array $input, ResolveContext $ctx): array`** — turns raw,
   already locale-flattened editor `data` into the props the React component
   receives. Default is identity (`return $input;`) — override this in almost
