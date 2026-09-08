@@ -1027,34 +1027,3 @@ function footerActionNames(?array $form): array
 
     return $names;
 }
-
-/**
- * The first field with this `name` at any depth. Fields sit inside layout
- * wrappers (the SEO tab lays them out in a grid beside the checklist), so a
- * firstWhere() over the top-level children finds nothing.
- *
- * @param  array<string, mixed>  $node
- * @return array<string, mixed>|null
- */
-function findFieldByName(array $node, string $name): ?array
-{
-    if (($node['name'] ?? null) === $name) {
-        return $node;
-    }
-
-    foreach ((array) ($node['options']['children'] ?? []) as $child) {
-        if (is_array($child) && ($found = findFieldByName($child, $name)) !== null) {
-            return $found;
-        }
-    }
-
-    // A repeater's row fields (e.g. BlockContent::make()'s `content` field)
-    // sit under options.fields, not options.children.
-    foreach ((array) ($node['options']['fields'] ?? []) as $child) {
-        if (is_array($child) && ($found = findFieldByName($child, $name)) !== null) {
-            return $found;
-        }
-    }
-
-    return null;
-}
