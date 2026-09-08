@@ -9,6 +9,7 @@ use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
+use Tbtop\Cms\Tests\Fixtures\LayoutOnlyBlock;
 use Tbtop\Cms\Tests\Fixtures\RequiredFieldBlock;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
 
@@ -205,19 +206,21 @@ it('reorders the persisted envelope when block_{id}_sort values change on save',
 });
 
 it('appends an inactive block of the chosen kind via the add action, creating the row when none existed', function (): void {
-    config(['tbtop-cms.blocks.types' => [SimpleBlock::class]]);
+    // SimpleBlock defaults to Placement::PAGES, so its add action isn't
+    // registered on the layout editor — use a layout-placed block instead.
+    config(['tbtop-cms.blocks.types' => [LayoutOnlyBlock::class]]);
 
     expect(Layout::query()->where('slot', Slots::HEADER)->exists())->toBeFalse();
 
     test()->actingAs(layoutTabsAdmin(), 'web')->postJson(
-        '/admin/layout/' . Slots::HEADER . '/edit/actions/layoutBlockAdd_Simple',
+        '/admin/layout/' . Slots::HEADER . '/edit/actions/layoutBlockAdd_LayoutOnly',
         ['payload' => ['form' => []]],
     )->assertOk();
 
     $layout = Layout::query()->where('slot', Slots::HEADER)->firstOrFail();
 
     expect($layout->content)->toHaveCount(1)
-        ->and($layout->content[0]['kind'])->toBe('Simple')
+        ->and($layout->content[0]['kind'])->toBe('LayoutOnly')
         ->and($layout->content[0]['active'])->toBeFalse();
 });
 

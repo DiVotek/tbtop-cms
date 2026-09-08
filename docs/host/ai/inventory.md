@@ -161,7 +161,8 @@ Source of truth: the contract/base-class files themselves under `src/`.
 
 | Class/Contract | Path | Methods to implement | Purpose |
 |---|---|---|---|
-| `Block` (abstract) | `src/Block/Block.php` | Required: `kind(): string`, `form(S $s): list<Field>`. Overridable (have defaults): `label()`, `description()`, `category()`, `resolve(array $input, ResolveContext $ctx): array`, `translatableFields()` | Base for a block type: schema/form plus an optional server-side resolve step |
+| `Block` (abstract) | `src/Block/Block.php` | Required: `kind(): string`, `form(S $s): list<Field>`. Overridable (have defaults): `label()`, `description()`, `category()`, `placements(): list<string>`, `resolve(array $input, ResolveContext $ctx): array`, `translatableFields()` | Base for a block type: schema/form plus an optional server-side resolve step |
+| `Placement` | `src/Block/Placement.php` | Constants `LAYOUT`, `PAGES` | Values a `Block::placements()` entry may hold: a page-type key, `Placement::LAYOUT`, or the wildcard `Placement::PAGES` (every page type) |
 | `PageTypeInterface` | `src/Page/Contracts/PageTypeInterface.php` | `key()`, `label()`, `allowedChildren(): list<string>`, `requiresParent(): bool`, `maxDepth(): int`, `isSourceBacked(): bool`, `source(Page $page): ?object`, `template(Page $page): ?array` | Contract for a page type |
 | `BasePageType` (abstract) | `src/Page/Types/BasePageType.php` | Implements `PageTypeInterface` with defaults (`label`=ucfirst(key), `allowedChildren`=[], `requiresParent`=false, `maxDepth`=1, `isSourceBacked`=false, `source`=null, `template`=null); a subclass need only override `key()` plus whatever defaults don't fit | Convenience base for page types |
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
@@ -176,7 +177,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 
 | Registry | Path | Method signature | Purpose |
 |---|---|---|---|
-| `BlockRegistry` | `src/Block/BlockRegistry.php` | `static extend(callable(): list<class-string> $extension): void` | Register block classes; must run before the registry's first `get()`/`has()`/`all()`/`kinds()` call |
+| `BlockRegistry` | `src/Block/BlockRegistry.php` | `static extend(callable(): list<class-string> $extension): void`; `forPlacement(string $placement): array<string, Block>` | Register block classes (must run before the registry's first `get()`/`has()`/`all()`/`kinds()`/`forPlacement()` call); `forPlacement()` filters `all()` to blocks offered at that placement |
 | `PageTypeRegistry` | `src/Page/PageTypeRegistry.php` | `static extend(callable(): list<class-string> $extension): void` | Register page-type classes; same before-boot timing rule |
 | `Notifications` | `src/Notifications/Notifications.php` (delegates to `NotificationRegistry`) | `static type(TypeDefinition $type): void`; `static channel(string $channel): void` (`$channel` a `class-string<Channel>`) | Register a notification type / channel class. A duplicate `type()` key or an unregistered `channel()` throws `InvalidArgumentException` |
 

@@ -10,6 +10,7 @@ use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Block\Placement;
 use Tbtop\Cms\Layout\Models\Layout;
 
 /**
@@ -142,7 +143,7 @@ final class LayoutEditBlockTabs
     private static function addBlockTab(S $s, string $slot, BlockRegistry $registry): array
     {
         $actions = [];
-        foreach (array_keys($registry->all()) as $kind) {
+        foreach (array_keys($registry->forPlacement(Placement::LAYOUT)) as $kind) {
             $actions[] = self::addAction($s, $slot, $kind);
         }
 
