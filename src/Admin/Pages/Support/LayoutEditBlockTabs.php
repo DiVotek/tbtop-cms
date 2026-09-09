@@ -149,7 +149,7 @@ final class LayoutEditBlockTabs
 
         return [
             'label' => __('tbtop-cms::pages.tabs_edit.add_block'),
-            'body' => $s->stack([$s->actionsRow($actions)]),
+            'body' => $s->stack([$s->actionsRow($actions, ['variant' => 'grid'])]),
         ];
     }
 

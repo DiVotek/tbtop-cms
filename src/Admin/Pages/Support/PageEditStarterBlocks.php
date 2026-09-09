@@ -96,7 +96,7 @@ final class PageEditStarterBlocks
                         ? [$s->displayText(__('tbtop-cms::pages.starter_blocks.empty'))->variant('muted')]
                         : self::rows($s, $page, $type, $elements)),
                 ]),
-                $s->actionsRow(self::addActions($s, $page, $type, $registry)),
+                $s->actionsRow(self::addActions($s, $page, $type, $registry), ['variant' => 'grid']),
                 $s->flex([self::applyAction($s, $page, $type), $s->spacer()]),
             ]),
         ];
