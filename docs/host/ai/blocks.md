@@ -245,6 +245,13 @@ editor unions every registered block's form fields into one flat repeater, so tw
 kinds declaring the same field name with different types collide in the editor.
 Name fields distinctly across kinds, or keep the shared name's field type identical.
 
+**Reserved field names** — `id`, `kind`, `active`, `sort` are the block
+envelope's own keys. The page and layout editors assemble each block row as
+`{id, kind, active, sort, ...fields}`, so a block field with one of those names
+silently overwrites the envelope key on save — a `kind` select turned every
+saved block into kind `"solution"` and the frontend dropped it. Nothing enforces
+this at registration yet; pick another name (`variant`, `position`, …).
+
 ## Form-handling blocks
 
 A block that collects an anonymous submission implements
