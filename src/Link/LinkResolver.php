@@ -41,19 +41,22 @@ class LinkResolver
             LinkType::Phone => $link->value === null ? null : 'tel:' . $link->telNumber(),
         };
 
-        if ($href === null) {
+        $label = $href === null ? null : $this->label($link, $page, $locale);
+
+        // A page with no name in any locale has nothing to render the link as.
+        if ($href === null || $label === null) {
             return null;
         }
 
         return [
             'href' => $href,
             'type' => $link->type->value,
-            'label' => $this->label($link, $page, $locale),
+            'label' => $label,
         ];
     }
 
     /** Authored text wins; otherwise the page's own name, or the target the author typed. */
-    private function label(LinkValue $link, ?Page $page, string $locale): string
+    private function label(LinkValue $link, ?Page $page, string $locale): ?string
     {
         $authored = $link->label($locale, $this->languages->defaultLocale());
 
@@ -69,7 +72,7 @@ class LinkResolver
             }
         }
 
-        return $link->value ?? '';
+        return $link->value;
     }
 
     /** Rendered locale first, then the package-wide default/first-non-empty pick. */

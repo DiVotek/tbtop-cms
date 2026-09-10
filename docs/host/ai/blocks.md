@@ -225,7 +225,8 @@ here. Block-specific usage:
   translatable part of the value. It is optional: when a locale is left empty
   the resolver falls back to the target page's name in the rendered locale, or
   to the stored `value` for the other three types, so `label` in the resolved
-  array is always a non-empty string. Note the asymmetry — `LocaleFlattener`
+  array is always a non-empty string; a live page with no name in any locale
+  resolves to `null` like an unpublished one. Note the asymmetry — `LocaleFlattener`
   collapses any all-locale-keyed map, so by the time `resolve()` runs `label`
   is already one string, while the validator and the admin cell still see the
   raw map.

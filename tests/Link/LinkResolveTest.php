@@ -185,6 +185,13 @@ it('falls back to another locale name when the rendered locale has none', functi
     expect(linkCtx('uk')->link(['type' => 'page', 'page' => $page->id])['label'])->toBe('Only English');
 });
 
+it('resolves null rather than an empty label for a live page with no name in any locale', function (): void {
+    $page = livePage();
+    $page->newQuery()->toBase()->where('id', $page->id)->update(['name' => json_encode(['en' => '', 'uk' => null])]);
+
+    expect(linkCtx()->link(['type' => 'page', 'page' => (string) $page->id]))->toBeNull();
+});
+
 it('uses the locale entry of a label map matching the rendered locale', function (): void {
     $page = livePage('Target');
     $value = ['type' => 'page', 'page' => $page->id, 'label' => ['en' => 'Buy', 'uk' => 'Купити']];
