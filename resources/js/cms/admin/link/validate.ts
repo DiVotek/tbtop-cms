@@ -24,10 +24,9 @@ export function linkError(link: LinkValue): LinkErrorKey | null {
 	}
 
 	if (link.type === "page") {
-		if (link.anchor !== null && !ANCHOR.test(link.anchor)) {
-			return "anchor";
-		}
-		return link.page === null ? "page" : null;
+		// An unpicked page is not yet wrong, the same as an empty value below;
+		// `required` is the server's to enforce. A typed anchor still is.
+		return link.anchor !== null && !ANCHOR.test(link.anchor) ? "anchor" : null;
 	}
 
 	const value = link.value?.trim() ?? "";

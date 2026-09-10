@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Link;
 
-/** Messenger deep-link schemes for `external`, beyond http(s). Mirrored in resources/js/cms/link/schemes.ts. */
+/** Messenger deep-link schemes for `external`, beyond http(s). Mirrored in resources/js/cms/admin/link/schemes.ts. */
 final class ExternalSchemes
 {
     /** An allowlist, not a blocklist: `javascript:`, `data:`, `file:`, `vbscript:` must never pass. */

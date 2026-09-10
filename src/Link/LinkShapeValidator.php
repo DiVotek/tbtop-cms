@@ -19,7 +19,7 @@ final class LinkShapeValidator
     /** 6-20 digits, optional leading `+`, with spaces/dashes/parentheses allowed between them. */
     private const PHONE_PATTERN = '/^\+?[0-9 ()\-]{5,40}$/';
 
-    /** Bare fragment, no leading `#`. Mirrored in resources/js/cms/link/validate.ts. */
+    /** Bare fragment, no leading `#`. Mirrored in resources/js/cms/admin/link/validate.ts. */
     private const ANCHOR_PATTERN = '/^[A-Za-z0-9_-]+$/';
 
     private const LABEL_MAX = 255;

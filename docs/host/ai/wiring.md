@@ -255,6 +255,10 @@ options — TSX for the admin blocks above):
 Missing either line does not error — the affected classes silently compile
 to nothing and those blocks/pages render unstyled.
 
+Every admin-facing TSX in this package therefore lives under
+`resources/js/cms/admin/` — that glob is the host's contract, so a component
+placed outside it compiles without its utility classes.
+
 ## Vite build input
 
 ```js

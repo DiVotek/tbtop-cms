@@ -80,8 +80,12 @@ describe("page", () => {
 		expect(linkError(link("page", "7", "how-it-works"))).toBeNull();
 	});
 
-	it("reports a missing page", () => {
-		expect(linkError(link("page", null))).toBe("page");
+	it("stays quiet for an unpicked page, leaving `required` to the server", () => {
+		expect(linkError(link("page", null))).toBeNull();
+	});
+
+	it("still flags a bad anchor before a page is picked", () => {
+		expect(linkError(link("page", null, "#how"))).toBe("anchor");
 	});
 
 	it("reports an anchor carrying a hash", () => {

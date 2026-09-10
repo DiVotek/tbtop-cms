@@ -100,6 +100,12 @@ describe("LinkForm inline validation", () => {
 
 		expect(queryByRole("alert")).toBeNull();
 	});
+
+	it("stays quiet on first render of a page field, before anything is picked", () => {
+		const { queryByRole } = renderForm({ value: null, options: { types: ["page"] } });
+
+		expect(queryByRole("alert")).toBeNull();
+	});
 });
 
 describe("LinkForm page picker", () => {
