@@ -7,6 +7,7 @@ use Illuminate\Testing\TestResponse;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Link\LinkShapeValidator;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -220,6 +221,15 @@ it('rejects a label keyed by an unknown locale', function (): void {
     $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['de' => 'Schreiben']];
 
     saveLink($page, $link)->assertJsonValidationErrors('block_l1_cta');
+});
+
+it('judges label locales by the CMS languages, not by the unsynced admin config', function (): void {
+    // Outside the panel middleware tbtop-admin.content_locales is whatever the host shipped.
+    config(['tbtop-admin.content_locales' => ['en']]);
+
+    $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['en' => 'Mail us', 'uk' => 'Напишіть']];
+
+    expect(LinkShapeValidator::passes($link))->toBeTrue();
 });
 
 it('rejects a label longer than 255 characters', function (): void {

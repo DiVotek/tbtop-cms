@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Link;
 
 use Illuminate\Support\Facades\Validator;
-use Tbtop\Admin\I18n\LocaleService;
+use Tbtop\Cms\Admin\Pages\Support\EditorLocales;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -80,7 +81,9 @@ final class LinkShapeValidator
             return false;
         }
 
-        $locales = LocaleService::contentLocales();
+        // The locales the editor rendered rows for, not tbtop-admin.content_locales:
+        // that config is only synced by the panel middleware, and this rule can run outside it.
+        $locales = EditorLocales::list(app(Languages::class)->defaultLocale());
 
         foreach ($label as $locale => $text) {
             if (! is_string($locale) || ! in_array($locale, $locales, true)) {
