@@ -63,6 +63,7 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 	const [isLoading, setLoading] = useState(false);
 	const [known, setKnown] = useState<Record<string, PageOption>>({});
 	const seen = useRef<Record<string, PageOption>>({});
+	const latestSearch = useRef(0);
 
 	const noteSeen = useCallback((option: PageOption) => {
 		seen.current[option.value] = option;
@@ -74,12 +75,15 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 			if (endpoint === undefined) {
 				return;
 			}
+			// Responses can land out of order; only the newest request may touch the list.
+			const ticket = ++latestSearch.current;
+			const isCurrent = () => ticket === latestSearch.current;
 			setLoading(true);
 			client
 				.post(endpoint, { search: term })
-				.then((response) => setOptions(toOptions(response)))
-				.catch(() => setOptions([]))
-				.finally(() => setLoading(false));
+				.then((response) => isCurrent() && setOptions(toOptions(response)))
+				.catch(() => isCurrent() && setOptions([]))
+				.finally(() => isCurrent() && setLoading(false));
 		},
 		[client, endpoint],
 	);
