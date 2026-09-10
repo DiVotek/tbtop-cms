@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -23,6 +24,7 @@ beforeEach(function (): void {
     config(['auth.providers.users.model' => AdminUser::class]);
     config(['tbtop-cms.blocks.types' => [LinkBlock::class, RequiredLinkBlock::class]]);
     Language::factory()->default()->create(['locale' => 'en']);
+    Language::factory()->create(['locale' => 'uk']);
 });
 
 function linkAdmin(): AdminUser
@@ -186,4 +188,80 @@ it('rejects a null link on a required field', function (): void {
 it('accepts a filled link on a required field', function (): void {
     saveLink(pageWithLinkBlock('RequiredLinkBlock'), ['type' => 'email', 'page' => null, 'value' => 'hi@example.com', 'anchor' => null])
         ->assertRedirect();
+});
+
+// --- label ---
+
+it('accepts a label map on the declared content locales', function (): void {
+    $page = pageWithLinkBlock();
+    $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['en' => 'Mail us', 'uk' => 'Напишіть']];
+
+    saveLink($page, $link)->assertSessionHasNoErrors();
+
+    expect($page->fresh()->content[0]['data']['cta']['label'])->toBe(['en' => 'Mail us', 'uk' => 'Напишіть']);
+});
+
+it('accepts a label left null', function (): void {
+    $page = pageWithLinkBlock();
+
+    saveLink($page, ['type' => 'email', 'value' => 'hi@example.com', 'label' => null])
+        ->assertSessionHasNoErrors();
+});
+
+it('accepts a label entry left empty for one locale', function (): void {
+    $page = pageWithLinkBlock();
+    $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['en' => 'Mail us', 'uk' => null]];
+
+    saveLink($page, $link)->assertSessionHasNoErrors();
+});
+
+it('rejects a label keyed by an unknown locale', function (): void {
+    $page = pageWithLinkBlock();
+    $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['de' => 'Schreiben']];
+
+    saveLink($page, $link)->assertJsonValidationErrors('block_l1_cta');
+});
+
+it('rejects a label longer than 255 characters', function (): void {
+    $page = pageWithLinkBlock();
+    $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['en' => str_repeat('a', 256)]];
+
+    saveLink($page, $link)->assertJsonValidationErrors('block_l1_cta');
+});
+
+it('accepts a label of exactly 255 characters', function (): void {
+    $page = pageWithLinkBlock();
+    $link = ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['en' => str_repeat('a', 255)]];
+
+    saveLink($page, $link)->assertSessionHasNoErrors();
+});
+
+it('rejects a non-string label entry', function (): void {
+    $page = pageWithLinkBlock();
+
+    saveLink($page, ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['en' => ['nested']]])
+        ->assertJsonValidationErrors('block_l1_cta');
+});
+
+it('rejects a label that is a list rather than a locale map', function (): void {
+    $page = pageWithLinkBlock();
+
+    saveLink($page, ['type' => 'email', 'value' => 'hi@example.com', 'label' => ['Mail us']])
+        ->assertJsonValidationErrors('block_l1_cta');
+});
+
+it('carries the content locales and the fallback for the label row', function (): void {
+    $options = (new S)->link('cta')->toNode()->options;
+
+    expect($options['locales'])->toBe(['en', 'uk'])
+        ->and($options['defaultLocale'])->toBe('en');
+});
+
+it('carries the translated editor strings rather than client-side defaults', function (): void {
+    app()->setLocale('uk');
+
+    $options = (new S)->link('cta')->toNode()->options;
+
+    expect($options['labels']['page'])->toBe('Сторінка')
+        ->and($options['textLabel'])->toBe('Текст');
 });

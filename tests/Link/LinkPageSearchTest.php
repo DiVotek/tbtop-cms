@@ -16,6 +16,7 @@ beforeEach(function (): void {
     config(['tbtop-cms.admin.model' => AdminUser::class]);
     config(['auth.providers.users.model' => AdminUser::class]);
     Language::factory()->default()->create(['locale' => 'en']);
+    Language::factory()->create(['locale' => 'uk']);
 });
 
 function pageSearchAdmin(): AdminUser
@@ -70,7 +71,9 @@ it('resolves a page by id', function (): void {
 
     pageSearch(['value' => (string) $page->id])
         ->assertOk()
-        ->assertExactJson(['option' => ['value' => (string) $page->id, 'label' => 'About']]);
+        ->assertExactJson([
+            'option' => ['value' => (string) $page->id, 'label' => 'About', 'names' => ['en' => 'About']],
+        ]);
 });
 
 it('resolves a missing id to a null option', function (): void {
@@ -89,4 +92,28 @@ it('forbids an authenticated user without a cms profile', function (): void {
     $user = AdminUser::create(['name' => 'Nobody', 'email' => 'nobody@example.com', 'password' => 'secret']);
 
     test()->actingAs($user, 'web')->postJson('/admin/link/page-search', ['search' => ''])->assertForbidden();
+});
+
+it('returns a per-locale name map beside the label', function (): void {
+    Page::factory()->create(['name' => ['en' => 'Contact us', 'uk' => 'Звʼязатися']]);
+
+    $option = pageSearch(['search' => 'Contact'])->json('options.0');
+
+    expect($option['names'])->toBe(['en' => 'Contact us', 'uk' => 'Звʼязатися']);
+});
+
+it('omits locales the page has no name for', function (): void {
+    Page::factory()->create(['name' => ['en' => 'Only English']]);
+
+    $option = pageSearch(['search' => 'Only'])->json('options.0');
+
+    expect($option['names'])->toBe(['en' => 'Only English']);
+});
+
+it('returns the name map when resolving a stored id', function (): void {
+    $page = Page::factory()->create(['name' => ['en' => 'About', 'uk' => 'Про нас']]);
+
+    $option = pageSearch(['value' => (string) $page->id])->json('option');
+
+    expect($option['names'])->toBe(['en' => 'About', 'uk' => 'Про нас']);
 });

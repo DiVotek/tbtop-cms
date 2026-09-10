@@ -88,10 +88,13 @@ Overridable, all with sane defaults:
   outside a page context (a layout slot — `LayoutResolver` passes no page).
   Never assume non-null.
 - **`link(mixed $value): ?array`** — resolves a `link` field's stored value
-  to `{href: string, type: string}`, or `null` when it is malformed, points
-  at a page that is not live, or at a page with no slug in the active locale
-  (never a bare `/`). A `page` link's `anchor` is appended; `email` becomes
-  `mailto:`, `phone` becomes `tel:` with the formatting stripped.
+  to `{href: string, type: string, label: string}`, or `null` when it is
+  malformed, points at a page that is not live, or at a page with no slug in
+  the active locale (never a bare `/`). A `page` link's `anchor` is appended;
+  `email` becomes `mailto:`, `phone` becomes `tel:` with the formatting
+  stripped. `label` is the author's text for the active locale, falling back to
+  the target page's name or the stored `value`; it is never empty when `href`
+  resolved.
 - **`source`** — the source-backed page type's domain object (e.g. a
   `Product` model), or `null` for a non-source-backed page/layout slot. Set
   by `PageController` only when the page's type is source-backed; see
@@ -209,14 +212,23 @@ here. Block-specific usage:
   React side expects.
 - **Link fields** (`$s->link('cta')`) — the page-aware link picker. Stores a
   value object, **never a resolved href**:
-  `{type: 'page'|'external'|'email'|'phone', page: string|null, value: string|null, anchor: string|null}`
+  `{type: 'page'|'external'|'email'|'phone', page: string|null, value: string|null, anchor: string|null, label: {en: string|null, …}|null}`
   (or `null`). For `type=page` the stored `page` is the page **id**, so the
   link survives the target's slug changing; `anchor` is a bare fragment
   (`how`, never `#how`). The other three types keep the URL / address /
   number in `value`. Resolve it in `resolve()` with
   `$ctx->link($input['cta'] ?? null)`, which returns
-  `{href, type}` or `null` — editor input is untrusted, so pass the raw value
-  straight in and let it do the parsing rather than reading the keys yourself.
+  `{href, type, label}` or `null` — editor input is untrusted, so pass the raw
+  value straight in and let it do the parsing rather than reading the keys
+  yourself.
+  `label` is the link's own text, one entry per content locale, and is the only
+  translatable part of the value. It is optional: when a locale is left empty
+  the resolver falls back to the target page's name in the rendered locale, or
+  to the stored `value` for the other three types, so `label` in the resolved
+  array is always a non-empty string. Note the asymmetry — `LocaleFlattener`
+  collapses any all-locale-keyed map, so by the time `resolve()` runs `label`
+  is already one string, while the validator and the admin cell still see the
+  raw map.
   Not translatable: `->translatable()` throws, because one link serves every
   locale and `$ctx->link()` localizes the page path itself. Restrict the type
   switch with `->types(['page', 'external'])`.

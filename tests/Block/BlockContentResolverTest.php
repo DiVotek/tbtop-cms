@@ -57,7 +57,26 @@ it('leaves a link field value untouched through the flattener', function (): voi
         ]],
     ]);
 
-    expect($out[0]->props['cta'])->toBe(['href' => '/' . $page->pathFor('en') . '#how', 'type' => 'page']);
+    expect($out[0]->props['cta'])
+        ->toBe(['href' => '/' . $page->pathFor('en') . '#how', 'type' => 'page', 'label' => 'Target']);
+});
+
+it("resolves a link's label map through the flattener to the active locale", function (): void {
+    $page = Page::factory()->create(['name' => ['en' => 'Target'], 'status' => PageStatus::Published]);
+
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'LinkBlock', 'active' => true, 'data' => [
+            'cta' => [
+                'type' => 'page',
+                'page' => (string) $page->id,
+                'value' => null,
+                'anchor' => null,
+                'label' => ['en' => 'Buy now', 'uk' => 'Купити'],
+            ],
+        ]],
+    ]);
+
+    expect($out[0]->props['cta']['label'])->toBe('Buy now');
 });
 
 it('falls back to the default locale for a missing translation', function (): void {

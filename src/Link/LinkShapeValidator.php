@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Link;
 
 use Illuminate\Support\Facades\Validator;
+use Tbtop\Admin\I18n\LocaleService;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -20,6 +21,8 @@ final class LinkShapeValidator
 
     /** Bare fragment, no leading `#`. Mirrored in resources/js/cms/link/validate.ts. */
     private const ANCHOR_PATTERN = '/^[A-Za-z0-9_-]+$/';
+
+    private const LABEL_MAX = 255;
 
     public static function register(): void
     {
@@ -55,12 +58,48 @@ final class LinkShapeValidator
             return false;
         }
 
+        if (! self::labelIsValid($value['label'] ?? null)) {
+            return false;
+        }
+
         return match ($link->type) {
             LinkType::Page => self::pageIsValid($link),
             LinkType::External => $link->value !== null && self::externalIsValid($link->value),
             LinkType::Email => $link->value !== null && filter_var($link->value, FILTER_VALIDATE_EMAIL) !== false,
             LinkType::Phone => $link->value !== null && self::phoneIsValid($link->value),
         };
+    }
+
+    /** Read raw, not off LinkValue: the max-length and known-locale gates are about what was posted. */
+    private static function labelIsValid(mixed $label): bool
+    {
+        if ($label === null) {
+            return true;
+        }
+
+        // Already collapsed to one string by LocaleFlattener when a resolved
+        // value is revalidated; a scalar carries no locale keys to check.
+        if (is_string($label)) {
+            return mb_strlen($label) <= self::LABEL_MAX;
+        }
+
+        if (! is_array($label)) {
+            return false;
+        }
+
+        $locales = LocaleService::contentLocales();
+
+        foreach ($label as $locale => $text) {
+            if (! is_string($locale) || ! in_array($locale, $locales, true)) {
+                return false;
+            }
+
+            if ($text !== null && (! is_string($text) || mb_strlen($text) > self::LABEL_MAX)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** http(s) URL, or a messenger deep link on the ExternalSchemes allowlist. */

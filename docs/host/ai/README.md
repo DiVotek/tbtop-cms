@@ -35,7 +35,7 @@ pages its `Page` class. Its own guide is at `vendor/tbtop/admin/docs/ai/`
 | Site content | idempotent seeders per section, keyed by slug — never admin clicks | [pages.md](./pages.md#seeding-content) |
 | Header / footer | layout blocks in the two slots, rendered by the host's `SiteChrome` from `cms.layout` | [wiring.md](./wiring.md), [recipes.md](./recipes.md) |
 | Meta tags, canonical, sitemap, robots, JSON-LD | already shipped — edit page/site SEO settings; only block-derived JSON-LD needs host code | [seo.md](./seo.md) |
-| A link an author picks (page, URL, email, phone) | `$s->link()` in the block form; read it back with `$ctx->link()` — store the value object, never a resolved href | [blocks.md](./blocks.md) |
+| A link an author picks (page, URL, email, phone) with its own text | `$s->link()` in the block form; read it back with `$ctx->link()` — store the value object, never a resolved href; `label` is per-locale and falls back to the page name | [blocks.md](./blocks.md) |
 | A form that sends somewhere | `HandlesFormSubmission` on the block; admin fan-out (mail/telegram/bell) is automatic | [blocks.md](./blocks.md#form-handling-blocks), [notifications.md](./notifications.md) |
 | A new notification type or channel | `Notifications::type()` / `::channel()` from a provider's `boot()` | [notifications.md](./notifications.md) |
 | Host wiring (routes, Vite entries, `<head>`, SSR, admin access) | the host's own files — `cms:install` prints the list, `cms:doctor` checks it | [wiring.md](./wiring.md) |

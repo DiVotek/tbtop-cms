@@ -216,7 +216,7 @@ import '@cms/admin/blocks';
 ```
 
 The barrel also registers the **`link` field client** (`$s->link()`'s type
-switch, page picker and inline validation). Without the import a `link` field
+switch, page picker, per-locale label row and inline validation). Without the import a `link` field
 in the page editor renders as the unknown-kind placeholder, so a host using
 link fields needs this wired even if it never touches the preview blocks.
 

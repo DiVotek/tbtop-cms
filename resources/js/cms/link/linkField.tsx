@@ -13,9 +13,18 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@tbtop/inertia-admin";
-import { usePageOptions } from "./pageOptions";
-import { emptyLink, LINK_TYPES, type LinkOptions, type LinkType, type LinkValue, parseLinkValue } from "./types";
-import { linkError } from "./validate";
+import { LabelRow } from "./LabelRow";
+import { type PageOption, usePageOptions } from "./pageOptions";
+import {
+	emptyLink,
+	LINK_TYPES,
+	type LinkOptions,
+	type LinkType,
+	type LinkValue,
+	parseLinkValue,
+	pickLabel,
+} from "./types";
+import { type LinkErrorKey, linkError } from "./validate";
 
 const DEFAULT_LABELS: Record<LinkType, string> = {
 	page: "Page",
@@ -24,12 +33,13 @@ const DEFAULT_LABELS: Record<LinkType, string> = {
 	phone: "Phone",
 };
 
-const DEFAULT_ERRORS: Record<LinkType | "anchor", string> = {
+const DEFAULT_ERRORS: Record<LinkErrorKey, string> = {
 	page: "Pick a page.",
 	external: "Enter an http(s) URL, or a viber:/tg:/whatsapp:/skype:/sms: link.",
 	email: "Enter a valid email address.",
 	phone: "Enter 6 to 20 digits, optionally starting with +.",
 	anchor: "Use letters, numbers, dashes and underscores only — no #.",
+	label: "Keep the link text under 255 characters.",
 };
 
 function allowedTypes(options: LinkOptions | undefined): LinkType[] {
@@ -43,6 +53,10 @@ export function LinkForm({ id, value, onChange, onBlur, disabled, invalid, descr
 	const link = parseLinkValue(value) ?? emptyLink(types[0]);
 	const error = linkError(link);
 	const errorText = error === null ? null : (options?.errors?.[error] ?? DEFAULT_ERRORS[error]);
+	const locales = options?.locales ?? [];
+	// Lifted out of PageTarget: the label row needs the resolved page's names
+	// for its per-locale placeholders.
+	const remote = usePageOptions(options?.searchEndpoint, link.type === "page" ? link.page : null);
 
 	// A type switch discards the other half of the value: an email address is
 	// not a page id, and carrying it over would re-submit a stale target.
@@ -70,6 +84,7 @@ export function LinkForm({ id, value, onChange, onBlur, disabled, invalid, descr
 					disabled={disabled}
 					invalid={invalid || error !== null}
 					options={options}
+					remote={remote}
 				/>
 			) : (
 				<Input
@@ -82,6 +97,18 @@ export function LinkForm({ id, value, onChange, onBlur, disabled, invalid, descr
 					disabled={disabled}
 					aria-invalid={invalid || error !== null}
 					aria-describedby={describedBy}
+				/>
+			)}
+
+			{locales.length === 0 ? null : (
+				<LabelRow
+					link={link}
+					locales={locales}
+					onChange={onChange}
+					onBlur={onBlur}
+					disabled={disabled}
+					selected={remote.selected}
+					label={options?.textLabel ?? "Text"}
 				/>
 			)}
 
@@ -101,12 +128,12 @@ interface PageTargetProps {
 	disabled?: boolean;
 	invalid?: boolean;
 	options?: LinkOptions;
+	remote: ReturnType<typeof usePageOptions>;
 }
 
-function PageTarget({ id, link, onChange, disabled, invalid, options }: PageTargetProps) {
+function PageTarget({ id, link, onChange, disabled, invalid, options, remote }: PageTargetProps) {
 	const [isOpen, setOpen] = useState(false);
 	const [term, setTerm] = useState("");
-	const remote = usePageOptions(options?.searchEndpoint, link.page);
 
 	const open = (next: boolean) => {
 		setOpen(next);
@@ -115,7 +142,7 @@ function PageTarget({ id, link, onChange, disabled, invalid, options }: PageTarg
 		}
 	};
 
-	const pick = (option: { value: string; label: string }) => {
+	const pick = (option: PageOption) => {
 		remote.noteSeen(option);
 		onChange({ ...link, page: option.value });
 		setOpen(false);
@@ -134,7 +161,7 @@ function PageTarget({ id, link, onChange, disabled, invalid, options }: PageTarg
 						className="min-w-0 flex-1 justify-start font-normal"
 					>
 						<span className="truncate">
-							{remote.selectedLabel ?? link.page ?? (options?.pagePlaceholder ?? "Search pages…")}
+							{remote.selected?.label ?? link.page ?? (options?.pagePlaceholder ?? "Search pages…")}
 						</span>
 					</Button>
 				</PopoverTrigger>
@@ -194,6 +221,10 @@ export function LinkCell({ value, options: raw }: FieldCellProps<LinkValue>) {
 }
 
 function summary(link: LinkValue, options?: LinkOptions): string {
+	const authored = pickLabel(link, options?.defaultLocale);
+	if (authored !== null) {
+		return authored;
+	}
 	if (link.type === "page") {
 		const label = options?.labels?.page ?? DEFAULT_LABELS.page;
 		const target = link.page === null ? "—" : `${label} #${link.page}`;

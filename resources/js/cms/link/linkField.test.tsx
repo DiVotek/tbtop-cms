@@ -38,25 +38,25 @@ describe("LinkForm type switch", () => {
 	it("clears the other half of the value when the type changes", () => {
 		const onChange = mock(NOOP);
 		const { getByText } = renderForm({
-			value: { type: "email", page: null, value: "hi@example.com", anchor: null },
+			value: { type: "email", page: null, value: "hi@example.com", anchor: null, label: null },
 			onChange,
 		});
 
 		fireEvent.click(getByText("Phone"));
 
-		expect(onChange).toHaveBeenCalledWith({ type: "phone", page: null, value: null, anchor: null });
+		expect(onChange).toHaveBeenCalledWith({ type: "phone", page: null, value: null, anchor: null, label: null });
 	});
 
 	it("drops a page id and its anchor when switching away from page", () => {
 		const onChange = mock(NOOP);
 		const { getByText } = renderForm({
-			value: { type: "page", page: "7", value: null, anchor: "how" },
+			value: { type: "page", page: "7", value: null, anchor: "how", label: null },
 			onChange,
 		});
 
 		fireEvent.click(getByText("URL"));
 
-		expect(onChange).toHaveBeenCalledWith({ type: "external", page: null, value: null, anchor: null });
+		expect(onChange).toHaveBeenCalledWith({ type: "external", page: null, value: null, anchor: null, label: null });
 	});
 
 	it("renders only the declared types", () => {
@@ -70,7 +70,7 @@ describe("LinkForm type switch", () => {
 describe("LinkForm inline validation", () => {
 	it("shows the message for an invalid email but keeps the raw input on screen", () => {
 		const { getByRole } = renderForm({
-			value: { type: "email", page: null, value: "nope", anchor: null },
+			value: { type: "email", page: null, value: "nope", anchor: null, label: null },
 		});
 
 		expect(getByRole("alert").textContent).toContain("valid email");
@@ -79,7 +79,7 @@ describe("LinkForm inline validation", () => {
 
 	it("accepts an allowlisted messenger deep link with no message", () => {
 		const { queryByRole } = renderForm({
-			value: { type: "external", page: null, value: "viber://chat?number=%2B380441234567", anchor: null },
+			value: { type: "external", page: null, value: "viber://chat?number=%2B380441234567", anchor: null, label: null },
 		});
 
 		expect(queryByRole("alert")).toBeNull();
@@ -87,7 +87,7 @@ describe("LinkForm inline validation", () => {
 
 	it("rejects a javascript: url", () => {
 		const { getByRole } = renderForm({
-			value: { type: "external", page: null, value: "javascript:alert(1)", anchor: null },
+			value: { type: "external", page: null, value: "javascript:alert(1)", anchor: null, label: null },
 		});
 
 		expect(getByRole("alert").textContent).toContain("http(s)");
@@ -95,7 +95,7 @@ describe("LinkForm inline validation", () => {
 
 	it("stays quiet on an untouched field", () => {
 		const { queryByRole } = renderForm({
-			value: { type: "email", page: null, value: null, anchor: null },
+			value: { type: "email", page: null, value: null, anchor: null, label: null },
 		});
 
 		expect(queryByRole("alert")).toBeNull();
@@ -107,7 +107,7 @@ describe("LinkForm page picker", () => {
 		const onChange = mock(NOOP);
 		const post = mock(async () => ({ options: [{ value: "7", label: "About us" }] }));
 		const { getByRole, getByText } = renderForm({
-			value: { type: "page", page: null, value: null, anchor: null },
+			value: { type: "page", page: null, value: null, anchor: null, label: null },
 			options: { searchEndpoint: ENDPOINT },
 			onChange,
 			client: stubClient(post as unknown as AdminClient["post"]),
@@ -118,7 +118,7 @@ describe("LinkForm page picker", () => {
 		await waitFor(() => expect(getByText("About us")).toBeTruthy());
 		fireEvent.click(getByText("About us"));
 
-		expect(onChange).toHaveBeenCalledWith({ type: "page", page: "7", value: null, anchor: null });
+		expect(onChange).toHaveBeenCalledWith({ type: "page", page: "7", value: null, anchor: null, label: null });
 	});
 
 	it("resolves the stored id to a label instead of showing the bare number", async () => {
@@ -128,7 +128,7 @@ describe("LinkForm page picker", () => {
 				: { options: [] },
 		);
 		const { getByRole } = renderForm({
-			value: { type: "page", page: "7", value: null, anchor: null },
+			value: { type: "page", page: "7", value: null, anchor: null, label: null },
 			options: { searchEndpoint: ENDPOINT },
 			client: stubClient(post as unknown as AdminClient["post"]),
 		});
@@ -140,7 +140,7 @@ describe("LinkForm page picker", () => {
 		const onChange = mock(NOOP);
 		const post = mock(async () => ({ options: [{ value: "7", label: "About us" }] }));
 		const { getByRole, getByText } = renderForm({
-			value: { type: "page", page: null, value: null, anchor: "how" },
+			value: { type: "page", page: null, value: null, anchor: "how", label: null },
 			options: { searchEndpoint: ENDPOINT },
 			onChange,
 			client: stubClient(post as unknown as AdminClient["post"]),
@@ -150,12 +150,12 @@ describe("LinkForm page picker", () => {
 		await waitFor(() => expect(getByText("About us")).toBeTruthy());
 		fireEvent.click(getByText("About us"));
 
-		expect(onChange).toHaveBeenCalledWith({ type: "page", page: "7", value: null, anchor: "how" });
+		expect(onChange).toHaveBeenCalledWith({ type: "page", page: "7", value: null, anchor: "how", label: null });
 	});
 
 	it("flags an anchor carrying a hash", () => {
 		const { getByRole } = renderForm({
-			value: { type: "page", page: "7", value: null, anchor: "#how" },
+			value: { type: "page", page: "7", value: null, anchor: "#how", label: null },
 			options: { searchEndpoint: ENDPOINT },
 		});
 
@@ -166,11 +166,11 @@ describe("LinkForm page picker", () => {
 describe("LinkCell", () => {
 	it("summarises each type", () => {
 		const cases: Array<[LinkValue, string]> = [
-			[{ type: "page", page: "7", value: null, anchor: null }, "→ Page #7"],
-			[{ type: "page", page: "7", value: null, anchor: "how" }, "→ Page #7#how"],
-			[{ type: "external", page: null, value: "https://example.com", anchor: null }, "https://example.com"],
-			[{ type: "email", page: null, value: "hi@example.com", anchor: null }, "mailto:hi@example.com"],
-			[{ type: "phone", page: null, value: "+380441234567", anchor: null }, "tel:+380441234567"],
+			[{ type: "page", page: "7", value: null, anchor: null, label: null }, "→ Page #7"],
+			[{ type: "page", page: "7", value: null, anchor: "how", label: null }, "→ Page #7#how"],
+			[{ type: "external", page: null, value: "https://example.com", anchor: null, label: null }, "https://example.com"],
+			[{ type: "email", page: null, value: "hi@example.com", anchor: null, label: null }, "mailto:hi@example.com"],
+			[{ type: "phone", page: null, value: "+380441234567", anchor: null, label: null }, "tel:+380441234567"],
 		];
 
 		for (const [value, expected] of cases) {
@@ -184,5 +184,69 @@ describe("LinkCell", () => {
 		const { container } = render(<LinkCell value={{ nope: true } as unknown as LinkValue} />);
 
 		expect(container.textContent).toBe("—");
+	});
+});
+
+describe("LinkForm label row", () => {
+	const LOCALES: LinkOptions = { locales: ["en", "uk"], defaultLocale: "en", searchEndpoint: ENDPOINT };
+
+	it("renders one label input per content locale", () => {
+		const { getByLabelText } = renderForm({
+			options: LOCALES,
+			value: { type: "email", page: null, value: "hi@example.com", anchor: null, label: null },
+		});
+
+		expect(getByLabelText("Text (en)")).toBeDefined();
+		expect(getByLabelText("Text (uk)")).toBeDefined();
+	});
+
+	it("renders no label row when the field carries no locales", () => {
+		const { queryByLabelText } = renderForm({
+			value: { type: "email", page: null, value: "hi@example.com", anchor: null, label: null },
+		});
+
+		expect(queryByLabelText("Text (en)")).toBeNull();
+	});
+
+	it("shows the typed target as the label placeholder", () => {
+		const { getByLabelText } = renderForm({
+			options: LOCALES,
+			value: { type: "email", page: null, value: "hi@example.com", anchor: null, label: null },
+		});
+
+		expect((getByLabelText("Text (en)") as HTMLInputElement).placeholder).toBe("hi@example.com");
+	});
+
+	it("shows the page's own per-locale name as the placeholder", async () => {
+		const post = mock(async () => ({
+			option: { value: "7", label: "Contact us", names: { en: "Contact us", uk: "Звʼязатися" } },
+		}));
+		const { getByLabelText } = renderForm({
+			options: LOCALES,
+			value: { type: "page", page: "7", value: null, anchor: null, label: null },
+			client: stubClient(post as unknown as AdminClient["post"]),
+		});
+
+		await waitFor(() => {
+			expect((getByLabelText("Text (uk)") as HTMLInputElement).placeholder).toBe("Звʼязатися");
+		});
+	});
+});
+
+describe("LinkCell label", () => {
+	it("prefers the authored label over the target summary", () => {
+		const { getByText } = render(
+			<LinkCell value={{ type: "page", page: "7", value: null, anchor: null, label: { en: "Buy now" } }} />,
+		);
+
+		expect(getByText("Buy now")).toBeDefined();
+	});
+
+	it("shows the flattened label string", () => {
+		const { getByText } = render(
+			<LinkCell value={{ type: "email", page: null, value: "hi@example.com", anchor: null, label: null }} />,
+		);
+
+		expect(getByText("mailto:hi@example.com")).toBeDefined();
 	});
 });

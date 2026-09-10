@@ -9,13 +9,20 @@ const PHONE_SHAPE = /^\+?[0-9 ()-]{5,40}$/;
 /** Bare fragment, no leading `#`. Mirrors ANCHOR_PATTERN in src/Link/LinkShapeValidator.php. */
 const ANCHOR = /^[A-Za-z0-9_-]+$/;
 
-export type LinkErrorKey = "page" | "external" | "email" | "phone" | "anchor";
+/** Mirrors LABEL_MAX in src/Link/LinkShapeValidator.php. */
+const LABEL_MAX = 255;
+
+export type LinkErrorKey = "page" | "external" | "email" | "phone" | "anchor" | "label";
 
 /**
  * Preview of src/Link/LinkShapeValidator.php. Advisory only — the server is the
  * authority; this exists so the author sees the problem before saving.
  */
 export function linkError(link: LinkValue): LinkErrorKey | null {
+	if (isLabelTooLong(link)) {
+		return "label";
+	}
+
 	if (link.type === "page") {
 		if (link.anchor !== null && !ANCHOR.test(link.anchor)) {
 			return "anchor";
@@ -37,6 +44,10 @@ export function linkError(link: LinkValue): LinkErrorKey | null {
 		return EMAIL.test(value) ? null : "email";
 	}
 	return isPhone(value) ? null : "phone";
+}
+
+function isLabelTooLong(link: LinkValue): boolean {
+	return Object.values(link.label ?? {}).some((text) => (text ?? "").length > LABEL_MAX);
 }
 
 function isPhone(value: string): boolean {

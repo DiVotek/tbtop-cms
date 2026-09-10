@@ -4,8 +4,8 @@ import type { LinkType, LinkValue } from "./types";
 
 function link(type: LinkType, value: string | null, anchor: string | null = null): LinkValue {
 	return type === "page"
-		? { type, page: value, value: null, anchor }
-		: { type, page: null, value, anchor: null };
+		? { type, page: value, value: null, anchor, label: null }
+		: { type, page: null, value, anchor: null, label: null };
 }
 
 describe("external", () => {
@@ -92,4 +92,30 @@ describe("page", () => {
 it("stays quiet on an untouched value", () => {
 	expect(linkError(link("email", null))).toBeNull();
 	expect(linkError(link("external", ""))).toBeNull();
+});
+
+describe("label length", () => {
+	const withLabels = (label: Record<string, string | null>): LinkValue => ({
+		type: "email",
+		page: null,
+		value: "hi@example.com",
+		anchor: null,
+		label,
+	});
+
+	it("accepts a label of exactly 255 characters", () => {
+		expect(linkError(withLabels({ en: "a".repeat(255) }))).toBeNull();
+	});
+
+	it("flags a label past 255 characters", () => {
+		expect(linkError(withLabels({ en: "a".repeat(256) }))).toBe("label");
+	});
+
+	it("flags an over-long label in any locale, not just the first", () => {
+		expect(linkError(withLabels({ en: "Mail us", uk: "a".repeat(300) }))).toBe("label");
+	});
+
+	it("ignores a null label entry", () => {
+		expect(linkError(withLabels({ en: null }))).toBeNull();
+	});
 });

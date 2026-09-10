@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Tbtop\Admin\Dsl\RelationSearchLimit;
 use Tbtop\Admin\I18n\LocaleService;
 use Tbtop\Admin\I18n\TranslatableValue;
+use Tbtop\Cms\Admin\Pages\Support\EditorLocales;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 
 /** POST {admin.prefix}/link/page-search — relation-search protocol: `{search}` → `{options}`, `{value}` → `{option}`. */
@@ -57,14 +59,39 @@ final class LinkPageSearchController
         return Page::query()->orderBy('sort_order')->orderBy('id');
     }
 
-    /** @return array{value: string, label: string} */
+    /**
+     * `names` feeds the client's per-locale label placeholders.
+     *
+     * @return array{value: string, label: string, names: array<string, string>}
+     */
     private static function toOption(Page $page): array
     {
-        $label = TranslatableValue::pick($page->getRawOriginal('name') ?? $page->name);
+        $raw = $page->getRawOriginal('name') ?? $page->name;
+        $label = TranslatableValue::pick($raw);
 
         return [
             'value' => (string) $page->getKey(),
             'label' => is_scalar($label) ? (string) $label : '',
+            'names' => self::names($raw),
         ];
+    }
+
+    /** @return array<string, string> */
+    private static function names(mixed $raw): array
+    {
+        $map = TranslatableValue::asLocaleMap($raw);
+        $names = [];
+
+        // CMS languages, not tbtop-admin.content_locales: that config is only
+        // populated by SyncContentLocales, which this route does not run.
+        foreach (EditorLocales::list(app(Languages::class)->defaultLocale()) as $locale) {
+            $text = is_array($map) ? ($map[$locale] ?? null) : null;
+
+            if (is_string($text) && trim($text) !== '') {
+                $names[$locale] = $text;
+            }
+        }
+
+        return $names;
     }
 }

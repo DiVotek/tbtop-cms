@@ -4,6 +4,8 @@ import { useClient } from "@tbtop/inertia-admin";
 export interface PageOption {
 	value: string;
 	label: string;
+	/** Per-locale page names, for the label placeholders. */
+	names: Record<string, string>;
 }
 
 function toOption(raw: unknown): PageOption | null {
@@ -15,7 +17,24 @@ function toOption(raw: unknown): PageOption | null {
 		return null;
 	}
 	const value = String(bag.value);
-	return { value, label: typeof bag.label === "string" && bag.label !== "" ? bag.label : value };
+	return {
+		value,
+		label: typeof bag.label === "string" && bag.label !== "" ? bag.label : value,
+		names: names(bag.names),
+	};
+}
+
+function names(raw: unknown): Record<string, string> {
+	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+		return {};
+	}
+	const out: Record<string, string> = {};
+	for (const [locale, text] of Object.entries(raw as Record<string, unknown>)) {
+		if (typeof text === "string" && text !== "") {
+			out[locale] = text;
+		}
+	}
+	return out;
 }
 
 function toOptions(response: unknown): PageOption[] {
@@ -26,8 +45,8 @@ function toOptions(response: unknown): PageOption[] {
 export interface PageOptionsState {
 	options: PageOption[];
 	isLoading: boolean;
-	/** Label for the currently stored id, resolved separately from the list. */
-	selectedLabel: string | null;
+	/** The currently stored id's option, resolved separately from the list. */
+	selected: PageOption | null;
 	search: (term: string) => void;
 	noteSeen: (option: PageOption) => void;
 }
@@ -42,12 +61,12 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 	const client = useClient();
 	const [options, setOptions] = useState<PageOption[]>([]);
 	const [isLoading, setLoading] = useState(false);
-	const [labels, setLabels] = useState<Record<string, string>>({});
-	const seen = useRef<Record<string, string>>({});
+	const [known, setKnown] = useState<Record<string, PageOption>>({});
+	const seen = useRef<Record<string, PageOption>>({});
 
 	const noteSeen = useCallback((option: PageOption) => {
-		seen.current[option.value] = option.label;
-		setLabels((prev) => ({ ...prev, [option.value]: option.label }));
+		seen.current[option.value] = option;
+		setKnown((prev) => ({ ...prev, [option.value]: option }));
 	}, []);
 
 	const search = useCallback(
@@ -77,8 +96,8 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 			.then((response) => {
 				const option = toOption((response as { option?: unknown } | null)?.option);
 				if (active && option !== null) {
-					seen.current[option.value] = option.label;
-					setLabels((prev) => ({ ...prev, [option.value]: option.label }));
+					seen.current[option.value] = option;
+					setKnown((prev) => ({ ...prev, [option.value]: option }));
 				}
 			})
 			.catch(() => undefined);
@@ -90,7 +109,7 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 	return {
 		options,
 		isLoading,
-		selectedLabel: value === null ? null : (labels[value] ?? null),
+		selected: value === null ? null : (known[value] ?? null),
 		search,
 		noteSeen,
 	};

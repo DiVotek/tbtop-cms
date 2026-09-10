@@ -34,7 +34,7 @@ final readonly class ResolveContext
         return $renderer->render($value);
     }
 
-    /** @return array{href: string, type: string}|null Null for a malformed, unpublished or locale-slugless target. */
+    /** @return array{href: string, type: string, label: string}|null Null for a malformed, unpublished or locale-slugless target. */
     public function link(mixed $value): ?array
     {
         $resolver = $this->linkResolver ?? app(LinkResolver::class);

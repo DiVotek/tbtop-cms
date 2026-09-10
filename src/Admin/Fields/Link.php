@@ -7,13 +7,15 @@ namespace Tbtop\Cms\Admin\Fields;
 use InvalidArgumentException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
+use Tbtop\Cms\Admin\Pages\Support\EditorLocales;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Link\LinkPageSearchRoute;
 use Tbtop\Cms\Link\LinkShapeValidator;
 use Tbtop\Cms\Link\LinkType;
 
 /**
- * `$s->link('cta')` — stores `{type, page, value, anchor}`, never a resolved
- * href, so a page link survives the target's slug changing. See blocks.md.
+ * `$s->link('cta')` — stores `{type, page, value, anchor, label}`, never a
+ * resolved href, so a page link survives the target's slug changing. blocks.md.
  */
 final class Link extends Field
 {
@@ -82,13 +84,37 @@ final class Link extends Field
         return [...($isRequired ? [] : ['nullable']), ...$declared, 'array', $this->shapeRule()];
     }
 
-    /** In the node's options so it survives a custom admin prefix and PrefixedField::rename(). */
+    /**
+     * In the node's options so they survive a custom admin prefix and
+     * PrefixedField::rename(); useActiveLocale/useContentLocaleConfig are not
+     * exported from @tbtop/inertia-admin, so the client cannot ask for itself.
+     * The per-locale row can become active-locale-aware once it exports them.
+     */
     #[\Override]
     public function toNode(): Node
     {
+        $default = app(Languages::class)->defaultLocale();
+
         $this->set('searchEndpoint', LinkPageSearchRoute::path());
+        $this->set('locales', EditorLocales::list($default));
+        $this->set('defaultLocale', $default);
+        $this->set('labels', self::strings('types'));
+        $this->set('placeholders', self::strings('placeholders'));
+        $this->set('errors', self::strings('errors'));
+        $this->set('anchorLabel', (string) __('tbtop-cms::link.anchor'));
+        $this->set('anchorPlaceholder', (string) __('tbtop-cms::link.anchor_placeholder'));
+        $this->set('pagePlaceholder', (string) __('tbtop-cms::link.page_placeholder'));
+        $this->set('textLabel', (string) __('tbtop-cms::link.text'));
 
         return parent::toNode();
+    }
+
+    /** @return array<string, string> */
+    private static function strings(string $key): array
+    {
+        $group = __('tbtop-cms::link.' . $key);
+
+        return is_array($group) ? array_map(static fn (mixed $v): string => (string) $v, $group) : [];
     }
 
     /** `link_shape` alone allows all four types; parameters narrow it to what types() declared. */
