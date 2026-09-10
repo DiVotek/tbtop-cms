@@ -134,6 +134,26 @@ it('resolves null for a typed link with no value', function (): void {
     expect(linkCtx()->link(['type' => 'email', 'value' => null]))->toBeNull();
 });
 
+// Stored rows are not trusted: save-time validation can be bypassed by an import or a hand edit.
+
+it('resolves null for a stored external value off the scheme allowlist', function (string $value): void {
+    expect(linkCtx()->link(['type' => 'external', 'value' => $value]))->toBeNull();
+})->with(['javascript:alert(1)', 'data:text/html,hi', 'file:///etc/passwd', 'ftp://example.com']);
+
+it('resolves null for a stored email that is not an address', function (): void {
+    expect(linkCtx()->link(['type' => 'email', 'value' => 'javascript:alert(1)']))->toBeNull();
+});
+
+it('resolves null for a stored phone with letters in it', function (): void {
+    expect(linkCtx()->link(['type' => 'phone', 'value' => '+380 call-me']))->toBeNull();
+});
+
+it('resolves null for a stored anchor that is not a bare fragment', function (): void {
+    $page = livePage();
+
+    expect(linkCtx()->link(['type' => 'page', 'page' => (string) $page->id, 'anchor' => '#a?b']))->toBeNull();
+});
+
 // --- label ---
 
 it('prefers the stored label over the page name', function (): void {

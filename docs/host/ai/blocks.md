@@ -235,7 +235,9 @@ here. Block-specific usage:
   An `external` value may be an `http(s)` URL or a messenger deep link on a
   fixed scheme allowlist — `viber:`, `tg:`, `whatsapp:`, `skype:`, `sms:`
   (`src/Link/ExternalSchemes.php`). Everything else, `javascript:` and `data:`
-  in particular, is rejected on both sides. Prefer the https forms where they
+  in particular, is rejected on both sides, and `$ctx->link()` re-checks the
+  stored target (`src/Link/LinkTarget.php`) so an imported or hand-edited row
+  resolves to null rather than to a raw href. Prefer the https forms where they
   exist — `https://wa.me/…`, `https://t.me/…`, `https://signal.me/#p/…`,
   `https://m.me/…` — since a scheme-only link like Viber's silently does
   nothing in a browser without the app installed.

@@ -26,7 +26,9 @@ class LinkResolver
     {
         $link = LinkValue::parse($value);
 
-        if ($link === null) {
+        // Revalidated here, not only on save: block data can be imported or
+        // hand-edited, and an external value is emitted as the href verbatim.
+        if ($link === null || ! LinkTarget::isWellFormed($link)) {
             return null;
         }
 

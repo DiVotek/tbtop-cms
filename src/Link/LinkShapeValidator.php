@@ -16,12 +16,6 @@ final class LinkShapeValidator
 {
     public const RULE = 'link_shape';
 
-    /** 6-20 digits, optional leading `+`, with spaces/dashes/parentheses allowed between them. */
-    private const PHONE_PATTERN = '/^\+?[0-9 ()\-]{5,40}$/';
-
-    /** Bare fragment, no leading `#`. Mirrored in resources/js/cms/admin/link/validate.ts. */
-    private const ANCHOR_PATTERN = '/^[A-Za-z0-9_-]+$/';
-
     private const LABEL_MAX = 255;
 
     public static function register(): void
@@ -62,12 +56,11 @@ final class LinkShapeValidator
             return false;
         }
 
-        return match ($link->type) {
-            LinkType::Page => self::pageIsValid($link),
-            LinkType::External => $link->value !== null && self::externalIsValid($link->value),
-            LinkType::Email => $link->value !== null && filter_var($link->value, FILTER_VALIDATE_EMAIL) !== false,
-            LinkType::Phone => $link->value !== null && self::phoneIsValid($link->value),
-        };
+        if (! LinkTarget::isWellFormed($link)) {
+            return false;
+        }
+
+        return $link->type !== LinkType::Page || Page::query()->whereKey($link->page)->exists();
     }
 
     /** Read raw, not off LinkValue: the max-length and known-locale gates are about what was posted. */
@@ -100,38 +93,5 @@ final class LinkShapeValidator
         }
 
         return true;
-    }
-
-    /** http(s) URL, or a messenger deep link on the ExternalSchemes allowlist. */
-    private static function externalIsValid(string $value): bool
-    {
-        $isHttpUrl = filter_var($value, FILTER_VALIDATE_URL) !== false
-            && in_array(strtolower((string) parse_url($value, PHP_URL_SCHEME)), ['http', 'https'], true);
-
-        return $isHttpUrl || ExternalSchemes::matches($value);
-    }
-
-    private static function pageIsValid(LinkValue $link): bool
-    {
-        if ($link->page === null || ! ctype_digit($link->page)) {
-            return false;
-        }
-
-        if ($link->anchor !== null && preg_match(self::ANCHOR_PATTERN, $link->anchor) !== 1) {
-            return false;
-        }
-
-        return Page::query()->whereKey($link->page)->exists();
-    }
-
-    private static function phoneIsValid(string $value): bool
-    {
-        if (preg_match(self::PHONE_PATTERN, $value) !== 1) {
-            return false;
-        }
-
-        $digits = strlen(preg_replace('/[^0-9]/', '', $value) ?? '');
-
-        return $digits >= 6 && $digits <= 20;
     }
 }
