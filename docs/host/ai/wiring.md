@@ -215,6 +215,11 @@ display block can do). Import the barrel to register them:
 import '@cms/admin/blocks';
 ```
 
+The barrel also registers the **`link` field client** (`$s->link()`'s type
+switch, page picker, per-locale label row and inline validation). Without the import a `link` field
+in the page editor renders as the unknown-kind placeholder, so a host using
+link fields needs this wired even if it never touches the preview blocks.
+
 **Must go in the admin entry, not `app.tsx`.** Putting it in `app.tsx`
 instead ships the admin blocks (and their dependencies) to every public
 visitor, defeating the entire bundle split `admin:install` sets up.
@@ -249,6 +254,10 @@ options — TSX for the admin blocks above):
 
 Missing either line does not error — the affected classes silently compile
 to nothing and those blocks/pages render unstyled.
+
+Every admin-facing TSX in this package therefore lives under
+`resources/js/cms/admin/` — that glob is the host's contract, so a component
+placed outside it compiles without its utility classes.
 
 ## Vite build input
 

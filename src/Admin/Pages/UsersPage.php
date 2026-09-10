@@ -148,10 +148,12 @@ class UsersPage extends AdminPage
         $model = $this->userModel();
         $table = (new $model)->getTable();
         $currentId = CurrentAdmin::user()?->getKey();
+        // Built before the is_a() branch: larastan's Builder<T> is invariant, so a
+        // query started from the narrowed class-string would not be Builder<Model>.
+        $query = $model::query()->select($table . '.*');
 
         if (is_a($model, CmsAdmin::class, true)) {
-            return $model::query()
-                ->select($table . '.*')
+            return $query
                 ->selectRaw("'managed' as has_access")
                 ->selectRaw('0 as is_owner')
                 ->selectRaw(
@@ -160,8 +162,7 @@ class UsersPage extends AdminPage
                 );
         }
 
-        return $model::query()
-            ->select($table . '.*')
+        return $query
             ->selectSub(
                 CmsUserProfile::query()->selectRaw("CASE WHEN is_owner THEN 'owner' ELSE 'granted' END")
                     ->whereColumn('user_id', $table . '.id')

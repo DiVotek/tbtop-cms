@@ -90,6 +90,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|---|---|
 | `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
 | `tbtop.cms.logout` | POST | `{admin.prefix}/logout` | `LogoutController`, middleware `['web','auth:{admin.guard}']` |
+| `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
 
 **Admin panel pages** (`CmsPanel`, prefix = `config('tbtop-cms.admin.prefix','admin')`, guard = `config('tbtop-cms.admin.guard','web')`):
 
@@ -308,6 +309,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `Tbtop\Cms\Mail\CmsMailer` | `send(Mailable $mailable, array\|string $to): void` | Sends mail via an on-demand mailer built from admin `mail.*` settings, or the host's default mailer if `mail.host` is unset |
 | | `transportConfig(): array` | Builds the Laravel mail transport config array from `mail.*` settings |
 | `Tbtop\Cms\Richtext\RichtextHtmlRenderer` | `render(mixed $value): string` | Renders a Lexical-shaped richtext value to HTML; plain strings wrap as one paragraph; empty/unrecognized input renders `''` |
+| `Tbtop\Cms\Link\LinkResolver` | `resolve(mixed $value, string $locale): ?array` | Resolves a `link` field value to `{href, type, label}`; `null` for malformed input, a non-live page, or a page with no slug in that locale. Reached from a block via `$ctx->link()` |
 | `Tbtop\Cms\Language\Languages` | `all(): array` | All configured languages (cached) |
 | | `default(): ?array` | The language row flagged `is_default` |
 | | `defaultLocale(): string` | Locale code of the default language |

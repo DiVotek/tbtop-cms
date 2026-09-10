@@ -6,8 +6,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockResolutionException;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\BrokenBlock;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
+use Tbtop\Cms\Tests\Fixtures\LinkBlock;
 use Tbtop\Cms\Tests\Fixtures\SourceAwareBlock;
 use Tbtop\Cms\Tests\Fixtures\SourcedThing;
 
@@ -17,7 +20,7 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     Language::factory()->create(['locale' => 'uk']);
     app()->setLocale('en');
-    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, BrokenBlock::class, SourceAwareBlock::class]);
+    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, BrokenBlock::class, SourceAwareBlock::class, LinkBlock::class]);
 });
 
 it('resolves a block with locale-flattened props', function (): void {
@@ -43,6 +46,37 @@ it('does not discard a non-translatable field coincidentally shaped like a local
         'title' => 'Hello',
         'image' => ['en' => 'not-a-translation', 'url' => '/about'],
     ]);
+});
+
+it('leaves a link field value untouched through the flattener', function (): void {
+    $page = Page::factory()->create(['name' => ['en' => 'Target'], 'status' => PageStatus::Published]);
+
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'LinkBlock', 'active' => true, 'data' => [
+            'cta' => ['type' => 'page', 'page' => (string) $page->id, 'value' => null, 'anchor' => 'how'],
+        ]],
+    ]);
+
+    expect($out[0]->props['cta'])
+        ->toBe(['href' => '/' . $page->pathFor('en') . '#how', 'type' => 'page', 'label' => 'Target']);
+});
+
+it("resolves a link's label map through the flattener to the active locale", function (): void {
+    $page = Page::factory()->create(['name' => ['en' => 'Target'], 'status' => PageStatus::Published]);
+
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'LinkBlock', 'active' => true, 'data' => [
+            'cta' => [
+                'type' => 'page',
+                'page' => (string) $page->id,
+                'value' => null,
+                'anchor' => null,
+                'label' => ['en' => 'Buy now', 'uk' => 'Купити'],
+            ],
+        ]],
+    ]);
+
+    expect($out[0]->props['cta']['label'])->toBe('Buy now');
 });
 
 it('falls back to the default locale for a missing translation', function (): void {

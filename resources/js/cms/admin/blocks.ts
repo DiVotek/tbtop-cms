@@ -5,6 +5,7 @@
  * admin entry (see the README's admin blocks step). Without the import the
  * client falls back to its UnknownBlock placeholder for these kinds.
  */
+export { linkFieldClient } from "./link/linkField";
 export { ogPreviewBlock } from "./ogPreview";
 export { seoChecklistBlock } from "./seoChecklist";
 export { serpPreviewBlock } from "./serpPreview";

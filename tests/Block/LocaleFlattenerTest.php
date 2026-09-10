@@ -196,3 +196,27 @@ it('does not let a translatable top-level field collide with a same-named non-tr
         ],
     ]);
 });
+
+it("collapses a link field's label map even though the link itself is not translatable", function () use ($locales): void {
+    $value = ['cta' => ['type' => 'page', 'page' => '7', 'label' => ['en' => 'Buy now', 'uk' => 'Купити']]];
+
+    $out = LocaleFlattener::flattenData($value, 'en', 'uk', $locales, ['heading']);
+
+    expect($out['cta'])->toBe(['type' => 'page', 'page' => '7', 'label' => 'Buy now']);
+});
+
+it("leaves a link's empty label map as an empty array rather than null", function () use ($locales): void {
+    $value = ['cta' => ['type' => 'email', 'value' => 'a@b.co', 'label' => []]];
+
+    $out = LocaleFlattener::flattenData($value, 'en', 'uk', $locales, ['heading']);
+
+    expect($out['cta']['label'])->toBe([]);
+});
+
+it('yields null for a link label present in neither the active nor the fallback locale', function () use ($locales): void {
+    $value = ['cta' => ['type' => 'page', 'page' => '7', 'label' => ['de' => 'Kaufen']]];
+
+    $out = LocaleFlattener::flattenData($value, 'en', 'uk', $locales, ['heading']);
+
+    expect($out['cta']['label'])->toBeNull();
+});

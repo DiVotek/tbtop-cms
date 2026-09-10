@@ -87,6 +87,14 @@ Overridable, all with sane defaults:
 - **`page`** — the `Page` model being rendered, or `null` when resolving
   outside a page context (a layout slot — `LayoutResolver` passes no page).
   Never assume non-null.
+- **`link(mixed $value): ?array`** — resolves a `link` field's stored value
+  to `{href: string, type: string, label: string}`, or `null` when it is
+  malformed, points at a page that is not live, or at a page with no slug in
+  the active locale (never a bare `/`). A `page` link's `anchor` is appended;
+  `email` becomes `mailto:`, `phone` becomes `tel:` with the formatting
+  stripped. `label` is the author's text for the active locale, falling back to
+  the target page's name or the stored `value`; it is never empty when `href`
+  resolved.
 - **`source`** — the source-backed page type's domain object (e.g. a
   `Product` model), or `null` for a non-source-backed page/layout slot. Set
   by `PageController` only when the page's type is source-backed; see
@@ -202,15 +210,50 @@ here. Block-specific usage:
   shape; never pass it straight through to props. Resolve via
   `$ctx->richtextHtml($input['body'] ?? null)` to get the HTML string the
   React side expects.
-- **Page pickers** — no dedicated field type exists in this package. Both
-  real hosts surveyed link to pages with a plain `$s->text('href')` (the
-  admin types or pastes the path) rather than a page-relationship field;
-  treat this as the current norm, not a gap to work around silently.
+- **Link fields** (`$s->link('cta')`) — the page-aware link picker. Stores a
+  value object, **never a resolved href**:
+  `{type: 'page'|'external'|'email'|'phone', page: string|null, value: string|null, anchor: string|null, label: {en: string|null, …}|null}`
+  (or `null`). For `type=page` the stored `page` is the page **id**, so the
+  link survives the target's slug changing; `anchor` is a bare fragment
+  (`how`, never `#how`). The other three types keep the URL / address /
+  number in `value`. Resolve it in `resolve()` with
+  `$ctx->link($input['cta'] ?? null)`, which returns
+  `{href, type, label}` or `null` — editor input is untrusted, so pass the raw
+  value straight in and let it do the parsing rather than reading the keys
+  yourself.
+  `label` is the link's own text, one entry per content locale, and is the only
+  translatable part of the value. It is optional: when a locale is left empty
+  the resolver falls back to the target page's name in the rendered locale, or
+  to the stored `value` for the other three types, so `label` in the resolved
+  array is always a non-empty string; a live page with no name in any locale
+  resolves to `null` like an unpublished one. Note the asymmetry — `LocaleFlattener`
+  collapses any all-locale-keyed map, so by the time `resolve()` runs `label`
+  is already one string, while the validator and the admin cell still see the
+  raw map.
+  Not translatable: `->translatable()` throws, because one link serves every
+  locale and `$ctx->link()` localizes the page path itself. Restrict the type
+  switch with `->types(['page', 'external'])`.
+  An `external` value may be an `http(s)` URL or a messenger deep link on a
+  fixed scheme allowlist — `viber:`, `tg:`, `whatsapp:`, `skype:`, `sms:`
+  (`src/Link/ExternalSchemes.php`). Everything else, `javascript:` and `data:`
+  in particular, is rejected on both sides, and `$ctx->link()` re-checks the
+  stored target (`src/Link/LinkTarget.php`) so an imported or hand-edited row
+  resolves to null rather than to a raw href. Prefer the https forms where they
+  exist — `https://wa.me/…`, `https://t.me/…`, `https://signal.me/#p/…`,
+  `https://m.me/…` — since a scheme-only link like Viber's silently does
+  nothing in a browser without the app installed.
 
 **Editor caveat** (`src/Admin/Fields/BlockContent.php` docblock): the admin block
 editor unions every registered block's form fields into one flat repeater, so two
 kinds declaring the same field name with different types collide in the editor.
 Name fields distinctly across kinds, or keep the shared name's field type identical.
+
+**Reserved field names** — `id`, `kind`, `active`, `sort` are the block
+envelope's own keys. The page and layout editors assemble each block row as
+`{id, kind, active, sort, ...fields}`, so a block field with one of those names
+silently overwrites the envelope key on save — a `kind` select turned every
+saved block into kind `"solution"` and the frontend dropped it. Nothing enforces
+this at registration yet; pick another name (`variant`, `position`, …).
 
 ## Form-handling blocks
 
