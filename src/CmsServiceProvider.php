@@ -14,11 +14,14 @@ use Inertia\Ssr\HttpGateway;
 use Spatie\Activitylog\ActivitylogServiceProvider;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
+use Tbtop\Cms\Admin\Fields\Link;
 use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
+use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
 use Tbtop\Cms\Admin\Listeners\SeedsLocaleFromProfile;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockContentResolver;
@@ -39,6 +42,10 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\LayoutResolver;
+use Tbtop\Cms\Link\Http\LinkPageSearchController;
+use Tbtop\Cms\Link\LinkPageSearchRoute;
+use Tbtop\Cms\Link\LinkResolver;
+use Tbtop\Cms\Link\LinkShapeValidator;
 use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\NotFound\Commands\PruneNotFoundHitsCommand;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
@@ -146,6 +153,8 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(DeliveryRecorder::class);
         $this->app->scoped(TemplateRenderer::class);
         $this->app->bind(TemplateStore::class, DatabaseTemplateStore::class);
+        $this->app->scoped(LinkResolver::class);
+        $this->registerLinkField();
         $this->registerAdminPanel();
     }
 
@@ -155,6 +164,8 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->gateSsrByRequest();
         $this->wireAdminLoginRedirect();
         $this->wireAdminLogout();
+        $this->wireLinkPageSearch();
+        LinkShapeValidator::register();
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
         $this->wirePageRevisions();
@@ -183,6 +194,12 @@ class CmsServiceProvider extends PackageServiceProvider
         if ($path !== false) {
             $this->loadTranslationsFrom($path, 'tbtop-cms');
         }
+    }
+
+    /** Kind registration only — the shape rule waits for boot, when the validator factory exists. */
+    private function registerLinkField(): void
+    {
+        S::register('link', Link::class);
     }
 
     private function registerAdminPanel(): void
@@ -296,6 +313,21 @@ class CmsServiceProvider extends PackageServiceProvider
         Route::middleware(['web', 'auth:' . $guard])
             ->post($prefix . '/logout', LogoutController::class)
             ->name('tbtop.cms.logout');
+    }
+
+    /** One fixed route, not a per-field query() closure: PrefixedField::rename() cannot carry a closure. */
+    private function wireLinkPageSearch(): void
+    {
+        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
+            return;
+        }
+
+        $guard = (string) config('tbtop-cms.admin.guard', 'web');
+        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+
+        Route::middleware(['web', 'auth:' . $guard, EnsureCmsAdmin::class])
+            ->post($prefix . '/' . LinkPageSearchRoute::RELATIVE_PATH, LinkPageSearchController::class)
+            ->name(LinkPageSearchRoute::NAME);
     }
 
     private function wireLocaleSlugBackfill(): void

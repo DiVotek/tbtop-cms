@@ -87,6 +87,11 @@ Overridable, all with sane defaults:
 - **`page`** — the `Page` model being rendered, or `null` when resolving
   outside a page context (a layout slot — `LayoutResolver` passes no page).
   Never assume non-null.
+- **`link(mixed $value): ?array`** — resolves a `link` field's stored value
+  to `{href: string, type: string}`, or `null` when it is malformed, points
+  at a page that is not live, or at a page with no slug in the active locale
+  (never a bare `/`). A `page` link's `anchor` is appended; `email` becomes
+  `mailto:`, `phone` becomes `tel:` with the formatting stripped.
 - **`source`** — the source-backed page type's domain object (e.g. a
   `Product` model), or `null` for a non-source-backed page/layout slot. Set
   by `PageController` only when the page's type is source-backed; see
@@ -202,10 +207,26 @@ here. Block-specific usage:
   shape; never pass it straight through to props. Resolve via
   `$ctx->richtextHtml($input['body'] ?? null)` to get the HTML string the
   React side expects.
-- **Page pickers** — no dedicated field type exists in this package. Both
-  real hosts surveyed link to pages with a plain `$s->text('href')` (the
-  admin types or pastes the path) rather than a page-relationship field;
-  treat this as the current norm, not a gap to work around silently.
+- **Link fields** (`$s->link('cta')`) — the page-aware link picker. Stores a
+  value object, **never a resolved href**:
+  `{type: 'page'|'external'|'email'|'phone', page: string|null, value: string|null, anchor: string|null}`
+  (or `null`). For `type=page` the stored `page` is the page **id**, so the
+  link survives the target's slug changing; `anchor` is a bare fragment
+  (`how`, never `#how`). The other three types keep the URL / address /
+  number in `value`. Resolve it in `resolve()` with
+  `$ctx->link($input['cta'] ?? null)`, which returns
+  `{href, type}` or `null` — editor input is untrusted, so pass the raw value
+  straight in and let it do the parsing rather than reading the keys yourself.
+  Not translatable: `->translatable()` throws, because one link serves every
+  locale and `$ctx->link()` localizes the page path itself. Restrict the type
+  switch with `->types(['page', 'external'])`.
+  An `external` value may be an `http(s)` URL or a messenger deep link on a
+  fixed scheme allowlist — `viber:`, `tg:`, `whatsapp:`, `skype:`, `sms:`
+  (`src/Link/ExternalSchemes.php`). Everything else, `javascript:` and `data:`
+  in particular, is rejected on both sides. Prefer the https forms where they
+  exist — `https://wa.me/…`, `https://t.me/…`, `https://signal.me/#p/…`,
+  `https://m.me/…` — since a scheme-only link like Viber's silently does
+  nothing in a browser without the app installed.
 
 **Editor caveat** (`src/Admin/Fields/BlockContent.php` docblock): the admin block
 editor unions every registered block's form fields into one flat repeater, so two
