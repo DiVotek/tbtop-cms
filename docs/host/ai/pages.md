@@ -172,17 +172,55 @@ languages before creating pages — this bites most often in tests.
 - **System pages are exempt.** `is_system` pages ignore any slug override
   outright — their URL is not author-editable, matching their
   status/type/parent locks (see `PageObserver::guardSystemStatus()`).
+- **An error page gets no `PageSlug` row at all**, not even an empty one —
+  see "Error pages" below. `PageSlugWriter::sync()`/`writeDown()` skip a page
+  where `Page::isErrorPage()` is true before deriving any base.
 
 ### The home page
 
-The root `is_system` page (`is_system = true`, `parent_id = null`) maps to
-the **empty path** — `PageSlugWriter::slugBase()` returns `''` for it, so
-its `PageSlug.path` is `''`, and `PageResolver::resolve('', $locale)` finds
-it for `/`. There is no separate "home page" flag or config key read at
-request time; `is_system` + no parent *is* the home-page identity. A seeder
-locates the existing home page by that combination
-(`Page::where('is_system', true)->where('type', 'page')->first()`), never by
-slug.
+The root `is_system` page (`is_system = true`, `parent_id = null`,
+`error_class = null`) maps to the **empty path** —
+`PageSlugWriter::slugBase()` returns `''` for it, so its `PageSlug.path` is
+`''`, and `PageResolver::resolve('', $locale)` finds it for `/`. There is no
+separate "home page" flag or config key read at request time; `is_system` +
+no parent + no `error_class` *is* the home-page identity. `PageSeeder`
+locates the existing home page by `(is_system, type, error_class: null)`,
+never by slug — `is_system` + `type = 'page'` alone is no longer unique,
+since both error pages share that pair too (see "Error pages" below).
+
+### Error pages
+
+Two more system pages, one per HTTP status class: `error_class` (nullable,
+unique string column on `tbtop_pages`, cast to
+`Tbtop\Cms\Page\Enums\ErrorClass`) is `'4xx'` or `'5xx'`, never a specific
+status code — 522 and 500 share the same page. `Page::isErrorPage()` is
+`error_class !== null`. Like the home page they are `is_system = true`,
+`parent_id = null`, `type = 'page'`, which is exactly why the seeder cannot
+tell the three apart by `(is_system, type)` alone — it locates each error
+page by `error_class` specifically, and the home page by `error_class:
+null` in addition to `(is_system, type)`.
+
+Differences from the home page:
+
+- **No `PageSlug` row, ever** — an error page is never resolvable by path.
+  It renders only through `Cms::errorResponse(Request $request, int
+  $status): Response`, which looks it up by `ErrorClass::fromStatus($status)`
+  (`src/Frontend/Errors/ErrorPageResolver.php`), not by path.
+- `error_class` is immutable after creation — `PageObserver::updating()`
+  throws if it's dirty, same shape as `guardSystemStatus()`.
+- `is_indexable` is force-kept `false` server-side
+  (`PageForm::fillAttributes()`) and the field is hidden in the admin editor
+  (`PageEditSidebar`) — an editor cannot re-enable indexing for an error
+  page. `SitemapEntryBuilder` also excludes `error_class IS NOT NULL`
+  explicitly, belt and braces.
+- `PageDuplicator::duplicate()` clears `error_class` to `null` on the copy,
+  same as it clears `is_system` — a duplicated error page is an ordinary page.
+- 4xx pages render directly from the DB through the normal `Cms/Page`
+  pipeline. 5xx rendering is wrapped in a try/catch: if it throws, the
+  response falls back to a static Blade view
+  (`resources/views/errors/fallback.blade.php`) with no DB/Inertia/settings
+  dependency of its own — see `docs/host/ai/seo.md` and `wiring.md` for the
+  full fallback chain and the `errors.handle`/`errors.statuses` config.
 
 ### Building a URL
 
@@ -393,13 +431,20 @@ clicking through the admin — every real host does this. The pattern (from
 The package's own `PageSeeder` (`database/seeders/PageSeeder.php`, run by
 `cms:install`, verified against `tests/Page/PageSeederTest.php`) follows
 exactly this shape for the home page — `Page::firstOrCreate(['is_system' =>
-true, 'type' => 'page'], [...])` — reading `name`/`title` from
-`config('tbtop-cms.pages.home')` and the default locale from
-`Languages::defaultLocale()`. `cms:install` also runs `LanguageSeeder`,
-which upserts every row in `config('tbtop-cms.languages.seed')` by `locale`
-(`firstOrCreate`, so a second run is a no-op). A host seeds further content
-the same way, from its own `DatabaseSeeder` or a dedicated `cms:seed`-style
-command — nothing restricts seeding to `cms:install`'s two seeders.
+true, 'type' => 'page', 'error_class' => null], [...])` — reading
+`name`/`title` from `config('tbtop-cms.pages.home')`. It seeds the two error
+pages the same way, keyed by `error_class` alone — `Page::firstOrCreate(
+['error_class' => ErrorClass::ClientError], [...])` and the `ServerError`
+counterpart — reading `name`/`title` from
+`config('tbtop-cms.pages.errors.4xx')`/`.5xx`. All three reads use the
+default locale from `Languages::defaultLocale()`. `cms:install` also runs
+`LanguageSeeder`, which upserts every row in
+`config('tbtop-cms.languages.seed')` by `locale` (`firstOrCreate`, so a
+second run is a no-op). A host seeds further content the same way, from its
+own `DatabaseSeeder` or a dedicated `cms:seed`-style command — nothing
+restricts seeding to `cms:install`'s two seeders. A host already running
+`PageSeeder` in production gets the two new error-page rows the next time it
+runs the seeder — nothing else needs re-running.
 
 ## Cache: what a host must do
 

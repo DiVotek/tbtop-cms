@@ -227,8 +227,13 @@ files, never paginate forever). The budget is `seo.sitemap_per_chunk`
 (Settings) if set, else `config('tbtop-cms.seo.sitemap.per_chunk')`
 (default 1000), clamped to the protocol's 50,000 ceiling either way.
 
-**Included**: live, indexable pages (`Page::query()->live()->where('is_indexable', true)`),
-one URL entry per locale the page has a slug for. Each entry carries
+**Included**: live, indexable pages
+(`Page::query()->live()->where('is_indexable', true)->whereNull('error_class')`),
+one URL entry per locale the page has a slug for. The `error_class` filter is
+belt and braces — an error page is already seeded `is_indexable = false` and
+the admin form force-keeps it that way (see `docs/host/ai/pages.md`'s "Error
+pages" section) — but it means an editor can never re-enable indexing for one
+by flipping that flag. Each entry carries
 `lastmod` (page `updated_at`), a depth-derived `priority` (home = 1.0, else
 `max(0.3, 0.8 - depth*0.2)` — Google ignores `<priority>` since 2015, so this
 needs no editor input), the page's *own* image only (never the site default
@@ -397,6 +402,51 @@ unset or `< 1`, to avoid a blank field wiping the whole log on a scheduled
 run). `cms:not-found:prune` deletes rows with `last_seen_at` older than the
 retention window; scheduled daily by the package itself unless
 `tbtop-cms.not_found.auto_prune` (config) is `false`.
+
+The log keeps recording exactly as above even though a 404 now renders a
+real page (see "Editable error pages" below) — `PageController::notFound()`
+still dispatches `PageNotFound` before rendering, and the redirect lookup
+still runs first and still wins over both the log and the error page.
+
+## Editable error pages
+
+`src/Frontend/Errors/*`. `Cms::errorResponse(Request $request, int $status):
+Response` always returns a response, in three fallback layers:
+
+1. The seeded DB page for that status's `ErrorClass` (`4xx`/`5xx` —
+   `ErrorPageResolver`), rendered through the normal `Cms/Page` Inertia
+   component — same pipeline as any other page, so it picks up the host's
+   `SiteChrome` for free (there is no package Blade layout — see
+   `docs/host/ai/wiring.md`). `seo.noindex` is forced `true` and
+   `canonical`/`ogUrl` are forced `null`: an error page carries no slug (see
+   `docs/host/ai/pages.md`), so `SeoResolver`'s own canonical would be a
+   made-up `/`-rooted URL.
+2. Missing/unpublished page (e.g. seeder not run yet): the same `Cms/Page`
+   component with `render: []` and `page.heading` from
+   `tbtop-cms::errors.{4xx,5xx}.heading` — never Laravel's stock error view.
+3. **5xx only**: if rendering the page itself throws, a static Blade view
+   (`resources/views/errors/fallback.blade.php`) with no DB/Inertia/Settings
+   dependency, so a broken database or a broken block cannot take down the
+   error page meant to report it.
+
+**Auto-registration** (`CmsServiceProvider::wireErrorPages()`), gated by
+`config('tbtop-cms.errors.handle')` (default `true`): registers a
+`renderable()` on the host's exception handler for
+`Symfony\Component\HttpKernel\Exception\HttpExceptionInterface`, whitelisted
+by `config('tbtop-cms.errors.statuses')` (default `[404, 500, 503]`) — any
+other status falls through to stock Laravel untouched. Also falls through
+(returns `null`) when: the status is 5xx and `app.debug` is `true` (Ignition
+needs the real exception), or the request path is under the admin prefix
+(`config('tbtop-cms.admin.prefix')`). `PageController`'s own 404 catch-all
+calls the same underlying service directly rather than throwing, so it never
+depends on this registration at all — `errors.handle = false` only turns off
+interception of exceptions raised elsewhere (a host's own `abort()`,
+`AuthenticationException`, etc.), not the CMS's own not-found handling.
+
+**Maintenance mode**: a `503` served by Laravel's maintenance screen (`php
+artisan down`) happens before the framework boots the request pipeline —
+this package's exception handler registration is never reached, so a
+maintenance page is unaffected by any of the above.
 
 ## Redirects, briefly
 

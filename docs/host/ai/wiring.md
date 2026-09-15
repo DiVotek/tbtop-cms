@@ -122,6 +122,53 @@ handler at a redirect to `admin/login`, or just link there directly.
 `cms:doctor` does not catch this — its route check only confirms
 `tbtop.cms.login-page` exists, which it always does once `tbtop/admin` boots.
 
+## Error pages (`Cms::errorResponse()`)
+
+The package auto-registers a `renderable()` on the host's exception handler
+(`CmsServiceProvider::wireErrorPages()`) that turns a whitelisted HTTP
+status into the matching editable error page instead of Laravel's stock
+error view — nothing to wire in `routes/web.php` for this to work on a plain
+`abort(404)`/`abort(500)` raised anywhere in the app, including outside
+`frontendRoutes()`'s own group.
+
+```php
+// config/tbtop-cms.php
+'errors' => [
+    'handle' => true,             // false: register nothing, host handles exceptions itself
+    'statuses' => [404, 500, 503], // any other status stays stock Laravel
+],
+```
+
+Falls through to stock Laravel (returns `null` from the renderable) when:
+the status is 5xx and `app.debug` is `true` (Ignition needs the real
+exception), or the request path is under the admin prefix
+(`tbtop-cms.admin.prefix`). A host that wants the same rendering from code
+that already caught the exception itself (a custom handler, a queued job's
+failure page, etc.) calls the same service directly — this is what
+`errors.handle = false` leaves available:
+
+```php
+public function respond(Request $request, Throwable $e): Response
+{
+    $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
+
+    return Cms::errorResponse($request, $status);
+}
+```
+
+See `docs/host/ai/seo.md`'s "Editable error pages" section for the three
+fallback layers (DB page → chrome fallback with `render: []` → static Blade
+view for a 5xx that fails to render) and `docs/host/ai/pages.md`'s "Error
+pages" section for how the two pages are identified and seeded. No package
+Blade layout exists for any of this — every layer except the last-resort 5xx
+Blade view renders through the same `Cms/Page` component as a normal page,
+so it inherits the host's `SiteChrome` (see "Inertia entries and page
+components" below) for free.
+
+**Maintenance mode is out of reach.** A `503` from `php artisan down` is
+served before the framework boots the request pipeline, so this
+registration never sees it.
+
 ## Inertia entries and page components
 
 Two Vite entries, two audiences:
