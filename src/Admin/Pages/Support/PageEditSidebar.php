@@ -28,8 +28,13 @@ final class PageEditSidebar
             $s->section(['title' => __('tbtop-cms::pages.sections.publication'), 'variant' => 'card'], [
                 $s->select('status')->label(__('tbtop-cms::pages.fields.status'))
                     ->required()->options(PageFormOptions::statuses()),
-                // boolean, not checkbox: renders as a switch on the client
-                $s->boolean('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
+                // An error page is force-kept unindexable server-side
+                // (PageForm::fillAttributes()) — hidden rather than shown
+                // disabled, since there is nothing for an editor to decide.
+                ...($page->isErrorPage() ? [] : [
+                    // boolean, not checkbox: renders as a switch on the client
+                    $s->boolean('is_indexable')->label(__('tbtop-cms::pages.fields.is_indexable')),
+                ]),
                 ...self::schedulingFields($s),
             ]),
             $s->section(['title' => __('tbtop-cms::pages.sections.structure'), 'variant' => 'card'], [
