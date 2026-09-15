@@ -55,6 +55,7 @@ class PageSeeder extends Seeder
     {
         $name = (string) config("tbtop-cms.pages.errors.{$errorClass->value}.name", $errorClass->value);
         $title = (string) config("tbtop-cms.pages.errors.{$errorClass->value}.title", $name);
+        $heading = (string) __("tbtop-cms::errors.{$errorClass->value}.heading");
 
         Page::firstOrCreate(
             ['error_class' => $errorClass],
@@ -64,6 +65,7 @@ class PageSeeder extends Seeder
                 'status' => PageStatus::Published,
                 'name' => [$locale => $name],
                 'title' => [$locale => $title],
+                'heading' => [$locale => $heading],
                 'is_indexable' => false,
                 'sort_order' => 0,
             ],

@@ -136,9 +136,6 @@ class SitemapEntryBuilder
         return Page::query()
             ->live()
             ->where('is_indexable', true)
-            // Belt and braces: an error page is seeded with is_indexable
-            // false already, but this keeps it out of the sitemap even if
-            // an editor flips that flag — see docs/host/ai/pages.md.
             ->whereNull('error_class')
             ->with('slugs');
     }
