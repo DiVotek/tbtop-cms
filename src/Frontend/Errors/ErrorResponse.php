@@ -58,16 +58,7 @@ class ErrorResponse
         return $this->withStatus($request, Inertia::render($this->component(), $props), $status);
     }
 
-    /**
-     * 5xx rendering is wrapped rather than trusted: the page-render pipeline
-     * (block resolution, SEO templating) is the thing likely to be broken
-     * when the app is already failing with a server error, so this is the
-     * one path in the package that must never itself throw. The auto-
-     * registered renderable never calls this under app.debug (Ignition
-     * needs the real exception) — a host calling Cms::errorResponse()
-     * directly gets a rendered 5xx page regardless of debug, same as any
-     * other status.
-     */
+    /** Must never throw: falls back to the static Blade view instead. */
     private function render5xx(Request $request, int $status): Response
     {
         try {

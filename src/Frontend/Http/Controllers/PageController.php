@@ -89,9 +89,6 @@ class PageController
 
         event(new PageNotFound($path, $locale, $request->headers->get('referer'), $request->userAgent()));
 
-        // The same service Cms::errorResponse() calls, invoked directly
-        // rather than via the exception handler — this catch-all already
-        // knows it's a 404, so there is nothing to throw/convert.
         return $this->errors->render($request, 404);
     }
 

@@ -221,7 +221,6 @@ class PageObserver
         }
     }
 
-    /** One page per class (unique column) — changing it after creation would let two pages fight over the same class. */
     private function guardErrorClassImmutable(Page $page): void
     {
         if ($page->isDirty('error_class')) {
