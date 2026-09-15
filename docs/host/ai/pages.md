@@ -208,11 +208,10 @@ Differences from the home page:
   (`src/Frontend/Errors/ErrorPageResolver.php`), not by path.
 - `error_class` is immutable after creation — `PageObserver::updating()`
   throws if it's dirty, same shape as `guardSystemStatus()`.
-- `is_indexable` is force-kept `false` server-side
-  (`PageForm::fillAttributes()`) and the field is hidden in the admin editor
-  (`PageEditSidebar`) — an editor cannot re-enable indexing for an error
-  page. `SitemapEntryBuilder` also excludes `error_class IS NOT NULL`
-  explicitly, belt and braces.
+- `is_indexable` is seeded `false`, and `SitemapEntryBuilder` excludes
+  `error_class IS NOT NULL` outright — an error page stays out of the sitemap
+  even if an editor flips the flag back on. The admin treats an error page
+  like any other system page: no special column, no hidden field.
 - `PageDuplicator::duplicate()` clears `error_class` to `null` on the copy,
   same as it clears `is_system` — a duplicated error page is an ordinary page.
 - 4xx pages render directly from the DB through the normal `Cms/Page`

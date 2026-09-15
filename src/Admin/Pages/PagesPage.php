@@ -435,14 +435,8 @@ class PagesPage extends AdminPage
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
     }
 
-    private function typeLabel(mixed $value, mixed $row): string
+    private function typeLabel(mixed $value): string
     {
-        $errorClass = $row instanceof Page ? $row->error_class : null;
-
-        if ($errorClass !== null) {
-            return EnumLabel::make('tbtop-cms::pages.error_types', $errorClass->value);
-        }
-
         return EnumLabel::make('tbtop-cms::pages.types', $value);
     }
 

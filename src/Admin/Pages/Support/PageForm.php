@@ -630,9 +630,7 @@ class PageForm
             'image' => self::nullableMediaId($form['image'] ?? null),
             // The create form has no is_indexable field — new pages are always
             // indexable by default; edits keep the form-submitted value.
-            'is_indexable' => $page->exists && $page->isErrorPage()
-                ? false
-                : ($isCreate ? true : (bool) ($form['is_indexable'] ?? false)),
+            'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
             'seo' => self::seoAttribute($form),
         ];

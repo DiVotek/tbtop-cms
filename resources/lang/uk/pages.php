@@ -46,10 +46,6 @@ return [
         'category' => 'Категорія',
         'article' => 'Стаття',
     ],
-    'error_types' => [
-        '4xx' => 'Сторінка 404',
-        '5xx' => 'Сторінка 500',
-    ],
     'date_format' => 'd.m.Y',
     'empty' => [
         'title' => 'Тут поки порожньо',

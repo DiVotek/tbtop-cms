@@ -46,10 +46,6 @@ return [
         'category' => 'Category',
         'article' => 'Article',
     ],
-    'error_types' => [
-        '4xx' => '404 page',
-        '5xx' => '500 page',
-    ],
     'date_format' => 'M j, Y',
     'empty' => [
         'title' => 'Nothing here yet',
