@@ -18,11 +18,11 @@ afterEach(function (): void {
     }
 });
 
-it('prepares default languages and a single home page on a fresh app', function (): void {
+it('prepares default languages, a home page and the two error pages on a fresh app', function (): void {
     $this->artisan('cms:install')->assertExitCode(0);
 
     expect(Language::count())->toBe(1)
-        ->and(Page::where('is_system', true)->count())->toBe(1);
+        ->and(Page::where('is_system', true)->count())->toBe(3);
 });
 
 it('is safe to run twice without duplicating data', function (): void {
@@ -30,7 +30,7 @@ it('is safe to run twice without duplicating data', function (): void {
     $this->artisan('cms:install')->assertExitCode(0);
 
     expect(Language::count())->toBe(1)
-        ->and(Page::where('is_system', true)->count())->toBe(1);
+        ->and(Page::where('is_system', true)->count())->toBe(3);
 });
 
 it('fails gracefully instead of throwing when migrations cannot run', function (): void {

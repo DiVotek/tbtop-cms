@@ -37,7 +37,7 @@ it('records one row with hits = 1 on a miss to an unknown path', function (): vo
     // The after-response fan-out (app()->terminating()) has already run by
     // the time get() returns — MakesHttpRequests::call() invokes
     // $kernel->terminate() itself, same as a real request.
-    $this->get('/totally/unknown/path')->assertNotFound();
+    $this->get('/totally/unknown/path', ['X-Inertia' => 'true'])->assertNotFound();
 
     $hit = NotFoundHit::query()->first();
 
@@ -49,9 +49,9 @@ it('records one row with hits = 1 on a miss to an unknown path', function (): vo
 });
 
 it('increments the same row to hits = 2 on a repeat miss instead of inserting a second row', function (): void {
-    $this->get('/missing')->assertNotFound();
+    $this->get('/missing', ['X-Inertia' => 'true'])->assertNotFound();
     clearTerminatingCallbacks();
-    $this->get('/missing')->assertNotFound();
+    $this->get('/missing', ['X-Inertia' => 'true'])->assertNotFound();
 
     expect(NotFoundHit::query()->count())->toBe(1)
         ->and(NotFoundHit::query()->first()->hits)->toBe(2);
@@ -74,7 +74,7 @@ it('does not log a page that actually resolves', function (): void {
 });
 
 it('skips a path matching the scanner-noise ignore list', function (): void {
-    $this->get('/wp-login.php')->assertNotFound();
+    $this->get('/wp-login.php', ['X-Inertia' => 'true'])->assertNotFound();
 
     expect(NotFoundHit::query()->count())->toBe(0);
 });
@@ -82,7 +82,7 @@ it('skips a path matching the scanner-noise ignore list', function (): void {
 it('records nothing when logging is turned off in Settings', function (): void {
     app(Settings::class)->set('seo.not_found.enabled', false);
 
-    $this->get('/missing')->assertNotFound();
+    $this->get('/missing', ['X-Inertia' => 'true'])->assertNotFound();
 
     expect(NotFoundHit::query()->count())->toBe(0);
 });
@@ -93,7 +93,7 @@ it('keeps recording when the setting row holds a stored null', function (): void
     // otherwise silently stop the log.
     app(Settings::class)->set('seo.not_found.enabled', null);
 
-    $this->get('/missing')->assertNotFound();
+    $this->get('/missing', ['X-Inertia' => 'true'])->assertNotFound();
 
     expect(NotFoundHit::query()->count())->toBe(1);
 });

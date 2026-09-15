@@ -90,7 +90,7 @@ it('does not redirect when a stored mixed-locale chain cycles', function (): voi
     Redirect::create(['locale' => 'en', 'from_path' => 'a', 'to_path' => 'b', 'status_code' => 301]);
     Redirect::create(['locale' => null, 'from_path' => 'b', 'to_path' => 'a', 'status_code' => 301]);
 
-    $this->get('/b')->assertNotFound();
+    $this->get('/b', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('redirects to a normal internal path unchanged', function (): void {

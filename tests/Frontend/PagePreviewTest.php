@@ -29,7 +29,7 @@ function makePreviewAdmin(): AdminUser
 it('404s a draft page for an anonymous visitor', function (): void {
     Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Secret']]);
 
-    test()->getJson('/secret')->assertNotFound();
+    test()->getJson('/secret', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('404s a draft for an authenticated user without cms admin access', function (): void {
@@ -40,7 +40,7 @@ it('404s a draft for an authenticated user without cms admin access', function (
     $user = AdminUser::create(['name' => 'Visitor', 'email' => 'visitor@example.com', 'password' => 'secret']);
     Page::factory()->create(['status' => PageStatus::Draft, 'name' => ['en' => 'Secret']]);
 
-    test()->actingAs($user, 'web')->getJson('/secret')->assertNotFound();
+    test()->actingAs($user, 'web')->getJson('/secret', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('shows a draft page to an authenticated admin with preview props set', function (): void {
@@ -120,10 +120,10 @@ it('404s a tampered or expired signed preview link', function (): void {
 
     $url = app(PreviewLink::class)->for($page, 'en');
 
-    test()->getJson($url . 'x')->assertNotFound();
+    test()->getJson($url . 'x', ['X-Inertia' => 'true'])->assertNotFound();
 
     test()->travel(73)->hours();
-    test()->getJson($url)->assertNotFound();
+    test()->getJson($url, ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('serves a signed link for an already-published page as a normal (non-preview) view', function (): void {

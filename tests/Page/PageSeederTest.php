@@ -16,7 +16,7 @@ it('seeds a single published system home page', function (): void {
     (new PageSeeder)->run();
     (new PageSeeder)->run();
 
-    $home = Page::where('is_system', true)->get();
+    $home = Page::where('is_system', true)->whereNull('error_class')->get();
 
     expect($home)->toHaveCount(1)
         ->and($home->first()->type)->toBe('page')
@@ -28,7 +28,7 @@ it('seeds the home name under the default locale', function (): void {
     (new LanguageSeeder)->run();
     (new PageSeeder)->run();
 
-    $home = Page::where('is_system', true)->first();
+    $home = Page::where('is_system', true)->whereNull('error_class')->first();
 
     expect($home->getTranslation('name', 'en'))->toBe('Home')
         ->and($home->getTranslation('title', 'en'))->toBe('Home');
@@ -55,8 +55,20 @@ it('seeds the home name under a fallback locale when none is configured', functi
 
     (new PageSeeder)->run();
 
-    $translations = Page::where('is_system', true)->first()->getTranslations('name');
+    $translations = Page::where('is_system', true)->whereNull('error_class')->first()->getTranslations('name');
 
     expect($translations)->toHaveKey('en')
         ->and($translations)->not->toHaveKey('');
+});
+
+it('seeds exactly one 4xx and one 5xx error page, idempotently', function (): void {
+    (new LanguageSeeder)->run();
+    (new PageSeeder)->run();
+    (new PageSeeder)->run();
+
+    $errorPages = Page::query()->whereNotNull('error_class')->get();
+
+    expect($errorPages)->toHaveCount(2)
+        ->and($errorPages->pluck('error_class')->map->value->sort()->values()->all())->toBe(['4xx', '5xx'])
+        ->and($errorPages->every(fn (Page $page): bool => $page->is_system && ! $page->is_indexable))->toBeTrue();
 });

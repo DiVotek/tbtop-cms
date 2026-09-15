@@ -146,7 +146,7 @@ it('does not persist a submission when forms.store is disabled', function (): vo
 it('returns 404 when submitting to an unknown block', function (): void {
     $page = contactFormPage();
 
-    $this->postJson(submitUrl($page, 'nope'))->assertNotFound();
+    $this->postJson(submitUrl($page, 'nope'), [], ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('rejects a non-numeric page route segment before it reaches the controller', function (): void {
@@ -165,7 +165,7 @@ it('returns 404 when submitting to a block that is not a form', function (): voi
         ]],
     ]);
 
-    $this->postJson(submitUrl($page, 'hero-1'))->assertNotFound();
+    $this->postJson(submitUrl($page, 'hero-1'), [], ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('returns 404 when submitting to a draft page', function (): void {
@@ -180,7 +180,7 @@ it('returns 404 when submitting to a draft page', function (): void {
         ]],
     ]);
 
-    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    $this->postJson(submitUrl($page, 'form-1'), [], ['X-Inertia' => 'true'])->assertNotFound();
     Mail::assertNothingSent();
 });
 
@@ -197,7 +197,7 @@ it('returns 404 when submitting to a page scheduled for the future', function ()
         ]],
     ]);
 
-    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    $this->postJson(submitUrl($page, 'form-1'), [], ['X-Inertia' => 'true'])->assertNotFound();
     Mail::assertNothingSent();
 });
 
@@ -214,7 +214,7 @@ it('returns 404 when submitting to an expired page', function (): void {
         ]],
     ]);
 
-    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    $this->postJson(submitUrl($page, 'form-1'), [], ['X-Inertia' => 'true'])->assertNotFound();
     Mail::assertNothingSent();
 });
 
@@ -309,7 +309,7 @@ it('returns 404 when the block id exists only on a different page', function ():
         'name' => 'Ada',
         'email' => 'ada@example.test',
         'message' => 'Hello there',
-    ])->assertNotFound();
+    ], ['X-Inertia' => 'true'])->assertNotFound();
 
     Mail::assertNothingSent();
 });
@@ -326,7 +326,7 @@ it('returns 404 when submitting to an inactive block', function (): void {
         ]],
     ]);
 
-    $this->postJson(submitUrl($page, 'form-1'))->assertNotFound();
+    $this->postJson(submitUrl($page, 'form-1'), [], ['X-Inertia' => 'true'])->assertNotFound();
     Mail::assertNothingSent();
 });
 
