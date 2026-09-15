@@ -99,7 +99,7 @@ it('returns 404 for sitemap but keeps robots reachable when the sitemap config d
     config(['tbtop-cms.seo.sitemap.enabled' => false]);
     app(Cms::class)->frontendRoutes();
 
-    $this->get('/sitemap.xml')->assertNotFound();
+    $this->get('/sitemap.xml', ['X-Inertia' => 'true'])->assertNotFound();
 
     $response = $this->get('/robots.txt')
         ->assertOk()
@@ -125,7 +125,7 @@ it('disallows all crawling and 404s the sitemap when indexing is disabled', func
     app(Settings::class)->set('seo.indexing_enabled', false);
     app(Cms::class)->frontendRoutes();
 
-    $this->get('/sitemap.xml')->assertNotFound();
+    $this->get('/sitemap.xml', ['X-Inertia' => 'true'])->assertNotFound();
 
     $response = $this->get('/robots.txt')
         ->assertOk()
@@ -305,7 +305,7 @@ it('404s a chunk beyond the last one', function (): void {
     app(Cms::class)->frontendRoutes();
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
 
-    $this->get('/sitemap-2.xml')->assertNotFound();
+    $this->get('/sitemap-2.xml', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('gives the home page the top priority and nests the rest below it', function (): void {

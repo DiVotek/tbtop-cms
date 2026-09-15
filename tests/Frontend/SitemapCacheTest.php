@@ -120,7 +120,7 @@ it('404s the sitemap when indexing is disabled even with a warm cache', function
 
     app(Settings::class)->set('seo.indexing_enabled', false);
 
-    $this->get('/sitemap.xml')->assertNotFound();
+    $this->get('/sitemap.xml', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('shortens the cache TTL to the next scheduled transition instead of the configured ttl', function (): void {

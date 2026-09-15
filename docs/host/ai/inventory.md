@@ -19,6 +19,8 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `pages.types` | `array<string,class-string>` | `[]` | Host page-type classes merged into `PageTypeRegistry` (`Page/PageTypeRegistry.php`) | pages.md |
 | `pages.home.name` | `string` | `'Home'` | Name given to the seeded home page (`database/seeders/PageSeeder.php`) | wiring.md |
 | `pages.home.title` | `string` | falls back to `pages.home.name` | Title given to the seeded home page | wiring.md |
+| `pages.errors.4xx.name` / `.title` | `string` | `'Page not found'` | Name/title given to the seeded 4xx error page (`database/seeders/PageSeeder.php`) | pages.md |
+| `pages.errors.5xx.name` / `.title` | `string` | `'Something went wrong'` | Name/title given to the seeded 5xx error page | pages.md |
 | `blocks.types` | `array<string,class-string<Block>>` | `[]` | Host block classes merged into `BlockRegistry` (`Block/BlockRegistry.php`) | blocks.md |
 | `blocks.strict` | `bool` | `false` | When true, `BlockContentResolver` throws on an unknown block kind instead of skipping it | blocks.md |
 | `seo.robots.disallow` | `list<string>` | `[]` | Extra paths robots.txt closes to crawlers, on top of the admin prefix and `/login` (`Frontend/Seo/RobotsRegistry.php`) | seo.md |
@@ -37,6 +39,8 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `redirects.allowed_external_hosts` | `list<string>` | `[]` | Hosts an external redirect target is allowed to point at; exact, case-insensitive match (`Admin/Pages/Support/RedirectValidator.php`) — listing `example.com` does not allow `sub.example.com` | pages.md |
 | `not_found.ignore` | `list<string>` | `NotFoundNoise::DEFAULT_IGNORE` | Case-insensitive substring patterns; a matching 404 path is dropped before it's counted (`NotFound/Listeners/RecordsNotFoundHit.php`). The on/off switch itself is the Settings key `seo.not_found.enabled`, not this config key | seo.md |
 | `not_found.auto_prune` | `bool` | `true` | Whether `CmsServiceProvider` schedules `cms:not-found:prune` daily itself | §2 below |
+| `errors.handle` | `bool` | `true` | Whether `CmsServiceProvider` auto-registers an exception-handler `renderable()` that turns a whitelisted HTTP status into the matching error page; `false` leaves exception handling entirely to the host, `Cms::errorResponse()` still works when called directly | seo.md, wiring.md |
+| `errors.statuses` | `list<int>` | `[404, 500, 503]` | Statuses the auto-registered renderable intercepts; any other status stays stock Laravel | seo.md |
 | `revisions.keep` | `int` | `25` | Page content-revision snapshots kept per page, oldest pruned past this (`Page/Support/PageRevisionWriter.php`, `Page/Observers/PageRevisions.php`); `0` or `null` disables the revisions feature entirely — no snapshots taken, not even on creation | pages.md |
 | `audit.retention_days` | `int` | `365` | Days an activity-log row is kept before pruning (`CmsServiceProvider`, min-clamped to 1) | wiring.md |
 | `audit.auto_prune` | `bool` | `true` | Whether `CmsServiceProvider` schedules the audit-log prune itself | §2 below |
@@ -84,6 +88,8 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | `tbtop-cms.sitemap` | GET | `sitemap.xml` | `SitemapController@index` — sitemap index; only if `tbtop-cms.seo.sitemap.enabled` (default true) |
 | `tbtop-cms.sitemap.chunk` | GET | `sitemap-{chunk}.xml` | `SitemapController@chunk` — one sitemap chunk; registered before the catch-all so it isn't shadowed by a page slug |
 | `tbtop-cms.page` | GET | `{path?}` (catch-all, `.*`) | `PageController` — resolves and renders any CMS page; must be registered last |
+
+**Not a route**: `CmsServiceProvider::wireErrorPages()` registers a `renderable()` on the host's exception handler (`Illuminate\Contracts\Debug\ExceptionHandler::renderable()`), gated by `tbtop-cms.errors.handle` — see seo.md/wiring.md.
 
 **Admin, registered directly by `CmsServiceProvider`:**
 
@@ -272,7 +278,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | Table | Owning concept | `tbtop_` prefixed? | Notes |
 |---|---|---|---|
 | `tbtop_languages` | `src/Language/Models/Language.php` | Yes | |
-| `tbtop_pages` | `src/Page/Models/Page.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define`; gained `body`/`excerpt`, `image`, `source_id`, scheduling columns, and a starter-blocks flag over later ALTER migrations |
+| `tbtop_pages` | `src/Page/Models/Page.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define`; gained `body`/`excerpt`, `image`, `source_id`, scheduling columns, a starter-blocks flag, and a nullable unique `error_class` column (`ErrorClass` enum, migration `2026_09_15_000000_add_error_class_to_pages_table.php`) over later ALTER migrations |
 | `tbtop_page_slugs` | `src/Page/Models/PageSlug.php` | Yes | |
 | `tbtop_user_profiles` | `src/Admin/Models/CmsUserProfile.php` | Yes | `user_id` via `UserKeyColumn::define` (unique); gained a `user_id` FK, then `role` (added, later dropped), then `is_owner` |
 | `tbtop_redirects` | `src/Redirect/Models/Redirect.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define` |
@@ -298,6 +304,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `resolve(string $path, ?string $locale = null): ?Page` | Resolves a path to a `Page` for the given/current locale |
 | | `url(Page $page, ?string $locale = null): string` | Builds the absolute frontend URL for a page in a locale |
 | | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page |
+| | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |
 | | `forget(string $key): void` | Deletes one setting, bumps the content cache |

@@ -75,7 +75,7 @@ it('resolves the system home page at the empty root path', function (): void {
 it('returns 404 for an unknown path', function (): void {
     app(Cms::class)->frontendRoutes();
 
-    $this->getJson('/missing')->assertNotFound();
+    $this->getJson('/missing', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('does not resolve a draft page', function (): void {
@@ -86,7 +86,7 @@ it('does not resolve a draft page', function (): void {
 
     app(Cms::class)->frontendRoutes();
 
-    $this->getJson('/secret')->assertNotFound();
+    $this->getJson('/secret', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('redirects the default-locale prefix to the clean URL', function (): void {
@@ -124,7 +124,7 @@ it('stops and then resumes serving a locale across a deactivate/reactivate cycle
 
     $uk->update(['is_frontend_active' => false]);
 
-    $this->getJson('/uk/' . $page->pathFor('uk'))->assertNotFound();
+    $this->getJson('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])->assertNotFound();
 
     $uk->update(['is_frontend_active' => true]);
 

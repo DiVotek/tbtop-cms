@@ -45,6 +45,16 @@ return [
             'name' => 'Home',
             'title' => 'Home',
         ],
+        'errors' => [
+            '4xx' => [
+                'name' => 'Page not found',
+                'title' => 'Page not found',
+            ],
+            '5xx' => [
+                'name' => 'Something went wrong',
+                'title' => 'Something went wrong',
+            ],
+        ],
     ],
     'blocks' => [
         'types' => [],
@@ -117,6 +127,13 @@ return [
         // External redirect targets are rejected unless their host is listed here.
         // Exact, case-insensitive match only — listing "example.com" does NOT allow "sub.example.com".
         'allowed_external_hosts' => [],
+    ],
+    'errors' => [
+        // Registers a renderable on the host's exception handler for the
+        // listed statuses (see CmsServiceProvider::wireErrorPages()).
+        // Any status not listed here falls through to stock Laravel.
+        'handle' => true,
+        'statuses' => [404, 500, 503],
     ],
     'not_found' => [
         // Case-insensitive substring match against the requested path; a hit

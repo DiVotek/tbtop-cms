@@ -136,6 +136,7 @@ class SitemapEntryBuilder
         return Page::query()
             ->live()
             ->where('is_indexable', true)
+            ->whereNull('error_class')
             ->with('slugs');
     }
 

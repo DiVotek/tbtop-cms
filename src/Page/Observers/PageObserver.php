@@ -114,6 +114,7 @@ class PageObserver
     public function updating(Page $page): void
     {
         $this->guardSystemStatus($page);
+        $this->guardErrorClassImmutable($page);
 
         if ($page->isDirty(['type', 'parent_id'])) {
             PageHierarchy::assert($page, $this->registry);
@@ -217,6 +218,13 @@ class PageObserver
     {
         if ($page->is_system && $page->isDirty('status')) {
             throw new DomainException(__('tbtop-cms::pages.validation.status_change_system'));
+        }
+    }
+
+    private function guardErrorClassImmutable(Page $page): void
+    {
+        if ($page->isDirty('error_class')) {
+            throw new DomainException(__('tbtop-cms::pages.validation.error_class_immutable'));
         }
     }
 }

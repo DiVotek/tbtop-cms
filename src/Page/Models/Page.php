@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
 use Spatie\Translatable\HasTranslations;
 use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 use Tbtop\Cms\Database\Factories\PageFactory;
+use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Observers\PageObserver;
@@ -38,6 +39,7 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
  * @property array<string, mixed>|null $seo
  * @property bool $is_indexable
  * @property bool $is_system
+ * @property ErrorClass|null $error_class
  * @property int $sort_order
  * @property int $lock_version
  * @property int|null $created_by
@@ -85,6 +87,7 @@ class Page extends Model
         'seo',
         'is_indexable',
         'is_system',
+        'error_class',
         'sort_order',
         'created_at',
     ];
@@ -126,6 +129,7 @@ class Page extends Model
         'seo' => 'array',
         'is_indexable' => 'boolean',
         'is_system' => 'boolean',
+        'error_class' => ErrorClass::class,
         'sort_order' => 'integer',
         'lock_version' => 'integer',
     ];
@@ -176,6 +180,11 @@ class Page extends Model
         return $this->displayState() === PageDisplayState::Published;
     }
 
+    public function isErrorPage(): bool
+    {
+        return $this->error_class !== null;
+    }
+
     /** The computed state PageEditStatusBar/PagesPage/DashboardRecent display, folding the schedule into PageStatus's plain draft/published. */
     public function displayState(): PageDisplayState
     {
@@ -207,7 +216,7 @@ class Page extends Model
         return [
             'type', 'parent_id', 'status', 'published_at', 'unpublish_at',
             'name', 'title', 'heading', 'summary', 'body', 'image', 'content',
-            'seo', 'is_indexable', 'is_system', 'sort_order',
+            'seo', 'is_indexable', 'is_system', 'error_class', 'sort_order',
         ];
     }
 

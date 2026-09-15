@@ -39,6 +39,7 @@ final class PageDuplicator
         // slug locks (PageObserver::guardSystemStatus(), PageSlugWriter::
         // baseFor()) must not carry over to it.
         $copy->is_system = false;
+        $copy->error_class = null;
         $copy->sort_order = $this->nextSortOrder($source->parent_id);
 
         // replicate() copied translation JSON verbatim; overwrite just the
