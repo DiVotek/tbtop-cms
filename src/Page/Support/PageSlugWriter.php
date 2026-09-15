@@ -30,6 +30,14 @@ class PageSlugWriter
      */
     public function sync(Page $page, array $slugOverrides = []): void
     {
+        // An error page is never reached by path — it renders only through
+        // Cms::errorResponse()'s own lookup (see ErrorPageResolver) — so it
+        // gets no PageSlug row at all, unlike the home page which resolves
+        // at ''.
+        if ($page->isErrorPage()) {
+            return;
+        }
+
         $changed = false;
 
         foreach ($this->locales() as $locale) {
@@ -59,7 +67,9 @@ class PageSlugWriter
 
     private function writeDown(Page $page, string $locale): void
     {
-        $this->writeRow($page, $locale, '');
+        if (! $page->isErrorPage()) {
+            $this->writeRow($page, $locale, '');
+        }
 
         foreach (Page::query()->where('parent_id', $page->getKey())->get() as $child) {
             $this->writeDown($child, $locale);

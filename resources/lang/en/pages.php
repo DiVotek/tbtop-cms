@@ -46,6 +46,10 @@ return [
         'category' => 'Category',
         'article' => 'Article',
     ],
+    'error_types' => [
+        '4xx' => '404 page',
+        '5xx' => '500 page',
+    ],
     'date_format' => 'M j, Y',
     'empty' => [
         'title' => 'Nothing here yet',
@@ -245,6 +249,7 @@ return [
         'delete_has_children' => 'This page has child pages — move or delete them first.',
         'delete_system' => 'System pages cannot be deleted.',
         'status_change_system' => 'The status of a system page cannot be changed.',
+        'error_class_immutable' => 'An error page\'s class (4xx/5xx) cannot be changed after creation.',
         'restore_parent_trashed' => 'Restore the parent page first.',
         'unpublish_before_published' => 'Unpublish date must be after the publish date.',
     ],

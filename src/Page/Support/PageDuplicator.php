@@ -37,8 +37,10 @@ final class PageDuplicator
         $copy->unpublish_at = null;
         // A copy of a system page is an ordinary page — system-page status/
         // slug locks (PageObserver::guardSystemStatus(), PageSlugWriter::
-        // baseFor()) must not carry over to it.
+        // baseFor()) must not carry over to it. error_class is unique, so a
+        // copy that kept it would violate the constraint on save.
         $copy->is_system = false;
+        $copy->error_class = null;
         $copy->sort_order = $this->nextSortOrder($source->parent_id);
 
         // replicate() copied translation JSON verbatim; overwrite just the
