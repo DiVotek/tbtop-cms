@@ -138,10 +138,12 @@ it('disallows all crawling and 404s the sitemap when indexing is disabled', func
 it('allows indexing by default when the setting is absent', function (): void {
     app(Cms::class)->frontendRoutes();
 
-    $this->get('/robots.txt')
-        ->assertOk()
-        ->assertSee('Allow: /', false)
-        ->assertDontSee('Disallow: /', false);
+    $body = (string) $this->get('/robots.txt')->assertOk()->getContent();
+
+    // The exact line, not the substring: the owned group also carries
+    // `Disallow: /admin` and friends, which share the prefix.
+    expect($body)->toContain('Allow: /')
+        ->and(preg_split('/\R/', $body))->not->toContain('Disallow: /');
 
     $this->get('/sitemap.xml')->assertOk();
 });
@@ -209,7 +211,7 @@ it('drops a custom line that claims a directive the site owns', function (): voi
 
     expect($body)->toContain('Allow: /')
         ->and($body)->toContain('Crawl-delay: 5')
-        ->and($body)->not->toContain('Disallow: /');
+        ->and(preg_split('/\R/', (string) $body))->not->toContain('Disallow: /');
 });
 
 it('keeps the disallow-all block intact when indexing is off, custom rules and all', function (): void {

@@ -38,6 +38,7 @@ final readonly class RobotsTxt
     public function __construct(
         private Settings $settings,
         private IndexingSetting $indexing,
+        private RobotsRegistry $disallow,
     ) {}
 
     /**
@@ -54,7 +55,9 @@ final readonly class RobotsTxt
      */
     public function render(): string
     {
-        $group = ['User-agent: *', $this->indexing->enabled() ? 'Allow: /' : 'Disallow: /'];
+        $group = $this->indexing->enabled()
+            ? ['User-agent: *', 'Allow: /', ...$this->ownedDisallows()]
+            : ['User-agent: *', 'Disallow: /'];
 
         $custom = self::customLines((string) $this->settings->get('seo.robots_extra', ''));
 
@@ -103,6 +106,17 @@ final readonly class RobotsTxt
         $directive = mb_strtolower(trim(explode(':', $line, 2)[0]));
 
         return in_array($directive, self::OWNED_DIRECTIVES, true);
+    }
+
+    /**
+     * Only under `Allow: /` — below a site-wide `Disallow: /` they say nothing
+     * the broader line has not already said.
+     *
+     * @return list<string>
+     */
+    private function ownedDisallows(): array
+    {
+        return array_map(fn (string $path): string => 'Disallow: ' . $path, $this->disallow->all());
     }
 
     /**
