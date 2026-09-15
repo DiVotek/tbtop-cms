@@ -65,7 +65,7 @@ final class JsonLd
     /**
      * $currentUrl is the current page's already-absolute canonical URL — the list's final item.
      *
-     * @param  list<array{label: string, path: string, url: string}>  $breadcrumbs  Ancestors only (root-relative `url`), current page excluded.
+     * @param  list<array{label: string, path: string, url: string}>  $breadcrumbs  The trail preceding the page (root-relative `url`), current page excluded.
      * @return array{'@context': string, '@type': string, itemListElement: list<array{'@type': string, position: int, name: string, item: string}>}|null
      */
     public function breadcrumbList(array $breadcrumbs, string $currentLabel, string $currentUrl): ?array

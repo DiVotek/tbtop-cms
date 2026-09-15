@@ -36,6 +36,19 @@ function serverHeadMedia(string $name): Media
     ]);
 }
 
+// The site root as PageSeeder creates it: is_system + no parent is what
+// gives it the empty slug path, and therefore the '/' breadcrumb URL.
+function serverHeadHome(): Page
+{
+    return Page::factory()->create([
+        'status' => PageStatus::Published,
+        'is_system' => true,
+        'type' => 'page',
+        'name' => ['en' => 'Home'],
+        'title' => ['en' => 'Home'],
+    ]);
+}
+
 it('renders the full head tag set server-side for a plain GET on a published nested page', function (): void {
     Language::factory()->create(['locale' => 'uk']);
     app(Cms::class)->frontendRoutes();
@@ -100,7 +113,7 @@ it('omits the hreflang cluster when the page exists in only one locale', functio
     expect($html)->not->toContain('rel="alternate"');
 });
 
-it('omits the BreadcrumbList object for a top-level page', function (): void {
+it('omits the BreadcrumbList object for a top-level page when no site root is seeded', function (): void {
     app(Cms::class)->frontendRoutes();
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
@@ -110,6 +123,55 @@ it('omits the BreadcrumbList object for a top-level page', function (): void {
     $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
 
     expect($html)->not->toContain('BreadcrumbList');
+});
+
+it('roots the BreadcrumbList at the home page for a top-level page', function (): void {
+    app(Cms::class)->frontendRoutes();
+    serverHeadHome();
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'About'],
+    ]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)->toContain('"@type":"BreadcrumbList"')
+        ->toContain('"position":1,"name":"Home","item":"' . url('/') . '"')
+        ->toContain('"position":2,"name":"About"');
+});
+
+it('omits the BreadcrumbList object on the home page itself', function (): void {
+    app(Cms::class)->frontendRoutes();
+    $home = serverHeadHome();
+
+    $html = $this->get($home->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)->not->toContain('BreadcrumbList');
+});
+
+it('prepends home to an existing nested trail without reordering it', function (): void {
+    app(Cms::class)->frontendRoutes();
+    serverHeadHome();
+    $parent = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'type' => 'category',
+        'name' => ['en' => 'Guides'],
+        'title' => ['en' => 'Guides'],
+    ]);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'type' => 'article',
+        'parent_id' => $parent->getKey(),
+        'name' => ['en' => 'Setup Guide'],
+        'title' => ['en' => 'Setup Guide'],
+    ]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)->toContain('"position":1,"name":"Home"')
+        ->toContain('"position":2,"name":"Guides"')
+        ->toContain('"position":3,"name":"Setup Guide"');
 });
 
 it('omits the WebSite object when site.name is empty', function (): void {

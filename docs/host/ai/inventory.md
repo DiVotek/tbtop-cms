@@ -150,7 +150,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md |
-| `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` |
+| `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — real ancestry, site root NOT prepended (the JSON-LD `BreadcrumbList` uses `trailForSchema()` instead; see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
 

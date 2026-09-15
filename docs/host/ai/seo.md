@@ -131,9 +131,24 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
 
 1. **`JsonLd::website()`** — a `WebSite` node (name + root URL), emitted
    whenever `site.name` is set.
-2. **`JsonLd::breadcrumbList()`** — a `BreadcrumbList` from the `breadcrumbs`
-   prop plus the current page as the final item; omitted when there is only
-   one item (a top-level page has nothing to list).
+2. **`JsonLd::breadcrumbList()`** — a `BreadcrumbList` from
+   `Breadcrumbs::trailForSchema()` plus the current page as the final item.
+   That trail is the page's ancestry with the **site root prepended**, so a
+   top-level page still lists `Home › Page` and a nested one lists
+   `Home › Category › Article`. Omitted only on the home page itself, and on
+   a site with no seeded root page (`is_system` + no parent — `PageSeeder`),
+   where it falls back to the plain ancestry and so needs two real levels.
+
+   This is deliberately *not* the `breadcrumbs` prop: that one stays on the
+   real ancestry, because it also feeds the `{parent}` template variable.
+   Prepending home there would turn `{parent}` from empty into `Home` on
+   every top-level page. A host rendering its own visible trail keeps adding
+   its own "Home" link as before.
+
+   The root crumb is labelled from the home page's `title`/`name` with the
+   usual locale → default-locale fallback; `PageSeeder` writes those only in
+   the default locale, so until an editor translates the home page the crumb
+   shows the default-locale label in every locale.
 3. **`PageSchema::build()`** — the page's own object, one per page,
    type chosen by the page's own `type`, never editable directly:
    - `article` → `Article`/`NewsArticle`/`BlogPosting`
