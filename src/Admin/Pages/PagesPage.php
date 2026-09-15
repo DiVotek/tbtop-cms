@@ -435,11 +435,6 @@ class PagesPage extends AdminPage
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
     }
 
-    /**
-     * Error pages keep type='page' (see PageSeeder) — the type column shows
-     * their error_class label instead so they read as "404/500 page" rather
-     * than plain "Page" in the list.
-     */
     private function typeLabel(mixed $value, mixed $row): string
     {
         $errorClass = $row instanceof Page ? $row->error_class : null;

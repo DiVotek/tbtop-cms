@@ -46,11 +46,6 @@ class PageSeeder extends Seeder
         app(PageSlugWriter::class)->sync($home);
     }
 
-    /**
-     * Located by error_class, never by the (is_system, type) pair the home
-     * lookup uses — both rows share is_system=true and type='page', so that
-     * pair can't tell them apart (see docs/host/ai/pages.md).
-     */
     private function seedErrorPage(ErrorClass $errorClass, string $locale): void
     {
         $name = (string) config("tbtop-cms.pages.errors.{$errorClass->value}.name", $errorClass->value);

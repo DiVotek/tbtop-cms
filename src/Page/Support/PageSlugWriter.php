@@ -30,10 +30,7 @@ class PageSlugWriter
      */
     public function sync(Page $page, array $slugOverrides = []): void
     {
-        // An error page is never reached by path — it renders only through
-        // Cms::errorResponse()'s own lookup (see ErrorPageResolver) — so it
-        // gets no PageSlug row at all, unlike the home page which resolves
-        // at ''.
+        // Error pages resolve by error_class, never by path.
         if ($page->isErrorPage()) {
             return;
         }

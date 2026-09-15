@@ -468,9 +468,6 @@ class CmsServiceProvider extends PackageServiceProvider
 
     private function renderError(Request $request, int $status): ?Response
     {
-        // Checked per request, not at registration time, so a host (or a
-        // test) can flip errors.handle after boot and have it take effect
-        // immediately.
         if (! (bool) config('tbtop-cms.errors.handle', true)) {
             return null;
         }

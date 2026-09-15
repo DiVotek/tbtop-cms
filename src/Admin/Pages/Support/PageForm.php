@@ -629,11 +629,7 @@ class PageForm
             // in the unconditional part below rather than the is_system gate.
             'image' => self::nullableMediaId($form['image'] ?? null),
             // The create form has no is_indexable field — new pages are always
-            // indexable by default; edits keep the form-submitted value. An
-            // error page is the one exception: it must stay unindexable no
-            // matter what an editor submits (PageEditSidebar hides the field
-            // for it, but this is what actually enforces it — see
-            // SitemapEntryBuilder's belt-and-braces exclusion too).
+            // indexable by default; edits keep the form-submitted value.
             'is_indexable' => $page->exists && $page->isErrorPage()
                 ? false
                 : ($isCreate ? true : (bool) ($form['is_indexable'] ?? false)),
