@@ -295,7 +295,7 @@ response:
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
 | `render` | `Spec` (json-render) | The assembled page spec — resolved block content passed through `PageSpecAssembler`; see blocks.md for the block/envelope/resolved-block vocabulary |
 | `seo` | `object` | Full SEO tag set (title, description, canonical, OG/Twitter, hreflang alternates, JSON-LD, `noindex`) — see seo.md for field-by-field detail; `CmsPage.tsx`'s `<Head>` and `head.blade.php` both render this same payload |
-| `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` |
+| `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` — real ancestry, no site root prepended |
 | `path` | `string` | The resolved request path |
 | `isPreview` | `bool` | `true` for draft/scheduled/expired pages reachable only via preview access — `seo.noindex` is forced `true` alongside it |
 

@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Frontend\Seo;
 
 use Closure;
 use Tbtop\Cms\Block\MediaUrlResolver;
+use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageUrl;
@@ -28,6 +29,7 @@ class SeoResolver
         private readonly PageUrl $url,
         private readonly Languages $languages,
         private readonly JsonLd $jsonLd,
+        private readonly Breadcrumbs $breadcrumbs,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
         ?IndexingSetting $indexing = null,
         ?PageSchema $pageSchema = null,
@@ -62,7 +64,9 @@ class SeoResolver
      *
      * @param  list<Breadcrumb>  $breadcrumbs  Ancestors only (Breadcrumbs::forPage() shape), reused
      *                                         as-is from the caller's own `breadcrumbs` prop build so
-     *                                         this stays a single query per request.
+     *                                         this stays a single query per request. Feeds {parent}
+     *                                         and nothing else — BreadcrumbList builds its own trail
+     *                                         (see jsonLd()), so passing [] does not suppress it.
      * @return array{
      *     title: string, description: string, canonical: string, ogImage: string|null,
      *     ogImageAlt: string|null, ogImageType: string|null,
@@ -129,7 +133,6 @@ class SeoResolver
                 $ogDescription,
                 $canonical,
                 $ogImage,
-                $breadcrumbs,
             ),
         ];
     }
@@ -231,10 +234,7 @@ class SeoResolver
         return is_string($id) && $id !== '' ? $this->mediaUrlResolver->resolve($id) : null;
     }
 
-    /**
-     * @param  list<Breadcrumb>  $breadcrumbs
-     * @return list<array<string, mixed>>
-     */
+    /** @return list<array<string, mixed>> */
     private function jsonLd(
         Page $page,
         string $locale,
@@ -243,7 +243,6 @@ class SeoResolver
         string $ogDescription,
         string $canonical,
         ?string $ogImage,
-        array $breadcrumbs,
     ): array {
         $objects = [];
 
@@ -259,8 +258,10 @@ class SeoResolver
         // suffixed-elsewhere) og title.
         $currentLabel = (string) $page->getTranslation('title', $locale, false)
             ?: (string) $page->getTranslation('name', $locale, false);
+        // Not resolve()'s $breadcrumbs: that one must stay on the real
+        // ancestry for {parent}. See Breadcrumbs::trailForSchema().
         $breadcrumbList = $this->jsonLd->breadcrumbList(
-            $breadcrumbs,
+            $this->breadcrumbs->trailForSchema($page, $locale),
             $currentLabel !== '' ? $currentLabel : $ogTitle,
             $canonical,
         );

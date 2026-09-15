@@ -207,7 +207,11 @@ Cms::breadcrumbs(Page $page, ?string $locale = null): array // list<{label, path
 exposed) — it delegates to `PageResolver::resolve($path, $locale, false)`.
 `Cms::breadcrumbs()` walks `AncestorChain::forPage()` (root-first, self
 excluded) and labels each ancestor with its `title` falling back to `name`,
-current locale falling back to the default locale.
+current locale falling back to the default locale. It returns the real
+ancestry only — the site root is not prepended, so a top-level page yields
+an empty array and a host rendering a visible trail adds its own "Home" link.
+(The JSON-LD `BreadcrumbList` does prepend it, via
+`Breadcrumbs::trailForSchema()`; see seo.md.)
 
 ### Redirects
 
