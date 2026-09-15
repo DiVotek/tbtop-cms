@@ -437,11 +437,11 @@ by `config('tbtop-cms.errors.statuses')` (default `[404, 500, 503]`) — any
 other status falls through to stock Laravel untouched. Also falls through
 (returns `null`) when: the status is 5xx and `app.debug` is `true` (Ignition
 needs the real exception), or the request path is under the admin prefix
-(`config('tbtop-cms.admin.prefix')`). `PageController`'s own 404 catch-all
-calls the same underlying service directly rather than throwing, so it never
-depends on this registration at all — `errors.handle = false` only turns off
-interception of exceptions raised elsewhere (a host's own `abort()`,
-`AuthenticationException`, etc.), not the CMS's own not-found handling.
+(`config('tbtop-cms.admin.prefix')`), or the request expects JSON (an API
+client keeps Laravel's stock JSON body). `PageController`'s own 404 catch-all
+throws `NotFoundHttpException` like any other route, so it goes through this
+same registration and obeys every gate above — `errors.handle = false` leaves
+the CMS's own not-found handling to stock Laravel too.
 
 **Maintenance mode**: a `503` served by Laravel's maintenance screen (`php
 artisan down`) happens before the framework boots the request pipeline —

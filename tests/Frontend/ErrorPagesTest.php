@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
@@ -144,6 +145,35 @@ it('leaves a JSON client its stock Laravel error body', function (): void {
         ->assertNotFound()
         ->assertHeader('Content-Type', 'application/json')
         ->assertJsonMissingPath('component');
+});
+
+// The catch-all route is the main source of 404s, and it reaches the error
+// page by throwing rather than rendering directly — so the JSON/config gates
+// in CmsServiceProvider::renderError() apply to it too. Mutation this catches:
+// PageController::notFound() returning ErrorResponse::render() itself would
+// hand a JSON client an HTML CMS page, bypassing every gate.
+it('leaves a JSON client its stock error body on the catch-all 404 too', function (): void {
+    seedErrorPage(ErrorClass::ClientError);
+    app(Cms::class)->frontendRoutes();
+
+    $this->getJson('/nonexistent')
+        ->assertNotFound()
+        ->assertHeader('Content-Type', 'application/json')
+        ->assertJsonMissingPath('component');
+});
+
+it('leaves the catch-all 404 to stock Laravel when errors.handle is false', function (): void {
+    config(['tbtop-cms.errors.handle' => false]);
+    seedErrorPage(ErrorClass::ClientError);
+    app(Cms::class)->frontendRoutes();
+
+    // Raised, not rendered: with the renderable opted out there is nothing to
+    // convert the 404 into a CMS page, so it stays an ordinary
+    // NotFoundHttpException for the host's own handler to deal with.
+    $this->withoutExceptionHandling();
+
+    expect(fn () => $this->get('/nonexistent', ['X-Inertia' => 'true']))
+        ->toThrow(NotFoundHttpException::class);
 });
 
 it('leaves a non-whitelisted status like 403 to stock Laravel handling', function (): void {

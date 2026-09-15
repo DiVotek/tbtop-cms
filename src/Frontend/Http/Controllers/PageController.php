@@ -8,11 +8,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
-use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
@@ -34,7 +34,6 @@ class PageController
         private readonly SeoResolver $seo,
         private readonly FormActionBinder $forms,
         private readonly PageTypeRegistry $pageTypes,
-        private readonly ErrorResponse $errors,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -79,7 +78,7 @@ class PageController
         return $response;
     }
 
-    private function notFound(string $path, string $locale, Request $request): RedirectResponse | Response
+    private function notFound(string $path, string $locale, Request $request): RedirectResponse
     {
         $redirect = $this->redirects->resolve($path, $locale, $request);
 
@@ -89,7 +88,7 @@ class PageController
 
         event(new PageNotFound($path, $locale, $request->headers->get('referer'), $request->userAgent()));
 
-        return $this->errors->render($request, 404);
+        throw new NotFoundHttpException;
     }
 
     /**
