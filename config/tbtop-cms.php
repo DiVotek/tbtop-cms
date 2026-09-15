@@ -51,6 +51,12 @@ return [
         'strict' => false,
     ],
     'seo' => [
+        // Extra paths robots.txt closes to crawlers, on top of the admin
+        // prefix and /login the package owns. Read with an inline default —
+        // published host configs override whole sections.
+        'robots' => [
+            'disallow' => [],
+        ],
         'sitemap' => [
             'enabled' => true,
             // URLs per chunk file. The spec's ceiling is 50 000, but the real

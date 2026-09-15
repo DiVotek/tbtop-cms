@@ -7,7 +7,7 @@ namespace Tbtop\Cms\Frontend\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
@@ -65,7 +65,17 @@ class PageController
             return $this->notFound($path, $locale, $request);
         }
 
-        return Inertia::render($this->component(), $this->props($page, $locale, $path, $type, $source));
+        $props = $this->props($page, $locale, $path, $type, $source);
+        $response = Inertia::render($this->component(), $props)->toResponse($request);
+
+        // Same verdict as the meta tag, from the same computed value: a
+        // crawler that reads headers and skips the body must not see a page
+        // the tag calls noindex as indexable.
+        if (($props['seo']['noindex'] ?? false) === true) {
+            $response->headers->set('X-Robots-Tag', 'noindex');
+        }
+
+        return $response;
     }
 
     private function notFound(string $path, string $locale, Request $request): RedirectResponse

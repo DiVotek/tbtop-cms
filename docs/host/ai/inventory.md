@@ -21,6 +21,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `pages.home.title` | `string` | falls back to `pages.home.name` | Title given to the seeded home page | wiring.md |
 | `blocks.types` | `array<string,class-string<Block>>` | `[]` | Host block classes merged into `BlockRegistry` (`Block/BlockRegistry.php`) | blocks.md |
 | `blocks.strict` | `bool` | `false` | When true, `BlockContentResolver` throws on an unknown block kind instead of skipping it | blocks.md |
+| `seo.robots.disallow` | `list<string>` | `[]` | Extra paths robots.txt closes to crawlers, on top of the admin prefix and `/login` (`Frontend/Seo/RobotsRegistry.php`) | seo.md |
 | `seo.sitemap.enabled` | `bool` | `true` | Turns the sitemap routes on/off (`Cms.php`, `Frontend/Seo/RobotsTxt.php`) | seo.md |
 | `seo.sitemap.per_chunk` | `int` | `1000` | Fallback URLs-per-chunk when the Settings key `seo.sitemap_per_chunk` is unset (`Frontend/Seo/SitemapEntryBuilder.php`, capped by an internal `MAX_PER_CHUNK`). Two similarly-named knobs exist — this config key is the inline default; `seo.sitemap_per_chunk` in Settings (§7) is the live, admin-edited override | seo.md |
 | `preview.link_ttl_hours` | `int` | `72` | Hours a signed draft-preview link stays valid (`Frontend/PreviewLink.php`, admin status bar) | pages.md |
@@ -180,6 +181,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 |---|---|---|---|
 | `BlockRegistry` | `src/Block/BlockRegistry.php` | `static extend(callable(): list<class-string> $extension): void`; `forPlacement(string $placement): array<string, Block>` | Register block classes (must run before the registry's first `get()`/`has()`/`all()`/`kinds()`/`forPlacement()` call); `forPlacement()` filters `all()` to blocks offered at that placement |
 | `PageTypeRegistry` | `src/Page/PageTypeRegistry.php` | `static extend(callable(): list<class-string> $extension): void` | Register page-type classes; same before-boot timing rule |
+| `RobotsRegistry` | `src/Frontend/Seo/RobotsRegistry.php` | `static extend(callable(): list<string> $extension): void` | Register paths robots.txt disallows. Not boot-latched — re-read on every render, so a late `extend()` still lands |
 | `Notifications` | `src/Notifications/Notifications.php` (delegates to `NotificationRegistry`) | `static type(TypeDefinition $type): void`; `static channel(string $channel): void` (`$channel` a `class-string<Channel>`) | Register a notification type / channel class. A duplicate `type()` key or an unregistered `channel()` throws `InvalidArgumentException` |
 
 ## 6. Events a host may listen to

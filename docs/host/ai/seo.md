@@ -66,7 +66,9 @@ Field-by-field:
   `xDefault` points at the default locale's alternate, if present.
 - **robots (meta)** — driven by `noindex` only; there is no separate
   `robots` field beyond that boolean (rendered as `<meta name="robots"
-  content="noindex">` when true, omitted otherwise).
+  content="noindex">` when true, omitted otherwise). The same verdict also
+  goes out as an `X-Robots-Tag: noindex` response header — see
+  "Noindex header" below.
 - **jsonLd** — see Structured data below.
 
 ## Where each value is edited
@@ -244,7 +246,8 @@ differences only) does **not** exclude the locale.
 
 `RobotsController` → `RobotsTxt::render()`. Two halves: an owned
 `User-agent: *` group (`Allow: /` or `Disallow: /`, following
-`IndexingSetting`), then the editor's `seo.robots_extra` lines spliced
+`IndexingSetting`, plus the owned `Disallow:` paths below when indexing is
+on), then the editor's `seo.robots_extra` lines spliced
 **inside** that same group (blank lines between them are stripped — a blank
 line would end the group and orphan everything after it in a real
 robots.txt parse), then a trailing `Sitemap:` line (only when indexing is on
@@ -253,6 +256,37 @@ robots.txt parse), then a trailing `Sitemap:` line (only when indexing is on
 at save time in `SeoSettingsPage::guardRobotsExtra()`, not silently
 stripped — an editor who wrote a conflicting line gets a validation error
 naming it.
+
+### Disallowed paths
+
+The owned group carries a `Disallow:` line per path in `RobotsRegistry`, in
+this order: the admin prefix (`tbtop-cms.admin.prefix`, read per render so a
+renamed panel stays covered) and `/login` (the redirect the package registers
+when the host has no login route of its own), then
+`tbtop-cms.seo.robots.disallow`, then every `RobotsRegistry::extend()`
+closure. Paths are normalised to a single rooted form (`cart/` and `/cart`
+collapse to one `Disallow: /cart`).
+
+These lines appear only under `Allow: /` — below a site-wide `Disallow: /`
+they add nothing. `Disallow` stays an owned directive, so a path cannot be
+added through `seo.robots_extra`; a package adds its own from
+`boot()`/`packageBooted()`:
+
+```php
+RobotsRegistry::extend(fn (): array => ['/_storefront']);
+```
+
+Unlike `BlockRegistry`, this registry is **not** boot-latched — it is re-read
+on every render, so a late `extend()` still lands in the file.
+
+### Noindex header
+
+`PageController` sets `X-Robots-Tag: noindex` on a page response whose
+resolved `seo.noindex` is true — the same value the meta tag uses, taken from
+the props rather than recomputed. It therefore also covers the not-live case
+(draft, scheduled, expired) that `SeoResolver` alone does not know about:
+those are visible only through preview access, and the header keeps a leaked
+preview URL out of an index.
 
 **Install trap**: a static `public/robots.txt` shadows this route — see
 wiring.md, "`public/robots.txt` must not exist".
