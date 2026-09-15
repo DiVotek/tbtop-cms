@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Frontend\Breadcrumbs;
+use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
 use Tbtop\Cms\Frontend\Http\Controllers\RobotsController;
@@ -24,6 +27,7 @@ class Cms
         private readonly PageResolver $resolver,
         private readonly PageUrl $pageUrl,
         private readonly Breadcrumbs $crumbs,
+        private readonly ErrorResponse $errors,
     ) {}
 
     /**
@@ -80,5 +84,16 @@ class Cms
     public function breadcrumbs(Page $page, ?string $locale = null): array
     {
         return $this->crumbs->forPage($page, $locale ?? (string) app()->getLocale());
+    }
+
+    /**
+     * Always returns a response: the seeded DB page for this status class,
+     * or (4xx/5xx alike) a chrome-fallback render when it's missing, or (5xx
+     * only) a static Blade view when rendering itself throws. Works whether
+     * or not `errors.handle` auto-registered anything — see wireErrorPages().
+     */
+    public function errorResponse(Request $request, int $status): Response
+    {
+        return $this->errors->render($request, $status);
     }
 }

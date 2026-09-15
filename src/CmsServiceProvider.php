@@ -6,7 +6,9 @@ namespace Tbtop\Cms;
 
 use Illuminate\Auth\Events\Login;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +16,8 @@ use Inertia\Ssr\HttpGateway;
 use Spatie\Activitylog\ActivitylogServiceProvider;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
@@ -34,6 +38,8 @@ use Tbtop\Cms\Form\Events\SubmissionReceived;
 use Tbtop\Cms\Form\Listeners\NotifiesAdminsOfSubmission;
 use Tbtop\Cms\Form\Notifications\FormSubmissionPayload;
 use Tbtop\Cms\Form\SubmissionNotifier;
+use Tbtop\Cms\Frontend\Errors\ErrorPageResolver;
+use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Middleware\EnableSsr;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
@@ -119,6 +125,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_31_000001_update_pages_add_source_table')
             ->hasMigration('2026_08_31_000002_create_seo_audit_snapshots_table')
             ->hasMigration('2026_09_01_000000_create_notification_templates_table')
+            ->hasMigration('2026_09_15_000000_add_error_class_to_pages_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -143,6 +150,8 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(LayoutResolver::class);
         $this->app->scoped(PageResolver::class);
         $this->app->scoped(RedirectResolver::class);
+        $this->app->scoped(ErrorPageResolver::class);
+        $this->app->scoped(ErrorResponse::class);
         $this->app->scoped(Settings::class);
         $this->app->scoped(CmsMailer::class);
         $this->app->scoped(Cms::class);
@@ -176,6 +185,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireNotificationRegistry();
         $this->wireSubmissionNotifications();
         $this->wireNotFoundLogging();
+        $this->wireErrorPages();
         $this->wireNotFoundPruneSchedule();
         $this->wireAuditPruneSchedule();
         $this->wireSchedulerHeartbeat();
@@ -436,6 +446,53 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wireNotFoundLogging(): void
     {
         Event::listen(PageNotFound::class, RecordsNotFoundHit::class);
+    }
+
+    /**
+     * Renders the matching error page for a whitelisted status instead of
+     * Laravel's stock error view — gated by config so a host can opt out
+     * entirely (errors.handle=false) and still call Cms::errorResponse()
+     * itself. Registered against HttpExceptionInterface, not Throwable: a
+     * non-HTTP exception only reaches here after Laravel's own handler has
+     * already converted it (see Handler::prepareException()), so this never
+     * duplicates that conversion.
+     */
+    private function wireErrorPages(): void
+    {
+        $this->app->afterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {
+            $handler->renderable(function (HttpExceptionInterface $e, Request $request): ?Response {
+                return $this->renderError($request, $e->getStatusCode());
+            });
+        });
+    }
+
+    private function renderError(Request $request, int $status): ?Response
+    {
+        // Checked per request, not at registration time, so a host (or a
+        // test) can flip errors.handle after boot and have it take effect
+        // immediately.
+        if (! (bool) config('tbtop-cms.errors.handle', true)) {
+            return null;
+        }
+
+        /** @var list<int> $statuses */
+        $statuses = (array) config('tbtop-cms.errors.statuses', [404, 500, 503]);
+
+        if (! in_array($status, $statuses, true)) {
+            return null;
+        }
+
+        if ($status >= 500 && (bool) config('app.debug', false)) {
+            return null;
+        }
+
+        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+
+        if ($request->is($prefix) || $request->is($prefix . '/*')) {
+            return null;
+        }
+
+        return app(Cms::class)->errorResponse($request, $status);
     }
 
     /**
