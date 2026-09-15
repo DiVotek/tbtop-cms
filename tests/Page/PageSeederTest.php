@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Database\Seeders\LanguageSeeder;
 use Tbtop\Cms\Database\Seeders\PageSeeder;
@@ -31,6 +32,22 @@ it('seeds the home name under the default locale', function (): void {
 
     expect($home->getTranslation('name', 'en'))->toBe('Home')
         ->and($home->getTranslation('title', 'en'))->toBe('Home');
+});
+
+// A host's DatabaseSeeder runs with WithoutModelEvents, so PageObserver never
+// fires and the seeder itself has to write the home page's slug.
+it('seeds the home page slug when model events are muted', function (): void {
+    (new LanguageSeeder)->run();
+
+    Model::withoutEvents(function (): void {
+        (new PageSeeder)->run();
+    });
+
+    $slug = Page::where('is_system', true)->first()->slugs()->where('locale', 'en')->first();
+
+    expect($slug)->not->toBeNull()
+        ->and($slug->slug)->toBe('')
+        ->and($slug->path)->toBe('');
 });
 
 it('seeds the home name under a fallback locale when none is configured', function (): void {
