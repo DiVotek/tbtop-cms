@@ -131,6 +131,21 @@ it('renders the 4xx page for abort(404) raised from a host route in the frontend
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'Client error');
 });
 
+it('leaves a JSON client its stock Laravel error body', function (): void {
+    seedErrorPage(ErrorClass::ClientError);
+
+    withExtraFrontendRoute(function (): void {
+        Route::middleware(['web', SetLanguage::class])->group(function (): void {
+            Route::get('_test/missing-json', fn () => abort(404));
+        });
+    });
+
+    $this->getJson('/_test/missing-json')
+        ->assertNotFound()
+        ->assertHeader('Content-Type', 'application/json')
+        ->assertJsonMissingPath('component');
+});
+
 it('leaves a non-whitelisted status like 403 to stock Laravel handling', function (): void {
     seedErrorPage(ErrorClass::ClientError);
 

@@ -483,6 +483,12 @@ class CmsServiceProvider extends PackageServiceProvider
             return null;
         }
 
+        // API clients keep Laravel's JSON error body; Inertia XHRs send
+        // Accept: text/html, so they are not caught by this check.
+        if ($request->expectsJson()) {
+            return null;
+        }
+
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
 
         if ($request->is($prefix) || $request->is($prefix . '/*')) {
