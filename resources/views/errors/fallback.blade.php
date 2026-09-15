@@ -1,8 +1,3 @@
-{{--
-    Third layer for a 5xx: no DB read, no Inertia, no settings — rendering
-    the 5xx page itself is what's failing, so this view must not depend on
-    anything that could fail the same way. See ErrorResponse::render5xx().
---}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
