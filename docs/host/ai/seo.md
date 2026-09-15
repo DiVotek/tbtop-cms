@@ -405,7 +405,7 @@ retention window; scheduled daily by the package itself unless
 
 The log keeps recording exactly as above even though a 404 now renders a
 real page (see "Editable error pages" below) — `PageController::notFound()`
-still dispatches `PageNotFound` before rendering, and the redirect lookup
+still dispatches `PageNotFound` before it throws, and the redirect lookup
 still runs first and still wins over both the log and the error page.
 
 ## Editable error pages
