@@ -53,28 +53,24 @@ CmsPage.tsx` is a single default export, not a slotted component).
 
 ### Block-derived JSON-LD (FAQ, Service, …)
 
-`Tbtop\Cms\Frontend\Seo\JsonLd` builds the WebSite/BreadcrumbList/identity
-nodes, and the page's own node comes from a `SchemaTypeInterface` resolved
-through `SchemaTypeRegistry` (see seo.md) — a host can add a new schema.org
-*type* this way, but there is still no way to append extra, block-derived
-nodes (FAQPage from an FAQ block, Service from a service-detail block) to
-`seo.jsonLd` itself; `Block::toSchema()` does not exist yet (planned, not
-shipped). Until it lands, a host that wants block-derived nodes assembles its
-own graph in a middleware, reusing the same resolvers the controller uses —
-this workaround is temporary, not a permanent pattern:
-`divotek_com_ua/app/Http/Middleware/AttachSchemaGraph.php` shares
-`Inertia::share('schema', fn (): array => ...)`, calling this package's own
-`Tbtop\Cms\Frontend\PageResolver`, `Tbtop\Cms\Block\BlockContentResolver`, and
-`Tbtop\Cms\Frontend\Seo\SeoResolver` to get page/blocks/SEO, then hands off to
-`app/Cms/Seo/SchemaGraphBuilder::build()`, which matches on block `kind` via
-`app/Cms/Seo/BlockSchema::build()` (`Faq` → FAQPage, `ArticleDetail` →
-Article, `ServiceDetail` → Service). The host's own doc comment states the
-reasoning precisely: *"The package's SeoResolver has a fixed return shape and
-its controller is not extendable, so the graph is assembled here from the
-same page and block resolvers the controller uses — no vendor patching."*
-This is not a gap workaround, it's the intended shape: `SeoResolver`,
-`PageResolver`, and `BlockContentResolver` are all public services meant to be
-recomposed, not subclassed.
+`Block::toSchema(array $props, SchemaContext $ctx): ?array` is the extension
+point for this (see seo.md's "Structured data (JSON-LD)" section for the
+full contract, the built-in `FaqBlock` example, and a VideoObject sketch): a
+block overrides it to return one schema.org node built from its own resolved
+props, and `PageController` collects every block's non-null node into the
+page's `seo.jsonLd`, after the page type's own node and before identity. No
+middleware, no separate graph — this is now the primary path, and the
+middleware workaround below is obsolete for any host currently on it.
+
+A host that still needs to assemble its own graph outside `PageController`
+(e.g. a non-CMS route, or a batch job rendering JSON-LD for many pages) uses
+the same two public services `PageController` uses:
+`Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory::make($page, $locale,
+$source)` to build the `SchemaContext`, then
+`Tbtop\Cms\Frontend\Seo\SeoResolver::resolve($page, $locale, $breadcrumbs,
+$ctx, $blockNodes)` passing that same context plus its own list of ready
+nodes. `SeoResolver` and `SchemaContextFactory` are public services meant to
+be recomposed, not subclassed.
 
 ### A "section" page type that can hold plain pages
 
