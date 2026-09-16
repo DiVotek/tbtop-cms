@@ -49,7 +49,6 @@ it('falls back to the first schema key when the stored one has drifted out of ra
 
 it('derives the Article author and articleAuthor from the site identity settings', function (): void {
     app(Settings::class)->set('seo.identity.type', 'organization');
-    // The Identity tab has no name field; a real host's identity name is site.name.
     app(Settings::class)->set('site.name', 'Acme Inc');
     $blog = Page::factory()->category()->create(['name' => ['en' => 'Blog']]);
     $page = Page::factory()->article()->create([
