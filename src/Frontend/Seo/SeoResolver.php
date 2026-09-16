@@ -8,6 +8,7 @@ use Closure;
 use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaSelector;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeInterface;
 use Tbtop\Cms\Language\Languages;
@@ -26,6 +27,8 @@ class SeoResolver
 
     private readonly SeoTemplates $templates;
 
+    private readonly SchemaContextFactory $factory;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
@@ -37,6 +40,7 @@ class SeoResolver
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
         ?IndexingSetting $indexing = null,
         ?SeoTemplates $templates = null,
+        ?SchemaContextFactory $factory = null,
     ) {
         // Built from the same Settings instance rather than resolved from the
         // container: this resolver is constructed directly in places that pass
@@ -44,6 +48,7 @@ class SeoResolver
         // consult a different one.
         $this->indexing = $indexing ?? new IndexingSetting($settings);
         $this->templates = $templates ?? new SeoTemplates($settings);
+        $this->factory = $factory ?? new SchemaContextFactory($settings, $url, $pageTypes, $mediaUrlResolver);
     }
 
     /**
@@ -64,6 +69,12 @@ class SeoResolver
      *                                         this stays a single query per request. Feeds {parent}
      *                                         and nothing else — BreadcrumbList builds its own trail
      *                                         (see jsonLd()), so passing [] does not suppress it.
+     * @param  ?SchemaContext  $ctx  Built via SchemaContextFactory when omitted — pass one when the
+     *                               caller already built it (e.g. to resolve block schema nodes
+     *                               against the same context this call publishes).
+     * @param  list<array<string, mixed>>  $blockNodes  Ready JSON-LD nodes (e.g. from Block::toSchema()),
+     *                                                  placed after the page type's own node(s) and
+     *                                                  before the identity node.
      * @return array{
      *     title: string, description: string, canonical: string, ogImage: string|null,
      *     ogImageAlt: string|null, ogImageType: string|null,
@@ -76,58 +87,38 @@ class SeoResolver
      *     verificationGoogle: string|null, verificationBing: string|null,
      * }
      */
-    public function resolve(Page $page, string $locale, array $breadcrumbs = []): array
+    public function resolve(Page $page, string $locale, array $breadcrumbs = [], ?SchemaContext $ctx = null, array $blockNodes = []): array
     {
         $seo = $page->seo ?? [];
         $metaTitle = $this->metaTitle($page, $seo, $locale);
         $metaDescription = $this->description($page, $seo, $locale);
-        $canonical = $this->canonical($page, $seo, $locale);
-        $image = $this->ogImageDetails($page, $seo);
-        $ogImage = $image['url'] ?? null;
+        $image = $this->factory->ogImageDetails($page, $seo);
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
-        // og:description falls back to the UNtemplated base, same as og:title
-        // falls back to the untemplated metaTitle — social snippets should not
-        // carry the site-name branding a template typically appends.
-        $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale) ?: $metaDescription;
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
         $schema = $this->schemaSelector->selectFor($page);
-        // The UNtemplated title/description (same base og: falls back to): a
-        // schema `name` should be the thing's name, not the browser-tab
-        // string with the site name appended.
-        $currentLabel = (string) $page->getTranslation('title', $locale, false)
-            ?: (string) $page->getTranslation('name', $locale, false);
-        $context = new SchemaContext(
-            page: $page,
-            locale: $locale,
-            source: $this->pageTypes->has($page->type) ? $this->pageTypes->get($page->type)->source($page) : null,
-            name: $currentLabel !== '' ? $currentLabel : $ogTitle,
-            description: $ogDescription,
-            url: $canonical,
-            image: $ogImage,
-            author: $this->identityAuthor(),
-        );
+        $context = $ctx ?? $this->factory->make($page, $locale);
         $og = $schema->openGraph($context);
 
         return [
             'title' => $this->title($page, $metaTitle, $locale, $breadcrumbs),
             'description' => $this->descriptionWithTemplate($page, $metaDescription, $locale, $breadcrumbs),
-            'canonical' => $canonical,
-            'ogImage' => $ogImage,
+            'canonical' => $context->url,
+            'ogImage' => $context->image,
             'ogImageAlt' => $image['alt'] ?? null,
             'ogImageType' => $image['mime'] ?? null,
             'ogTitle' => $ogTitle,
-            'ogDescription' => $ogDescription,
+            'ogDescription' => $context->description,
             'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),
             'siteName' => $siteName,
             'ogType' => $og->type,
-            'ogUrl' => $canonical,
+            'ogUrl' => $context->url,
             'ogLocale' => $locale,
             'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
             'articlePublishedTime' => $og->publishedTime,
             'articleModifiedTime' => $og->modifiedTime,
             'articleAuthor' => $og->author,
-            'twitterCard' => $this->twitterCard($ogImage),
+            'twitterCard' => $this->twitterCard($context->image),
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
             // metaTitle is already the page's own cascade (seo.title → title →
@@ -143,34 +134,12 @@ class SeoResolver
                 $locale,
                 $siteName,
                 $ogTitle,
-                $canonical,
+                $context->url,
                 $schema,
                 $context,
+                $blockNodes,
             ),
         ];
-    }
-
-    /**
-     * The Article `author` and `article:author`/`articleAuthor` all come from
-     * the same site identity settings, not per-page data — reuses identity()'s
-     * own type/name parsing so the organization/person mapping exists once.
-     *
-     * @return array{'@type': string, name: string}|null
-     */
-    private function identityAuthor(): ?array
-    {
-        $type = (string) $this->settings->get('seo.identity.type', 'none');
-        $name = $this->identityName();
-
-        if ($name === '') {
-            return null;
-        }
-
-        return match ($type) {
-            'organization' => ['@type' => 'Organization', 'name' => $name],
-            'person' => ['@type' => 'Person', 'name' => $name],
-            default => null,
-        };
     }
 
     private function twitterCard(?string $ogImage): string
@@ -242,7 +211,10 @@ class SeoResolver
         return is_string($id) && $id !== '' ? $this->mediaUrlResolver->resolve($id) : null;
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @param  list<array<string, mixed>>  $blockNodes
+     * @return list<array<string, mixed>>
+     */
     private function jsonLd(
         Page $page,
         string $locale,
@@ -251,6 +223,7 @@ class SeoResolver
         string $canonical,
         SchemaTypeInterface $schema,
         SchemaContext $context,
+        array $blockNodes = [],
     ): array {
         $objects = [];
 
@@ -282,6 +255,10 @@ class SeoResolver
             $objects[] = $node;
         }
 
+        foreach ($blockNodes as $node) {
+            $objects[] = $node;
+        }
+
         $identity = $this->identity();
 
         if ($identity !== null) {
@@ -291,19 +268,14 @@ class SeoResolver
         return $objects;
     }
 
-    /** Shared by the identity node and the Article author so both name the same entity. */
-    private function identityName(): string
-    {
-        $name = (string) $this->settings->get('seo.identity.name', '');
-
-        return $name !== '' ? $name : (string) $this->settings->get('site.name', '');
-    }
-
     /** @return array<string, mixed>|null */
     private function identity(): ?array
     {
         $type = (string) $this->settings->get('seo.identity.type', 'none');
-        $name = $this->identityName();
+        // Shared with SchemaContextFactory::identityAuthor() via the same
+        // method, so the identity node and the Article author name the same
+        // entity.
+        $name = $this->factory->identityName();
 
         // The Identity tab no longer exposes name/logo fields directly, so
         // both fall back to the site's own identity — a saved seo.identity.*
@@ -566,177 +538,36 @@ class SeoResolver
         return trim((string) $trimmed);
     }
 
-    /** @param array<string, mixed> $seo */
-    private function canonical(Page $page, array $seo, string $locale): string
-    {
-        $override = $this->validCanonicalOverride($seo, $locale);
-
-        if ($override !== null) {
-            return $override;
-        }
-
-        return url($this->url->build((string) $page->pathFor($locale), $locale));
-    }
-
     /**
-     * The stored override for this locale, or null when there isn't one or it
-     * doesn't survive validation. Public because SitemapEntryBuilder needs the
-     * exact same "is this a usable override" answer to decide whether a locale
-     * has a non-self canonical pointing elsewhere — duplicating the check
-     * there would let the two drift.
-     *
-     * Re-validated here rather than trusted from the stored value: the form
-     * rule only covers what an editor types going forward (see
-     * PageForm::seoFields()), but a row can carry a value written before the
-     * rule existed, saved via a legacy scalar format, or written straight to
-     * the database. A scheme other than http/https (a stray `javascript:` or
-     * `mailto:`) is worse than no override at all, so it is treated as absent
-     * rather than published as-is.
+     * Delegates to SchemaContextFactory: SitemapEntryBuilder needs the exact
+     * same "is this a usable override" answer to decide whether a locale has
+     * a non-self canonical pointing elsewhere, and the factory is the one
+     * place that computation lives.
      *
      * @param  array<string, mixed>  $seo
      */
     public function validCanonicalOverride(array $seo, string $locale): ?string
     {
-        $override = LocalizedSeo::value($seo['canonical'] ?? null, $locale);
-
-        if ($override === '') {
-            return null;
-        }
-
-        // Scheme alone is not enough: parse_url('http:foo') yields a scheme
-        // but no host, and such a value is not an absolute URL a crawler can
-        // follow — require a non-empty host too before trusting the override.
-        $parts = parse_url($override);
-
-        if ($parts === false) {
-            return null;
-        }
-
-        $scheme = mb_strtolower($parts['scheme'] ?? '');
-        $host = $parts['host'] ?? '';
-
-        return in_array($scheme, ['http', 'https'], true) && $host !== ''
-            ? $override
-            : null;
+        return $this->factory->validCanonicalOverride($seo, $locale);
     }
 
     /**
-     * og_image, page.image, and seo.default_og_image are all $s->media()
-     * fields — each stores a media id, not a URL, so all three go through
-     * the same id-to-url resolver. Fallback order: the page's explicit
-     * og_image override, then the page's own image, then the global default.
-     * og_image itself is NOT translatable (see PageForm::seoFields()) — an
-     * image isn't per-locale, so it's read as a plain scalar.
-     *
-     * Returns alt/mime alongside the URL — og:image:alt and og:image:type
-     * must follow whichever image actually resolved (override, own, or
-     * global default), and MediaUrlResolver::details() is the one query that
-     * already has both on hand.
-     *
-     * @param  array<string, mixed>  $seo
-     * @return array{url: string, alt: string|null, mime: string|null}|null
-     */
-    private function ogImageDetails(Page $page, array $seo): ?array
-    {
-        // A page that named an image has made its choice, and a broken id is
-        // still that choice — falling through to the site default here would
-        // quietly publish a different image than the one the editor picked,
-        // which is worse than publishing none.
-        if (self::namesAnImage($page, $seo)) {
-            return $this->ownImageDetails($page, $seo);
-        }
-
-        $global = $this->settings->get('seo.default_og_image');
-
-        return is_string($global) && $global !== '' ? $this->imageDetails($global) : null;
-    }
-
-    /** @param  array<string, mixed>  $seo */
-    private static function namesAnImage(Page $page, array $seo): bool
-    {
-        return PageOwnSeo::namesImage($page, $seo);
-    }
-
-    /**
-     * The image this page carries itself, with no site-wide fallback.
-     *
-     * Public because the sitemap needs exactly this and not ogImageDetails():
-     * the global default exists so a share card is never blank, but listing
-     * it against every URL in the sitemap would tell a crawler the same
-     * image belongs to the whole site. A page with no image of its own is
-     * better listed with none.
+     * Delegates to SchemaContextFactory. Public because the sitemap needs
+     * exactly the page's own image, with no site-wide fallback — listing the
+     * global default against every sitemap URL would claim one image
+     * belongs to the whole site.
      *
      * @param  array<string, mixed>  $seo
      */
     public function ownImage(Page $page, array $seo): ?string
     {
-        return $this->ownImageDetails($page, $seo)['url'] ?? null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $seo
-     * @return array{url: string, alt: string|null, mime: string|null}|null
-     */
-    private function ownImageDetails(Page $page, array $seo): ?array
-    {
-        $override = $seo['og_image'] ?? null;
-
-        if (is_string($override) && $override !== '') {
-            return $this->imageDetails($override);
-        }
-
-        if ($page->image !== null && $page->image !== '') {
-            return $this->imageDetails($page->image);
-        }
-
-        return null;
-    }
-
-    /**
-     * The one place a media id becomes an og:image URL + alt + mime. Mime is
-     * dropped (not merely nulled) unless it starts with `image/` — the
-     * library also stores PDFs and similar, and a non-image mime published
-     * as og:image:type is worse than omitting the tag entirely.
-     *
-     * @return array{url: string, alt: string|null, mime: string|null}|null
-     */
-    private function imageDetails(string $id): ?array
-    {
-        $details = $this->mediaUrlResolver->details($id);
-
-        if ($details === null) {
-            return null;
-        }
-
-        $url = AbsoluteUrl::make($details['url']);
-
-        if ($url === null) {
-            return null;
-        }
-
-        return [
-            'url' => $url,
-            'alt' => $details['alt'] !== null && $details['alt'] !== '' ? $details['alt'] : null,
-            'mime' => str_starts_with($details['mime'], 'image/') ? $details['mime'] : null,
-        ];
+        return $this->factory->ownImage($page, $seo);
     }
 
     /** @param array<string, mixed> $seo */
     private function description(Page $page, array $seo, string $locale): string
     {
-        $override = LocalizedSeo::value($seo['description'] ?? null, $locale);
-
-        if ($override !== '') {
-            return $override;
-        }
-
-        $summary = (string) $page->getTranslation('summary', $locale);
-
-        if ($summary !== '') {
-            return $summary;
-        }
-
-        return LocalizedSeo::value($this->settings->get('seo.default_description', ''), $locale);
+        return $this->factory->description($page, $seo, $locale);
     }
 
     /**
