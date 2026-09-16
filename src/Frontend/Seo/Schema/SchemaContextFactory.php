@@ -31,14 +31,38 @@ final class SchemaContextFactory
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
+    public function make(Page $page, string $locale, ?object $source = null): SchemaContext
+    {
+        $seo = is_array($page->seo) ? $page->seo : [];
+
+        return $this->makeFromDetails($page, $locale, $seo, $source, $this->ogImageDetails($page, $seo));
+    }
+
+    /**
+     * SeoResolver already needs a full ogImageDetails() call of its own (for
+     * alt/mime, which SchemaContext doesn't carry) whenever it builds its
+     * own context — this lets it pass that result through instead of paying
+     * for the media lookup a second time.
+     *
+     * @param  array{url: string, alt: string|null, mime: string|null}|null  $ogImageDetails
+     */
+    public function makeWithImageDetails(Page $page, string $locale, ?array $ogImageDetails): SchemaContext
+    {
+        $seo = is_array($page->seo) ? $page->seo : [];
+
+        return $this->makeFromDetails($page, $locale, $seo, null, $ogImageDetails);
+    }
+
     /**
      * $source is the page type's source() result; pass it when the caller
      * already paid for that call so this doesn't fetch it twice. Left null,
      * a source-backed type's source() is fetched here instead.
+     *
+     * @param  array<string, mixed>  $seo
+     * @param  array{url: string, alt: string|null, mime: string|null}|null  $ogImageDetails
      */
-    public function make(Page $page, string $locale, ?object $source = null): SchemaContext
+    private function makeFromDetails(Page $page, string $locale, array $seo, ?object $source, ?array $ogImageDetails): SchemaContext
     {
-        $seo = is_array($page->seo) ? $page->seo : [];
         $metaTitle = PageOwnSeo::title($page, $seo, $locale);
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
         $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale)
@@ -61,7 +85,7 @@ final class SchemaContextFactory
             name: $currentLabel !== '' ? $currentLabel : $ogTitle,
             description: $ogDescription,
             url: $this->canonical($page, $seo, $locale),
-            image: $this->ogImageDetails($page, $seo)['url'] ?? null,
+            image: $ogImageDetails['url'] ?? null,
             author: $this->identityAuthor(),
         );
     }

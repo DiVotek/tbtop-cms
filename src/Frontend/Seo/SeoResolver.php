@@ -97,7 +97,7 @@ class SeoResolver
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
         $schema = $this->schemaSelector->selectFor($page);
-        $context = $ctx ?? $this->factory->make($page, $locale);
+        $context = $ctx ?? $this->factory->makeWithImageDetails($page, $locale, $image);
         $og = $schema->openGraph($context);
 
         return [
