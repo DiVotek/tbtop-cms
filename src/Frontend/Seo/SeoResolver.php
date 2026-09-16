@@ -160,7 +160,7 @@ class SeoResolver
     private function identityAuthor(): ?array
     {
         $type = (string) $this->settings->get('seo.identity.type', 'none');
-        $name = (string) $this->settings->get('seo.identity.name', '');
+        $name = $this->identityName();
 
         if ($name === '') {
             return null;
@@ -291,15 +291,24 @@ class SeoResolver
         return $objects;
     }
 
+    /**
+     * The one effective-name rule for every identity consumer: the JSON-LD
+     * Organization/Person node and the Article author must name the same
+     * entity, or a site whose identity relies on the site.name fallback
+     * publishes an identity but no author.
+     */
+    private function identityName(): string
+    {
+        $name = (string) $this->settings->get('seo.identity.name', '');
+
+        return $name !== '' ? $name : (string) $this->settings->get('site.name', '');
+    }
+
     /** @return array<string, mixed>|null */
     private function identity(): ?array
     {
         $type = (string) $this->settings->get('seo.identity.type', 'none');
-        $name = (string) $this->settings->get('seo.identity.name', '');
-
-        if ($name === '') {
-            $name = (string) $this->settings->get('site.name', '');
-        }
+        $name = $this->identityName();
 
         // The Identity tab no longer exposes name/logo fields directly, so
         // both fall back to the site's own identity — a saved seo.identity.*
