@@ -16,6 +16,9 @@ use Tbtop\Cms\Frontend\Seo\Schema\Types\WebPage;
 
 class SchemaTypeRegistry
 {
+    /** The key every fallback site (an unregistered page type, or a page type declaring no schemaTypes()) resolves to. */
+    public const string FALLBACK_KEY = 'WebPage';
+
     /** @var list<callable(): list<class-string>> */
     private static array $extensions = [];
 

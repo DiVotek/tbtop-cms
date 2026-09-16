@@ -178,13 +178,21 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    `name`/`description`/`url`/`image` inputs the rendered head tags use,
    and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
    derived from the site identity settings, null when the identity type is
-   `none` or the name is empty). `SchemaContext::node(string $type): array`
-   is the standard node every built-in starts from —
-   `@context`/`@type`/`name`/`url` always, `description`/`image` if
-   non-empty, `datePublished`/`dateModified` from `publishedAt()`/
-   `modifiedAt()`. `publishedAt(): ?string` is gated on
-   `published_at !== null && isLive()`; `modifiedAt(): ?string` is
-   unconditional on `updated_at`.
+   `none` or the name is empty — `SeoResolver` always supplies this
+   argument). `SchemaContext::baseNode(string $type): array` is the
+   standard node every built-in starts from — `@context`/`@type`/`name`/
+   `url` always, `description`/`image` if non-empty, `datePublished`/
+   `dateModified` from `publishedAt()`/`modifiedAt()`. `publishedAt(): ?string`
+   is gated on `published_at !== null && isLive()`; `modifiedAt(): ?string`
+   is unconditional on `updated_at`.
+
+   A host adds a schema type by extending `SchemaType`
+   (`Frontend/Seo/Schema/SchemaType.php`), not by implementing
+   `SchemaTypeInterface` directly — same convention as `Block`. Required:
+   `key()`, `build(SchemaContext $ctx): list<array<string,mixed>>`.
+   Overridable, with defaults that fit most types: `label()` (defaults to
+   `Str::headline($this->key())`) and `openGraph(SchemaContext $ctx): OpenGraph`
+   (defaults to `OpenGraph::website()`).
 
    `SchemaTypeInterface::openGraph(SchemaContext $ctx): OpenGraph` drives
    `SeoResolver::resolve()`'s `ogType`/`articlePublishedTime`/
@@ -200,9 +208,9 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    `article` with `publishedTime`/`modifiedTime`/`author` from the context,
    node adds `mainEntityOfPage` and, when `$ctx->author` is set, `author`);
    `CollectionPage` (`hasPart` listing up to 100 live, indexable children,
-   one query spent only for categories, `openGraph()` returns
-   `OpenGraph::website()`). A host adds a class implementing
-   `SchemaTypeInterface` via `config('tbtop-cms.seo.schema_types')` or
+   one query spent only for categories, `openGraph()` inherits
+   `SchemaType`'s `OpenGraph::website()` default). A host adds a class
+   extending `SchemaType` via `config('tbtop-cms.seo.schema_types')` or
    `SchemaTypeRegistry::extend()` (package convention, same before-boot
    timing as `PageTypeRegistry`).
 

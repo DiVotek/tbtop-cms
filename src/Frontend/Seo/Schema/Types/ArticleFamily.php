@@ -6,20 +6,15 @@ namespace Tbtop\Cms\Frontend\Seo\Schema\Types;
 
 use Tbtop\Cms\Frontend\Seo\Schema\OpenGraph;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
-use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeInterface;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaType;
 
 /**
  * `author` is not filled in here: it comes from the site identity settings,
  * not per-page data, so SchemaContext::$author carries it in — the one place
  * that already parses identity.
  */
-abstract class ArticleFamily implements SchemaTypeInterface
+abstract class ArticleFamily extends SchemaType
 {
-    public function label(): string
-    {
-        return __('tbtop-cms::pages.schema_type.' . $this->key());
-    }
-
     public function openGraph(SchemaContext $ctx): OpenGraph
     {
         return new OpenGraph(
@@ -34,7 +29,7 @@ abstract class ArticleFamily implements SchemaTypeInterface
     public function build(SchemaContext $ctx): array
     {
         $node = [
-            ...$ctx->node($this->key()),
+            ...$ctx->baseNode($this->key()),
             'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $ctx->url],
         ];
 

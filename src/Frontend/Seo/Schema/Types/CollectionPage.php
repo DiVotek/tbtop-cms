@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo\Schema\Types;
 
-use Tbtop\Cms\Frontend\Seo\Schema\OpenGraph;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
-use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeInterface;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaType;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageUrl;
 
-class CollectionPage implements SchemaTypeInterface
+class CollectionPage extends SchemaType
 {
     /**
      * How many children a CollectionPage advertises in hasPart. Sized to a
@@ -32,15 +31,10 @@ class CollectionPage implements SchemaTypeInterface
         return __('tbtop-cms::pages.schema_type.' . $this->key());
     }
 
-    public function openGraph(SchemaContext $ctx): OpenGraph
-    {
-        return OpenGraph::website();
-    }
-
     /** @return list<array<string, mixed>> */
     public function build(SchemaContext $ctx): array
     {
-        $node = $ctx->node($this->key());
+        $node = $ctx->baseNode($this->key());
         $parts = $this->parts($ctx->page, $ctx->locale);
 
         if ($parts !== []) {

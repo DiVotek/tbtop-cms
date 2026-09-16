@@ -22,17 +22,11 @@ final readonly class SchemaContext
         public string $description,
         public string $url,
         public ?string $image,
-        public ?array $author = null,
+        public ?array $author,
     ) {}
 
-    /**
-     * datePublished is gated on isLive(), not merely on published_at being
-     * set: a draft or expired page reached through admin preview must not
-     * advertise a publication date for something the public cannot see.
-     *
-     * @return array<string, mixed>
-     */
-    public function node(string $type): array
+    /** @return array<string, mixed> */
+    public function baseNode(string $type): array
     {
         $node = [
             '@context' => 'https://schema.org',

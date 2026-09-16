@@ -533,7 +533,7 @@ class SeoResolver
 
     /**
      * Gated on isLive() rather than on published_at alone, same rule
-     * SchemaContext::node() applies: a draft or expired page reached through
+     * SchemaContext::baseNode() applies: a draft or expired page reached through
      * admin preview must not stamp a publication date into its title.
      *
      * Formatted through ->locale($locale) rather than Carbon's ambient locale.

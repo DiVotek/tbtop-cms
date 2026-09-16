@@ -96,7 +96,7 @@ it('omits article:published_time for a draft article, even reached through admin
 
     // A draft 404s for an anonymous visitor (see PagePreviewTest.php), so the
     // isLive() gate on articlePublishedTime can only be exercised through
-    // admin preview access — the same route that reaches SchemaContext::node()'s
+    // admin preview access — the same route that reaches SchemaContext::baseNode()'s
     // matching gate.
     $this->actingAs($user, 'web')
         ->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])

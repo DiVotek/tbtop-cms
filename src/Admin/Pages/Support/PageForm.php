@@ -8,6 +8,7 @@ use Carbon\Exceptions\InvalidFormatException;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
@@ -232,7 +233,8 @@ class PageForm
 
         return [
             $s->section(['title' => __('tbtop-cms::pages.sections.schema')], [
-                $s->select('schema_type')->label(__('tbtop-cms::pages.fields.schema_type'))->options($options),
+                $s->select('schema_type')->label(__('tbtop-cms::pages.fields.schema_type'))->options($options)
+                    ->rules(['nullable', Rule::in($keys)]),
             ]),
         ];
     }
@@ -630,6 +632,9 @@ class PageForm
      * rather than written as an empty array — SchemaSelector reads a
      * missing key and an unknown one identically (falls back to the type's
      * default), so an empty bag would only add noise to every row's JSON.
+     * A page type change after this was saved can leave a stale
+     * `seo.schema.type` outside the new type's schemaTypes() — SchemaSelector
+     * simply ignores it and falls back to the default.
      *
      * @param  array<string, mixed>  $form
      * @return array{title: array<string, string>, description: array<string, string>, focus_keyword: array<string, string>, og_title: array<string, string>, og_description: array<string, string>, og_image: string, canonical: array<string, string>, schema?: array{type: string}}

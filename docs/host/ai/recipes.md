@@ -286,9 +286,9 @@ header/footer are, only from each page's own content editor.
 
 ### Appending nodes to the package's JSON-LD graph
 
-The page's own schema.org node type IS extendable — a host class
-implementing `Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeInterface`, registered
-via `config('tbtop-cms.seo.schema_types')` or `SchemaTypeRegistry::extend()`
+The page's own schema.org node type IS extendable — a host class extending
+`Tbtop\Cms\Frontend\Seo\Schema\SchemaType`, registered via
+`config('tbtop-cms.seo.schema_types')` or `SchemaTypeRegistry::extend()`
 (see seo.md), can add a new key to the `schema_type` picker. What is still
 not possible is *appending extra nodes on top of* the one the registry
 already produces — `WebSite`/`BreadcrumbList`/identity plus one page node is
