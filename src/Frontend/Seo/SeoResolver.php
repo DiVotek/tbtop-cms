@@ -92,9 +92,22 @@ class SeoResolver
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
         $schema = $this->schemaSelector->selectFor($page);
-        $ogType = $schema->ogType();
-        $isArticle = $ogType === 'article';
-        $identityAuthor = $this->identityAuthor();
+        // The UNtemplated title/description (same base og: falls back to): a
+        // schema `name` should be the thing's name, not the browser-tab
+        // string with the site name appended.
+        $currentLabel = (string) $page->getTranslation('title', $locale, false)
+            ?: (string) $page->getTranslation('name', $locale, false);
+        $context = new SchemaContext(
+            page: $page,
+            locale: $locale,
+            source: $this->pageTypes->has($page->type) ? $this->pageTypes->get($page->type)->source($page) : null,
+            name: $currentLabel !== '' ? $currentLabel : $ogTitle,
+            description: $ogDescription,
+            url: $canonical,
+            image: $ogImage,
+            author: $this->identityAuthor(),
+        );
+        $og = $schema->openGraph($context);
 
         return [
             'title' => $this->title($page, $metaTitle, $locale, $breadcrumbs),
@@ -107,13 +120,13 @@ class SeoResolver
             'ogDescription' => $ogDescription,
             'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),
             'siteName' => $siteName,
-            'ogType' => $ogType ?? 'website',
+            'ogType' => $og->type,
             'ogUrl' => $canonical,
             'ogLocale' => $locale,
             'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
-            'articlePublishedTime' => $isArticle ? $this->articlePublishedTime($page) : null,
-            'articleModifiedTime' => $isArticle ? $this->articleModifiedTime($page) : null,
-            'articleAuthor' => $isArticle ? $identityAuthor['name'] : null,
+            'articlePublishedTime' => $og->publishedTime,
+            'articleModifiedTime' => $og->modifiedTime,
+            'articleAuthor' => $og->author,
             'twitterCard' => $this->twitterCard($ogImage),
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
@@ -130,32 +143,11 @@ class SeoResolver
                 $locale,
                 $siteName,
                 $ogTitle,
-                $ogDescription,
                 $canonical,
-                $ogImage,
                 $schema,
-                $identityAuthor,
+                $context,
             ),
         ];
-    }
-
-    /**
-     * Mirrors SchemaContext::node()'s datePublished gate exactly: a draft or
-     * expired page reached through admin preview must not advertise a
-     * publication date via article:published_time either. Keep the two in
-     * sync if this rule ever changes.
-     */
-    private function articlePublishedTime(Page $page): ?string
-    {
-        return $page->published_at !== null && $page->isLive()
-            ? $page->published_at->toIso8601String()
-            : null;
-    }
-
-    /** Mirrors SchemaContext::node()'s dateModified — unconditional, unlike published. */
-    private function articleModifiedTime(Page $page): ?string
-    {
-        return $page->updated_at?->toIso8601String();
     }
 
     /**
@@ -163,21 +155,21 @@ class SeoResolver
      * the same site identity settings, not per-page data — reuses identity()'s
      * own type/name parsing so the organization/person mapping exists once.
      *
-     * @return array{node: array<string, mixed>|null, name: string|null}
+     * @return array{'@type': string, name: string}|null
      */
-    private function identityAuthor(): array
+    private function identityAuthor(): ?array
     {
         $type = (string) $this->settings->get('seo.identity.type', 'none');
         $name = (string) $this->settings->get('seo.identity.name', '');
 
         if ($name === '') {
-            return ['node' => null, 'name' => null];
+            return null;
         }
 
         return match ($type) {
-            'organization' => ['node' => ['@type' => 'Organization', 'name' => $name], 'name' => $name],
-            'person' => ['node' => ['@type' => 'Person', 'name' => $name], 'name' => $name],
-            default => ['node' => null, 'name' => null],
+            'organization' => ['@type' => 'Organization', 'name' => $name],
+            'person' => ['@type' => 'Person', 'name' => $name],
+            default => null,
         };
     }
 
@@ -250,20 +242,15 @@ class SeoResolver
         return is_string($id) && $id !== '' ? $this->mediaUrlResolver->resolve($id) : null;
     }
 
-    /**
-     * @param  array{node: array<string, mixed>|null, name: string|null}  $identityAuthor
-     * @return list<array<string, mixed>>
-     */
+    /** @return list<array<string, mixed>> */
     private function jsonLd(
         Page $page,
         string $locale,
         string $siteName,
         string $ogTitle,
-        string $ogDescription,
         string $canonical,
-        ?string $ogImage,
         SchemaTypeInterface $schema,
-        array $identityAuthor,
+        SchemaContext $context,
     ): array {
         $objects = [];
 
@@ -291,24 +278,7 @@ class SeoResolver
             $objects[] = $breadcrumbList;
         }
 
-        $context = new SchemaContext(
-            page: $page,
-            locale: $locale,
-            source: $this->pageTypes->has($page->type) ? $this->pageTypes->get($page->type)->source($page) : null,
-            // The UNtemplated title/description (same base og: falls back
-            // to): a schema `name` should be the thing's name, not the
-            // browser-tab string with the site name appended.
-            name: $currentLabel !== '' ? $currentLabel : $ogTitle,
-            description: $ogDescription,
-            url: $canonical,
-            image: $ogImage,
-        );
-
         foreach ($schema->build($context) as $node) {
-            if ($schema->ogType() === 'article' && $identityAuthor['node'] !== null) {
-                $node['author'] = $identityAuthor['node'];
-            }
-
             $objects[] = $node;
         }
 

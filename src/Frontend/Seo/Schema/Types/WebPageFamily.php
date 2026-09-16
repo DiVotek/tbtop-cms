@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo\Schema\Types;
 
+use Tbtop\Cms\Frontend\Seo\Schema\OpenGraph;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeInterface;
 
@@ -15,9 +16,9 @@ abstract class WebPageFamily implements SchemaTypeInterface
         return __('tbtop-cms::pages.schema_type.' . $this->key());
     }
 
-    public function ogType(): ?string
+    public function openGraph(SchemaContext $ctx): OpenGraph
     {
-        return null;
+        return OpenGraph::website();
     }
 
     /** @return list<array<string, mixed>> */

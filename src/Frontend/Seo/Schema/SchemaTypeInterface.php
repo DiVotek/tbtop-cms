@@ -11,8 +11,7 @@ interface SchemaTypeInterface
 
     public function label(): string;
 
-    /** Open Graph og:type; null means 'website'. */
-    public function ogType(): ?string;
+    public function openGraph(SchemaContext $ctx): OpenGraph;
 
     /** @return list<array<string, mixed>> */
     public function build(SchemaContext $ctx): array;

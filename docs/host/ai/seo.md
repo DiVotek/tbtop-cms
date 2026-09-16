@@ -171,33 +171,48 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
      via `SchemaTypeRegistry::get()`, which throws on an unknown key
      (host misconfiguration surfaces, no silent fallback).
 
-   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built by
-   `SeoResolver::jsonLd()`) carries `page`, `locale`, `source` (the page
-   type's `source()`, null for content-only types), and the same
-   `name`/`description`/`url`/`image` inputs the rendered head tags use.
-   `SchemaContext::node(string $type): array` is the standard node every
-   built-in starts from — `@context`/`@type`/`name`/`url` always,
-   `description`/`image` if non-empty, `datePublished` gated on
-   `published_at !== null && isLive()`, `dateModified` unconditional.
-   `SchemaTypeInterface::ogType(): ?string` drives `SeoResolver::resolve()`'s
-   `ogType`/`articlePublishedTime`/`articleModifiedTime` (`'article'` for the
-   Article family, `null` → rendered as `'website'` for everything else) —
-   `page->type === 'article'` is no longer the check.
+   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once by
+   `SeoResolver::resolve()` and reused for both `openGraph()` and
+   `build()`) carries `page`, `locale`, `source` (the page type's
+   `source()`, null for content-only types), the same
+   `name`/`description`/`url`/`image` inputs the rendered head tags use,
+   and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
+   derived from the site identity settings, null when the identity type is
+   `none` or the name is empty). `SchemaContext::node(string $type): array`
+   is the standard node every built-in starts from —
+   `@context`/`@type`/`name`/`url` always, `description`/`image` if
+   non-empty, `datePublished`/`dateModified` from `publishedAt()`/
+   `modifiedAt()`. `publishedAt(): ?string` is gated on
+   `published_at !== null && isLive()`; `modifiedAt(): ?string` is
+   unconditional on `updated_at`.
+
+   `SchemaTypeInterface::openGraph(SchemaContext $ctx): OpenGraph` drives
+   `SeoResolver::resolve()`'s `ogType`/`articlePublishedTime`/
+   `articleModifiedTime`/`articleAuthor`. `OpenGraph`
+   (`Frontend/Seo/Schema/OpenGraph.php`) is a value object with `type`,
+   `publishedTime`, `modifiedTime`, `author` (`OpenGraph::website()` sets
+   `type` to `'website'` and leaves the rest null) — `page->type === 'article'`
+   is not the check, each schema class owns its own Open Graph mapping.
 
    Built-ins: `WebPage`/`AboutPage`/`ContactPage`/`ItemPage` (plain node, no
-   OG article semantics); `Article`/`NewsArticle`/`BlogPosting` (`ogType()`
-   `'article'`, node adds `mainEntityOfPage`); `CollectionPage` (`hasPart`
-   listing up to 100 live, indexable children, one query spent only for
-   categories). A host adds a class implementing `SchemaTypeInterface` via
-   `config('tbtop-cms.seo.schema_types')` or `SchemaTypeRegistry::extend()`
-   (package convention, same before-boot timing as `PageTypeRegistry`).
+   OG article semantics, `openGraph()` returns `OpenGraph::website()`);
+   `Article`/`NewsArticle`/`BlogPosting` (`openGraph()` returns type
+   `article` with `publishedTime`/`modifiedTime`/`author` from the context,
+   node adds `mainEntityOfPage` and, when `$ctx->author` is set, `author`);
+   `CollectionPage` (`hasPart` listing up to 100 live, indexable children,
+   one query spent only for categories, `openGraph()` returns
+   `OpenGraph::website()`). A host adds a class implementing
+   `SchemaTypeInterface` via `config('tbtop-cms.seo.schema_types')` or
+   `SchemaTypeRegistry::extend()` (package convention, same before-boot
+   timing as `PageTypeRegistry`).
 
-   **Article author**: not a per-page field any more. `SeoResolver` derives
-   both the Article node's `author` and `articleAuthor`/`article:author`
-   from the site identity settings (`seo.identity.type` + `.name`):
-   `organization` → `{"@type":"Organization","name":...}`, `person` →
-   `Person`, `none` or an empty name → no author at all. This is the exact
-   type mapping `JsonLd::identity()` already applies to the standalone
+   **Article author**: not a per-page field any more. `SchemaContext::$author`
+   and, through it, the Article node's `author` and
+   `articleAuthor`/`article:author` all come from the site identity settings
+   (`seo.identity.type` + `.name`): `organization` →
+   `{"@type":"Organization","name":...}`, `person` → `Person`, `none` or an
+   empty name → no author at all. This is the exact type mapping
+   `JsonLd::identity()` already applies to the standalone
    identity node (below) — the two are meant to name the same entity.
 
    Removed with no migration of stored data: `ProfilePage` and its

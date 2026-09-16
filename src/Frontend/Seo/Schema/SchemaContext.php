@@ -13,6 +13,7 @@ use Tbtop\Cms\Page\Models\Page;
  */
 final readonly class SchemaContext
 {
+    /** @param  array{'@type': string, name: string}|null  $author */
     public function __construct(
         public Page $page,
         public string $locale,
@@ -21,6 +22,7 @@ final readonly class SchemaContext
         public string $description,
         public string $url,
         public ?string $image,
+        public ?array $author = null,
     ) {}
 
     /**
@@ -47,14 +49,31 @@ final readonly class SchemaContext
             $node['image'] = $this->image;
         }
 
-        if ($this->page->published_at !== null && $this->page->isLive()) {
-            $node['datePublished'] = $this->page->published_at->toIso8601String();
+        if ($this->publishedAt() !== null) {
+            $node['datePublished'] = $this->publishedAt();
         }
 
-        if ($this->page->updated_at !== null) {
-            $node['dateModified'] = $this->page->updated_at->toIso8601String();
+        if ($this->modifiedAt() !== null) {
+            $node['dateModified'] = $this->modifiedAt();
         }
 
         return $node;
+    }
+
+    /**
+     * Gated on isLive(), not merely on published_at being set: a draft or
+     * expired page reached through admin preview must not advertise a
+     * publication date for something the public cannot see.
+     */
+    public function publishedAt(): ?string
+    {
+        return $this->page->published_at !== null && $this->page->isLive()
+            ? $this->page->published_at->toIso8601String()
+            : null;
+    }
+
+    public function modifiedAt(): ?string
+    {
+        return $this->page->updated_at?->toIso8601String();
     }
 }
