@@ -74,6 +74,10 @@ Overridable, all with sane defaults:
   block's translatable set can't be read off its own form — the default is
   right for the overwhelming majority of blocks and is exercised directly by
   `tests/Block/TranslatableFieldsTest.php`.
+- **`toSchema(array $props, SchemaContext $ctx): ?array`** — this block's own
+  schema.org node for the page's `seo.jsonLd`, or `null` (default) to
+  publish nothing. Full contract, node placement, and examples (FAQPage,
+  VideoObject) are in [seo.md](./seo.md#structured-data-json-ld).
 
 ## `ResolveContext`
 

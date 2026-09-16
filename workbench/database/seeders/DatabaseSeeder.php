@@ -57,6 +57,24 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'id' => (string) Str::ulid(),
+                'kind' => 'faq',
+                'active' => true,
+                'data' => [
+                    'heading' => ['en' => 'Frequently asked questions'],
+                    'items' => [
+                        [
+                            'question' => ['en' => 'What is tbtop/cms?'],
+                            'answer' => ['en' => 'A minimal CMS core for Laravel, rendered through json-render.'],
+                        ],
+                        [
+                            'question' => ['en' => 'Does this FAQ publish structured data?'],
+                            'answer' => ['en' => 'Yes — FaqBlock::toSchema() publishes a FAQPage node.'],
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'id' => (string) Str::ulid(),
                 'kind' => 'ContactForm',
                 'active' => true,
                 'data' => [

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\Blocks\HeroBlock;
+use Workbench\App\Blocks\FaqBlock;
 use Workbench\App\Http\Middleware\AutoLoginAdmin;
 use Workbench\App\Models\User;
 
@@ -21,7 +22,7 @@ class WorkbenchServiceProvider extends ServiceProvider
     public function boot(): void
     {
         view()->addLocation(__DIR__ . '/../../resources/views');
-        config(['tbtop-cms.blocks.types' => [HeroBlock::class, ContactForm::class]]);
+        config(['tbtop-cms.blocks.types' => [HeroBlock::class, ContactForm::class, FaqBlock::class]]);
 
         if ($this->app->runningUnitTests()) {
             return;

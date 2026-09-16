@@ -11,14 +11,22 @@ assumes that wiring exists and describes what it produces.
 
 ## The `seo` prop and how it is resolved
 
-`SeoResolver::resolve(Page $page, string $locale, array $breadcrumbs = [])`
-is the single source of truth for the `seo` prop shared with every CMS page
-response. It returns one flat array — title, description, canonical, image
-fields, OG/Twitter fields, article fields, `alternates`, `xDefault`,
-`favicon`, verification tokens, and `jsonLd`. Nothing else in the package
-re-derives these values for rendering; `SeoChecklist` and `SeoAudit`
-re-derive only the *cheap* cascades (via `PageOwnSeo`) to avoid paying for a
-full `resolve()` per page in a loop.
+`SeoResolver::resolve(Page $page, string $locale, array $breadcrumbs = [],
+?SchemaContext $ctx = null, array $blockNodes = [])` is the single source of
+truth for the `seo` prop shared with every CMS page response. It returns one
+flat array — title, description, canonical, image fields, OG/Twitter fields,
+article fields, `alternates`, `xDefault`, `favicon`, verification tokens, and
+`jsonLd`. Nothing else in the package re-derives these values for rendering;
+`SeoChecklist` and `SeoAudit` re-derive only the *cheap* cascades (via
+`PageOwnSeo`) to avoid paying for a full `resolve()` per page in a loop.
+
+`$ctx` and `$blockNodes` exist for `Block::toSchema()` (below): a caller that
+already built a `SchemaContext` (`PageController` does, to resolve block
+schema against the same context this call publishes) passes it in so
+`resolve()` doesn't rebuild an equivalent one; `$blockNodes` are ready
+JSON-LD nodes appended into `jsonLd`. Both default to the pre-existing
+behavior — every other caller (`ErrorResponse`, `SitemapEntryBuilder`) is
+unaffected.
 
 Field-by-field:
 
@@ -171,11 +179,13 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
      via `SchemaTypeRegistry::get()`, which throws on an unknown key
      (host misconfiguration surfaces, no silent fallback).
 
-   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once by
-   `SeoResolver::resolve()` and reused for both `openGraph()` and
-   `build()`) carries `page`, `locale`, `source` (the page type's
+   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once per render by
+   `SchemaContextFactory::make()` and reused by `openGraph()`, `build()` and
+   every block's `toSchema()`) carries `page`, `locale`, `source` (the page type's
    `source()`, null for content-only types), the same
-   `name`/`description`/`url`/`image` inputs the rendered head tags use,
+   `name`/`description`/`url`/`image` inputs the rendered head tags use
+   (plus `imageAlt`/`imageMime` for the og: tags, so the media lookup runs
+   once),
    and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
    derived from the site identity settings, null when the identity type is
    `none` or the name is empty — `SeoResolver` always supplies this
@@ -229,7 +239,78 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    WebPage family, via `schemaTypes()` + the `schema_type` select), and
    `schema.author`. A row's stale `seo.schema.*` keys from before this
    change are simply ignored.
-4. **Identity** (`JsonLd::identity()`) — an `Organization` or `Person` node
+4. **Block-derived nodes** (`Block::toSchema()`) — zero or more nodes a
+   page's own blocks contribute, placed after the page type's node(s) and
+   before identity.
+
+   `Block::toSchema(array $props, SchemaContext $ctx): ?array` is a hook on
+   the abstract `Block` (`src/Block/Block.php`), default `return null;` —
+   most blocks have no structured-data opinion, and a null return is simply
+   dropped rather than published as an empty node. `$props` is this block's
+   already-resolved output, the same shape `resolve()` returns (absolute
+   media URLs, rendered richtext HTML) — not the raw envelope `data`.
+   `$ctx` is the same `SchemaContext` the page type's own node built from:
+   use `$ctx->url` for `mainEntityOfPage`, `$ctx->publishedAt()` /
+   `$ctx->modifiedAt()` for dates. Never read `request()` inside
+   `toSchema()` — nothing here guarantees an HTTP context.
+
+   `PageController` calls `toSchema()` once per resolved block (via
+   `BlockRegistry::get($block->kind)`) after block content resolution and
+   before `SeoResolver::resolve()`, collects the non-null results, and
+   passes them as `resolve()`'s `$blockNodes`. **Nested blocks are not
+   walked**: the package does not recurse into a container block's child
+   content, so a container block that wants its children's nodes in the
+   graph must collect them itself inside its own `toSchema()`.
+
+   FAQPage example (`workbench/app/Blocks/FaqBlock.php`, registered via
+   `config('tbtop-cms.blocks.types')`):
+
+   ```php
+   public function toSchema(array $props, SchemaContext $ctx): ?array
+   {
+       $mainEntity = [];
+       foreach ($props['items'] as $item) {
+           if (trim($item['question']) === '') {
+               continue;
+           }
+           $mainEntity[] = [
+               '@type' => 'Question',
+               'name' => $item['question'],
+               'acceptedAnswer' => ['@type' => 'Answer', 'text' => $item['answer']],
+           ];
+       }
+
+       return $mainEntity === [] ? null : [
+           '@context' => 'https://schema.org',
+           '@type' => 'FAQPage',
+           'mainEntityOfPage' => $ctx->url,
+           'mainEntity' => $mainEntity,
+       ];
+   }
+   ```
+
+   A VideoObject block reads its own resolved fields for `contentUrl`/
+   `thumbnailUrl` and falls `uploadDate` back to the context when the block
+   has no upload date of its own:
+
+   ```php
+   public function toSchema(array $props, SchemaContext $ctx): ?array
+   {
+       if ($props['videoUrl'] === null) {
+           return null;
+       }
+
+       return [
+           '@context' => 'https://schema.org',
+           '@type' => 'VideoObject',
+           'name' => $props['title'],
+           'contentUrl' => $props['videoUrl'],
+           'thumbnailUrl' => $props['thumbnail'],
+           'uploadDate' => $props['uploadDate'] ?? $ctx->publishedAt(),
+       ];
+   }
+   ```
+5. **Identity** (`JsonLd::identity()`) — an `Organization` or `Person` node
    from `seo.identity.*` settings (type/name/logo/sameAs), or nothing when
    `seo.identity.type` is `none`. Name and logo fall back to the site's own
    `site.name`/`site.logo` when no `seo.identity.name`/`seo.identity.logo`
