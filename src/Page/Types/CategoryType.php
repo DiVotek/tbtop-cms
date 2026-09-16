@@ -23,4 +23,11 @@ class CategoryType extends BasePageType
     {
         return 3;
     }
+
+    /** @return non-empty-list<string> */
+    #[\Override]
+    public function schemaTypes(): array
+    {
+        return ['CollectionPage'];
+    }
 }

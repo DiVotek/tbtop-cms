@@ -61,6 +61,8 @@ return [
         'strict' => false,
     ],
     'seo' => [
+        // Host schema.org node classes merged into SchemaTypeRegistry.
+        'schema_types' => [],
         // Extra paths robots.txt closes to crawlers, on top of the admin
         // prefix and /login the package owns. Read with an inline default —
         // published host configs override whole sections.

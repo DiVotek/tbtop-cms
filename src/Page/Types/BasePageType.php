@@ -46,4 +46,10 @@ abstract class BasePageType implements PageTypeInterface
     {
         return null;
     }
+
+    /** @return non-empty-list<string> */
+    public function schemaTypes(): array
+    {
+        return ['WebPage', 'AboutPage', 'ContactPage', 'ItemPage'];
+    }
 }

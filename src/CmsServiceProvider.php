@@ -43,6 +43,7 @@ use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Middleware\EnableSsr;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
 use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
@@ -146,6 +147,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->singleton(BlockRegistry::class);
         $this->app->singleton(RobotsRegistry::class);
+        $this->app->singleton(SchemaTypeRegistry::class);
         $this->app->scoped(BlockContentResolver::class);
         $this->app->scoped(LayoutResolver::class);
         $this->app->scoped(PageResolver::class);

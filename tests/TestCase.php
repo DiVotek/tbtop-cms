@@ -9,6 +9,7 @@ use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 class TestCase extends Orchestra
@@ -20,6 +21,7 @@ class TestCase extends Orchestra
         BlockRegistry::flushExtensions();
         PageTypeRegistry::flushExtensions();
         RobotsRegistry::flushExtensions();
+        SchemaTypeRegistry::flushExtensions();
 
         parent::setUp();
 

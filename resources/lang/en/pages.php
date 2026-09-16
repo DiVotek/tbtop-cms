@@ -109,37 +109,20 @@ return [
         'seo_canonical' => 'Canonical URL override',
         'seo_canonical_hint' => 'Advanced use only.',
         'image' => 'Image',
-        // The structured-data fields carry only what the page itself cannot
-        // supply: name, description, image and dates are filled in
-        // automatically (see PageSchema).
-        'schema_type' => 'Page kind',
-        'schema_type_hint' => 'What a search engine understands this page to be.',
-        'schema_article_type' => 'Article kind',
-        'schema_article_type_hint' => 'Only changes the label; the data published is the same.',
-        'schema_author' => 'Author',
-        'schema_author_hint' => 'Who wrote the text. Left empty, no author is published.',
-        'schema_profile_name' => 'Name',
-        'schema_profile_name_hint' => 'Required: without it the page stays an ordinary one.',
-        'schema_profile_alternate_name' => 'Alternate name',
-        'schema_profile_alternate_name_hint' => 'A handle, or another spelling of the name.',
-        'schema_profile_description' => 'About the person',
-        'schema_profile_description_hint' => 'Role or short bio. Left empty, the page description is used.',
-        'schema_profile_image' => 'Photo',
-        'schema_profile_image_hint' => 'Left empty, the page image is used.',
-        'schema_profile_same_as' => 'Profile links',
-        'schema_profile_same_as_hint' => 'Full links (https://…) to this person’s profiles.',
+        // Only the keys the current page type offers appear in this select
+        // (see PageForm::schemaSection()); everything else — name,
+        // description, image, dates, url, author — is derived automatically.
+        'schema_type' => 'Structured data kind',
     ],
     'schema_type' => [
         'WebPage' => 'Ordinary page',
         'AboutPage' => 'About us',
         'ContactPage' => 'Contacts',
-        'ProfilePage' => 'Person profile',
         'ItemPage' => 'Item page',
-    ],
-    'article_schema_type' => [
         'Article' => 'Article',
         'NewsArticle' => 'News article',
         'BlogPosting' => 'Blog post',
+        'CollectionPage' => 'Listing page',
     ],
     'actions' => [
         'new' => 'New',

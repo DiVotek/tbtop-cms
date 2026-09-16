@@ -7,8 +7,12 @@ namespace Tbtop\Cms\Frontend\Seo;
 use Closure;
 use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Breadcrumbs;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaSelector;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeInterface;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Settings\Settings;
 
@@ -20,8 +24,6 @@ class SeoResolver
 {
     private readonly IndexingSetting $indexing;
 
-    private readonly PageSchema $pageSchema;
-
     private readonly SeoTemplates $templates;
 
     public function __construct(
@@ -30,9 +32,10 @@ class SeoResolver
         private readonly Languages $languages,
         private readonly JsonLd $jsonLd,
         private readonly Breadcrumbs $breadcrumbs,
+        private readonly PageTypeRegistry $pageTypes,
+        private readonly SchemaSelector $schemaSelector,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
         ?IndexingSetting $indexing = null,
-        ?PageSchema $pageSchema = null,
         ?SeoTemplates $templates = null,
     ) {
         // Built from the same Settings instance rather than resolved from the
@@ -40,12 +43,6 @@ class SeoResolver
         // a purpose-built Settings, and a container-resolved reader there would
         // consult a different one.
         $this->indexing = $indexing ?? new IndexingSetting($settings);
-        // Same reasoning, one field over: built from the PageUrl this resolver
-        // was handed so hasPart URLs are prefixed by the same rule canonical
-        // and alternates use.
-        $this->pageSchema = $pageSchema ?? new PageSchema($url);
-        // Same Settings instance again: a container-resolved reader would
-        // consult a different one wherever this resolver is built by hand.
         $this->templates = $templates ?? new SeoTemplates($settings);
     }
 
@@ -94,7 +91,10 @@ class SeoResolver
         $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale) ?: $metaDescription;
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
-        $isArticle = $page->type === 'article';
+        $schema = $this->schemaSelector->selectFor($page);
+        $ogType = $schema->ogType();
+        $isArticle = $ogType === 'article';
+        $identityAuthor = $this->identityAuthor();
 
         return [
             'title' => $this->title($page, $metaTitle, $locale, $breadcrumbs),
@@ -107,13 +107,13 @@ class SeoResolver
             'ogDescription' => $ogDescription,
             'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),
             'siteName' => $siteName,
-            'ogType' => $isArticle ? 'article' : 'website',
+            'ogType' => $ogType ?? 'website',
             'ogUrl' => $canonical,
             'ogLocale' => $locale,
             'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
             'articlePublishedTime' => $isArticle ? $this->articlePublishedTime($page) : null,
             'articleModifiedTime' => $isArticle ? $this->articleModifiedTime($page) : null,
-            'articleAuthor' => $isArticle ? $this->articleAuthor($seo, $locale) : null,
+            'articleAuthor' => $isArticle ? $identityAuthor['name'] : null,
             'twitterCard' => $this->twitterCard($ogImage),
             'alternates' => $alternates,
             'xDefault' => $this->xDefault($alternates),
@@ -133,12 +133,14 @@ class SeoResolver
                 $ogDescription,
                 $canonical,
                 $ogImage,
+                $schema,
+                $identityAuthor,
             ),
         ];
     }
 
     /**
-     * Mirrors PageSchema::dates()'s datePublished gate exactly: a draft or
+     * Mirrors SchemaContext::node()'s datePublished gate exactly: a draft or
      * expired page reached through admin preview must not advertise a
      * publication date via article:published_time either. Keep the two in
      * sync if this rule ever changes.
@@ -150,19 +152,33 @@ class SeoResolver
             : null;
     }
 
-    /** Mirrors PageSchema::dates()'s dateModified — unconditional, unlike published. */
+    /** Mirrors SchemaContext::node()'s dateModified — unconditional, unlike published. */
     private function articleModifiedTime(Page $page): ?string
     {
         return $page->updated_at?->toIso8601String();
     }
 
-    /** @param  array<string, mixed>  $seo */
-    private function articleAuthor(array $seo, string $locale): ?string
+    /**
+     * The Article `author` and `article:author`/`articleAuthor` all come from
+     * the same site identity settings, not per-page data — reuses identity()'s
+     * own type/name parsing so the organization/person mapping exists once.
+     *
+     * @return array{node: array<string, mixed>|null, name: string|null}
+     */
+    private function identityAuthor(): array
     {
-        $schema = is_array($seo['schema'] ?? null) ? $seo['schema'] : [];
-        $author = LocalizedSeo::value($schema['author'] ?? null, $locale);
+        $type = (string) $this->settings->get('seo.identity.type', 'none');
+        $name = (string) $this->settings->get('seo.identity.name', '');
 
-        return $author !== '' ? $author : null;
+        if ($name === '') {
+            return ['node' => null, 'name' => null];
+        }
+
+        return match ($type) {
+            'organization' => ['node' => ['@type' => 'Organization', 'name' => $name], 'name' => $name],
+            'person' => ['node' => ['@type' => 'Person', 'name' => $name], 'name' => $name],
+            default => ['node' => null, 'name' => null],
+        };
     }
 
     private function twitterCard(?string $ogImage): string
@@ -234,7 +250,10 @@ class SeoResolver
         return is_string($id) && $id !== '' ? $this->mediaUrlResolver->resolve($id) : null;
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @param  array{node: array<string, mixed>|null, name: string|null}  $identityAuthor
+     * @return list<array<string, mixed>>
+     */
     private function jsonLd(
         Page $page,
         string $locale,
@@ -243,6 +262,8 @@ class SeoResolver
         string $ogDescription,
         string $canonical,
         ?string $ogImage,
+        SchemaTypeInterface $schema,
+        array $identityAuthor,
     ): array {
         $objects = [];
 
@@ -270,19 +291,25 @@ class SeoResolver
             $objects[] = $breadcrumbList;
         }
 
-        // The page's own object uses the UNtemplated title/description (the
-        // same base og: falls back to): a schema `name` should be the thing's
-        // name, not the browser-tab string with the site name appended.
-        $pageSchema = $this->pageSchema->build($page, $locale, [
-            'name' => $currentLabel !== '' ? $currentLabel : $ogTitle,
-            'description' => $ogDescription,
-            'url' => $canonical,
-            'image' => $ogImage,
-            'profileImage' => $this->profileImage($page),
-        ]);
+        $context = new SchemaContext(
+            page: $page,
+            locale: $locale,
+            source: $this->pageTypes->has($page->type) ? $this->pageTypes->get($page->type)->source($page) : null,
+            // The UNtemplated title/description (same base og: falls back
+            // to): a schema `name` should be the thing's name, not the
+            // browser-tab string with the site name appended.
+            name: $currentLabel !== '' ? $currentLabel : $ogTitle,
+            description: $ogDescription,
+            url: $canonical,
+            image: $ogImage,
+        );
 
-        if ($pageSchema !== null) {
-            $objects[] = $pageSchema;
+        foreach ($schema->build($context) as $node) {
+            if ($schema->ogType() === 'article' && $identityAuthor['node'] !== null) {
+                $node['author'] = $identityAuthor['node'];
+            }
+
+            $objects[] = $node;
         }
 
         $identity = $this->identity();
@@ -527,7 +554,7 @@ class SeoResolver
 
     /**
      * Gated on isLive() rather than on published_at alone, same rule
-     * PageSchema::dates() applies: a draft or expired page reached through
+     * SchemaContext::node() applies: a draft or expired page reached through
      * admin preview must not stamp a publication date into its title.
      *
      * Formatted through ->locale($locale) rather than Carbon's ambient locale.
@@ -648,27 +675,6 @@ class SeoResolver
         $global = $this->settings->get('seo.default_og_image');
 
         return is_string($global) && $global !== '' ? $this->imageDetails($global) : null;
-    }
-
-    /**
-     * The photo of a profile page's subject, when one was picked. Absolute
-     * for the same reason og:image is: structured data is read with no page
-     * context to resolve a root-relative path against (see AbsoluteUrl).
-     *
-     * null means "no profile photo was chosen" — PageSchema then falls back
-     * to the page's own image.
-     */
-    private function profileImage(Page $page): ?string
-    {
-        $seo = is_array($page->seo) ? $page->seo : [];
-        $schema = is_array($seo['schema'] ?? null) ? $seo['schema'] : [];
-        $id = $schema['profile_image'] ?? null;
-
-        if (! is_string($id) || $id === '') {
-            return null;
-        }
-
-        return AbsoluteUrl::make($this->mediaUrlResolver->resolve($id));
     }
 
     /** @param  array<string, mixed>  $seo */
