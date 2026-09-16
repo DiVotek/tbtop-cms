@@ -29,6 +29,15 @@ composer serve       # Boot the Workbench app for manual review
 `:changed` variants (`composer test:all:changed`, `lint:changed`, `analyse:changed`, …)
 run the same tools against git-changed PHP files — prefer them during development.
 
+Workbench quirks:
+
+- `composer serve` needs `CACHE_STORE=array`: the seeder bumps the content-version
+  cache and the database cache store has no `cache` table in the fresh sqlite.
+- `composer serve` syncs `workbench/public/build` into the served `public/` at
+  build time. Run `bun run build` first, or the admin 500s on a missing Vite
+  manifest; if the server was already up, symlink `workbench/public/build` to
+  `vendor/orchestra/testbench-core/laravel/public/build`.
+
 ## Testing policy
 
 - Boundary / integration tests by default: drive the package through its public

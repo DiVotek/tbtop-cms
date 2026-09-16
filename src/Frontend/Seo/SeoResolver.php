@@ -291,12 +291,7 @@ class SeoResolver
         return $objects;
     }
 
-    /**
-     * The one effective-name rule for every identity consumer: the JSON-LD
-     * Organization/Person node and the Article author must name the same
-     * entity, or a site whose identity relies on the site.name fallback
-     * publishes an identity but no author.
-     */
+    /** Shared by the identity node and the Article author so both name the same entity. */
     private function identityName(): string
     {
         $name = (string) $this->settings->get('seo.identity.name', '');
