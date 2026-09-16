@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Block;
 use Illuminate\Support\Str;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 
 abstract class Block
 {
@@ -66,6 +67,28 @@ abstract class Block
     public function translatableFields(): array
     {
         return self::collectTranslatablePaths($this->form(new S), '');
+    }
+
+    /**
+     * This block's own schema.org node for the page's `seo.jsonLd`, or null
+     * to publish nothing — most blocks have no structured-data opinion, and
+     * null is simply dropped rather than an empty placeholder. `$props` are
+     * this block's already-resolved output (the same shape `resolve()`
+     * returns: absolute media URLs, rendered richtext HTML), not the raw
+     * envelope data. Page-level values — `$ctx->url` for `mainEntityOfPage`,
+     * `$ctx->publishedAt()` for a date — come from `$ctx`, never from
+     * `request()`: this runs outside any HTTP context in some callers.
+     *
+     * A container block that nests other blocks collects its children's
+     * nodes itself; the package does not walk into nested block content on
+     * a block's behalf.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array<string, mixed>|null
+     */
+    public function toSchema(array $props, SchemaContext $ctx): ?array
+    {
+        return null;
     }
 
     /**

@@ -11,11 +11,15 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Block\BlockContentResolver;
+use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Block\MediaUrlResolver;
+use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
+use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
@@ -34,6 +38,8 @@ class PageController
         private readonly SeoResolver $seo,
         private readonly FormActionBinder $forms,
         private readonly PageTypeRegistry $pageTypes,
+        private readonly SchemaContextFactory $schemaContextFactory,
+        private readonly BlockRegistry $blockRegistry,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -117,7 +123,9 @@ class PageController
         // preview affordances, same as a plain draft did before scheduling.
         $isPreview = ! $page->isLive();
         $breadcrumbs = $this->breadcrumbs->forPage($page, $locale);
-        $seo = $this->seo->resolve($page, $locale, $breadcrumbs);
+        $ctx = $this->schemaContextFactory->make($page, $locale, $source);
+        $blockNodes = $this->blockSchemaNodes($resolved, $ctx);
+        $seo = $this->seo->resolve($page, $locale, $breadcrumbs, $ctx, $blockNodes);
 
         if ($isPreview) {
             $seo['noindex'] = true;
@@ -145,6 +153,29 @@ class PageController
     private function component(): string
     {
         return (string) config('tbtop-cms.render.component', 'Cms/Page');
+    }
+
+    /**
+     * A block's own schema.org node, one per block whose Block::toSchema()
+     * returns one — a container block collects its children's nodes itself,
+     * this does not walk into nested block content.
+     *
+     * @param  list<ResolvedBlock>  $resolved
+     * @return list<array<string, mixed>>
+     */
+    private function blockSchemaNodes(array $resolved, SchemaContext $ctx): array
+    {
+        $nodes = [];
+
+        foreach ($resolved as $block) {
+            $node = $this->blockRegistry->get($block->kind)->toSchema($block->props, $ctx);
+
+            if ($node !== null) {
+                $nodes[] = $node;
+            }
+        }
+
+        return $nodes;
     }
 
     // image stores a media id, not a URL; resolve() already returns null for
