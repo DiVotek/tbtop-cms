@@ -53,13 +53,15 @@ CmsPage.tsx` is a single default export, not a slotted component).
 
 ### Block-derived JSON-LD (FAQ, Service, …)
 
-`Tbtop\Cms\Frontend\Seo\JsonLd` and `PageSchema` build exactly three
-page-scoped graph nodes (WebSite, Person/Organization, BreadcrumbList) plus
-one page-type node (Article/CollectionPage/WebPage/ProfilePage via a hardcoded
-`match` in `PageSchema::build()`) — there is no append hook (see "Not yet
-expressible"). A host that wants block-derived nodes (FAQPage from an FAQ
-block, Service from a service-detail block) assembles its own graph in a
-middleware, reusing the same resolvers the controller uses:
+`Tbtop\Cms\Frontend\Seo\JsonLd` builds the WebSite/BreadcrumbList/identity
+nodes, and the page's own node comes from a `SchemaTypeInterface` resolved
+through `SchemaTypeRegistry` (see seo.md) — a host can add a new schema.org
+*type* this way, but there is still no way to append extra, block-derived
+nodes (FAQPage from an FAQ block, Service from a service-detail block) to
+`seo.jsonLd` itself; `Block::toSchema()` does not exist yet (planned, not
+shipped). Until it lands, a host that wants block-derived nodes assembles its
+own graph in a middleware, reusing the same resolvers the controller uses —
+this workaround is temporary, not a permanent pattern:
 `divotek_com_ua/app/Http/Middleware/AttachSchemaGraph.php` shares
 `Inertia::share('schema', fn (): array => ...)`, calling this package's own
 `Tbtop\Cms\Frontend\PageResolver`, `Tbtop\Cms\Block\BlockContentResolver`, and
@@ -284,20 +286,17 @@ header/footer are, only from each page's own content editor.
 
 ### Appending nodes to the package's JSON-LD graph
 
-`Tbtop\Cms\Frontend\Seo\JsonLd` and `PageSchema` have no event, macro, or
-registry: no `Event::dispatch`, no `Macroable`, no extension point of any
-kind. A host cannot append additional
-schema.org nodes (FAQPage, Product, Service, …) to what `SeoResolver`
-produces without either overriding `SeoResolver` wholesale or, as both real
-hosts do, building a parallel graph in host middleware and sharing it under a
-different Inertia prop (`schema`, not the package's own SEO prop) — see
-"Block-derived JSON-LD" above. That workaround is clean enough that it's
-listed as a recipe rather than a real limitation in practice, but it does
-mean per-page-type schema.org node types are capped at what
-`Tbtop\Cms\Page\Enums\SchemaType` lists (`WebPage`, `AboutPage`,
-`ContactPage`, `ProfilePage`, `ItemPage`) plus `PageSchema`'s own hardcoded
-Article/CollectionPage handling — extending that enum itself is not possible
-either (a plain PHP native enum, not a registry).
+The page's own schema.org node type IS extendable — a host class extending
+`Tbtop\Cms\Frontend\Seo\Schema\SchemaType`, registered via
+`config('tbtop-cms.seo.schema_types')` or `SchemaTypeRegistry::extend()`
+(see seo.md), can add a new key to the `schema_type` picker. What is still
+not possible is *appending extra nodes on top of* the one the registry
+already produces — `WebSite`/`BreadcrumbList`/identity plus one page node is
+the fixed shape `SeoResolver::jsonLd()` returns, no `Event::dispatch`, no
+`Macroable`. A host wanting a second, block-derived node (FAQPage, Product,
+Service, …) alongside the page's own still needs the "Block-derived JSON-LD"
+workaround above (a parallel graph shared under a different Inertia prop) —
+temporary until `Block::toSchema()` ships.
 
 ### Custom richtext node renderers
 

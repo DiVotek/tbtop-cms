@@ -109,37 +109,20 @@ return [
         'seo_canonical' => 'Перевизначення canonical URL',
         'seo_canonical_hint' => 'Лише для досвідчених.',
         'image' => 'Зображення',
-        // Поля структурованих даних заповнюються лише тим, чого немає в
-        // самій сторінці: назва, опис, зображення й дати підставляються
-        // автоматично (див. PageSchema).
-        'schema_type' => 'Тип сторінки',
-        'schema_type_hint' => 'Як пошуковик розуміє призначення сторінки.',
-        'schema_article_type' => 'Тип матеріалу',
-        'schema_article_type_hint' => 'Впливає лише на позначку типу, набір даних однаковий.',
-        'schema_author' => 'Автор',
-        'schema_author_hint' => 'Ім’я автора тексту. Порожнє — авторство не вказується.',
-        'schema_profile_name' => 'Ім’я',
-        'schema_profile_name_hint' => 'Обов’язкове: без нього сторінка лишається звичайною.',
-        'schema_profile_alternate_name' => 'Псевдонім',
-        'schema_profile_alternate_name_hint' => 'Нікнейм або друге написання імені.',
-        'schema_profile_description' => 'Про людину',
-        'schema_profile_description_hint' => 'Посада або короткий опис. Порожнє — береться опис сторінки.',
-        'schema_profile_image' => 'Фото',
-        'schema_profile_image_hint' => 'Порожнє — береться зображення сторінки.',
-        'schema_profile_same_as' => 'Профілі в мережі',
-        'schema_profile_same_as_hint' => 'Повні посилання (https://…) на профілі цієї людини.',
+        // У цьому селекті лише ключі, які пропонує тип поточної сторінки
+        // (див. PageForm::schemaSection()); решта — назва, опис, зображення,
+        // дати, url, автор — підставляється автоматично.
+        'schema_type' => 'Тип структурованих даних',
     ],
     'schema_type' => [
         'WebPage' => 'Звичайна сторінка',
         'AboutPage' => 'Про нас',
         'ContactPage' => 'Контакти',
-        'ProfilePage' => 'Профіль людини',
         'ItemPage' => 'Сторінка об’єкта',
-    ],
-    'article_schema_type' => [
         'Article' => 'Стаття',
         'NewsArticle' => 'Новина',
         'BlogPosting' => 'Допис у блозі',
+        'CollectionPage' => 'Сторінка списку',
     ],
     'actions' => [
         'new' => 'Нова',

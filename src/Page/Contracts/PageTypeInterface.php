@@ -42,4 +42,13 @@ interface PageTypeInterface
      * @return array<int, array<string, mixed>>|null
      */
     public function template(Page $page): ?array;
+
+    /**
+     * Schema.org node keys this page type may publish, resolved through
+     * SchemaTypeRegistry. The first element is the default when no valid
+     * choice is stored.
+     *
+     * @return non-empty-list<string>
+     */
+    public function schemaTypes(): array;
 }

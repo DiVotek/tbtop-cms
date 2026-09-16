@@ -45,13 +45,14 @@ function articleParentId(): int
 }
 
 it('renders article og:type and article:* tags for a live article with author', function (): void {
+    app(Settings::class)->set('seo.identity.type', 'person');
+    app(Settings::class)->set('seo.identity.name', 'Jane Doe');
     $page = Page::factory()->article()->create([
         'status' => PageStatus::Published,
         'parent_id' => articleParentId(),
         'name' => ['en' => 'My Post'],
         'title' => ['en' => 'My Post'],
         'published_at' => '2024-01-15 10:00:00',
-        'seo' => ['schema' => ['author' => ['en' => 'Jane Doe']]],
     ]);
     $page->forceFill(['updated_at' => '2024-02-01 12:00:00'])->save();
     $page->refresh();
@@ -66,11 +67,12 @@ it('renders article og:type and article:* tags for a live article with author', 
 });
 
 it('renders og:type website and no article:* tags for a non-article page', function (): void {
+    app(Settings::class)->set('seo.identity.type', 'person');
+    app(Settings::class)->set('seo.identity.name', 'Jane Doe');
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
         'published_at' => '2024-01-15 10:00:00',
-        'seo' => ['schema' => ['author' => ['en' => 'Jane Doe']]],
     ]);
 
     $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
@@ -94,7 +96,7 @@ it('omits article:published_time for a draft article, even reached through admin
 
     // A draft 404s for an anonymous visitor (see PagePreviewTest.php), so the
     // isLive() gate on articlePublishedTime can only be exercised through
-    // admin preview access — the same route that reaches PageSchema::dates()'s
+    // admin preview access — the same route that reaches SchemaContext::baseNode()'s
     // matching gate.
     $this->actingAs($user, 'web')
         ->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])

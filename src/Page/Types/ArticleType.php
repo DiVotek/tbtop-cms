@@ -16,4 +16,11 @@ class ArticleType extends BasePageType
     {
         return true;
     }
+
+    /** @return non-empty-list<string> */
+    #[\Override]
+    public function schemaTypes(): array
+    {
+        return ['Article', 'NewsArticle', 'BlogPosting'];
+    }
 }

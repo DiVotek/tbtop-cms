@@ -79,8 +79,8 @@ Field-by-field:
 | Focus keyword | `page.seo.focus_keyword` | SEO tab: *Focus keyword* — drives `SeoChecklist`'s keyword-presence checks only, never rendered |
 | OG title/description/image | `page.seo.og_title` / `og_description` / `og_image` | SEO tab → *Social* section (`og_image` is a plain scalar, not translatable — an image isn't per-locale) |
 | Canonical override | `page.seo.canonical` (translatable) | SEO tab: *Canonical URL* (validated `url:http,https`) |
-| Article author / Article subtype | `page.seo.schema.author` / `schema.article_type` | SEO tab → *Schema* section, article pages only |
-| WebPage subtype + profile fields | `page.seo.schema.type` / `profile_*` | SEO tab → *Schema* section, static (non-article, non-category) pages only |
+| Schema.org node type | `page.seo.schema.type` | SEO tab → *Schema* section, only present when the page type's `schemaTypes()` offers more than one key |
+| Article author | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab — same value used for the site-wide Organization/Person node |
 | `is_indexable` | `page.is_indexable` column | Page edit sidebar → *Publication* card, not the SEO tab |
 | Site title/description templates, separator, suffix | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`, `seo.title_suffix`) | Admin → SEO settings → *Titles* tab |
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type |
@@ -151,23 +151,84 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    usual locale → default-locale fallback; `PageSeeder` writes those only in
    the default locale, so until an editor translates the home page the crumb
    shows the default-locale label in every locale.
-3. **`PageSchema::build()`** — the page's own object, one per page,
-   type chosen by the page's own `type`, never editable directly:
-   - `article` → `Article`/`NewsArticle`/`BlogPosting`
-     (`page.seo.schema.article_type`, via `ArticleSchemaType`), with
-     `mainEntityOfPage`, `datePublished`/`dateModified`, and `author` (only
-     if `schema.author` is set — there is no automatic author source).
-   - `category` → `CollectionPage`, with `hasPart` listing up to 100 live,
-     indexable children (name + URL), one query spent only for categories.
-   - anything else (static pages) → the `SchemaType` picker
-     (`WebPage`/`AboutPage`/`ContactPage`/`ProfilePage`/`ItemPage`,
-     `page.seo.schema.type`) — this is the only page kind with an editorial
-     type choice, because article/category types are already facts the CMS
-     knows. `ProfilePage` without a `schema.profile_name` silently downgrades
-     to plain `WebPage` (Search Console flags a mainEntity-less ProfilePage
-     as invalid). `name`/`description`/`image`/`url`/dates are always
-     derived, never hand-entered — a page with every schema field left blank
-     still emits correct, valid structured data.
+3. **The page's own node(s)** — built by a `Tbtop\Cms\Frontend\Seo\Schema\
+   SchemaTypeInterface` resolved through `SchemaTypeRegistry`
+   (`Frontend/Seo/Schema/`), one node per page (`build()` returns a
+   `list<array<string,mixed>>`, but every built-in returns exactly one).
+   Which key a page gets is a two-step lookup, not a hardcoded `match` on
+   `page->type` any more:
+   - `PageTypeInterface::schemaTypes(): non-empty-list<string>` lists the
+     keys a page type may publish, first element the default
+     (`BasePageType` → `['WebPage','AboutPage','ContactPage','ItemPage']`,
+     `ArticleType` → `['Article','NewsArticle','BlogPosting']`,
+     `CategoryType` → `['CollectionPage']`).
+   - `SchemaSelector` (`Frontend/Seo/Schema/SchemaSelector.php`) reads
+     `page.seo.schema.type` (the only key left under `seo.schema` — the
+     rest of the old structured-data form fields are gone, see below): a
+     page whose type isn't registered in `PageTypeRegistry` gets `WebPage`;
+     a stored key outside the type's `schemaTypes()` (or none stored at
+     all) falls back to the first element; the resulting key is looked up
+     via `SchemaTypeRegistry::get()`, which throws on an unknown key
+     (host misconfiguration surfaces, no silent fallback).
+
+   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once by
+   `SeoResolver::resolve()` and reused for both `openGraph()` and
+   `build()`) carries `page`, `locale`, `source` (the page type's
+   `source()`, null for content-only types), the same
+   `name`/`description`/`url`/`image` inputs the rendered head tags use,
+   and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
+   derived from the site identity settings, null when the identity type is
+   `none` or the name is empty — `SeoResolver` always supplies this
+   argument). `SchemaContext::baseNode(string $type): array` is the
+   standard node every built-in starts from — `@context`/`@type`/`name`/
+   `url` always, `description`/`image` if non-empty, `datePublished`/
+   `dateModified` from `publishedAt()`/`modifiedAt()`. `publishedAt(): ?string`
+   is gated on `published_at !== null && isLive()`; `modifiedAt(): ?string`
+   is unconditional on `updated_at`.
+
+   A host adds a schema type by extending `SchemaType`
+   (`Frontend/Seo/Schema/SchemaType.php`), not by implementing
+   `SchemaTypeInterface` directly — same convention as `Block`. Required:
+   `key()`, `build(SchemaContext $ctx): list<array<string,mixed>>`.
+   Overridable, with defaults that fit most types: `label()` (defaults to
+   `Str::headline($this->key())`) and `openGraph(SchemaContext $ctx): OpenGraph`
+   (defaults to `OpenGraph::website()`).
+
+   `SchemaTypeInterface::openGraph(SchemaContext $ctx): OpenGraph` drives
+   `SeoResolver::resolve()`'s `ogType`/`articlePublishedTime`/
+   `articleModifiedTime`/`articleAuthor`. `OpenGraph`
+   (`Frontend/Seo/Schema/OpenGraph.php`) is a value object with `type`,
+   `publishedTime`, `modifiedTime`, `author` (`OpenGraph::website()` sets
+   `type` to `'website'` and leaves the rest null) — `page->type === 'article'`
+   is not the check, each schema class owns its own Open Graph mapping.
+
+   Built-ins: `WebPage`/`AboutPage`/`ContactPage`/`ItemPage` (plain node, no
+   OG article semantics, `openGraph()` returns `OpenGraph::website()`);
+   `Article`/`NewsArticle`/`BlogPosting` (`openGraph()` returns type
+   `article` with `publishedTime`/`modifiedTime`/`author` from the context,
+   node adds `mainEntityOfPage` and, when `$ctx->author` is set, `author`);
+   `CollectionPage` (`hasPart` listing up to 100 live, indexable children,
+   one query spent only for categories, `openGraph()` inherits
+   `SchemaType`'s `OpenGraph::website()` default). A host adds a class
+   extending `SchemaType` via `config('tbtop-cms.seo.schema_types')` or
+   `SchemaTypeRegistry::extend()` (package convention, same before-boot
+   timing as `PageTypeRegistry`).
+
+   **Article author**: not a per-page field any more. `SchemaContext::$author`
+   and, through it, the Article node's `author` and
+   `articleAuthor`/`article:author` all come from the site identity settings
+   (`seo.identity.type` + `.name`): `organization` →
+   `{"@type":"Organization","name":...}`, `person` → `Person`, `none` or an
+   empty name → no author at all. This is the exact type mapping
+   `JsonLd::identity()` already applies to the standalone
+   identity node (below) — the two are meant to name the same entity.
+
+   Removed with no migration of stored data: `ProfilePage` and its
+   `profile_*` fields, `schema.article_type`
+   (Article/NewsArticle/BlogPosting is now chosen the same way as the
+   WebPage family, via `schemaTypes()` + the `schema_type` select), and
+   `schema.author`. A row's stale `seo.schema.*` keys from before this
+   change are simply ignored.
 4. **Identity** (`JsonLd::identity()`) — an `Organization` or `Person` node
    from `seo.identity.*` settings (type/name/logo/sameAs), or nothing when
    `seo.identity.type` is `none`. Name and logo fall back to the site's own
@@ -175,11 +236,13 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    is set.
 
 **What the host cannot add**: there is no hook or filter to append nodes to
-this list, and `SeoResolver`'s return shape and `SitemapController`/
-`RobotsController` are not extendable from outside. A page's own object is
-picked purely by `page->type`, and blocks the page renders (FAQ accordions,
+this list beyond registering a new `SchemaTypeInterface` key, and
+`SeoResolver`'s return shape and `SitemapController`/`RobotsController` are
+not extendable from outside. Blocks the page renders (FAQ accordions,
 service details, article body content, etc.) contribute **nothing** to
-`seo.jsonLd` — the resolver never inspects block content.
+`seo.jsonLd` — the resolver never inspects block content, and there is no
+`Block::toSchema()` yet (block-level schema is a later addition, not
+available today — see recipes.md for the current workaround).
 
 **Host pattern for block-derived schema** (what both real hosts that needed
 it — divotek_com_ua, autofocus — actually built; not shipped by the
