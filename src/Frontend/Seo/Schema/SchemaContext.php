@@ -7,9 +7,11 @@ namespace Tbtop\Cms\Frontend\Seo\Schema;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
- * Everything a schema class needs to build its node(s), resolved by
- * SeoResolver from the same values it uses for the rendered head tags.
- * `source` is the page type's `source()` result, null for content-only types.
+ * Everything a schema class needs to build its node(s), built once by
+ * SchemaContextFactory from the same values SeoResolver uses for the
+ * rendered head tags. `source` is the page type's `source()` result, null
+ * for content-only types. `imageAlt`/`imageMime` ride along for the og:
+ * tags so the media lookup behind `image` happens once per render.
  */
 final readonly class SchemaContext
 {
@@ -23,6 +25,8 @@ final readonly class SchemaContext
         public string $url,
         public ?string $image,
         public ?array $author,
+        public ?string $imageAlt = null,
+        public ?string $imageMime = null,
     ) {}
 
     /** @return array<string, mixed> */

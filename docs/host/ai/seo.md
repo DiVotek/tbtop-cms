@@ -179,11 +179,13 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
      via `SchemaTypeRegistry::get()`, which throws on an unknown key
      (host misconfiguration surfaces, no silent fallback).
 
-   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once by
-   `SeoResolver::resolve()` and reused for both `openGraph()` and
-   `build()`) carries `page`, `locale`, `source` (the page type's
+   `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once per render by
+   `SchemaContextFactory::make()` and reused by `openGraph()`, `build()` and
+   every block's `toSchema()`) carries `page`, `locale`, `source` (the page type's
    `source()`, null for content-only types), the same
-   `name`/`description`/`url`/`image` inputs the rendered head tags use,
+   `name`/`description`/`url`/`image` inputs the rendered head tags use
+   (plus `imageAlt`/`imageMime` for the og: tags, so the media lookup runs
+   once),
    and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
    derived from the site identity settings, null when the identity type is
    `none` or the name is empty — `SeoResolver` always supplies this

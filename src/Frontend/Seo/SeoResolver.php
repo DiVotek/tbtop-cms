@@ -92,12 +92,11 @@ class SeoResolver
         $seo = $page->seo ?? [];
         $metaTitle = $this->metaTitle($page, $seo, $locale);
         $metaDescription = $this->description($page, $seo, $locale);
-        $image = $this->factory->ogImageDetails($page, $seo);
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
         $siteName = (string) $this->settings->get('site.name', '');
         $alternates = $this->alternates($page);
         $schema = $this->schemaSelector->selectFor($page);
-        $context = $ctx ?? $this->factory->makeWithImageDetails($page, $locale, $image);
+        $context = $ctx ?? $this->factory->make($page, $locale);
         $og = $schema->openGraph($context);
 
         return [
@@ -105,8 +104,8 @@ class SeoResolver
             'description' => $this->descriptionWithTemplate($page, $metaDescription, $locale, $breadcrumbs),
             'canonical' => $context->url,
             'ogImage' => $context->image,
-            'ogImageAlt' => $image['alt'] ?? null,
-            'ogImageType' => $image['mime'] ?? null,
+            'ogImageAlt' => $context->imageAlt,
+            'ogImageType' => $context->imageMime,
             'ogTitle' => $ogTitle,
             'ogDescription' => $context->description,
             'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),

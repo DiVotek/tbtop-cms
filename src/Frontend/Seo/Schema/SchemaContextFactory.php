@@ -31,38 +31,18 @@ final class SchemaContextFactory
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
+    /**
+     * $source is the page type's source() result; pass it when the caller
+     * already paid for that call. Left null, a source-backed type's source()
+     * is fetched here — so a caller holding a legitimately null source for a
+     * source-backed page pays that fetch twice (PageController never does:
+     * it 404s on a null source before reaching here). Content-only types
+     * are never asked.
+     */
     public function make(Page $page, string $locale, ?object $source = null): SchemaContext
     {
         $seo = is_array($page->seo) ? $page->seo : [];
-
-        return $this->makeFromDetails($page, $locale, $seo, $source, $this->ogImageDetails($page, $seo));
-    }
-
-    /**
-     * SeoResolver already needs a full ogImageDetails() call of its own (for
-     * alt/mime, which SchemaContext doesn't carry) whenever it builds its
-     * own context — this lets it pass that result through instead of paying
-     * for the media lookup a second time.
-     *
-     * @param  array{url: string, alt: string|null, mime: string|null}|null  $ogImageDetails
-     */
-    public function makeWithImageDetails(Page $page, string $locale, ?array $ogImageDetails): SchemaContext
-    {
-        $seo = is_array($page->seo) ? $page->seo : [];
-
-        return $this->makeFromDetails($page, $locale, $seo, null, $ogImageDetails);
-    }
-
-    /**
-     * $source is the page type's source() result; pass it when the caller
-     * already paid for that call so this doesn't fetch it twice. Left null,
-     * a source-backed type's source() is fetched here instead.
-     *
-     * @param  array<string, mixed>  $seo
-     * @param  array{url: string, alt: string|null, mime: string|null}|null  $ogImageDetails
-     */
-    private function makeFromDetails(Page $page, string $locale, array $seo, ?object $source, ?array $ogImageDetails): SchemaContext
-    {
+        $ogImageDetails = $this->ogImageDetails($page, $seo);
         $metaTitle = PageOwnSeo::title($page, $seo, $locale);
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
         $ogDescription = LocalizedSeo::value($seo['og_description'] ?? null, $locale)
@@ -74,24 +54,26 @@ final class SchemaContextFactory
         $currentLabel = (string) $page->getTranslation('title', $locale, false)
             ?: (string) $page->getTranslation('name', $locale, false);
 
-        $resolvedSource = $source ?? ($this->pageTypes->has($page->type)
-            ? $this->pageTypes->get($page->type)->source($page)
-            : null);
+        if ($source === null && $this->pageTypes->isSourceBacked($page->type)) {
+            $source = $this->pageTypes->get($page->type)->source($page);
+        }
 
         return new SchemaContext(
             page: $page,
             locale: $locale,
-            source: $resolvedSource,
+            source: $source,
             name: $currentLabel !== '' ? $currentLabel : $ogTitle,
             description: $ogDescription,
             url: $this->canonical($page, $seo, $locale),
             image: $ogImageDetails['url'] ?? null,
             author: $this->identityAuthor(),
+            imageAlt: $ogImageDetails['alt'] ?? null,
+            imageMime: $ogImageDetails['mime'] ?? null,
         );
     }
 
     /** @param array<string, mixed> $seo */
-    public function canonical(Page $page, array $seo, string $locale): string
+    private function canonical(Page $page, array $seo, string $locale): string
     {
         $override = $this->validCanonicalOverride($seo, $locale);
 
@@ -143,7 +125,7 @@ final class SchemaContextFactory
      * @param  array<string, mixed>  $seo
      * @return array{url: string, alt: string|null, mime: string|null}|null
      */
-    public function ogImageDetails(Page $page, array $seo): ?array
+    private function ogImageDetails(Page $page, array $seo): ?array
     {
         // A page that named an image has made its choice, and a broken id is
         // still that choice — falling through to the site default here would
