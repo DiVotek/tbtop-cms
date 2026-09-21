@@ -11,7 +11,7 @@ use Tbtop\Cms\Block\ResolveContext;
 
 /**
  * Declares a `Shared` alias with a different shape than
- * AliasConflictOneBlock's — a registry-wide name collision (decision 6).
+ * AliasConflictOneBlock's — a registry-wide name collision.
  *
  * @phpstan-type Shared array{b: int}
  */

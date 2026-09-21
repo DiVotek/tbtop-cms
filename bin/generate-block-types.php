@@ -3,17 +3,9 @@
 declare(strict_types=1);
 
 /**
- * Regenerates the package's own resources/js/cms/blocks.generated.ts from
- * Hero/ContactForm's docblocks (invoked by the `types:blocks`/
- * `types:blocks:check` composer scripts). A plain `php artisan` can't do
- * this alone: the package ships no default registered blocks (config
- * tbtop-cms.blocks.types is empty by design — hosts opt in), and the
- * Testbench workbench used for `composer serve`/tests also registers a
- * demo-only Workbench\App\Blocks\FaqBlock alongside Hero/ContactForm that
- * has no place in the package's own catalog. Booting via Testbench and then
- * overriding the config again, before BlockRegistry's own lazy boot() first
- * runs, keeps this generation scoped to exactly the two blocks catalog.ts
- * actually ships.
+ * Regenerates resources/js/cms/blocks.generated.ts for exactly
+ * Hero/ContactForm — overrides tbtop-cms.blocks.types after boot to exclude
+ * the workbench's own demo-only FaqBlock registration.
  */
 
 use Illuminate\Contracts\Console\Kernel;

@@ -19,9 +19,9 @@ use Tbtop\Cms\Block\HandlesFormSubmission;
 
 /**
  * Reads one block's `resolve()` docblock and turns its `@return array{...}`
- * into a zod object fragment (decision 3), or the untyped fallback
- * (decision 4) when there is no usable shape. `HandlesFormSubmission`
- * blocks get the two FormActionBinder keys appended (decision 5).
+ * into a zod object fragment, or the untyped fallback when there is no
+ * usable shape. `HandlesFormSubmission` blocks get the two FormActionBinder
+ * keys appended.
  */
 final class BlockShapeExtractor
 {
@@ -43,10 +43,10 @@ final class BlockShapeExtractor
         $kind = $block->kind();
         $returnType = $this->returnTypeOf($block);
 
-        // Decision 4: no docblock, `array<string, mixed>`, bare `array`, or
-        // any other non-`array{}` top-level type all degrade to the untyped
-        // fallback rather than error — only a construct *inside* an
-        // otherwise-usable array{} shape is a hard failure (decision 3).
+        // No docblock, `array<string, mixed>`, bare `array`, or any other
+        // non-`array{}` top-level type all degrade to the untyped fallback
+        // rather than error — only a construct *inside* an otherwise-usable
+        // array{} shape is a hard failure.
         if ($returnType === null || ! $returnType instanceof ArrayShapeNode) {
             return $this->untypedShape($kind);
         }
@@ -92,8 +92,8 @@ final class BlockShapeExtractor
 
     /**
      * Appends the two keys FormActionBinder injects into every
-     * HandlesFormSubmission block's props after resolve() runs (decision
-     * 5) — never part of the docblock itself.
+     * HandlesFormSubmission block's props after resolve() runs — never
+     * part of the docblock itself.
      *
      * @param  list<string>  $fields
      */

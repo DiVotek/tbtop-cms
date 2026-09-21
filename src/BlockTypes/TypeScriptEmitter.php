@@ -7,11 +7,11 @@ namespace Tbtop\Cms\BlockTypes;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 
 /**
- * Assembles blocks.generated.ts (decision 2): header, `import { z }`, every
- * alias used by any block (in first-use order across the registry), every
- * block's props const/type, then the `blockProps` map. Alias/block order is
- * decided entirely by BlockShapeExtractor's traversal order — the emitter
- * only ever appends, so the output is deterministic for a given registry.
+ * Assembles blocks.generated.ts: header, `import { z }`, every alias used by
+ * any block (in first-use order across the registry), every block's props
+ * const/type, then the `blockProps` map. Alias/block order is decided
+ * entirely by BlockShapeExtractor's traversal order — the emitter only ever
+ * appends, so the output is deterministic for a given registry.
  */
 final class TypeScriptEmitter
 {
@@ -62,11 +62,9 @@ final class TypeScriptEmitter
     }
 
     /**
-     * Depth-first, dependencies-before-dependents: if alias A's body refers
-     * to alias B, B's `const` must appear earlier in the file than A's, or
-     * A's declaration would reference an identifier not yet defined. Insert
-     * order into $fragments is the array's own printed order, so a
-     * dependency is only ever inserted once its own dependencies are in.
+     * Post-order DFS: a dependency's entry lands in $fragments (and so in
+     * emission order) before its dependent's, so TS never sees a `const`
+     * reference an identifier declared later in the file.
      *
      * @param  list<BlockShape>  $shapes
      * @param  array<string, TypeNode>  $aliases

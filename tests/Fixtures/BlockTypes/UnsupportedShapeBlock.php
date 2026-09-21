@@ -11,8 +11,8 @@ use Tbtop\Cms\Block\ResolveContext;
 
 /**
  * A nested `resource` type has no zod mapping — a hard command error naming
- * the block kind and key path (decision 3), unlike an untyped top level
- * (decision 4) which degrades instead.
+ * the block kind and key path, unlike an untyped top level which degrades
+ * instead.
  */
 class UnsupportedShapeBlock extends Block
 {

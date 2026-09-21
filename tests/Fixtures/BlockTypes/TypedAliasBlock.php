@@ -10,9 +10,8 @@ use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
 
 /**
- * Typed block whose resolve() shape reuses a @phpstan-type alias, exercising
- * decision 1 (alias source of truth) and decision 2 (aliases emitted before
- * the block that first refers to them).
+ * Typed block whose resolve() shape reuses a @phpstan-type alias — proves
+ * an alias is emitted before the block that first refers to it.
  *
  * @phpstan-type CtaLink array{label: string, href: string}
  */

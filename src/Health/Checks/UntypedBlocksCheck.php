@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Health\Checks;
 
+use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\BlockTypes\BlockShapeExtractor;
 use Tbtop\Cms\Health\HealthCheck;
@@ -13,8 +14,8 @@ use Throwable;
 
 /**
  * Surfaces the same untyped-block fallback `cms:blocks:types` degrades to
- * (decision 4) as a proactive warning, before a host notices its generated
- * catalog has a permissive `z.record()` hole for a block it forgot to type.
+ * as a proactive warning, before a host notices its generated catalog has a
+ * permissive `z.record()` hole for a block it forgot to type.
  * A malformed docblock the command would hard-error on is left to the
  * command itself — this check only distinguishes typed from untyped, it
  * never fails the run.
@@ -58,19 +59,21 @@ final class UntypedBlocksCheck implements HealthCheck
         $untyped = [];
 
         foreach ($this->registry->all() as $block) {
-            // A block whose docblock is malformed enough to make cms:blocks:types
-            // itself error is not this check's concern — cms:doctor must
-            // stay non-throwing (see HealthCheck's own interface docblock),
-            // and the command already reports that failure loudly on its own run.
-            try {
-                if (! $extractor->extract($block)->isTyped) {
-                    $untyped[] = $block->kind();
-                }
-            } catch (Throwable) {
-                continue;
+            if (! self::isBlockTyped($extractor, $block)) {
+                $untyped[] = $block->kind();
             }
         }
 
         return $untyped;
+    }
+
+    /** A malformed docblock is cms:blocks:types's own error to report, not this (never-throwing) check's — treated as typed here so it's silently skipped. */
+    private static function isBlockTyped(BlockShapeExtractor $extractor, Block $block): bool
+    {
+        try {
+            return $extractor->extract($block)->isTyped;
+        } catch (Throwable) {
+            return true;
+        }
     }
 }

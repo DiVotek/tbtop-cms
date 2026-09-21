@@ -121,10 +121,10 @@ class BlocksTypesCommand extends Command
     }
 
     /**
-     * Decision 6: two different alias definitions sharing a name but
-     * reachable from different blocks in the same registry would collide on
-     * one exported const — refuse to write anything rather than pick one
-     * silently. Identical shapes (by rendered string) are not a conflict.
+     * Two different alias definitions sharing a name but reachable from
+     * different blocks in the same registry would collide on one exported
+     * const — refuse to write anything rather than pick one silently.
+     * Identical shapes (by rendered string) are not a conflict.
      *
      * @param  array<string, TypeNode>  $aliases
      * @param  array<string, TypeNode>  $fromBlock

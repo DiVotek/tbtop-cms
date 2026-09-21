@@ -29,11 +29,7 @@ function parsePhpDocType(string $type): TypeNode
     return $typeParser->parse($tokens);
 }
 
-/**
- * Decision 3's full mapping table, one row per construct. Each expected zod
- * fragment is a literal, matching the exact string ZodConverter::convert()
- * is documented to produce — never recomputed through the converter itself.
- */
+/** One row per PHPDoc construct ZodConverter maps; each expected fragment is a literal, never recomputed through the converter itself. */
 dataset('mappingTableCases', function (): array {
     return [
         'string' => ['string', 'z.string()'],

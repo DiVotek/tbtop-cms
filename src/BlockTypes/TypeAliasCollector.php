@@ -112,9 +112,8 @@ final class TypeAliasCollector
         $this->mergeAlias($localName, $imported[$import->importedAlias]);
 
         // The imported alias's own body may reference sibling aliases from
-        // the same source class (decision 1: "aliases may reference other
-        // aliases") — pull in every alias reachable from $from, not just the
-        // one named, so the converter can resolve those references too.
+        // the same source class — pull in every alias reachable from $from,
+        // not just the one named, so the converter can resolve those too.
         foreach ($imported as $name => $type) {
             $this->mergeAlias($name, $type);
         }

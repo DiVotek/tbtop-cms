@@ -10,8 +10,7 @@ use RuntimeException;
  * A PHPDoc construct with no zod mapping. `$blockKind` starts empty — the
  * converter has no notion of which block it's running for — and is filled
  * in once, by BlockShapeExtractor, as the exception propagates out of one
- * block's conversion; the top level itself never throws this, it degrades
- * to the untyped fallback instead (decision 4).
+ * block's conversion.
  */
 final class UnsupportedShapeException extends RuntimeException
 {

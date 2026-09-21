@@ -5,16 +5,11 @@ declare(strict_types=1);
 namespace Tbtop\Cms\BlockTypes;
 
 /**
- * Reformats one compact zod fragment (as ZodConverter renders it — every
- * `z.object({...})` on one line) into the repo's multi-line object-literal
- * style: one field per line, 4-space indent per nesting level, trailing
- * comma. Operates on the rendered string rather than the PHPDoc AST, so it
- * stays independent of the mapping table — it only ever sees brackets,
- * commas, and quoted string literals (block/alias/enum names never contain
- * braces). A bracket stack tracks `{`/`(`/`[` separately: only a comma whose
- * innermost enclosing bracket is `{` gets broken onto its own line — a plain
- * call's argument list, e.g. `z.record(z.string(), z.unknown())`, has no `{`
- * around it and stays inline.
+ * Reformats one compact zod fragment into the repo's multi-line
+ * object-literal style (one field per line, 4-space indent, trailing
+ * comma). Only breaks a comma whose innermost enclosing bracket is `{` —
+ * a plain call's argument list, e.g. `z.record(z.string(), z.unknown())`,
+ * has no `{` around it and stays inline.
  */
 final class ZodFragmentFormatter
 {

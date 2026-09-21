@@ -31,12 +31,8 @@ it('warns, never fails, naming the untyped block kinds', function (): void {
 });
 
 it('surfaces the warning through cms:doctor without failing the command', function (): void {
-    // A bare Testbench app fails several unrelated real checks (no
-    // @include in the fixture root view, no configured frontend routes,
-    // ...) — those are correct findings, not test bugs (see
-    // tests/Console/DoctorCommandTest.php), so the exit-0/warning-never-
-    // fails contract is proven here against a controlled check list
-    // instead of fighting the fixture into an artificially healthy shape.
+    // Controlled check list, not the full defaultChecks(): a bare Testbench
+    // app also fails unrelated real checks (see DoctorCommandTest.php).
     config()->set('tbtop-cms.blocks.types', []);
     BlockRegistry::extend(fn (): array => [UntypedBlock::class]);
     $this->app->instance(HealthCheckRunner::class, new HealthCheckRunner([app(UntypedBlocksCheck::class)]));

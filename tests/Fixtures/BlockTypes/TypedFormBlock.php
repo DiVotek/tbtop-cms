@@ -11,7 +11,7 @@ use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
 
-/** HandlesFormSubmission block: action/honeypotField appended (decision 5). */
+/** HandlesFormSubmission block: action/honeypotField get appended to its generated props. */
 class TypedFormBlock extends Block implements HandlesFormSubmission
 {
     public function kind(): string

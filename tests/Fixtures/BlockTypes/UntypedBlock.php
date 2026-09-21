@@ -9,7 +9,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
 
-/** No @return array{...} on resolve() — the untyped fallback (decision 4). */
+/** No @return array{...} on resolve() — exercises the untyped fallback. */
 class UntypedBlock extends Block
 {
     public function kind(): string

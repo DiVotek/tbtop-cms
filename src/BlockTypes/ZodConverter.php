@@ -20,8 +20,8 @@ use PHPStan\PhpDocParser\Ast\Type\UnionTypeNode;
 use ReflectionClass;
 
 /**
- * Converts one PHPDoc TypeNode into its zod fragment (decision 3's mapping
- * table). `$knownAliases` are emitted as a reference to the alias's own
+ * Converts one PHPDoc TypeNode into its zod fragment.
+ * `$knownAliases` are emitted as a reference to the alias's own
  * exported const rather than inlined; every alias name this call actually
  * used is recorded in `$usedAliases`, in first-use order, so the emitter can
  * print alias definitions before whatever first refers to them.
@@ -160,9 +160,9 @@ final class ZodConverter
     }
 
     /**
-     * Exposed for BlockShapeExtractor, which appends the two
-     * FormActionBinder keys (decision 5) to a top-level shape's field list
-     * without going through string surgery on the rendered object.
+     * Exposed for BlockShapeExtractor, which appends the FormActionBinder
+     * keys to a top-level shape's field list without string surgery on the
+     * rendered object.
      *
      * @return list<string> one "key: fragment" entry per shape item
      */
