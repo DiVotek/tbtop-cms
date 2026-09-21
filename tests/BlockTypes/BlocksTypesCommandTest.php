@@ -8,6 +8,7 @@ use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\KindCollisionBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\MalformedDocblockBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NestedTraitAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\RecursiveAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
@@ -80,6 +81,17 @@ it('degrades an untyped block to the z.record fallback with a TODO comment and a
     $contents = file_get_contents($this->outputPath);
 
     expect($contents)->toContain('export const untypedProps = z.record(z.string(), z.unknown()); // TODO: add @return array{...} to Untyped::resolve()');
+});
+
+it('degrades a block whose @return does not parse to the untyped fallback instead of crashing', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [MalformedDocblockBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain('[MalformedDocblock] has no typed @return array{...}')
+        ->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))->toContain('export const malformedDocblockProps = z.record(z.string(), z.unknown());');
 });
 
 it('keeps action/honeypotField on an untyped HandlesFormSubmission block', function (): void {
