@@ -57,14 +57,25 @@ final class TypeAliasCollector
     private function collectFromClassAndTraits(ReflectionClass $class): void
     {
         $this->collectFromDocComment($class->getDocComment() ?: null, $class->name);
-
-        foreach ($class->getTraits() as $trait) {
-            $this->collectFromDocComment($trait->getDocComment() ?: null, $class->name);
-        }
+        $this->collectFromTraits($class, $class->name);
 
         $parent = $class->getParentClass();
         if ($parent !== false) {
             $this->collectFromClassAndTraits($parent);
+        }
+    }
+
+    /**
+     * Traits use traits; every level may declare aliases. `self::` inside them
+     * still means the using class.
+     *
+     * @param  ReflectionClass<object>  $owner
+     */
+    private function collectFromTraits(ReflectionClass $owner, string $selfClass): void
+    {
+        foreach ($owner->getTraits() as $trait) {
+            $this->collectFromDocComment($trait->getDocComment() ?: null, $selfClass);
+            $this->collectFromTraits($trait, $selfClass);
         }
     }
 

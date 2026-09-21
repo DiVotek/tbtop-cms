@@ -7,6 +7,7 @@ use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\NestedTraitAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
@@ -53,6 +54,17 @@ it('emits an alias export referenced by its emitted const name', function (): vo
     expect($contents)->toContain('export const ctaLinkProps = z.object({')
         ->toContain('export type CtaLinkProps = z.infer<typeof ctaLinkProps>;')
         ->toContain('cta: ctaLinkProps,');
+});
+
+it('finds an alias declared on a trait used by another trait', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [NestedTraitAliasBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('export const pairProps = z.object({')
+        ->toContain('pair: pairProps,');
 });
 
 it('degrades an untyped block to the z.record fallback with a TODO comment and a warning, still exiting 0', function (): void {

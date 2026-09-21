@@ -170,9 +170,13 @@ final class ZodConverter
     {
         $fields = [];
 
-        foreach ($type->items as $item) {
+        foreach ($type->items as $index => $item) {
             $keyName = $item->keyName;
-            $key = $keyName === null ? '0' : (string) $keyName;
+            $key = match (true) {
+                $keyName === null => (string) $index,
+                $keyName instanceof ConstExprStringNode => $keyName->value,
+                default => (string) $keyName,
+            };
             $fieldPath = $keyPath === '' ? $key : "{$keyPath}.{$key}";
 
             $fragment = $this->convert($item->valueType, $fieldPath);
@@ -181,10 +185,16 @@ final class ZodConverter
                 $fragment .= '.optional()';
             }
 
-            $fields[] = "{$key}: {$fragment}";
+            $fields[] = self::objectKey($key) . ": {$fragment}";
         }
 
         return $fields;
+    }
+
+    /** A key that is not a JS identifier (or a plain index) must be quoted in an object literal. */
+    private static function objectKey(string $key): string
+    {
+        return preg_match('/^(?:[A-Za-z_$][A-Za-z0-9_$]*|0|[1-9][0-9]*)$/', $key) === 1 ? $key : json_encode($key, JSON_THROW_ON_ERROR);
     }
 
     private function convertGeneric(GenericTypeNode $type, string $keyPath): string
