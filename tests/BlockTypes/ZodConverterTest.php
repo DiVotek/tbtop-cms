@@ -83,7 +83,6 @@ it('references a known alias by its emitted const name instead of inlining it', 
 });
 
 it('throws UnsupportedShapeException naming the key path for a construct with no zod mapping', function (): void {
-    // `resource` has no PHPDoc meaning ZodConverter recognizes at any level.
     $type = parsePhpDocType('array{nested: array{deep: resource}}');
     $converter = new ZodConverter(knownAliases: []);
 
