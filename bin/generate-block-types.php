@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * Regenerates resources/js/cms/blocks.generated.ts for exactly
- * Hero/ContactForm — overrides tbtop-cms.blocks.types after boot to exclude
- * the workbench's own demo-only FaqBlock registration.
- */
+// Pins the registry to the package's own blocks: the workbench provider would add its demo FaqBlock.
 
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;

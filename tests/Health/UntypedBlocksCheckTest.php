@@ -31,8 +31,6 @@ it('warns, never fails, naming the untyped block kinds', function (): void {
 });
 
 it('surfaces the warning through cms:doctor without failing the command', function (): void {
-    // Controlled check list, not the full defaultChecks(): a bare Testbench
-    // app also fails unrelated real checks (see DoctorCommandTest.php).
     config()->set('tbtop-cms.blocks.types', []);
     BlockRegistry::extend(fn (): array => [UntypedBlock::class]);
     $this->app->instance(HealthCheckRunner::class, new HealthCheckRunner([app(UntypedBlocksCheck::class)]));
