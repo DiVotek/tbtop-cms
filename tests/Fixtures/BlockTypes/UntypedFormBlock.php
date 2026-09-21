@@ -11,7 +11,6 @@ use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
 
-/** Untyped HandlesFormSubmission block: the fallback still carries action/honeypotField. */
 class UntypedFormBlock extends Block implements HandlesFormSubmission
 {
     public function kind(): string
