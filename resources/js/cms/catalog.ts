@@ -1,29 +1,7 @@
 import { defineCatalog } from "@json-render/core";
 import { schema } from "@json-render/react/schema";
 import { z } from "zod";
-
-export const heroProps = z.object({
-    title: z.string(),
-    subtitle: z.string().nullable(),
-    image: z.string().nullable(),
-    cta: z.object({ label: z.string(), href: z.string() }).nullable(),
-});
-
-export const contactFormProps = z.object({
-    heading: z.string(),
-    submitLabel: z.string(),
-    successMessage: z.string(),
-    action: z.string(),
-    honeypotField: z.string().optional(),
-    fields: z.array(
-        z.object({
-            name: z.string(),
-            label: z.string(),
-            type: z.string(),
-            required: z.boolean(),
-        }),
-    ),
-});
+import { contactFormProps, heroProps } from "./blocks.generated";
 
 export const catalog = defineCatalog(schema, {
     components: {

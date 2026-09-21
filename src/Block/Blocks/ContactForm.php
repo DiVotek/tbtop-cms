@@ -66,7 +66,7 @@ class ContactForm extends Block implements HandlesFormSubmission
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
+     * @return array{heading: string, submitLabel: string, successMessage: string, fields: list<array{name: string, label: string, type: string, required: bool}>}
      */
     #[\Override]
     public function resolve(array $input, ResolveContext $ctx): array

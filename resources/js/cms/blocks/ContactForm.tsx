@@ -1,9 +1,6 @@
 import { useForm } from "@inertiajs/react";
 import { type FormEvent, useState } from "react";
-import type { z } from "zod";
-import type { contactFormProps } from "../catalog";
-
-type ContactFormProps = z.infer<typeof contactFormProps>;
+import type { ContactFormProps } from "../blocks.generated";
 
 export function ContactForm({ props }: { props: ContactFormProps }) {
     const initial: Record<string, string> = Object.fromEntries(
