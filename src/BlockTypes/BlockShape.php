@@ -15,5 +15,6 @@ final class BlockShape
         public readonly string $propsFragment,
         public readonly bool $isTyped,
         public readonly array $usedAliases,
+        public readonly ?string $leadingComment = null,
     ) {}
 }

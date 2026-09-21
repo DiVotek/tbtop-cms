@@ -34,7 +34,7 @@ it('writes typed props, an alias export, and the blockProps map for the real pac
         ->toContain('import { z } from "zod";')
         ->toContain('export const heroProps = z.object({')
         ->toContain('export type HeroProps = z.infer<typeof heroProps>;')
-        ->toContain('export const contactFormProps')
+        ->toContain("// action/honeypotField are injected by FormActionBinder after resolve() runs\nexport const contactFormProps = z.object({")
         ->toContain('action: z.string(),')
         ->toContain('honeypotField: z.string().optional(),')
         ->toContain('Hero: heroProps,')
@@ -77,7 +77,8 @@ it('appends action/honeypotField to a HandlesFormSubmission block after its docb
 
     expect($contents)->toContain('heading: z.string(),')
         ->toContain('action: z.string(),')
-        ->toContain('honeypotField: z.string().optional(),');
+        ->toContain('honeypotField: z.string().optional(),')
+        ->toContain("// action/honeypotField are injected by FormActionBinder after resolve() runs\nexport const typedFormProps = z.object({");
 });
 
 it('errors with exit 1 and writes nothing when two blocks declare the same alias name with different shapes', function (): void {

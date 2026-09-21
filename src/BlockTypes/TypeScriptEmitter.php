@@ -33,7 +33,7 @@ final class TypeScriptEmitter
         }
 
         foreach ($shapes as $shape) {
-            array_push($lines, ...$this->constAndType($shape->kind, $shape->propsFragment, $shape->isTyped));
+            array_push($lines, ...$this->constAndType($shape->kind, $shape->propsFragment, $shape->isTyped, $shape->leadingComment));
             $lines[] = '';
         }
 
@@ -48,14 +48,17 @@ final class TypeScriptEmitter
     }
 
     /** @return list<string> */
-    private function constAndType(string $name, string $fragment, bool $isTyped = true): array
+    private function constAndType(string $name, string $fragment, bool $isTyped = true, ?string $leadingComment = null): array
     {
         $const = EmitterNames::propsConst($name);
         $type = EmitterNames::propsType($name);
         $todo = $isTyped ? '' : " // TODO: add @return array{...} to {$name}::resolve()";
         $formatted = ZodFragmentFormatter::format($fragment, 0);
 
+        $lines = $leadingComment === null ? [] : [$leadingComment];
+
         return [
+            ...$lines,
             "export const {$const} = {$formatted};{$todo}",
             "export type {$type} = z.infer<typeof {$const}>;",
         ];

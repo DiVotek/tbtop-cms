@@ -12,7 +12,8 @@ export const heroProps = z.object({
 });
 export type HeroProps = z.infer<typeof heroProps>;
 
-export const contactFormProps = /* FormActionBinder injects action/honeypotField after resolve() runs */ z.object({
+// action/honeypotField are injected by FormActionBinder after resolve() runs
+export const contactFormProps = z.object({
     heading: z.string(),
     submitLabel: z.string(),
     successMessage: z.string(),

@@ -55,28 +55,29 @@ final class BlockShapeExtractor
         $converter = new ZodConverter($aliases);
 
         try {
-            $fragment = $this->convertTopLevelShape($converter, $returnType, $block, $kind);
+            [$fragment, $leadingComment] = $this->convertTopLevelShape($converter, $returnType, $block, $kind);
         } catch (UnsupportedShapeException $e) {
             throw $e->withBlockKind($kind);
         }
 
-        return new BlockShape($kind, $fragment, isTyped: true, usedAliases: $converter->usedAliases());
+        return new BlockShape($kind, $fragment, isTyped: true, usedAliases: $converter->usedAliases(), leadingComment: $leadingComment);
     }
 
-    private function convertTopLevelShape(ZodConverter $converter, ArrayShapeNode $type, Block $block, string $kind): string
+    /** @return array{0: string, 1: ?string} the props fragment, and a leading comment to print above its `export const` */
+    private function convertTopLevelShape(ZodConverter $converter, ArrayShapeNode $type, Block $block, string $kind): array
     {
         $resolved = SelfTypeResolver::resolveShape($type, $block::class);
 
         if (! $block instanceof HandlesFormSubmission) {
             $fields = $converter->convertShapeFields($resolved, '');
 
-            return 'z.object({ ' . implode(', ', $fields) . ' })';
+            return ['z.object({ ' . implode(', ', $fields) . ' })', null];
         }
 
         $this->assertNoFormKeyCollision($resolved, $kind);
         $fields = $converter->convertShapeFields($resolved, '');
 
-        return $this->appendFormKeys($fields);
+        return [$this->appendFormKeys($fields), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
     }
 
     private function assertNoFormKeyCollision(ArrayShapeNode $type, string $kind): void
@@ -102,7 +103,7 @@ final class BlockShapeExtractor
         $fields[] = 'action: z.string()';
         $fields[] = 'honeypotField: z.string().optional()';
 
-        return '/* FormActionBinder injects action/honeypotField after resolve() runs */ z.object({ ' . implode(', ', $fields) . ' })';
+        return 'z.object({ ' . implode(', ', $fields) . ' })';
     }
 
     private function untypedShape(string $kind): BlockShape
