@@ -165,5 +165,13 @@ return [
                 'missing' => 'Add this line to your AGENTS.md or CLAUDE.md (checked: :candidates) so an agent finds the guide: "Building on tbtop/cms → read vendor/tbtop/cms/docs/host/ai/README.md first."',
             ],
         ],
+        'untyped_blocks' => [
+            'label' => 'Typed block props',
+            'ok' => 'Every registered block has a typed @return array{...} on resolve().',
+            'warning' => 'Some registered blocks have no typed @return array{...} on resolve(): :kinds.',
+            'hints' => [
+                'warning' => 'Add a shaped @return array{...} docblock to each listed block\'s resolve() so `php artisan cms:blocks:types` can generate real props instead of a permissive z.record() fallback.',
+            ],
+        ],
     ],
 ];
