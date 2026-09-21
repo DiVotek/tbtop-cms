@@ -59,7 +59,7 @@ final class UntypedBlocksCheck implements HealthCheck
         $untyped = [];
 
         foreach ($this->registry->all() as $block) {
-            if (! self::isBlockTyped($extractor, $block)) {
+            if (! self::isTypedOrMalformed($extractor, $block)) {
                 $untyped[] = $block->kind();
             }
         }
@@ -67,8 +67,8 @@ final class UntypedBlocksCheck implements HealthCheck
         return $untyped;
     }
 
-    /** A malformed docblock is cms:blocks:types's own error to report, not this (never-throwing) check's — treated as typed here so it's silently skipped. */
-    private static function isBlockTyped(BlockShapeExtractor $extractor, Block $block): bool
+    /** Malformed docblocks are cms:blocks:types's error to report; a health check never throws. */
+    private static function isTypedOrMalformed(BlockShapeExtractor $extractor, Block $block): bool
     {
         try {
             return $extractor->extract($block)->isTyped;
