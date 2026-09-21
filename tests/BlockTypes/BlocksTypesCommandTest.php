@@ -7,12 +7,16 @@ use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\KindCollisionBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\MalformedDocblockBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NestedTraitAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\RecursiveAliasBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\RenamedImportsBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\ShortNameImportBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedFormBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsealedRootBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedFormBlock;
@@ -68,6 +72,51 @@ it('finds an alias declared on a trait used by another trait', function (): void
     expect(file_get_contents($this->outputPath))
         ->toContain('export const pairProps = z.object({')
         ->toContain('pair: pairProps,');
+});
+
+it('resolves @phpstan-import-type sources by short name and by use alias', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [ShortNameImportBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('export const moneyProps = z.object({')
+        ->toContain('export const rangeProps = z.object({')
+        ->toContain('price: moneyProps,')
+        ->toContain('range: rangeProps,');
+});
+
+it('keeps two renamed imports of the same alias name apart', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [RenamedImportsBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('export const aItemProps = z.object({')
+        ->toContain('export const bItemProps = z.object({')
+        ->not->toContain('unusedProps');
+});
+
+it('keeps the catchall of an unsealed top-level shape', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [UnsealedRootBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))->toContain("}).catchall(z.number().int());\nexport type UnsealedRootProps");
+});
+
+it('quotes a block kind that is not a JS identifier in the blockProps map', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [DashKindBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('export const heroBannerProps = z.object({')
+        ->toContain('    "hero-banner": heroBannerProps,');
 });
 
 it('degrades an untyped block to the z.record fallback with a TODO comment and a warning, still exiting 0', function (): void {

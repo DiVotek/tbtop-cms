@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\BlockTypes;
 
+use PHPStan\PhpDocParser\Ast\AbstractNodeVisitor;
+use PHPStan\PhpDocParser\Ast\Node;
+use PHPStan\PhpDocParser\Ast\NodeTraverser;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\TypeAliasImportTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\TypeAliasTagValueNode;
+use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
@@ -56,7 +60,7 @@ final class TypeAliasCollector
     /** @param  ReflectionClass<object>  $class */
     private function collectFromClassAndTraits(ReflectionClass $class): void
     {
-        $this->collectFromDocComment($class->getDocComment() ?: null, $class->name);
+        $this->collectFromDocComment($class, $class->name);
         $this->collectFromTraits($class, $class->name);
 
         $parent = $class->getParentClass();
@@ -74,14 +78,17 @@ final class TypeAliasCollector
     private function collectFromTraits(ReflectionClass $owner, string $selfClass): void
     {
         foreach ($owner->getTraits() as $trait) {
-            $this->collectFromDocComment($trait->getDocComment() ?: null, $selfClass);
+            $this->collectFromDocComment($trait, $selfClass);
             $this->collectFromTraits($trait, $selfClass);
         }
     }
 
-    private function collectFromDocComment(?string $docComment, string $selfClass): void
+    /** @param  ReflectionClass<object>  $declaring  the class or trait carrying the docblock */
+    private function collectFromDocComment(ReflectionClass $declaring, string $selfClass): void
     {
-        if ($docComment === null) {
+        $docComment = $declaring->getDocComment();
+
+        if ($docComment === false) {
             return;
         }
 
@@ -96,7 +103,7 @@ final class TypeAliasCollector
         }
 
         foreach ($doc->getTypeAliasImportTagValues() as $import) {
-            $this->importAlias($import);
+            $this->importAlias($import, $declaring);
         }
     }
 
@@ -105,14 +112,16 @@ final class TypeAliasCollector
         $this->mergeAlias($tag->alias, SelfTypeResolver::resolve($tag->type, $selfClass));
     }
 
-    private function importAlias(TypeAliasImportTagValueNode $import): void
+    /** @param  ReflectionClass<object>  $declaring */
+    private function importAlias(TypeAliasImportTagValueNode $import, ReflectionClass $declaring): void
     {
-        $from = $import->importedFrom->name;
+        $from = DocblockClassResolver::resolve($import->importedFrom->name, $declaring);
 
         if (! class_exists($from) && ! trait_exists($from) && ! interface_exists($from)) {
             throw new RuntimeException("@phpstan-import-type [{$import->importedAlias}] names an unknown class [{$from}].");
         }
 
+        /** @var class-string $from */
         $imported = (new self)->collect($from);
 
         if (! isset($imported[$import->importedAlias])) {
@@ -122,12 +131,49 @@ final class TypeAliasCollector
         $localName = $import->importedAs ?? $import->importedAlias;
         $this->mergeAlias($localName, $imported[$import->importedAlias]);
 
-        // The imported alias's own body may reference sibling aliases from
-        // the same source class — pull in every alias reachable from $from,
-        // not just the one named, so the converter can resolve those too.
-        foreach ($imported as $name => $type) {
-            $this->mergeAlias($name, $type);
+        // The imported body may refer to sibling aliases of the source class;
+        // those come along under their own names. Unrelated siblings do not,
+        // so `Item from A as AItem` + `Item from B as BItem` can coexist.
+        foreach (self::referencedAliases($imported[$import->importedAlias], $imported) as $name) {
+            $this->mergeAlias($name, $imported[$name]);
         }
+    }
+
+    /**
+     * @param  array<string, TypeNode>  $pool
+     * @return list<string> alias names reachable from $type, transitively
+     */
+    private static function referencedAliases(TypeNode $type, array $pool): array
+    {
+        $found = [];
+        $queue = [$type];
+
+        while ($queue !== []) {
+            $visitor = new class extends AbstractNodeVisitor
+            {
+                /** @var list<string> */
+                public array $names = [];
+
+                public function enterNode(Node $node): null
+                {
+                    if ($node instanceof IdentifierTypeNode) {
+                        $this->names[] = $node->name;
+                    }
+
+                    return null;
+                }
+            };
+            (new NodeTraverser([$visitor]))->traverse([array_shift($queue)]);
+
+            foreach ($visitor->names as $name) {
+                if (isset($pool[$name]) && ! isset($found[$name])) {
+                    $found[$name] = true;
+                    $queue[] = $pool[$name];
+                }
+            }
+        }
+
+        return array_keys($found);
     }
 
     private function mergeAlias(string $name, TypeNode $type): void

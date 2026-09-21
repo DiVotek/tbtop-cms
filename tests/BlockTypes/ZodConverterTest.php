@@ -51,13 +51,13 @@ dataset('mappingTableCases', function (): array {
         'literal union of ints' => ['1|2|3', 'z.union([z.literal(1), z.literal(2), z.literal(3)])'],
         'list<T>' => ['list<string>', 'z.array(z.string())'],
         'non-empty-list<T>' => ['non-empty-list<string>', 'z.array(z.string()).min(1)'],
-        'T[]' => ['string[]', 'z.array(z.string())'],
-        'array<int,T>' => ['array<int, string>', 'z.array(z.string())'],
         'array<string,T>' => ['array<string, int>', 'z.record(z.string(), z.number().int())'],
         'nested array{}' => ['array{a: string, b: int}', 'z.object({ a: z.string(), b: z.number().int() })'],
         'array{} with optional key' => ['array{a?: string}', 'z.object({ a: z.string().optional() })'],
         'unsealed array{...}' => ['array{a: string, ...}', 'z.object({ a: z.string() }).catchall(z.unknown())'],
         'unsealed array{...<string, T>}' => ['array{a: string, ...<string, int>}', 'z.object({ a: z.string() }).catchall(z.number().int())'],
+        'tuple array{T, U}' => ['array{string, int}', 'z.tuple([z.string(), z.number().int()])'],
+        'tuple list{T, U}' => ['list{string, int}', 'z.tuple([z.string(), z.number().int()])'],
         'array{} with a non-identifier key' => ["array{'data-id': string, ok: bool}", 'z.object({ "data-id": z.string(), ok: z.boolean() })'],
     ];
 });
@@ -85,10 +85,19 @@ it('references a known alias by its emitted const name instead of inlining it', 
         ->and($converter->usedAliases())->toBe(['SomeAlias' => true]);
 });
 
-it('throws UnsupportedShapeException naming the key path for a construct with no zod mapping', function (): void {
-    $type = parsePhpDocType('array{nested: array{deep: resource}}');
+dataset('unsupportedCases', function (): array {
+    return [
+        'no zod mapping' => ['array{nested: array{deep: resource}}', 'unsupported PHPDoc construct at [root.nested.deep]: resource'],
+        'T[] may serialize as an object' => ['array{items: string[]}', 'at [root.items]: T[]'],
+        'array<int,T> may serialize as an object' => ['array{items: array<int, string>}', 'at [root.items]: array<int, T>'],
+        'positional item mixed with named keys' => ['array{string, b: int}', 'at [root.0]: a positional item mixed with named keys'],
+    ];
+});
+
+it('throws UnsupportedShapeException naming the key path for a construct with no zod mapping', function (string $phpDocType, string $message): void {
+    $type = parsePhpDocType($phpDocType);
     $converter = new ZodConverter(knownAliases: []);
 
     expect(fn () => $converter->convert($type, 'root'))
-        ->toThrow(UnsupportedShapeException::class, 'unsupported PHPDoc construct at [root.nested.deep]: resource');
-});
+        ->toThrow(UnsupportedShapeException::class, $message);
+})->with('unsupportedCases');

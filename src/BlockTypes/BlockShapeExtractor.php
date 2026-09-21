@@ -71,13 +71,13 @@ final class BlockShapeExtractor
         if (! $block instanceof HandlesFormSubmission) {
             $fields = $converter->convertShapeFields($resolved, '');
 
-            return ['z.object({ ' . implode(', ', $fields) . ' })', null];
+            return [$converter->objectFromFields($fields, $resolved, ''), null];
         }
 
         $this->assertNoFormKeyCollision($resolved, $kind);
         $fields = $converter->convertShapeFields($resolved, '');
 
-        return [$this->appendFormKeys($fields), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
+        return [$converter->objectFromFields($this->appendFormKeys($fields), $resolved, ''), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
     }
 
     private function assertNoFormKeyCollision(ArrayShapeNode $type, string $kind): void
@@ -97,19 +97,20 @@ final class BlockShapeExtractor
      * part of the docblock itself.
      *
      * @param  list<string>  $fields
+     * @return list<string>
      */
-    private function appendFormKeys(array $fields): string
+    private function appendFormKeys(array $fields): array
     {
         $fields[] = 'action: z.string()';
         $fields[] = 'honeypotField: z.string().optional()';
 
-        return 'z.object({ ' . implode(', ', $fields) . ' })';
+        return $fields;
     }
 
     private function untypedShape(string $kind, Block $block): BlockShape
     {
         $fragment = $block instanceof HandlesFormSubmission
-            ? $this->appendFormKeys([]) . '.catchall(z.unknown())'
+            ? 'z.object({ ' . implode(', ', $this->appendFormKeys([])) . ' }).catchall(z.unknown())'
             : 'z.record(z.string(), z.unknown())';
 
         return new BlockShape($kind, $fragment, isTyped: false, usedAliases: []);

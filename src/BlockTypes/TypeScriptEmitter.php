@@ -43,7 +43,7 @@ final class TypeScriptEmitter
 
         $lines[] = 'export const blockProps = {';
         foreach ($shapes as $shape) {
-            $lines[] = "    {$shape->kind}: " . EmitterNames::propsConst($shape->kind) . ',';
+            $lines[] = '    ' . EmitterNames::objectKey($shape->kind) . ': ' . EmitterNames::propsConst($shape->kind) . ',';
         }
         $lines[] = '} as const;';
         $lines[] = '';

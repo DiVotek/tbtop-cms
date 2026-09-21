@@ -64,9 +64,20 @@ extractor, so a forgotten docblock shows up before a host notices the
 generated catalog has a hole.
 
 `@phpstan-type`/`@psalm-type` aliases (and `@phpstan-import-type` imports)
-are supported and resolved across classes/traits; an alias reused with two
-different shapes anywhere in the registry is a command error, nothing is
-written.
+are supported and resolved across classes/traits; the `from` class is
+resolved like PHP would in that file (same namespace, `use` aliases, or a
+leading `\`). `... as Local` renames the import, so two sources may each
+declare an `Item`; an alias reused with two different shapes anywhere in
+the registry is a command error, nothing is written.
+
+Array types must say what they serialize to: `list<T>` and
+`non-empty-list<T>` become `z.array()`, `array<string, T>` becomes
+`z.record()`, and an all-positional `array{T, U}` / `list{T, U}` becomes
+`z.tuple()`. `T[]` and `array<int, T>` are rejected — a PHP array with
+non-sequential integer keys serializes as a JSON object, so neither maps to
+a single zod schema; write `list<T>` when the value is a list. An unsealed
+shape (`array{a: string, ...}` or `...<string, T>`) keeps its extra keys via
+`.catchall()`, at the top level too.
 
 ## `Block` API
 

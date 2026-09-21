@@ -53,7 +53,7 @@ final class ZodConverter
         }
 
         if ($type instanceof ArrayTypeNode) {
-            return 'z.array(' . $this->convert($type->type, $keyPath . '[]') . ')';
+            throw new UnsupportedShapeException($keyPath, 'T[] (keys may be non-sequential and serialize as an object; use list<T>)');
         }
 
         if ($type instanceof ConstTypeNode) {
@@ -154,18 +154,65 @@ final class ZodConverter
 
     private function convertShape(ArrayShapeNode $type, string $keyPath): string
     {
-        $body = implode(', ', $this->convertShapeFields($type, $keyPath));
-        $object = "z.object({ {$body} })";
+        if (self::isTuple($type)) {
+            return $this->convertTuple($type, $keyPath);
+        }
+
+        return $this->objectFromFields($this->convertShapeFields($type, $keyPath), $type, $keyPath);
+    }
+
+    /**
+     * `array{a: string, ...}` / `...<string, T>`: extra keys are part of the
+     * contract, and a plain z.object() would strip them at parse time.
+     *
+     * @param  list<string>  $fields  "key: fragment" entries
+     */
+    public function objectFromFields(array $fields, ArrayShapeNode $type, string $keyPath): string
+    {
+        $object = 'z.object({ ' . implode(', ', $fields) . ' })';
 
         if ($type->sealed) {
             return $object;
         }
 
-        // `array{a: string, ...}` / `...<string, T>`: extra keys are part of the
-        // contract, and a plain z.object() would strip them at parse time.
         $extra = $type->unsealedType === null ? 'z.unknown()' : $this->convert($type->unsealedType->valueType, "{$keyPath}.*");
 
         return "{$object}.catchall({$extra})";
+    }
+
+    /** Every item positional (`array{string, int}` / `list{string, int}`): a PHP list, so a JSON array. */
+    private static function isTuple(ArrayShapeNode $type): bool
+    {
+        if ($type->items === []) {
+            return false;
+        }
+
+        foreach ($type->items as $item) {
+            if ($item->keyName !== null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function convertTuple(ArrayShapeNode $type, string $keyPath): string
+    {
+        if (! $type->sealed) {
+            throw new UnsupportedShapeException($keyPath, 'an unsealed tuple');
+        }
+
+        $elements = [];
+
+        foreach ($type->items as $index => $item) {
+            if ($item->optional) {
+                throw new UnsupportedShapeException("{$keyPath}.{$index}", 'an optional tuple element');
+            }
+
+            $elements[] = $this->convert($item->valueType, "{$keyPath}.{$index}");
+        }
+
+        return 'z.tuple([' . implode(', ', $elements) . '])';
     }
 
     /**
@@ -181,11 +228,12 @@ final class ZodConverter
 
         foreach ($type->items as $index => $item) {
             $keyName = $item->keyName;
-            $key = match (true) {
-                $keyName === null => (string) $index,
-                $keyName instanceof ConstExprStringNode => $keyName->value,
-                default => (string) $keyName,
-            };
+
+            if ($keyName === null) {
+                throw new UnsupportedShapeException("{$keyPath}.{$index}", 'a positional item mixed with named keys');
+            }
+
+            $key = $keyName instanceof ConstExprStringNode ? $keyName->value : (string) $keyName;
             $fieldPath = $keyPath === '' ? $key : "{$keyPath}.{$key}";
 
             $fragment = $this->convert($item->valueType, $fieldPath);
@@ -194,16 +242,10 @@ final class ZodConverter
                 $fragment .= '.optional()';
             }
 
-            $fields[] = self::objectKey($key) . ": {$fragment}";
+            $fields[] = EmitterNames::objectKey($key) . ": {$fragment}";
         }
 
         return $fields;
-    }
-
-    /** A key that is not a JS identifier (or a plain index) must be quoted in an object literal. */
-    private static function objectKey(string $key): string
-    {
-        return preg_match('/^(?:[A-Za-z_$][A-Za-z0-9_$]*|0|[1-9][0-9]*)$/', $key) === 1 ? $key : json_encode($key, JSON_THROW_ON_ERROR);
     }
 
     private function convertGeneric(GenericTypeNode $type, string $keyPath): string
@@ -253,7 +295,7 @@ final class ZodConverter
         }
 
         if ($keyType->name === 'int') {
-            return 'z.array(' . $this->convert($valueType, $keyPath . '[]') . ')';
+            throw new UnsupportedShapeException($keyPath, 'array<int, T> (keys may be non-sequential and serialize as an object; use list<T>)');
         }
 
         if ($valueType instanceof IdentifierTypeNode && $valueType->name === 'mixed') {
