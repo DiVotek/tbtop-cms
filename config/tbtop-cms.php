@@ -59,6 +59,12 @@ return [
     'blocks' => [
         'types' => [],
         'strict' => false,
+        // Output path for `php artisan cms:blocks:types` (zod schemas + TS
+        // types generated from each block's resolve() docblock). Read with
+        // an inline default (resource_path('js/cms/blocks.generated.ts')) —
+        // published host configs override whole sections and won't have
+        // this key; override per-invocation with --path=.
+        'types_path' => null,
     ],
     'seo' => [
         // Host schema.org node classes merged into SchemaTypeRegistry.

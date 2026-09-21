@@ -32,6 +32,7 @@ use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Cache\InvalidatesContentCache;
+use Tbtop\Cms\Console\BlocksTypesCommand;
 use Tbtop\Cms\Console\DoctorCommand;
 use Tbtop\Cms\Console\InstallCommand;
 use Tbtop\Cms\Form\Events\SubmissionReceived;
@@ -135,6 +136,7 @@ class CmsServiceProvider extends PackageServiceProvider
                 PruneNotFoundHitsCommand::class,
                 SnapshotSeoAuditCommand::class,
                 DoctorCommand::class,
+                BlocksTypesCommand::class,
             ])
             ->runsMigrations();
     }
