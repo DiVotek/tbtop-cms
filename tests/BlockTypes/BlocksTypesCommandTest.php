@@ -7,7 +7,9 @@ use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\KindCollisionBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NestedTraitAliasBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\RecursiveAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
@@ -113,6 +115,28 @@ it('errors with exit 1 and writes nothing when two blocks declare the same alias
 
     $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
         ->expectsOutputToContain('Type alias [Shared] is declared with two different shapes')
+        ->assertExitCode(1);
+
+    expect(is_file($this->outputPath))->toBeFalse();
+});
+
+it('errors with exit 1 and writes nothing for an alias that refers to itself', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [RecursiveAliasBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain('Type alias [Node] refers to itself (Node -> Node)')
+        ->assertExitCode(1);
+
+    expect(is_file($this->outputPath))->toBeFalse();
+});
+
+it('errors with exit 1 and writes nothing when an alias name collides with a block kind', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [KindCollisionBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain('would both be exported as `collideProps`')
         ->assertExitCode(1);
 
     expect(is_file($this->outputPath))->toBeFalse();

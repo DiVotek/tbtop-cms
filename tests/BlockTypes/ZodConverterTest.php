@@ -56,6 +56,8 @@ dataset('mappingTableCases', function (): array {
         'array<string,T>' => ['array<string, int>', 'z.record(z.string(), z.number().int())'],
         'nested array{}' => ['array{a: string, b: int}', 'z.object({ a: z.string(), b: z.number().int() })'],
         'array{} with optional key' => ['array{a?: string}', 'z.object({ a: z.string().optional() })'],
+        'unsealed array{...}' => ['array{a: string, ...}', 'z.object({ a: z.string() }).catchall(z.unknown())'],
+        'unsealed array{...<string, T>}' => ['array{a: string, ...<string, int>}', 'z.object({ a: z.string() }).catchall(z.number().int())'],
         'array{} with a non-identifier key' => ["array{'data-id': string, ok: bool}", 'z.object({ "data-id": z.string(), ok: z.boolean() })'],
     ];
 });

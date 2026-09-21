@@ -155,8 +155,17 @@ final class ZodConverter
     private function convertShape(ArrayShapeNode $type, string $keyPath): string
     {
         $body = implode(', ', $this->convertShapeFields($type, $keyPath));
+        $object = "z.object({ {$body} })";
 
-        return "z.object({ {$body} })";
+        if ($type->sealed) {
+            return $object;
+        }
+
+        // `array{a: string, ...}` / `...<string, T>`: extra keys are part of the
+        // contract, and a plain z.object() would strip them at parse time.
+        $extra = $type->unsealedType === null ? 'z.unknown()' : $this->convert($type->unsealedType->valueType, "{$keyPath}.*");
+
+        return "{$object}.catchall({$extra})";
     }
 
     /**
