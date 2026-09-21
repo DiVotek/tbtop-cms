@@ -53,7 +53,8 @@ bare `array`/`array<string, mixed>` return, or an unparsable top-level type)
 degrades to a permissive `z.record(z.string(), z.unknown())` fallback with a
 `TODO` comment and a command warning — it does not fail the run.
 `HandlesFormSubmission` blocks get `action`/`honeypotField` appended
-automatically (FormActionBinder injects them after `resolve()` runs); declare
+automatically (FormActionBinder injects them after `resolve()` runs), typed
+or not — an untyped form block falls back to `z.object({action, honeypotField?}).catchall(z.unknown())`; declare
 either key in the docblock yourself and the command errors. A PHPDoc
 construct the converter has no zod mapping for (inside an otherwise-typed
 shape) is a hard error naming the block and the key path — fix the docblock,

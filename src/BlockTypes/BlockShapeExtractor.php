@@ -48,7 +48,7 @@ final class BlockShapeExtractor
         // rather than error — only a construct *inside* an otherwise-usable
         // array{} shape is a hard failure.
         if ($returnType === null || ! $returnType instanceof ArrayShapeNode) {
-            return $this->untypedShape($kind);
+            return $this->untypedShape($kind, $block);
         }
 
         $aliases = (new TypeAliasCollector)->collect($block::class);
@@ -106,9 +106,13 @@ final class BlockShapeExtractor
         return 'z.object({ ' . implode(', ', $fields) . ' })';
     }
 
-    private function untypedShape(string $kind): BlockShape
+    private function untypedShape(string $kind, Block $block): BlockShape
     {
-        return new BlockShape($kind, 'z.record(z.string(), z.unknown())', isTyped: false, usedAliases: []);
+        $fragment = $block instanceof HandlesFormSubmission
+            ? $this->appendFormKeys([]) . '.catchall(z.unknown())'
+            : 'z.record(z.string(), z.unknown())';
+
+        return new BlockShape($kind, $fragment, isTyped: false, usedAliases: []);
     }
 
     private function returnTypeOf(Block $block): ?TypeNode

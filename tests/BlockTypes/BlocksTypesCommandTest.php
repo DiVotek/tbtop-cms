@@ -11,6 +11,7 @@ use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedFormBlock;
 
 beforeEach(function (): void {
     $this->outputPath = sys_get_temp_dir() . '/tbtop-cms-blocks-types-test-' . uniqid() . '.ts';
@@ -65,6 +66,19 @@ it('degrades an untyped block to the z.record fallback with a TODO comment and a
     $contents = file_get_contents($this->outputPath);
 
     expect($contents)->toContain('export const untypedProps = z.record(z.string(), z.unknown()); // TODO: add @return array{...} to Untyped::resolve()');
+});
+
+it('keeps action/honeypotField on an untyped HandlesFormSubmission block', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [UntypedFormBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain('[UntypedForm] has no typed @return array{...}')
+        ->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))->toContain(
+        "export const untypedFormProps = z.object({\n    action: z.string(),\n    honeypotField: z.string().optional(),\n}).catchall(z.unknown()); // TODO: add @return array{...} to UntypedForm::resolve()",
+    );
 });
 
 it('appends action/honeypotField to a HandlesFormSubmission block after its docblock keys', function (): void {
