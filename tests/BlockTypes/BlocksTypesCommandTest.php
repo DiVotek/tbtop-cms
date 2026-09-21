@@ -74,7 +74,7 @@ it('finds an alias declared on a trait used by another trait', function (): void
         ->toContain('pair: pairProps,');
 });
 
-it('resolves @phpstan-import-type sources by short name and by use alias', function (): void {
+it('resolves @phpstan-import-type sources by short name, plain use import and use alias', function (): void {
     config()->set('tbtop-cms.blocks.types', []);
     BlockRegistry::extend(fn (): array => [ShortNameImportBlock::class]);
 
@@ -84,7 +84,8 @@ it('resolves @phpstan-import-type sources by short name and by use alias', funct
         ->toContain('export const moneyProps = z.object({')
         ->toContain('export const rangeProps = z.object({')
         ->toContain('price: moneyProps,')
-        ->toContain('range: rangeProps,');
+        ->toContain('range: rangeProps,')
+        ->toContain('period: periodProps,');
 });
 
 it('keeps two renamed imports of the same alias name apart', function (): void {

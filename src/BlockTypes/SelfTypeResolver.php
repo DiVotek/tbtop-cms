@@ -41,10 +41,9 @@ final class SelfTypeResolver
         }
 
         if ($type instanceof UnionTypeNode) {
-            return new UnionTypeNode(array_map(
-                static fn (TypeNode $t): TypeNode => self::resolve($t, $selfClass),
-                $type->types,
-            ));
+            return new UnionTypeNode(
+                array_map(static fn (TypeNode $t): TypeNode => self::resolve($t, $selfClass), $type->types),
+            );
         }
 
         if ($type instanceof ArrayTypeNode) {

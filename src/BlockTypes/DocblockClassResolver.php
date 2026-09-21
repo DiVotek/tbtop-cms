@@ -87,12 +87,19 @@ final class DocblockClassResolver
             foreach (self::expandGroup($statement) as $clause) {
                 [$fqcn, $alias] = array_pad(array_map('trim', preg_split('/\s+as\s+/i', $clause) ?: []), 2, null);
                 $fqcn = ltrim((string) $fqcn, '\\');
-                $alias ??= substr($fqcn, (int) strrpos('\\' . $fqcn, '\\'));
+                $alias ??= self::basename($fqcn);
                 $imports[strtolower($alias)] = $fqcn;
             }
         }
 
         return $imports;
+    }
+
+    private static function basename(string $fqcn): string
+    {
+        $separator = strrpos($fqcn, '\\');
+
+        return $separator === false ? $fqcn : substr($fqcn, $separator + 1);
     }
 
     /** @return list<string> one `Fqcn[ as Alias]` clause per imported name */

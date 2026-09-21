@@ -8,6 +8,7 @@ use PHPStan\PhpDocParser\Ast\Type\ArrayShapeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
+use PHPStan\PhpDocParser\Parser\ParserException;
 use PHPStan\PhpDocParser\Parser\PhpDocParser as VendorPhpDocParser;
 use PHPStan\PhpDocParser\Parser\TokenIterator;
 use PHPStan\PhpDocParser\Parser\TypeParser;
@@ -125,8 +126,12 @@ final class BlockShapeExtractor
             return null;
         }
 
-        $tokens = new TokenIterator($this->lexer->tokenize($docComment));
-        $doc = $this->parser->parse($tokens);
+        try {
+            $doc = $this->parser->parse(new TokenIterator($this->lexer->tokenize($docComment)));
+        } catch (ParserException) {
+            return null;
+        }
+
         $returns = $doc->getReturnTagValues();
 
         if ($returns === []) {
