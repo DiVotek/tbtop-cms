@@ -17,12 +17,7 @@ use PHPStan\PhpDocParser\Ast\Type\UnionTypeNode;
 /** Rewrites `self`/`static` in a `value-of<self::CONST>` reference to a concrete class name, so ZodConverter's reflection lookup never sees them. */
 final class SelfTypeResolver
 {
-    /**
-     * Same rewrite as resolve(), typed to keep an ArrayShapeNode input an
-     * ArrayShapeNode output statically — BlockShapeExtractor's top-level
-     * shape is already known to be one by this point, and asserting that
-     * back at runtime would trip the security preset's ban on assert().
-     */
+    /** Same rewrite as resolve(), narrowed so an ArrayShapeNode caller keeps an ArrayShapeNode without a runtime type check. */
     public static function resolveShape(ArrayShapeNode $type, string $selfClass): ArrayShapeNode
     {
         $items = array_map(

@@ -10,6 +10,7 @@ use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
 use Tbtop\Cms\BlockTypes\UnsupportedShapeException;
 use Tbtop\Cms\BlockTypes\ZodConverter;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\ValueOfConstFixture;
 
 /**
  * Parses a bare PHPDoc type string (no surrounding /** @return) into the same
@@ -70,7 +71,7 @@ it('converts every construct in the PHPDoc-to-zod mapping table', function (stri
 })->with('mappingTableCases');
 
 it('resolves value-of<ClassName::CONST> to a string enum from the constant values', function (): void {
-    $type = parsePhpDocType('value-of<' . TestValueOfConst::class . '::KINDS>');
+    $type = parsePhpDocType('value-of<' . ValueOfConstFixture::class . '::KINDS>');
     $converter = new ZodConverter(knownAliases: []);
 
     expect($converter->convert($type, 'root'))->toBe('z.enum(["a", "b"])');
@@ -93,9 +94,3 @@ it('throws UnsupportedShapeException naming the key path for a construct with no
     expect(fn () => $converter->convert($type, 'root'))
         ->toThrow(UnsupportedShapeException::class, 'unsupported PHPDoc construct at [root.nested.deep]: resource');
 });
-
-/** @phpstan-ignore-next-line class-not-found.notFound (fixture only used for its class-string, never instantiated) */
-class TestValueOfConst
-{
-    public const array KINDS = ['a', 'b'];
-}
