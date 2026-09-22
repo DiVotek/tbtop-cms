@@ -50,7 +50,8 @@ when it's already current.
 
 A block with no typed `@return array{...}` on `resolve()` (no docblock, a
 bare `array`/`array<string, mixed>` return, or an unparsable top-level type)
-degrades to a permissive `z.record(z.string(), z.unknown())` fallback with a
+degrades to a permissive `z.record(z.string(), z.unknown())` fallback (wrapped
+like any record, see below) with a
 `TODO` comment and a command warning — it does not fail the run.
 `HandlesFormSubmission` blocks get `action`/`honeypotField` appended
 automatically (FormActionBinder injects them after `resolve()` runs), typed
@@ -66,7 +67,9 @@ generated catalog has a hole.
 `@phpstan-type`/`@psalm-type` aliases (and `@phpstan-import-type` imports)
 are supported and resolved across classes/traits; the `from` class is
 resolved like PHP would in that file (same namespace, `use` aliases, or a
-leading `\`). `... as Local` renames the import, so two sources may each
+leading `\`; a trait `use` inside a class body is not an import). The class
+in `value-of<Class::CONST>` resolves the same way, and `self`/`static` mean the
+block. `... as Local` renames the import, so two sources may each
 declare an `Item`; an alias reused with two different shapes anywhere in
 the registry is a command error, nothing is written.
 
@@ -78,6 +81,13 @@ non-sequential integer keys serializes as a JSON object, so neither maps to
 a single zod schema; write `list<T>` when the value is a list. An unsealed
 shape (`array{a: string, ...}` or `...<string, T>`) keeps its extra keys via
 `.catchall()`, at the top level too.
+
+`json_encode()` writes an empty PHP array as `[]`, whatever its declared
+shape, and zod rejects `[]` for an object or a record. So every schema whose
+value may be empty (an `array<string, T>` record, a shape with no required
+key, the untyped fallback) is wrapped in the generated file's
+`emptyArrayAsObject(...)` helper, which parses `[]` as `{}`. A shape with at
+least one required key is never empty and stays a plain `z.object()`.
 
 ## `Block` API
 

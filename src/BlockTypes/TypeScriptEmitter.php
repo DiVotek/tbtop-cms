@@ -31,6 +31,15 @@ final class TypeScriptEmitter
             '',
         ];
 
+        if ($this->usesEmptyArrayHelper($shapes, $aliasFragments)) {
+            array_push(
+                $lines,
+                '// PHP encodes an empty array as [], never {}: a schema whose value may be empty accepts it as {}.',
+                'const ' . ZodConverter::EMPTY_ARRAY_AS_OBJECT . ' = <T extends z.ZodType>(schema: T) => z.preprocess((value) => (Array.isArray(value) && value.length === 0 ? {} : value), schema);',
+                '',
+            );
+        }
+
         foreach ($aliasFragments as $name => $fragment) {
             array_push($lines, ...$this->constAndType($name, $fragment));
             $lines[] = '';
@@ -49,6 +58,18 @@ final class TypeScriptEmitter
         $lines[] = '';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param  list<BlockShape>  $shapes
+     * @param  array<string, string>  $aliasFragments
+     */
+    private function usesEmptyArrayHelper(array $shapes, array $aliasFragments): bool
+    {
+        $call = ZodConverter::EMPTY_ARRAY_AS_OBJECT . '(';
+        $fragments = [...array_map(static fn (BlockShape $shape): string => $shape->propsFragment, $shapes), ...array_values($aliasFragments)];
+
+        return array_any($fragments, static fn (string $fragment): bool => str_contains($fragment, $call));
     }
 
     /**

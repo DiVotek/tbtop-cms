@@ -8,18 +8,22 @@ use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\EmptyableShapesBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\KindCollisionBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\MalformedDocblockBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NestedTraitAliasBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\OptionalOnlyRootBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\RecursiveAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\RenamedImportsBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\ShortNameImportBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\TraitImportBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsealedRootBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedFormBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\ValueOfImportBlock;
 
 beforeEach(function (): void {
     $this->outputPath = sys_get_temp_dir() . '/tbtop-cms-blocks-types-test-' . uniqid() . '.ts';
@@ -88,6 +92,51 @@ it('resolves @phpstan-import-type sources by short name, plain use import and us
         ->toContain('period: periodProps,');
 });
 
+it('resolves an import source that the block also uses as a trait', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [TraitImportBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('export const pointProps = z.object({')
+        ->toContain('at: pointProps,');
+});
+
+it('resolves the class in value-of<Class::CONST> by same-namespace short name and use alias', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [ValueOfImportBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('kind: z.enum(["a", "b"]),')
+        ->toContain('export const statusProps = z.enum(["draft", "published"]);')
+        ->toContain('status: statusProps,');
+});
+
+it('accepts PHP\'s [] for a record or a shape with no required key', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [EmptyableShapesBlock::class, OptionalOnlyRootBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('const emptyArrayAsObject = <T extends z.ZodType>(schema: T) => z.preprocess((value) => (Array.isArray(value) && value.length === 0 ? {} : value), schema);')
+        ->toContain('labels: emptyArrayAsObject(z.record(z.string(), z.string())),')
+        ->toContain("extra: emptyArrayAsObject(z.object({\n        note: z.string().optional(),\n    })),")
+        ->toContain("export const optionalOnlyRootProps = emptyArrayAsObject(z.object({\n    title: z.string().optional(),\n}));");
+});
+
+it('leaves out the empty-array helper when no schema needs it', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [HeroBlock::class, ContactForm::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))->not->toContain('emptyArrayAsObject');
+});
+
 it('keeps two renamed imports of the same alias name apart', function (): void {
     config()->set('tbtop-cms.blocks.types', []);
     BlockRegistry::extend(fn (): array => [RenamedImportsBlock::class]);
@@ -130,7 +179,7 @@ it('degrades an untyped block to the z.record fallback with a TODO comment and a
 
     $contents = file_get_contents($this->outputPath);
 
-    expect($contents)->toContain('export const untypedProps = z.record(z.string(), z.unknown()); // TODO: add @return array{...} to Untyped::resolve()');
+    expect($contents)->toContain('export const untypedProps = emptyArrayAsObject(z.record(z.string(), z.unknown())); // TODO: add @return array{...} to Untyped::resolve()');
 });
 
 it('degrades a block whose @return does not parse to the untyped fallback instead of crashing', function (): void {
@@ -141,7 +190,7 @@ it('degrades a block whose @return does not parse to the untyped fallback instea
         ->expectsOutputToContain('[MalformedDocblock] has no typed @return array{...}')
         ->assertExitCode(0);
 
-    expect(file_get_contents($this->outputPath))->toContain('export const malformedDocblockProps = z.record(z.string(), z.unknown());');
+    expect(file_get_contents($this->outputPath))->toContain('export const malformedDocblockProps = emptyArrayAsObject(z.record(z.string(), z.unknown()));');
 });
 
 it('keeps action/honeypotField on an untyped HandlesFormSubmission block', function (): void {

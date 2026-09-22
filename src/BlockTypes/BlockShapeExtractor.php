@@ -67,7 +67,8 @@ final class BlockShapeExtractor
     /** @return array{0: string, 1: ?string} the props fragment, and a leading comment to print above its `export const` */
     private function convertTopLevelShape(ZodConverter $converter, ArrayShapeNode $type, Block $block, string $kind): array
     {
-        $resolved = SelfTypeResolver::resolveShape($type, $block::class);
+        $scope = (new ReflectionMethod($block, 'resolve'))->getDeclaringClass();
+        $resolved = ConstFetchResolver::resolveShape($type, $block::class, $scope);
 
         if (! $block instanceof HandlesFormSubmission) {
             $fields = $converter->convertShapeFields($resolved, '');
@@ -78,7 +79,7 @@ final class BlockShapeExtractor
         $this->assertNoFormKeyCollision($resolved, $kind);
         $fields = $converter->convertShapeFields($resolved, '');
 
-        return [$converter->objectFromFields($this->appendFormKeys($fields), $resolved, ''), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
+        return [$converter->objectFromFields($this->appendFormKeys($fields), $resolved, '', alwaysHasKeys: true), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
     }
 
     private function assertNoFormKeyCollision(ArrayShapeNode $type, string $kind): void
@@ -112,7 +113,7 @@ final class BlockShapeExtractor
     {
         $fragment = $block instanceof HandlesFormSubmission
             ? 'z.object({ ' . implode(', ', $this->appendFormKeys([])) . ' }).catchall(z.unknown())'
-            : 'z.record(z.string(), z.unknown())';
+            : ZodConverter::acceptEmptyArray('z.record(z.string(), z.unknown())');
 
         return new BlockShape($kind, $fragment, isTyped: false, usedAliases: []);
     }
