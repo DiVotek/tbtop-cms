@@ -55,7 +55,9 @@ final class DocblockClassResolver
 
     /**
      * Top-level `use Foo\Bar;`, `use Foo\Bar as Baz;` and `use Foo\{Bar, Baz as Q};`
-     * statements only — function/const imports and closure `use` are skipped.
+     * statements only — function/const imports are skipped, and so is every
+     * `use` inside braces: a trait `use` in a class body, a closure `use`.
+     * The brace of a braced `namespace X { }` still counts as top level.
      *
      * @return array<string, string>
      */
@@ -64,11 +66,39 @@ final class DocblockClassResolver
         $imports = [];
         $tokens = token_get_all($source);
         $count = count($tokens);
+        /** @var list<bool> $braces true for a namespace block's brace */
+        $braces = [];
+        $inNamespaceDeclaration = false;
 
         for ($i = 0; $i < $count; $i++) {
             $token = $tokens[$i];
 
-            if (! is_array($token) || $token[0] !== T_USE) {
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $inNamespaceDeclaration = true;
+
+                continue;
+            }
+
+            if ($token === ';') {
+                $inNamespaceDeclaration = false;
+
+                continue;
+            }
+
+            if ($token === '{' || (is_array($token) && ($token[0] === T_CURLY_OPEN || $token[0] === T_DOLLAR_OPEN_CURLY_BRACES))) {
+                $braces[] = $inNamespaceDeclaration;
+                $inNamespaceDeclaration = false;
+
+                continue;
+            }
+
+            if ($token === '}') {
+                array_pop($braces);
+
+                continue;
+            }
+
+            if (! is_array($token) || $token[0] !== T_USE || in_array(false, $braces, true)) {
                 continue;
             }
 

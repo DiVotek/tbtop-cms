@@ -95,11 +95,11 @@ final class TypeAliasCollector
         $doc = $this->parseDocComment($docComment);
 
         foreach ($doc->getTypeAliasTagValues('@phpstan-type') as $tag) {
-            $this->addAlias($tag, $selfClass);
+            $this->addAlias($tag, $selfClass, $declaring);
         }
 
         foreach ($doc->getTypeAliasTagValues('@psalm-type') as $tag) {
-            $this->addAlias($tag, $selfClass);
+            $this->addAlias($tag, $selfClass, $declaring);
         }
 
         foreach ($doc->getTypeAliasImportTagValues() as $import) {
@@ -107,9 +107,10 @@ final class TypeAliasCollector
         }
     }
 
-    private function addAlias(TypeAliasTagValueNode $tag, string $selfClass): void
+    /** @param  ReflectionClass<object>  $declaring */
+    private function addAlias(TypeAliasTagValueNode $tag, string $selfClass, ReflectionClass $declaring): void
     {
-        $this->mergeAlias($tag->alias, SelfTypeResolver::resolve($tag->type, $selfClass));
+        $this->mergeAlias($tag->alias, ConstFetchResolver::resolve($tag->type, $selfClass, $declaring));
     }
 
     /** @param  ReflectionClass<object>  $declaring */

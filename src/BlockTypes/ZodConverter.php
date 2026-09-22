@@ -9,6 +9,7 @@ use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprIntegerNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprStringNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprTrueNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstFetchNode;
+use PHPStan\PhpDocParser\Ast\Type\ArrayShapeItemNode;
 use PHPStan\PhpDocParser\Ast\Type\ArrayShapeNode;
 use PHPStan\PhpDocParser\Ast\Type\ArrayTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\ConstTypeNode;
@@ -28,6 +29,9 @@ use ReflectionClass;
  */
 final class ZodConverter
 {
+    /** The generated file's helper that turns PHP's `[]` (an empty array, whatever its declared shape) into `{}` before parsing. */
+    public const string EMPTY_ARRAY_AS_OBJECT = 'emptyArrayAsObject';
+
     /** @var array<string, true> alias name => used, insertion order preserved */
     private array $usedAliases = [];
 
@@ -71,6 +75,15 @@ final class ZodConverter
     public function usedAliases(): array
     {
         return $this->usedAliases;
+    }
+
+    /**
+     * json_encode() writes an empty PHP array as `[]`, which z.object() and
+     * z.record() reject — wrap any schema whose value may be empty.
+     */
+    public static function acceptEmptyArray(string $fragment): string
+    {
+        return self::EMPTY_ARRAY_AS_OBJECT . "({$fragment})";
     }
 
     private function convertUnion(UnionTypeNode $type, string $keyPath): string
@@ -164,20 +177,26 @@ final class ZodConverter
     /**
      * `array{a: string, ...}` / `...<string, T>`: extra keys are part of the
      * contract, and a plain z.object() would strip them at parse time.
+     * A shape with no required key may be an empty array at runtime, unless
+     * the caller appends keys that are always present (`$alwaysHasKeys`).
      *
      * @param  list<string>  $fields  "key: fragment" entries
      */
-    public function objectFromFields(array $fields, ArrayShapeNode $type, string $keyPath): string
+    public function objectFromFields(array $fields, ArrayShapeNode $type, string $keyPath, bool $alwaysHasKeys = false): string
     {
         $object = 'z.object({ ' . implode(', ', $fields) . ' })';
 
-        if ($type->sealed) {
-            return $object;
+        if (! $type->sealed) {
+            $extra = $type->unsealedType === null ? 'z.unknown()' : $this->convert($type->unsealedType->valueType, "{$keyPath}.*");
+            $object = "{$object}.catchall({$extra})";
         }
 
-        $extra = $type->unsealedType === null ? 'z.unknown()' : $this->convert($type->unsealedType->valueType, "{$keyPath}.*");
+        return $alwaysHasKeys || self::hasRequiredKey($type) ? $object : self::acceptEmptyArray($object);
+    }
 
-        return "{$object}.catchall({$extra})";
+    private static function hasRequiredKey(ArrayShapeNode $type): bool
+    {
+        return array_any($type->items, static fn (ArrayShapeItemNode $item): bool => ! $item->optional);
     }
 
     /** Every item positional (`array{string, int}` / `list{string, int}`): a PHP list, so a JSON array. */
@@ -302,7 +321,7 @@ final class ZodConverter
             throw new UnsupportedShapeException($keyPath, 'array<string, mixed> has no usable shape');
         }
 
-        return 'z.record(z.string(), ' . $this->convert($valueType, $keyPath . '.*') . ')';
+        return self::acceptEmptyArray('z.record(z.string(), ' . $this->convert($valueType, $keyPath . '.*') . ')');
     }
 
     /** @param  list<TypeNode>  $args */
