@@ -237,18 +237,22 @@ Use the `Cms` facade (`src/Facades/Cms.php` / `src/Cms.php`) rather than
 ```php
 Cms::resolve(string $path, ?string $locale = null): ?Page   // path → live Page, current locale by default
 Cms::url(Page $page, ?string $locale = null): string        // Page → locale-prefixed path
-Cms::breadcrumbs(Page $page, ?string $locale = null): array // list<{label, path, url}>, ancestor chain
+Cms::breadcrumbs(Page $page, ?string $locale = null): array // list<{label, path, url}>, home › ancestors › page
 ```
 
 `Cms::resolve()` only ever returns a *live* page (no `$withDrafts` param
 exposed) — it delegates to `PageResolver::resolve($path, $locale, false)`.
-`Cms::breadcrumbs()` walks `AncestorChain::forPage()` (root-first, self
-excluded) and labels each ancestor with its `title` falling back to `name`,
-current locale falling back to the default locale. It returns the real
-ancestry only — the site root is not prepended, so a top-level page yields
-an empty array and a host rendering a visible trail adds its own "Home" link.
-(The JSON-LD `BreadcrumbList` does prepend it, via
-`Breadcrumbs::trailForSchema()`; see seo.md.)
+`Cms::breadcrumbs()` (and the `breadcrumbs` prop, same method) walks
+`AncestorChain::forPage()` (root-first), prepends the seeded site root
+(`is_system`, no parent, not an error page — it is a *sibling* of top-level
+pages, not their parent) unless it is already in the chain, and appends the
+page itself. Each crumb is labelled with its `title` falling back to `name`,
+current locale falling back to the default locale. Fewer than two crumbs
+yields `[]`, so the home page has no trail: `/services` → `[Home, Services]`,
+`/blog/post` → `[Home, Blog, Post]`. The JSON-LD `BreadcrumbList` is built
+from the same trail (see seo.md). `{parent}` does **not** read it — that
+variable uses `Breadcrumbs::ancestors()`, the real ancestry without root or
+self.
 
 ### Redirects
 

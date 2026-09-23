@@ -143,7 +143,7 @@ final class SeoAudit
             $byDescription = [];
 
             foreach ($pages as $page) {
-                $breadcrumbs = fn (): array => $this->breadcrumbs->forPage($page, $locale);
+                $breadcrumbs = fn (): array => $this->breadcrumbs->ancestors($page, $locale);
 
                 $title = $this->resolver->renderedTitle($page, $locale, $breadcrumbs);
 

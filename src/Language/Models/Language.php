@@ -16,6 +16,7 @@ use Tbtop\Cms\Language\Observers\LanguageObserver;
  * @property int $id
  * @property string $name
  * @property string $locale
+ * @property string|null $og_locale
  * @property bool $is_default
  * @property bool $is_admin_active
  * @property bool $is_frontend_active
@@ -36,6 +37,7 @@ class Language extends Model
     protected $fillable = [
         'name',
         'locale',
+        'og_locale',
         'is_default',
         'is_admin_active',
         'is_frontend_active',

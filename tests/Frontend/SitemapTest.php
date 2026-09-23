@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Date;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\Seo\SitemapEntryBuilder;
@@ -605,3 +607,27 @@ it('excludes an entry whose canonical differs only by userinfo or fragment', fun
     'userinfo' => ['userinfo', 'userinfo-page'],
     'fragment' => ['fragment', 'fragment-page'],
 ]);
+
+it('emits lastmod when the host swaps in immutable dates', function (): void {
+    // Laravel starter kits call Date::use(CarbonImmutable::class); updated_at
+    // then is no Illuminate\Support\Carbon, and lastmod must not depend on that.
+    Date::use(CarbonImmutable::class);
+
+    try {
+        app(Cms::class)->frontendRoutes();
+
+        Page::factory()->create([
+            'status' => PageStatus::Published,
+            'name' => ['en' => 'About'],
+            'is_indexable' => true,
+            'updated_at' => '2026-03-04 05:06:07',
+        ]);
+
+        $xml = new SimpleXMLElement($this->get('/sitemap-1.xml')->assertOk()->getContent());
+        $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+
+        expect(array_map('strval', $xml->xpath('//s:url/s:lastmod')))->toContain('2026-03-04T05:06:07+00:00');
+    } finally {
+        Date::useDefault();
+    }
+});

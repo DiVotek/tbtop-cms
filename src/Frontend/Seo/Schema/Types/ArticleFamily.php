@@ -15,6 +15,8 @@ use Tbtop\Cms\Frontend\Seo\Schema\SchemaType;
  */
 abstract class ArticleFamily extends SchemaType
 {
+    private const int HEADLINE_MAX = 110;
+
     public function openGraph(SchemaContext $ctx): OpenGraph
     {
         return new OpenGraph(
@@ -30,6 +32,7 @@ abstract class ArticleFamily extends SchemaType
     {
         $node = [
             ...$ctx->baseNode($this->key()),
+            'headline' => self::headline($ctx->name),
             'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $ctx->url],
         ];
 
@@ -37,6 +40,27 @@ abstract class ArticleFamily extends SchemaType
             $node['author'] = $ctx->author;
         }
 
+        if ($ctx->publisher !== null) {
+            $node['publisher'] = $ctx->publisher;
+        }
+
         return [$node];
+    }
+
+    /**
+     * Google truncates or ignores an Article headline past 110 characters,
+     * so a longer name is cut at the last whole word that fits — a cut
+     * mid-word reads as a typo in the rich result.
+     */
+    private static function headline(string $name): string
+    {
+        if (mb_strlen($name) <= self::HEADLINE_MAX) {
+            return $name;
+        }
+
+        $cut = mb_substr($name, 0, self::HEADLINE_MAX + 1);
+        $space = mb_strrpos($cut, ' ');
+
+        return rtrim($space !== false ? mb_substr($cut, 0, $space) : mb_substr($name, 0, self::HEADLINE_MAX));
     }
 }

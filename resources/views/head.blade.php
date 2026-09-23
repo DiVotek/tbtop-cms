@@ -75,7 +75,9 @@
     @if (! empty($seo['siteName']))
         <meta data-inertia="og-site-name" property="og:site_name" content="{{ $seo['siteName'] }}">
     @endif
-    <meta data-inertia="og-locale" property="og:locale" content="{{ $seo['ogLocale'] ?? '' }}">
+    @if (! empty($seo['ogLocale']))
+        <meta data-inertia="og-locale" property="og:locale" content="{{ $seo['ogLocale'] }}">
+    @endif
     @foreach (($seo['ogLocaleAlternates'] ?? []) as $alternateLocale)
         <meta data-inertia="og-locale-alternate-{{ $alternateLocale }}" property="og:locale:alternate" content="{{ $alternateLocale }}">
     @endforeach
@@ -92,6 +94,10 @@
         @endif
         @if (! empty($seo['ogImageType']))
             <meta data-inertia="og-image-type" property="og:image:type" content="{{ $seo['ogImageType'] }}">
+        @endif
+        @if (! empty($seo['ogImageWidth']) && ! empty($seo['ogImageHeight']))
+            <meta data-inertia="og-image-width" property="og:image:width" content="{{ $seo['ogImageWidth'] }}">
+            <meta data-inertia="og-image-height" property="og:image:height" content="{{ $seo['ogImageHeight'] }}">
         @endif
     @endif
     @if (($seo['ogType'] ?? 'website') === 'article')

@@ -7,6 +7,7 @@ use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Settings\Settings;
 
 uses(RefreshDatabase::class);
 
@@ -91,3 +92,34 @@ it('lists only live indexable children in a category hasPart', function (): void
         'url' => url((string) $live->slugs()->where('locale', 'en')->value('path')),
     ]]);
 });
+
+it('cuts an article headline to 110 characters at a word boundary', function (): void {
+    $article = Page::factory()->create([
+        'type' => 'article',
+        'parent_id' => Page::factory()->create(['type' => 'category'])->getKey(),
+        'status' => PageStatus::Published,
+        'title' => ['en' => str_repeat('abcdefg ', 20)],
+    ]);
+
+    $node = collect(app(SeoResolver::class)->resolve($article, 'en')['jsonLd'])->firstWhere('@type', 'Article');
+
+    // 13 whole words fit in 110 characters; the 14th would be cut mid-word.
+    expect($node['headline'])->toBe(implode(' ', array_fill(0, 13, 'abcdefg')));
+});
+
+it('names the identity as article publisher only when it is an organization', function (string $type, ?array $publisher): void {
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.identity.type', $type);
+    $article = Page::factory()->create([
+        'type' => 'article',
+        'parent_id' => Page::factory()->create(['type' => 'category'])->getKey(),
+        'status' => PageStatus::Published,
+    ]);
+
+    $node = collect(app(SeoResolver::class)->resolve($article, 'en')['jsonLd'])->firstWhere('@type', 'Article');
+
+    expect($node['publisher'] ?? null)->toBe($publisher);
+})->with([
+    'organization' => ['organization', ['@type' => 'Organization', 'name' => 'Acme Co', 'url' => 'http://localhost']],
+    'person' => ['person', null],
+]);

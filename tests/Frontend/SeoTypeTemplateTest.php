@@ -170,7 +170,7 @@ it('resolves the same title the frontend renders when given breadcrumbs', functi
 
     $page = $article->fresh();
     $withCrumbs = app(SeoResolver::class)
-        ->resolve($page, 'en', app(Breadcrumbs::class)->forPage($page, 'en'));
+        ->resolve($page, 'en', app(Breadcrumbs::class)->ancestors($page, 'en'));
     $withoutCrumbs = app(SeoResolver::class)->resolve($page, 'en');
 
     expect($frontendTitle)->toBe('Post — Blog — Acme Co')

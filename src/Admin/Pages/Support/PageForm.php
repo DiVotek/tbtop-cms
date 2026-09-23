@@ -343,7 +343,7 @@ class PageForm
         $resolved = app(SeoResolver::class)->resolve(
             $page,
             $locale,
-            app(Breadcrumbs::class)->forPage($page, $locale),
+            app(Breadcrumbs::class)->ancestors($page, $locale),
         );
 
         return [

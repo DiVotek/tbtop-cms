@@ -8,10 +8,19 @@ use DomainException;
 use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Language\LocaleCatalog;
 use Tbtop\Cms\Language\Models\Language;
 
 class LanguageObserver
 {
+    /** Seeders and installers create languages too, not only the admin form. */
+    public function creating(Language $language): void
+    {
+        if ($language->og_locale === null || $language->og_locale === '') {
+            $language->og_locale = LocaleCatalog::defaultOgLocale($language->locale);
+        }
+    }
+
     public function saving(Language $language): void
     {
         $this->guardLastDefaultNotUnset($language);

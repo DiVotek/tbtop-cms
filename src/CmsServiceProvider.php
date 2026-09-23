@@ -128,6 +128,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_08_31_000002_create_seo_audit_snapshots_table')
             ->hasMigration('2026_09_01_000000_create_notification_templates_table')
             ->hasMigration('2026_09_15_000000_add_error_class_to_pages_table')
+            ->hasMigration('2026_09_23_000000_add_og_locale_to_languages_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

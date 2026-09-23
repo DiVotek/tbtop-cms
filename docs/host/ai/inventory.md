@@ -160,7 +160,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md |
-| `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — real ancestry, site root NOT prepended (the JSON-LD `BreadcrumbList` uses `trailForSchema()` instead; see seo.md) |
+| `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; `[]` when fewer than two crumbs (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
 
@@ -178,7 +178,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `BasePageType` (abstract) | `src/Page/Types/BasePageType.php` | Implements `PageTypeInterface` with defaults (`label`=ucfirst(key), `allowedChildren`=[], `requiresParent`=false, `maxDepth`=1, `isSourceBacked`=false, `source`=null, `template`=null, `schemaTypes`=`['WebPage','AboutPage','ContactPage','ItemPage']`); a subclass need only override `key()` plus whatever defaults don't fit | Convenience base for page types |
 | `SchemaTypeInterface` | `src/Frontend/Seo/Schema/SchemaTypeInterface.php` | `key(): string`, `label(): string`, `openGraph(SchemaContext $ctx): OpenGraph`, `build(SchemaContext $ctx): list<array<string,mixed>>` | Contract for a schema.org node type selectable via `page.seo.schema.type` |
 | `SchemaType` (abstract) | `src/Frontend/Seo/Schema/SchemaType.php` | Required: `key()`, `build(SchemaContext $ctx): list<array<string,mixed>>`. Overridable (have defaults): `label()` (`Str::headline($this->key())`), `openGraph()` (`OpenGraph::website()`) | Convenience base for a host schema type — extend this, not `SchemaTypeInterface` directly |
-| `SchemaContextFactory` | `src/Frontend/Seo/Schema/SchemaContextFactory.php` | `make(Page $page, string $locale, ?object $source = null): SchemaContext` — one og-image media lookup per call, its `alt`/`mime` ride on the context | Builds the `SchemaContext` a page's schema node(s) and its blocks' `toSchema()` share; constructible with a purpose-built `Settings` the same way `SeoResolver` is |
+| `SchemaContextFactory` | `src/Frontend/Seo/Schema/SchemaContextFactory.php` | `make(Page $page, string $locale, ?object $source = null): SchemaContext` — one og-image media lookup per call, its `alt`/`mime`/`width`/`height` ride on the context | Builds the `SchemaContext` a page's schema node(s) and its blocks' `toSchema()` share; constructible with a purpose-built `Settings` the same way `SeoResolver` is |
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
 | `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms) |
@@ -310,7 +310,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `Tbtop\Cms\Cms` (facade `Tbtop\Cms\Facades\Cms`) | `frontendRoutes(): void` | Registers all CMS frontend routes — call from a `web`-middleware route file |
 | | `resolve(string $path, ?string $locale = null): ?Page` | Resolves a path to a `Page` for the given/current locale |
 | | `url(Page $page, ?string $locale = null): string` | Builds the absolute frontend URL for a page in a locale |
-| | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page |
+| | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, `[]` for home |
 | | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |

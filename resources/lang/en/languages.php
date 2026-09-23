@@ -27,6 +27,7 @@ return [
         'name' => 'Name',
         'locale' => 'Locale',
         'language' => 'Language',
+        'og_locale' => 'Social locale (og:locale)',
         'is_default' => 'Default language',
         'is_admin_active' => 'Active in admin',
         'is_frontend_active' => 'Active on site',
@@ -34,6 +35,7 @@ return [
     ],
     'helpers' => [
         'locale' => 'Locale cannot be changed after creation.',
+        'og_locale' => 'Language and territory for social previews, e.g. en_US or en_GB. Leave empty to omit og:locale.',
         'is_admin_active' => 'Turning this off also removes the language from the site (Active on site is switched off too).',
         'is_frontend_active' => 'Turning this off removes the language from the site: its URLs stop responding, but its translations are kept and come back when you switch it on again.',
     ],
@@ -59,5 +61,6 @@ return [
     'validation' => [
         'locale_taken' => 'A language with this locale already exists.',
         'locale_unknown' => 'Unknown locale — pick a language from the list.',
+        'og_locale_format' => 'Use language_TERRITORY, e.g. en_US.',
     ],
 ];

@@ -51,6 +51,25 @@ class LocaleCatalog
         'id' => 'Bahasa Indonesia',
     ];
 
+    /**
+     * ogp.me wants language_TERRITORY; the territory is the one a site in
+     * that language most often targets. `no` maps to nb_NO because Facebook's
+     * scraper rejects the macro-language code.
+     *
+     * @var array<string, string>
+     */
+    private const OG_LOCALES = [
+        'en' => 'en_US', 'uk' => 'uk_UA', 'de' => 'de_DE', 'fr' => 'fr_FR',
+        'es' => 'es_ES', 'it' => 'it_IT', 'pl' => 'pl_PL', 'cs' => 'cs_CZ',
+        'sk' => 'sk_SK', 'ro' => 'ro_RO', 'bg' => 'bg_BG', 'el' => 'el_GR',
+        'tr' => 'tr_TR', 'pt' => 'pt_PT', 'nl' => 'nl_NL', 'sv' => 'sv_SE',
+        'no' => 'nb_NO', 'da' => 'da_DK', 'fi' => 'fi_FI', 'et' => 'et_EE',
+        'lv' => 'lv_LV', 'lt' => 'lt_LT', 'hu' => 'hu_HU', 'hr' => 'hr_HR',
+        'sr' => 'sr_RS', 'sl' => 'sl_SI', 'ja' => 'ja_JP', 'zh' => 'zh_CN',
+        'ko' => 'ko_KR', 'hi' => 'hi_IN', 'th' => 'th_TH', 'vi' => 'vi_VN',
+        'id' => 'id_ID',
+    ];
+
     /** @return array<string, string> */
     public static function all(): array
     {
@@ -60,6 +79,16 @@ class LocaleCatalog
     public static function name(string $code): ?string
     {
         return self::LOCALES[$code] ?? null;
+    }
+
+    public static function defaultOgLocale(string $code): ?string
+    {
+        return self::OG_LOCALES[$code] ?? null;
+    }
+
+    public static function isOgLocale(string $value): bool
+    {
+        return preg_match('/^[a-z]{2,3}_[A-Z]{2}$/', $value) === 1;
     }
 
     /** @return list<array{value: string, label: string}> */

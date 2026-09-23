@@ -10,12 +10,15 @@ use Tbtop\Cms\Page\Models\Page;
  * Everything a schema class needs to build its node(s), built once by
  * SchemaContextFactory from the same values SeoResolver uses for the
  * rendered head tags. `source` is the page type's `source()` result, null
- * for content-only types. `imageAlt`/`imageMime` ride along for the og:
+ * for content-only types. `imageAlt`/`imageMime`/`imageWidth`/`imageHeight` ride along for the og:
  * tags so the media lookup behind `image` happens once per render.
  */
 final readonly class SchemaContext
 {
-    /** @param  array{'@type': string, name: string}|null  $author */
+    /**
+     * @param  array{'@type': string, name: string}|null  $author
+     * @param  array{'@type': string, name: string, url: string, logo?: string}|null  $publisher
+     */
     public function __construct(
         public Page $page,
         public string $locale,
@@ -25,8 +28,11 @@ final readonly class SchemaContext
         public string $url,
         public ?string $image,
         public ?array $author,
+        public ?array $publisher = null,
         public ?string $imageAlt = null,
         public ?string $imageMime = null,
+        public ?int $imageWidth = null,
+        public ?int $imageHeight = null,
     ) {}
 
     /** @return array<string, mixed> */

@@ -15,11 +15,11 @@ class MediaUrlResolver
     }
 
     /**
-     * Same lookup as resolve(), plus the row's alt/mime — for callers that
-     * need og:image:alt / og:image:type from the exact media the URL came
-     * from without a second query for the same id.
+     * Same lookup as resolve(), plus the row's alt/mime/dimensions — for
+     * callers that need og:image:alt / :type / :width / :height from the
+     * exact media the URL came from without a second query for the same id.
      *
-     * @return array{url: string, alt: string|null, mime: string}|null
+     * @return array{url: string, alt: string|null, mime: string, width: int|null, height: int|null}|null
      */
     public function details(string | int $id): ?array
     {
@@ -40,6 +40,8 @@ class MediaUrlResolver
             'url' => UploadUrl::make((string) $media->disk, (string) $media->path),
             'alt' => $media->alt,
             'mime' => (string) $media->mime,
+            'width' => $media->width,
+            'height' => $media->height,
         ];
     }
 }

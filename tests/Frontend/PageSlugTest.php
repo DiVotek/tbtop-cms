@@ -66,7 +66,19 @@ it('builds nested paths from the ancestor chain', function (): void {
     expect($article->pathFor('en'))->toBe('blog/first-post');
 });
 
-it('derives localized breadcrumbs from ancestors', function (): void {
+it('gives every page but home a breadcrumb trail from the site root to itself', function (): void {
+    // The seeded home is a sibling of top-level pages, not their parent.
+    $home = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'is_system' => true,
+        'name' => ['en' => 'Home'],
+        'title' => ['en' => 'Home'],
+    ]);
+    $services = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Services'],
+        'title' => ['en' => 'Services'],
+    ]);
     $category = Page::factory()->category()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'Blog'],
@@ -76,15 +88,21 @@ it('derives localized breadcrumbs from ancestors', function (): void {
         'status' => PageStatus::Published,
         'parent_id' => $category->id,
         'name' => ['en' => 'First Post'],
+        'title' => ['en' => 'First Post'],
     ]);
 
     app(Cms::class)->frontendRoutes();
 
-    $this->get('/' . $article->pathFor('en'), ['X-Inertia' => 'true'])
-        ->assertOk()
-        ->assertJsonCount(1, 'props.breadcrumbs')
-        ->assertJsonPath('props.breadcrumbs.0.label', 'Blog')
-        ->assertJsonPath('props.breadcrumbs.0.url', '/blog');
+    $trail = fn (Page $page): array => array_map(
+        static fn (array $crumb): string => $crumb['label'] . ' ' . $crumb['url'],
+        $this->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])->assertOk()->json('props.breadcrumbs'),
+    );
+
+    // `/` is the package's own boot route under Testbench, so home goes
+    // through the facade that shares forPage() with the controller.
+    expect(app(Cms::class)->breadcrumbs($home, 'en'))->toBe([])
+        ->and($trail($services))->toBe(['Home /', 'Services /services'])
+        ->and($trail($article))->toBe(['Home /', 'Blog /blog', 'First Post /blog/first-post']);
 });
 
 it('rebuilds descendant paths when an ancestor is reparented', function (): void {

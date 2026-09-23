@@ -125,7 +125,7 @@ class PageController
         $breadcrumbs = $this->breadcrumbs->forPage($page, $locale);
         $ctx = $this->schemaContextFactory->make($page, $locale, $source);
         $blockNodes = $this->blockSchemaNodes($resolved, $ctx);
-        $seo = $this->seo->resolve($page, $locale, $breadcrumbs, $ctx, $blockNodes);
+        $seo = $this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $blockNodes);
 
         if ($isPreview) {
             $seo['noindex'] = true;
