@@ -12,7 +12,9 @@ use Tbtop\Cms\Tests\Fixtures\BlockTypes\EmptyableShapesBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\KindCollisionBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\MalformedDocblockBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NestedTraitAliasBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\OptionalOnlyFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\OptionalOnlyRootBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\QuotedActionFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\RecursiveAliasBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\RenamedImportsBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\ShortNameImportBlock;
@@ -202,8 +204,30 @@ it('keeps action/honeypotField on an untyped HandlesFormSubmission block', funct
         ->assertExitCode(0);
 
     expect(file_get_contents($this->outputPath))->toContain(
-        "export const untypedFormProps = z.object({\n    action: z.string().optional(),\n    honeypotField: z.string().optional(),\n}).catchall(z.unknown()); // TODO: add @return array{...} to UntypedForm::resolve()",
+        "export const untypedFormProps = emptyArrayAsObject(z.object({\n    action: z.string().optional(),\n    honeypotField: z.string().optional(),\n}).catchall(z.unknown())); // TODO: add @return array{...} to UntypedForm::resolve()",
     );
+});
+
+it('accepts an empty array for a form block whose declared keys are all optional', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [OptionalOnlyFormBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))->toContain(
+        "export const optionalOnlyFormProps = emptyArrayAsObject(z.object({\n    heading: z.string().optional(),\n    action: z.string().optional(),\n    honeypotField: z.string().optional(),\n}));",
+    );
+});
+
+it('errors with exit 1 and writes nothing when a form block declares the injected action key in quotes', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [QuotedActionFormBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain("Block [QuotedActionForm]: resolve()'s docblock declares [action]")
+        ->assertExitCode(1);
+
+    expect(is_file($this->outputPath))->toBeFalse();
 });
 
 it('appends action/honeypotField to a HandlesFormSubmission block after its docblock keys', function (): void {

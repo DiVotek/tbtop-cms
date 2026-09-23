@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\BlockTypes;
 
+use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprStringNode;
 use PHPStan\PhpDocParser\Ast\Type\ArrayShapeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
@@ -79,13 +80,13 @@ final class BlockShapeExtractor
         $this->assertNoFormKeyCollision($resolved, $kind);
         $fields = $converter->convertShapeFields($resolved, '');
 
-        return [$converter->objectFromFields($this->appendFormKeys($fields), $resolved, '', alwaysHasKeys: true), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
+        return [$converter->objectFromFields($this->appendFormKeys($fields), $resolved, ''), '// action/honeypotField are injected by FormActionBinder after resolve() runs'];
     }
 
     private function assertNoFormKeyCollision(ArrayShapeNode $type, string $kind): void
     {
         foreach ($type->items as $item) {
-            $key = (string) $item->keyName;
+            $key = $item->keyName instanceof ConstExprStringNode ? $item->keyName->value : (string) $item->keyName;
 
             if ($key === 'action' || $key === 'honeypotField') {
                 throw new RuntimeException("Block [{$kind}]: resolve()'s docblock declares [{$key}], which FormActionBinder injects automatically — remove it from the @return shape.");
@@ -114,7 +115,7 @@ final class BlockShapeExtractor
     private function untypedShape(string $kind, Block $block): BlockShape
     {
         $fragment = $block instanceof HandlesFormSubmission
-            ? 'z.object({ ' . implode(', ', $this->appendFormKeys([])) . ' }).catchall(z.unknown())'
+            ? ZodConverter::acceptEmptyArray('z.object({ ' . implode(', ', $this->appendFormKeys([])) . ' }).catchall(z.unknown())')
             : ZodConverter::acceptEmptyArray('z.record(z.string(), z.unknown())');
 
         return new BlockShape($kind, $fragment, isTyped: false, usedAliases: []);

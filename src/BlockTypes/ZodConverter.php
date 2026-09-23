@@ -177,12 +177,11 @@ final class ZodConverter
     /**
      * `array{a: string, ...}` / `...<string, T>`: extra keys are part of the
      * contract, and a plain z.object() would strip them at parse time.
-     * A shape with no required key may be an empty array at runtime, unless
-     * the caller appends keys that are always present (`$alwaysHasKeys`).
+     * A shape with no required key may be an empty array at runtime.
      *
      * @param  list<string>  $fields  "key: fragment" entries
      */
-    public function objectFromFields(array $fields, ArrayShapeNode $type, string $keyPath, bool $alwaysHasKeys = false): string
+    public function objectFromFields(array $fields, ArrayShapeNode $type, string $keyPath): string
     {
         $object = 'z.object({ ' . implode(', ', $fields) . ' })';
 
@@ -191,7 +190,7 @@ final class ZodConverter
             $object = "{$object}.catchall({$extra})";
         }
 
-        return $alwaysHasKeys || self::hasRequiredKey($type) ? $object : self::acceptEmptyArray($object);
+        return self::hasRequiredKey($type) ? $object : self::acceptEmptyArray($object);
     }
 
     private static function hasRequiredKey(ArrayShapeNode $type): bool
