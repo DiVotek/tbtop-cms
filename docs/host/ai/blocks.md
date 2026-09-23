@@ -78,8 +78,11 @@ in `value-of<Class::CONST>` resolves the same way, and `self`/`static` mean the
 block — also inside aliases of traits the block uses. An alias pulled in with
 `@phpstan-import-type ... from X` keeps `X`'s meaning of `self`, as in PHPStan:
 the block need not declare the constants `X` refers to. `... as Local` renames the import, so two sources may each
-declare an `Item`; an alias reused with two different shapes anywhere in
-the registry is a command error, nothing is written.
+declare an `Item`. Only the imported alias is renamed: sibling aliases its
+body refers to come along under their own names, so importing `Box` from
+two sources whose `Box` each uses a different `Item` is a collision. An
+alias reused with two different shapes anywhere in the registry is a
+command error, nothing is written.
 
 Array types must say what they serialize to: `list<T>` and
 `non-empty-list<T>` become `z.array()`, `array<string, T>` becomes
