@@ -28,9 +28,10 @@ final readonly class SchemaContext
         public string $url,
         public ?string $image,
         public ?array $author,
-        public ?array $publisher = null,
         public ?string $imageAlt = null,
         public ?string $imageMime = null,
+        // New parameters go last: hosts may construct this positionally.
+        public ?array $publisher = null,
         public ?int $imageWidth = null,
         public ?int $imageHeight = null,
     ) {}
