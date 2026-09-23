@@ -11,12 +11,20 @@ final class EmitterNames
 {
     public static function propsConst(string $name): string
     {
-        return Str::camel($name) . 'Props';
+        return self::identifier(Str::camel($name)) . 'Props';
     }
 
     public static function propsType(string $name): string
     {
-        return Str::studly($name) . 'Props';
+        return self::identifier(Str::studly($name)) . 'Props';
+    }
+
+    /** kind() is any non-empty string; names that collapse together are caught by assertDistinctExportNames(). */
+    private static function identifier(string $name): string
+    {
+        $name = (string) preg_replace('/[^A-Za-z0-9_$]/', '', $name);
+
+        return preg_match('/^[0-9]/', $name) === 1 ? "_{$name}" : $name;
     }
 
     public static function aliasConst(string $aliasName): string

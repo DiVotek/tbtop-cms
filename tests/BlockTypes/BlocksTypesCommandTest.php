@@ -8,6 +8,7 @@ use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\DigitKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\EmptyableShapesBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\KindCollisionBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\MalformedDocblockBlock;
@@ -169,6 +170,18 @@ it('quotes a block kind that is not a JS identifier in the blockProps map', func
     expect(file_get_contents($this->outputPath))
         ->toContain('export const heroBannerProps = z.object({')
         ->toContain('    "hero-banner": heroBannerProps,');
+});
+
+it('turns a block kind with a leading digit or punctuation into a valid TS identifier', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [DigitKindBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('export const _3dPromov2Props = z.object({')
+        ->toContain('export type _3dPromov2Props = z.infer<typeof _3dPromov2Props>;')
+        ->toContain('    "3d-promo.v2": _3dPromov2Props,');
 });
 
 it('degrades an untyped block to the z.record fallback with a TODO comment and a warning, still exiting 0', function (): void {
