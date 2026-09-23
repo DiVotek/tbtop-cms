@@ -7,8 +7,8 @@ namespace Tbtop\Cms\Frontend\Seo;
 /**
  * Builds the schema.org objects rendered as `<script type="application/ld+json">`
  * tags. Kept separate from SeoResolver because the BreadcrumbList item list
- * needs the already-resolved canonical URL (the current page's own item) on
- * top of the Breadcrumbs prop (ancestors only) — mixing that composition into
+ * needs the already-resolved canonical URL (the current page's own item) in
+ * place of the trail's last slug-path crumb — mixing that composition into
  * SeoResolver's per-field resolve methods would blur its single job (fallback
  * chains per field).
  */

@@ -13,7 +13,9 @@ assumes that wiring exists and describes what it produces.
 
 `SeoResolver::resolve(Page $page, string $locale, array $breadcrumbs = [],
 ?SchemaContext $ctx = null, array $blockNodes = [])` is the single source of
-truth for the `seo` prop shared with every CMS page response. It returns one
+truth for the `seo` prop shared with every CMS page response. `$breadcrumbs`
+is `Breadcrumbs::ancestors()` (real ancestry, feeds `{parent}` only) — **not**
+`Cms::breadcrumbs()`, whose trail starts at home and ends at the page itself. It returns one
 flat array — title, description, canonical, image fields, OG/Twitter fields,
 article fields, `alternates`, `xDefault`, `favicon`, verification tokens, and
 `jsonLd`. Nothing else in the package re-derives these values for rendering;
@@ -56,13 +58,21 @@ Field-by-field:
   override is re-validated at read time, not trusted from storage, because
   rows can predate the validation rule or be written directly. `og:url` and
   the sitemap's per-locale `loc` reuse this same value/method.
-- **image (og:image, alt, mime)** — `ownImage` first: `seo.og_image`
+- **og:locale / og:locale:alternate** — the language's `og_locale` column
+  (`language_TERRITORY`, e.g. `en_US`; editable in Admin → Languages). New
+  languages get it from `LocaleCatalog::defaultOgLocale()`, and the
+  migration backfilled existing rows the same way. A language with no
+  `og_locale` publishes no `og:locale` (`seo.ogLocale` is `null`) and is
+  left out of the alternates — a bare `en` is invalid per ogp.me.
+- **image (og:image, alt, mime, width, height)** — `ownImage` first: `seo.og_image`
   override, else `page.image` (`PageOwnSeo::namesImage()` /
   `ownImageDetails()`). If the page names *no* image at all, falls back to
   `seo.default_og_image`. A page that named a broken media id still gets
   nothing rather than silently substituting the site default — the editor's
   choice is honored even when it fails to resolve. `mime` is only kept when
   it starts with `image/` (the media library also stores PDFs etc.).
+  `og:image:width`/`:height` come from the media row's `width`/`height`,
+  published only as a pair.
 - **noindex** — `! $page->is_indexable || ! IndexingSetting::enabled()`.
   Draft/expired/unpublished pages are excluded from the frontend entirely
   (routing, not `noindex`) — this flag only covers a *live* page an editor
@@ -141,19 +151,17 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
 
 1. **`JsonLd::website()`** — a `WebSite` node (name + root URL), emitted
    whenever `site.name` is set.
-2. **`JsonLd::breadcrumbList()`** — a `BreadcrumbList` from
-   `Breadcrumbs::trailForSchema()` plus the current page as the final item.
-   That trail is the page's ancestry with the **site root prepended**, so a
-   top-level page still lists `Home › Page` and a nested one lists
-   `Home › Category › Article`. Omitted only on the home page itself, and on
-   a site with no seeded root page (`is_system` + no parent — `PageSeeder`),
-   where it falls back to the plain ancestry and so needs two real levels.
+2. **`JsonLd::breadcrumbList()`** — a `BreadcrumbList` from the same trail
+   as the `breadcrumbs` prop (`Breadcrumbs::forPage()`: site root, ancestry,
+   the page), except that the page's own item carries the canonical URL
+   rather than its slug path. A top-level page lists `Home › Page` and a
+   nested one `Home › Category › Article`. Omitted on the home page itself,
+   and on a site with no seeded root page (`is_system` + no parent —
+   `PageSeeder`), where the trail is the plain ancestry and so needs two
+   real levels.
 
-   This is deliberately *not* the `breadcrumbs` prop: that one stays on the
-   real ancestry, because it also feeds the `{parent}` template variable.
-   Prepending home there would turn `{parent}` from empty into `Home` on
-   every top-level page. A host rendering its own visible trail keeps adding
-   its own "Home" link as before.
+   `{parent}` does not read this trail: it uses `Breadcrumbs::ancestors()`,
+   so it stays empty on a top-level page.
 
    The root crumb is labelled from the home page's `title`/`name` with the
    usual locale → default-locale fallback; `PageSeeder` writes those only in
@@ -184,12 +192,14 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    every block's `toSchema()`) carries `page`, `locale`, `source` (the page type's
    `source()`, null for content-only types), the same
    `name`/`description`/`url`/`image` inputs the rendered head tags use
-   (plus `imageAlt`/`imageMime` for the og: tags, so the media lookup runs
-   once),
+   (plus `imageAlt`/`imageMime`/`imageWidth`/`imageHeight` for the og:
+   tags, so the media lookup runs once),
    and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
    derived from the site identity settings, null when the identity type is
    `none` or the name is empty — `SeoResolver` always supplies this
-   argument). `SchemaContext::baseNode(string $type): array` is the
+   argument), and `publisher` (`array{'@type': 'Organization', name, url,
+   logo?}|null` — set only when the identity type is `organization`).
+   `SchemaContext::baseNode(string $type): array` is the
    standard node every built-in starts from — `@context`/`@type`/`name`/
    `url` always, `description`/`image` if non-empty, `datePublished`/
    `dateModified` from `publishedAt()`/`modifiedAt()`. `publishedAt(): ?string`
@@ -216,7 +226,9 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    OG article semantics, `openGraph()` returns `OpenGraph::website()`);
    `Article`/`NewsArticle`/`BlogPosting` (`openGraph()` returns type
    `article` with `publishedTime`/`modifiedTime`/`author` from the context,
-   node adds `mainEntityOfPage` and, when `$ctx->author` is set, `author`);
+   node adds `headline` (`name` cut at the last whole word within 110
+   characters), `mainEntityOfPage`, and, when set, `author` and
+   `publisher`);
    `CollectionPage` (`hasPart` listing up to 100 live, indexable children,
    one query spent only for categories, `openGraph()` inherits
    `SchemaType`'s `OpenGraph::website()` default). A host adds a class
@@ -564,7 +576,9 @@ Response` always returns a response, in three fallback layers:
    `docs/host/ai/wiring.md`). `seo.noindex` is forced `true` and
    `canonical`/`ogUrl` are forced `null`: an error page carries no slug (see
    `docs/host/ai/pages.md`), so `SeoResolver`'s own canonical would be a
-   made-up `/`-rooted URL.
+   made-up `/`-rooted URL. `seo.jsonLd` and `breadcrumbs` are forced `[]`:
+   a `BreadcrumbList`/`WebPage` would claim "Home › 404" lives at the home
+   URL.
 2. Missing/unpublished page (e.g. seeder not run yet): the same `Cms/Page`
    component with `render: []` and `page.heading` from
    `tbtop-cms::errors.{4xx,5xx}.heading` — never Laravel's stock error view.

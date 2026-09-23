@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
@@ -203,7 +203,7 @@ class SitemapEntryBuilder
     {
         $updatedAt = $page->getAttribute('updated_at');
 
-        return $updatedAt instanceof Carbon ? $updatedAt->toAtomString() : '';
+        return $updatedAt instanceof CarbonInterface ? $updatedAt->toAtomString() : '';
     }
 
     /**

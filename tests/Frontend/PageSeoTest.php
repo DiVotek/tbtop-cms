@@ -220,14 +220,24 @@ it('resolves siteName from settings, defaulting to an empty string when unset', 
         ->assertJsonPath('props.seo.siteName', 'Acme Co');
 });
 
-it('resolves ogType/ogUrl/ogLocale as a constant, the canonical, and the current locale', function (): void {
+it('resolves ogType/ogUrl/ogLocale as a constant, the canonical, and the language territory default', function (): void {
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.seo.ogType', 'website')
         ->assertJsonPath('props.seo.ogUrl', url($page->pathFor('en')))
-        ->assertJsonPath('props.seo.ogLocale', 'en');
+        ->assertJsonPath('props.seo.ogLocale', 'en_US');
+});
+
+it('publishes the og_locale an editor set, and no og:locale when it is blank', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    Language::query()->where('locale', 'en')->first()->update(['og_locale' => 'en_GB']);
+    $this->get('/about', ['X-Inertia' => 'true'])->assertJsonPath('props.seo.ogLocale', 'en_GB');
+
+    Language::query()->where('locale', 'en')->first()->update(['og_locale' => null]);
+    $this->get('/about', ['X-Inertia' => 'true'])->assertJsonPath('props.seo.ogLocale', null);
 });
 
 it('lists ogLocaleAlternates as the other locales the page has a slug in, excluding the current one', function (): void {
@@ -239,11 +249,11 @@ it('lists ogLocaleAlternates as the other locales the page has a slug in, exclud
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.seo.ogLocaleAlternates', ['uk']);
+        ->assertJsonPath('props.seo.ogLocaleAlternates', ['uk_UA']);
 
     $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.seo.ogLocaleAlternates', ['en']);
+        ->assertJsonPath('props.seo.ogLocaleAlternates', ['en_US']);
 });
 
 it('sets twitterCard to summary_large_image only when an ogImage resolves', function (): void {

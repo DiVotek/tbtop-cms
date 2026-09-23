@@ -33,6 +33,8 @@ class LanguageForm
             $s->text('name')->label(__('tbtop-cms::languages.fields.name'))->required(),
             $s->text('locale')->label(__('tbtop-cms::languages.fields.locale'))->required()
                 ->meta('disabled', true)->helperText(__('tbtop-cms::languages.helpers.locale')),
+            $s->text('og_locale')->label(__('tbtop-cms::languages.fields.og_locale'))
+                ->helperText(__('tbtop-cms::languages.helpers.og_locale')),
             $s->boolean('is_default')->label(__('tbtop-cms::languages.fields.is_default')),
             $s->boolean('is_admin_active')->label(__('tbtop-cms::languages.fields.is_admin_active'))
                 ->helperText(__('tbtop-cms::languages.helpers.is_admin_active')),
@@ -51,6 +53,7 @@ class LanguageForm
             $language = Language::query()->findOrFail($id);
             $wasDefault = $language->is_default;
             $language->name = (string) ($form['name'] ?? $language->name);
+            $language->og_locale = self::guardOgLocale($form['og_locale'] ?? $language->og_locale);
         } else {
             $wasDefault = false;
             $locale = (string) ($form['locale'] ?? '');
@@ -115,6 +118,22 @@ class LanguageForm
         return $name;
     }
 
+    /** Blank clears it (og:locale is then omitted); anything else must be language_TERRITORY. */
+    private static function guardOgLocale(mixed $value): ?string
+    {
+        $ogLocale = trim((string) $value);
+
+        if ($ogLocale === '') {
+            return null;
+        }
+
+        if (! LocaleCatalog::isOgLocale($ogLocale)) {
+            throw ValidationException::withMessages(['og_locale' => __('tbtop-cms::languages.validation.og_locale_format')]);
+        }
+
+        return $ogLocale;
+    }
+
     /** @return array<string, mixed> */
     public static function load(int $id): array
     {
@@ -123,6 +142,7 @@ class LanguageForm
         return [
             'name' => $language->name,
             'locale' => $language->locale,
+            'og_locale' => $language->og_locale,
             'is_default' => $language->is_default,
             'is_admin_active' => $language->is_admin_active,
             'is_frontend_active' => $language->is_frontend_active,

@@ -21,54 +21,60 @@ class Breadcrumbs
         private readonly Languages $languages,
     ) {}
 
-    /** @return list<array{label: string, path: string, url: string}> */
+    /**
+     * The trail a visitor and BreadcrumbList both read: site root first,
+     * whether or not an editor wired it as the parent (the seeded home is a
+     * sibling of top-level pages, not their parent), then real ancestry,
+     * then the page itself. Fewer than two crumbs is no trail — the home
+     * page gets [] rather than a lone "Home".
+     *
+     * @return list<array{label: string, path: string, url: string}>
+     */
     public function forPage(Page $page, string $locale): array
+    {
+        $chain = AncestorChain::forPage($page);
+        $home = $this->home();
+
+        if ($home !== null && $home->getKey() !== $page->getKey()
+            && ! $this->contains($chain, $home)) {
+            array_unshift($chain, $home);
+        }
+
+        $chain[] = $page;
+
+        return count($chain) < 2 ? [] : $this->crumbs($chain, $locale);
+    }
+
+    /**
+     * Real ancestry only — no site root, no self. The `{parent}` SEO
+     * template variable reads its last element (SeoResolver::parentLabel());
+     * feeding it forPage() would turn `{parent}` into "Home" on top-level
+     * pages and into the page's own label everywhere else.
+     *
+     * @return list<array{label: string, path: string, url: string}>
+     */
+    public function ancestors(Page $page, string $locale): array
     {
         return $this->crumbs(AncestorChain::forPage($page), $locale);
     }
 
     /**
-     * The trail as BreadcrumbList describes it: the site root is the first
-     * item for every page, whether or not an editor wired it as the parent.
-     *
-     * Deliberately NOT folded into forPage(): that array is also the source
-     * of the `{parent}` SEO template variable (SeoResolver::parentLabel()
-     * reads its last element) and of the host-facing `breadcrumbs` prop.
-     * Prepending home there would turn `{parent}` from empty into "Home" on
-     * every top-level page, rewriting live titles.
-     *
+     * @param  list<Page>  $pages
      * @return list<array{label: string, path: string, url: string}>
      */
-    public function trailForSchema(Page $page, string $locale): array
+    private function crumbs(array $pages, string $locale): array
     {
-        $ancestors = AncestorChain::forPage($page);
-        $home = $this->home();
-
-        if ($home !== null && $home->getKey() !== $page->getKey()
-            && ! $this->contains($ancestors, $home)) {
-            array_unshift($ancestors, $home);
-        }
-
-        return $this->crumbs($ancestors, $locale);
-    }
-
-    /**
-     * @param  list<Page>  $ancestors
-     * @return list<array{label: string, path: string, url: string}>
-     */
-    private function crumbs(array $ancestors, string $locale): array
-    {
-        if ($ancestors === []) {
+        if ($pages === []) {
             return [];
         }
 
-        $paths = $this->ancestorPaths($ancestors, $locale);
+        $paths = $this->paths($pages, $locale);
         $crumbs = [];
 
-        foreach ($ancestors as $ancestor) {
-            $path = (string) ($paths[$ancestor->getKey()] ?? '');
+        foreach ($pages as $crumbPage) {
+            $path = (string) ($paths[$crumbPage->getKey()] ?? '');
             $crumbs[] = [
-                'label' => $this->label($ancestor, $locale),
+                'label' => $this->label($crumbPage, $locale),
                 'path' => $path,
                 'url' => $this->url->build($path, $locale),
             ];
@@ -90,6 +96,9 @@ class Breadcrumbs
             $this->home = Page::query()
                 ->where('is_system', true)
                 ->whereNull('parent_id')
+                // Error pages are system roots too; without this the trail
+                // could start at the 404 page on a host that seeded it first.
+                ->whereNull('error_class')
                 ->first();
         }
 
@@ -109,12 +118,12 @@ class Breadcrumbs
     }
 
     /**
-     * @param  list<Page>  $ancestors
+     * @param  list<Page>  $pages
      * @return array<int, string>
      */
-    private function ancestorPaths(array $ancestors, string $locale): array
+    private function paths(array $pages, string $locale): array
     {
-        $ids = array_map(static fn (Page $page): int => $page->getKey(), $ancestors);
+        $ids = array_map(static fn (Page $page): int => $page->getKey(), $pages);
 
         return PageSlug::query()
             ->where('locale', $locale)

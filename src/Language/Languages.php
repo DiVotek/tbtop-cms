@@ -11,11 +11,13 @@ use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Language\Models\Language;
 
 /**
- * @phpstan-type LanguageRow array{id: int, name: string, locale: string, is_default: bool, is_admin_active: bool, is_frontend_active: bool, sort_order: int}
+ * @phpstan-type LanguageRow array{id: int, name: string, locale: string, og_locale: string|null, is_default: bool, is_admin_active: bool, is_frontend_active: bool, sort_order: int}
  */
 class Languages
 {
-    private const string CACHE_KEY = 'tbtop-cms.languages';
+    // Bumped whenever LanguageRow gains a key: a row cached before a deploy
+    // would otherwise lack it until the next language edit.
+    private const string CACHE_KEY = 'tbtop-cms.languages.v2';
 
     /** @var list<LanguageRow>|null */
     private ?array $cache = null;
@@ -126,6 +128,14 @@ class Languages
         $this->syncFallbackLocale();
     }
 
+    /** og:locale for a CMS locale; null when the language has none set. */
+    public function ogLocale(string $locale): ?string
+    {
+        $ogLocale = $this->find($locale)['og_locale'] ?? null;
+
+        return $ogLocale !== null && $ogLocale !== '' ? $ogLocale : null;
+    }
+
     /** @return LanguageRow|null */
     private function find(string $locale): ?array
     {
@@ -164,6 +174,7 @@ class Languages
                 'id' => $language->id,
                 'name' => $language->name,
                 'locale' => $language->locale,
+                'og_locale' => $language->og_locale,
                 'is_default' => $language->is_default,
                 'is_admin_active' => $language->is_admin_active,
                 'is_frontend_active' => $language->is_frontend_active,

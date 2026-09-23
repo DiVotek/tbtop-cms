@@ -93,7 +93,7 @@ final class OgPreview
         $shared = null;
 
         foreach ($locales as $locale) {
-            $resolved = $resolver->resolve($draft, $locale, $breadcrumbs->forPage($page, $locale));
+            $resolved = $resolver->resolve($draft, $locale, $breadcrumbs->ancestors($page, $locale));
 
             $byLocale[$locale] = [
                 'title' => $resolved['ogTitle'],

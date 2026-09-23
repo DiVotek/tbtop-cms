@@ -110,3 +110,14 @@ it('keeps a page translation intact across a language delete and revive-on-recre
 
     expect($page->fresh()->getTranslation('name', 'de'))->toBe('Ueber uns');
 });
+
+it('takes the og_locale territory an editor sets, and rejects one that is not language_TERRITORY', function (): void {
+    $language = Language::factory()->default()->create(['locale' => 'en', 'name' => 'English']);
+
+    LanguageForm::save(['name' => 'English', 'og_locale' => 'en_GB', 'is_default' => true], $language->id);
+    expect($language->refresh()->og_locale)->toBe('en_GB');
+
+    expect(fn () => LanguageForm::save(['name' => 'English', 'og_locale' => 'en', 'is_default' => true], $language->id))
+        ->toThrow(ValidationException::class);
+    expect($language->refresh()->og_locale)->toBe('en_GB');
+});

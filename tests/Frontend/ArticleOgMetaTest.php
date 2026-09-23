@@ -150,6 +150,20 @@ it('omits og:image:alt and twitter:image:alt when the media row has no alt text'
         ->toContain('data-inertia="og-image-type" property="og:image:type" content="image/jpeg"');
 });
 
+it('renders og:image:width and og:image:height from the media row, and neither without both', function (): void {
+    $sized = articleMeta('og.png', ['mime' => 'image/png', 'width' => 1200, 'height' => 630]);
+    $unsized = articleMeta('half.png', ['mime' => 'image/png', 'width' => 1200, 'height' => null]);
+    $sizedPage = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Sized'], 'image' => (string) $sized->getKey()]);
+    $unsizedPage = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Unsized'], 'image' => (string) $unsized->getKey()]);
+
+    expect($this->get($sizedPage->pathFor('en'))->assertOk()->getContent())
+        ->toContain('property="og:image:width" content="1200"')
+        ->toContain('property="og:image:height" content="630"')
+        ->and($this->get($unsizedPage->pathFor('en'))->assertOk()->getContent())
+        ->not->toContain('og:image:width')
+        ->not->toContain('og:image:height');
+});
+
 it('omits og:image:type when the resolved media is not an image mime', function (): void {
     $document = articleMeta('brochure.pdf', ['mime' => 'application/pdf', 'alt' => 'Brochure']);
     $page = Page::factory()->create([

@@ -67,8 +67,11 @@ final class SchemaContextFactory
             url: $this->canonical($page, $seo, $locale),
             image: $ogImageDetails['url'] ?? null,
             author: $this->identityAuthor(),
+            publisher: $this->identityPublisher(),
             imageAlt: $ogImageDetails['alt'] ?? null,
             imageMime: $ogImageDetails['mime'] ?? null,
+            imageWidth: $ogImageDetails['width'] ?? null,
+            imageHeight: $ogImageDetails['height'] ?? null,
         );
     }
 
@@ -118,12 +121,12 @@ final class SchemaContextFactory
 
     /**
      * Fallback order: the page's explicit og_image override, then the
-     * page's own image, then the global default. Returns alt/mime alongside
-     * the URL since og:image:alt/og:image:type must follow whichever image
+     * page's own image, then the global default. Returns alt/mime/dimensions
+     * alongside the URL since og:image:alt/:type/:width/:height must follow whichever image
      * actually resolved.
      *
      * @param  array<string, mixed>  $seo
-     * @return array{url: string, alt: string|null, mime: string|null}|null
+     * @return array{url: string, alt: string|null, mime: string|null, width: int|null, height: int|null}|null
      */
     private function ogImageDetails(Page $page, array $seo): ?array
     {
@@ -154,7 +157,7 @@ final class SchemaContextFactory
 
     /**
      * @param  array<string, mixed>  $seo
-     * @return array{url: string, alt: string|null, mime: string|null}|null
+     * @return array{url: string, alt: string|null, mime: string|null, width: int|null, height: int|null}|null
      */
     private function ownImageDetails(Page $page, array $seo): ?array
     {
@@ -175,7 +178,7 @@ final class SchemaContextFactory
      * Mime is dropped unless it starts with `image/` — a non-image mime
      * published as og:image:type is worse than omitting the tag entirely.
      *
-     * @return array{url: string, alt: string|null, mime: string|null}|null
+     * @return array{url: string, alt: string|null, mime: string|null, width: int|null, height: int|null}|null
      */
     private function imageDetails(string $id): ?array
     {
@@ -191,10 +194,16 @@ final class SchemaContextFactory
             return null;
         }
 
+        // Only as a pair: one dimension without the other tells a scraper
+        // nothing it can lay out a preview with.
+        $hasSize = $details['width'] > 0 && $details['height'] > 0;
+
         return [
             'url' => $url,
             'alt' => $details['alt'] !== null && $details['alt'] !== '' ? $details['alt'] : null,
             'mime' => str_starts_with($details['mime'], 'image/') ? $details['mime'] : null,
+            'width' => $hasSize ? $details['width'] : null,
+            'height' => $hasSize ? $details['height'] : null,
         ];
     }
 
@@ -243,6 +252,49 @@ final class SchemaContextFactory
             'person' => ['@type' => 'Person', 'name' => $name],
             default => null,
         };
+    }
+
+    /**
+     * Google reads Article `publisher` as an Organization only; a Person
+     * identity is the author, not a publisher, so it yields null here.
+     *
+     * @return array{'@type': string, name: string, url: string, logo?: string}|null
+     */
+    private function identityPublisher(): ?array
+    {
+        $name = $this->identityName();
+
+        if ($this->settings->get('seo.identity.type', 'none') !== 'organization' || $name === '') {
+            return null;
+        }
+
+        $publisher = ['@type' => 'Organization', 'name' => $name, 'url' => url('/')];
+        $logo = $this->identityLogo();
+
+        if ($logo !== null) {
+            $publisher['logo'] = $logo;
+        }
+
+        return $publisher;
+    }
+
+    /**
+     * Shared with SeoResolver's identity node. The Identity tab no longer
+     * exposes a logo field, so this falls back to the site logo — a saved
+     * seo.identity.logo from before that change, or written by a script,
+     * still wins.
+     */
+    public function identityLogo(): ?string
+    {
+        $logoId = $this->settings->get('seo.identity.logo');
+
+        if (! is_string($logoId) || $logoId === '') {
+            $logoId = $this->settings->get('site.logo');
+        }
+
+        return AbsoluteUrl::make(
+            is_string($logoId) && $logoId !== '' ? $this->mediaUrlResolver->resolve($logoId) : null,
+        );
     }
 
     /** Shared with SeoResolver::identityName() so the identity node and the Article author name the same entity. */

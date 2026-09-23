@@ -64,11 +64,11 @@ class SeoResolver
      * rendered value (see SeoChecklist::focusKeywordChecks()). Rendering
      * itself never uses these two.
      *
-     * @param  list<Breadcrumb>  $breadcrumbs  Ancestors only (Breadcrumbs::forPage() shape), reused
-     *                                         as-is from the caller's own `breadcrumbs` prop build so
-     *                                         this stays a single query per request. Feeds {parent}
-     *                                         and nothing else — BreadcrumbList builds its own trail
-     *                                         (see jsonLd()), so passing [] does not suppress it.
+     * @param  list<Breadcrumb>  $breadcrumbs  Real ancestry (Breadcrumbs::ancestors()), NOT the
+     *                                         `breadcrumbs` prop / Cms::breadcrumbs() trail, which
+     *                                         starts at home and ends at the page itself. Feeds
+     *                                         {parent} and nothing else — BreadcrumbList builds its
+     *                                         own trail (see jsonLd()), so passing [] does not suppress it.
      * @param  ?SchemaContext  $ctx  Built via SchemaContextFactory when omitted — pass one when the
      *                               caller already built it (e.g. to resolve block schema nodes
      *                               against the same context this call publishes).
@@ -77,9 +77,9 @@ class SeoResolver
      *                                                  before the identity node.
      * @return array{
      *     title: string, description: string, canonical: string, ogImage: string|null,
-     *     ogImageAlt: string|null, ogImageType: string|null,
+     *     ogImageAlt: string|null, ogImageType: string|null, ogImageWidth: int|null, ogImageHeight: int|null,
      *     ogTitle: string, ogDescription: string, noindex: bool, siteName: string,
-     *     ogType: string, ogUrl: string, ogLocale: string, ogLocaleAlternates: list<string>,
+     *     ogType: string, ogUrl: string, ogLocale: string|null, ogLocaleAlternates: list<string>,
      *     articlePublishedTime: string|null, articleModifiedTime: string|null, articleAuthor: string|null,
      *     twitterCard: string, alternates: list<Alternate>, xDefault: string|null,
      *     favicon: string|null, jsonLd: list<array<string, mixed>>,
@@ -106,13 +106,15 @@ class SeoResolver
             'ogImage' => $context->image,
             'ogImageAlt' => $context->imageAlt,
             'ogImageType' => $context->imageMime,
+            'ogImageWidth' => $context->imageWidth,
+            'ogImageHeight' => $context->imageHeight,
             'ogTitle' => $ogTitle,
             'ogDescription' => $context->description,
             'noindex' => ! $page->is_indexable || ! $this->indexing->enabled(),
             'siteName' => $siteName,
             'ogType' => $og->type,
             'ogUrl' => $context->url,
-            'ogLocale' => $locale,
+            'ogLocale' => $this->languages->ogLocale($locale),
             'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
             'articlePublishedTime' => $og->publishedTime,
             'articleModifiedTime' => $og->modifiedTime,
@@ -154,17 +156,25 @@ class SeoResolver
     /**
      * Derived from the hreflang alternates (locales the page actually exists
      * in), not from every frontend-active locale: og:locale:alternate is a
-     * claim that this content is available in that locale.
+     * claim that this content is available in that locale. A language with
+     * no og_locale is left out rather than published as a bare `en`.
      *
      * @param  list<Alternate>  $alternates
      * @return list<string>
      */
     private function ogLocaleAlternates(string $locale, array $alternates): array
     {
-        return array_values(array_filter(
-            array_column($alternates, 'locale'),
-            static fn (string $code): bool => $code !== $locale,
-        ));
+        $ogLocales = [];
+
+        foreach (array_column($alternates, 'locale') as $code) {
+            $ogLocale = $code !== $locale ? $this->languages->ogLocale($code) : null;
+
+            if ($ogLocale !== null) {
+                $ogLocales[] = $ogLocale;
+            }
+        }
+
+        return $ogLocales;
     }
 
     /**
@@ -238,10 +248,12 @@ class SeoResolver
         // suffixed-elsewhere) og title.
         $currentLabel = (string) $page->getTranslation('title', $locale, false)
             ?: (string) $page->getTranslation('name', $locale, false);
-        // Not resolve()'s $breadcrumbs: that one must stay on the real
-        // ancestry for {parent}. See Breadcrumbs::trailForSchema().
+        // The same trail as the `breadcrumbs` prop, minus its last crumb:
+        // the page's own item is re-added with the canonical URL (which an
+        // editor may have overridden) instead of the slug path. Not
+        // resolve()'s $breadcrumbs — that one is ancestry for {parent}.
         $breadcrumbList = $this->jsonLd->breadcrumbList(
-            $this->breadcrumbs->trailForSchema($page, $locale),
+            array_slice($this->breadcrumbs->forPage($page, $locale), 0, -1),
             $currentLabel !== '' ? $currentLabel : $ogTitle,
             $canonical,
         );
@@ -276,18 +288,7 @@ class SeoResolver
         // entity.
         $name = $this->factory->identityName();
 
-        // The Identity tab no longer exposes name/logo fields directly, so
-        // both fall back to the site's own identity — a saved seo.identity.*
-        // value from before that change, or written by a script, still wins.
-        $logoId = $this->settings->get('seo.identity.logo');
-
-        if (! is_string($logoId) || $logoId === '') {
-            $logoId = $this->settings->get('site.logo');
-        }
-
-        $logo = AbsoluteUrl::make(
-            is_string($logoId) && $logoId !== '' ? $this->mediaUrlResolver->resolve($logoId) : null,
-        );
+        $logo = $this->factory->identityLogo();
 
         return $this->jsonLd->identity($type, $name, url('/'), $logo, $this->sameAs());
     }

@@ -99,7 +99,7 @@ final class SerpPreview
             $resolved = $resolver->resolve(
                 self::draftOf($page, $locale, $bag),
                 $locale,
-                $breadcrumbs->forPage($page, $locale),
+                $breadcrumbs->ancestors($page, $locale),
             );
 
             $byLocale[$locale] = [

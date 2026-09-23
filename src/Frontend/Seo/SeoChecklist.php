@@ -41,7 +41,7 @@ class SeoChecklist
         // and a {parent} segment is part of what a crawler sees — resolving
         // without them would hide a keyword the page genuinely carries (see
         // focusKeywordChecks()).
-        $resolved = $this->resolver->resolve($page, $locale, $this->breadcrumbs->forPage($page, $locale));
+        $resolved = $this->resolver->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale));
         $seo = is_array($page->seo) ? $page->seo : [];
 
         return [
@@ -254,7 +254,7 @@ class SeoChecklist
                     $otherTitle = $this->resolver->renderedTitle(
                         $other,
                         $locale,
-                        fn (): array => $this->breadcrumbs->forPage($other, $locale),
+                        fn (): array => $this->breadcrumbs->ancestors($other, $locale),
                     );
 
                     $titleDuplicate = $otherTitle === $title;
@@ -264,7 +264,7 @@ class SeoChecklist
                     $otherDescription = $this->resolver->renderedDescription(
                         $other,
                         $locale,
-                        fn (): array => $this->breadcrumbs->forPage($other, $locale),
+                        fn (): array => $this->breadcrumbs->ancestors($other, $locale),
                     );
 
                     $descriptionDuplicate = $otherDescription === $description;

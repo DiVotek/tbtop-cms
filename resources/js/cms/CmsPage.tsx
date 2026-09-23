@@ -28,13 +28,15 @@ interface Seo {
     ogImage: string | null;
     ogImageAlt: string | null;
     ogImageType: string | null;
+    ogImageWidth: number | null;
+    ogImageHeight: number | null;
     ogTitle: string;
     ogDescription: string;
     noindex: boolean;
     siteName: string;
     ogType: string;
     ogUrl: string;
-    ogLocale: string;
+    ogLocale: string | null;
     ogLocaleAlternates: string[];
     articlePublishedTime: string | null;
     articleModifiedTime: string | null;
@@ -101,7 +103,7 @@ export default function CmsPage() {
                 <meta head-key="og-type" property="og:type" content={seo.ogType} />
                 {seo.ogUrl ? <meta head-key="og-url" property="og:url" content={seo.ogUrl} /> : null}
                 {seo.siteName ? <meta head-key="og-site-name" property="og:site_name" content={seo.siteName} /> : null}
-                <meta head-key="og-locale" property="og:locale" content={seo.ogLocale} />
+                {seo.ogLocale ? <meta head-key="og-locale" property="og:locale" content={seo.ogLocale} /> : null}
                 {seo.ogLocaleAlternates.map((locale) => (
                     <meta key={locale} head-key={`og-locale-alternate-${locale}`} property="og:locale:alternate" content={locale} />
                 ))}
@@ -116,6 +118,12 @@ export default function CmsPage() {
                 ) : null}
                 {seo.ogImage && seo.ogImageType ? (
                     <meta head-key="og-image-type" property="og:image:type" content={seo.ogImageType} />
+                ) : null}
+                {seo.ogImage && seo.ogImageWidth && seo.ogImageHeight ? (
+                    <meta head-key="og-image-width" property="og:image:width" content={String(seo.ogImageWidth)} />
+                ) : null}
+                {seo.ogImage && seo.ogImageWidth && seo.ogImageHeight ? (
+                    <meta head-key="og-image-height" property="og:image:height" content={String(seo.ogImageHeight)} />
                 ) : null}
                 {seo.ogType === "article" && seo.articlePublishedTime ? (
                     <meta head-key="article-published-time" property="article:published_time" content={seo.articlePublishedTime} />

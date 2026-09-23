@@ -9,7 +9,6 @@ use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Block\BlockContentResolver;
-use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Errors\Support\FallbackProps;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -33,7 +32,6 @@ class ErrorResponse
         private readonly BlockContentResolver $blocks,
         private readonly PageSpecAssembler $assembler,
         private readonly SeoResolver $seo,
-        private readonly Breadcrumbs $breadcrumbs,
     ) {}
 
     public function render(Request $request, int $status): Response
@@ -83,6 +81,9 @@ class ErrorResponse
         $seo['canonical'] = null;
         $seo['ogUrl'] = null;
         $seo['noindex'] = true;
+        // An error page is not a node of the site: a BreadcrumbList or
+        // WebPage for it would claim "Home › 404" lives at the home URL.
+        $seo['jsonLd'] = [];
 
         return [
             'page' => [
@@ -97,7 +98,7 @@ class ErrorResponse
             ],
             'render' => $this->assembler->assemble($resolved),
             'seo' => $seo,
-            'breadcrumbs' => $this->breadcrumbs->forPage($page, $locale),
+            'breadcrumbs' => [],
             'path' => null,
             'isPreview' => false,
         ];

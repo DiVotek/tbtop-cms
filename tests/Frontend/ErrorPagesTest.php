@@ -50,6 +50,17 @@ function withExtraFrontendRoute(Closure $registerFirst): void
     app(Cms::class)->frontendRoutes();
 }
 
+it('publishes no JSON-LD and no breadcrumbs on the 404 page', function (): void {
+    Page::factory()->create(['is_system' => true, 'status' => PageStatus::Published, 'name' => ['en' => 'Home']]);
+    seedErrorPage(ErrorClass::ClientError);
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/nonexistent', ['X-Inertia' => 'true'])
+        ->assertNotFound()
+        ->assertJsonPath('props.seo.jsonLd', [])
+        ->assertJsonPath('props.breadcrumbs', []);
+});
+
 // Contract 1
 it('renders the 404 page from the DB through the normal Cms/Page pipeline, noindex and no canonical', function (): void {
     seedErrorPage(ErrorClass::ClientError, [

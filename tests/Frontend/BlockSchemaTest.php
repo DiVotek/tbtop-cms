@@ -21,7 +21,7 @@ beforeEach(function (): void {
     app(Cms::class)->frontendRoutes();
 
     // The site root as PageSeeder creates it (is_system + no parent, empty
-    // slug path): Breadcrumbs::trailForSchema() prepends it to every other
+    // slug path): Breadcrumbs::forPage() prepends it to every other
     // page's trail, which is what gives a top-level `page` a BreadcrumbList.
     Page::factory()->create([
         'status' => PageStatus::Published,
