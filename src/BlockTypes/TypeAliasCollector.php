@@ -36,6 +36,14 @@ final class TypeAliasCollector
     /** @var array<string, TypeNode> */
     private array $aliases = [];
 
+    /**
+     * Classes whose aliases are being collected, outermost first. Each import
+     * collects its source with a fresh instance, so the chain must be shared.
+     *
+     * @var list<string>
+     */
+    private static array $importChain = [];
+
     public function __construct()
     {
         $config = new ParserConfig(usedAttributes: []);
@@ -51,10 +59,20 @@ final class TypeAliasCollector
      */
     public function collect(string $class): array
     {
-        $this->aliases = [];
-        $this->collectFromClassAndTraits(new ReflectionClass($class));
+        if (in_array($class, self::$importChain, true)) {
+            throw new RuntimeException('@phpstan-import-type cycle: ' . implode(' -> ', [...self::$importChain, $class]) . '.');
+        }
 
-        return $this->aliases;
+        self::$importChain[] = $class;
+
+        try {
+            $this->aliases = [];
+            $this->collectFromClassAndTraits(new ReflectionClass($class));
+
+            return $this->aliases;
+        } finally {
+            array_pop(self::$importChain);
+        }
     }
 
     /** @param  ReflectionClass<object>  $class */

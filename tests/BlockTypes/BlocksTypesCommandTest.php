@@ -7,6 +7,8 @@ use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Block\Blocks\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictOneBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\AliasConflictTwoBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\CyclicImportBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\CyclicImportSource;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DigitKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\EmptyableShapesBlock;
@@ -274,6 +276,17 @@ it('errors with exit 1 and writes nothing for an alias that refers to itself', f
 
     $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
         ->expectsOutputToContain('Type alias [Node] refers to itself (Node -> Node)')
+        ->assertExitCode(1);
+
+    expect(is_file($this->outputPath))->toBeFalse();
+});
+
+it('errors with exit 1 and writes nothing when two classes import aliases from each other', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [CyclicImportBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain('@phpstan-import-type cycle: ' . CyclicImportBlock::class . ' -> ' . CyclicImportSource::class . ' -> ' . CyclicImportBlock::class)
         ->assertExitCode(1);
 
     expect(is_file($this->outputPath))->toBeFalse();
