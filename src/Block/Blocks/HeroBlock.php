@@ -48,7 +48,7 @@ class HeroBlock extends Block
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
+     * @return array{title: string, subtitle: string|null, image: string|null, cta: array{label: string, href: string}|null}
      */
     #[\Override]
     public function resolve(array $input, ResolveContext $ctx): array

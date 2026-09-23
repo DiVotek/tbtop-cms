@@ -1,7 +1,4 @@
-import type { z } from "zod";
-import type { heroProps } from "../catalog";
-
-type HeroProps = z.infer<typeof heroProps>;
+import type { HeroProps } from "../blocks.generated";
 
 export function Hero({ props }: { props: HeroProps }) {
     return (

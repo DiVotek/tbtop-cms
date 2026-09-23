@@ -165,5 +165,13 @@ return [
                 'missing' => 'Додайте цей рядок у ваш AGENTS.md або CLAUDE.md (перевірено: :candidates), щоб агент знайшов гайд: "Building on tbtop/cms → read vendor/tbtop/cms/docs/host/ai/README.md first."',
             ],
         ],
+        'untyped_blocks' => [
+            'label' => 'Типізовані props блоків',
+            'ok' => 'Кожен зареєстрований блок має типізований @return array{...} у resolve().',
+            'warning' => 'Деякі зареєстровані блоки не мають типізованого @return array{...} у resolve(): :kinds.',
+            'hints' => [
+                'warning' => 'Додайте докблок @return array{...} з формою до resolve() кожного перерахованого блоку, щоб `php artisan cms:blocks:types` міг згенерувати реальні props замість поблажливого фолбеку z.record().',
+            ],
+        ],
     ],
 ];

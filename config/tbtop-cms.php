@@ -59,6 +59,9 @@ return [
     'blocks' => [
         'types' => [],
         'strict' => false,
+        // Where `cms:blocks:types` writes the generated zod schemas / TS types.
+        // Null means resources/js/cms/blocks.generated.ts; --path= overrides.
+        'types_path' => null,
     ],
     'seo' => [
         // Host schema.org node classes merged into SchemaTypeRegistry.
