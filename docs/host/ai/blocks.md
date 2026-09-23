@@ -75,7 +75,9 @@ are supported and resolved across classes/traits; the `from` class is
 resolved like PHP would in that file (same namespace, `use` aliases, or a
 leading `\`; a trait `use` inside a class body is not an import). The class
 in `value-of<Class::CONST>` resolves the same way, and `self`/`static` mean the
-block. `... as Local` renames the import, so two sources may each
+block — also inside aliases of traits the block uses. An alias pulled in with
+`@phpstan-import-type ... from X` keeps `X`'s meaning of `self`, as in PHPStan:
+the block need not declare the constants `X` refers to. `... as Local` renames the import, so two sources may each
 declare an `Item`; an alias reused with two different shapes anywhere in
 the registry is a command error, nothing is written.
 
