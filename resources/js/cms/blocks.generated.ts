@@ -23,7 +23,7 @@ export const contactFormProps = z.object({
         type: z.string(),
         required: z.boolean(),
     })),
-    action: z.string(),
+    action: z.string().optional(),
     honeypotField: z.string().optional(),
 });
 export type ContactFormProps = z.infer<typeof contactFormProps>;

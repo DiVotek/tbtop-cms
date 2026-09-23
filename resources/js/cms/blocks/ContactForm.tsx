@@ -14,6 +14,9 @@ export function ContactForm({ props }: { props: ContactFormProps }) {
 
     function submit(event: FormEvent): void {
         event.preventDefault();
+        if (!props.action) {
+            return;
+        }
         form.post(props.action, {
             preserveScroll: true,
             onSuccess: () => {

@@ -48,6 +48,10 @@ edit`; re-run the command after changing a block's `resolve()` return shape.
 date (wire this into CI so a drifted catalog fails the build) and exits 0
 when it's already current.
 
+`--check` compares bytes, so the file must stay exactly as generated: add its
+path to the host's `.prettierignore` (and any other formatter's ignore list).
+A reformatted file keeps working at runtime but fails `--check`.
+
 A block with no typed `@return array{...}` on `resolve()` (no docblock, a
 bare `array`/`array<string, mixed>` return, or an unparsable top-level type)
 degrades to a permissive `z.record(z.string(), z.unknown())` fallback (wrapped
@@ -55,7 +59,9 @@ like any record, see below) with a
 `TODO` comment and a command warning — it does not fail the run.
 `HandlesFormSubmission` blocks get `action`/`honeypotField` appended
 automatically (FormActionBinder injects them after `resolve()` runs), typed
-or not — an untyped form block falls back to `z.object({action, honeypotField?}).catchall(z.unknown())`; declare
+or not. Both are optional: only page rendering runs the binder, so a form
+block on an error page or in a layout slot arrives without `action` — guard
+the submit. An untyped form block falls back to `z.object({action?, honeypotField?}).catchall(z.unknown())`; declare
 either key in the docblock yourself and the command errors. A PHPDoc
 construct the converter has no zod mapping for (inside an otherwise-typed
 shape) is a hard error naming the block and the key path — fix the docblock,

@@ -48,7 +48,7 @@ it('writes typed props, an alias export, and the blockProps map for the real pac
         ->toContain('export const heroProps = z.object({')
         ->toContain('export type HeroProps = z.infer<typeof heroProps>;')
         ->toContain("// action/honeypotField are injected by FormActionBinder after resolve() runs\nexport const contactFormProps = z.object({")
-        ->toContain('action: z.string(),')
+        ->toContain('action: z.string().optional(),')
         ->toContain('honeypotField: z.string().optional(),')
         ->toContain('Hero: heroProps,')
         ->toContain('ContactForm: contactFormProps,');
@@ -202,7 +202,7 @@ it('keeps action/honeypotField on an untyped HandlesFormSubmission block', funct
         ->assertExitCode(0);
 
     expect(file_get_contents($this->outputPath))->toContain(
-        "export const untypedFormProps = z.object({\n    action: z.string(),\n    honeypotField: z.string().optional(),\n}).catchall(z.unknown()); // TODO: add @return array{...} to UntypedForm::resolve()",
+        "export const untypedFormProps = z.object({\n    action: z.string().optional(),\n    honeypotField: z.string().optional(),\n}).catchall(z.unknown()); // TODO: add @return array{...} to UntypedForm::resolve()",
     );
 });
 
@@ -215,7 +215,7 @@ it('appends action/honeypotField to a HandlesFormSubmission block after its docb
     $contents = file_get_contents($this->outputPath);
 
     expect($contents)->toContain('heading: z.string(),')
-        ->toContain('action: z.string(),')
+        ->toContain('action: z.string().optional(),')
         ->toContain('honeypotField: z.string().optional(),')
         ->toContain("// action/honeypotField are injected by FormActionBinder after resolve() runs\nexport const typedFormProps = z.object({");
 });
