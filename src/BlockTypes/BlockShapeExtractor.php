@@ -97,16 +97,14 @@ final class BlockShapeExtractor
     /**
      * Appends the two keys FormActionBinder injects into every
      * HandlesFormSubmission block's props after resolve() runs — never
-     * part of the docblock itself. `action` is optional because only
-     * PageController runs the binder: ErrorResponse and LayoutResolver
-     * resolve blocks without it, so a form there arrives with no action.
+     * part of the docblock itself.
      *
      * @param  list<string>  $fields
      * @return list<string>
      */
     private function appendFormKeys(array $fields): array
     {
-        $fields[] = 'action: z.string().optional()';
+        $fields[] = 'action: z.string()';
         $fields[] = 'honeypotField: z.string().optional()';
 
         return $fields;
