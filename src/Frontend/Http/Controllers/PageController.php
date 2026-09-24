@@ -21,6 +21,7 @@ use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
+use Tbtop\Cms\Frontend\Support\CurrentPage;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
@@ -40,6 +41,7 @@ class PageController
         private readonly PageTypeRegistry $pageTypes,
         private readonly SchemaContextFactory $schemaContextFactory,
         private readonly BlockRegistry $blockRegistry,
+        private readonly CurrentPage $currentPage,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -54,6 +56,8 @@ class PageController
         if (! $page instanceof Page) {
             return $this->notFound($path, $locale, $request);
         }
+
+        $this->currentPage->set($page);
 
         // pages.type is unconstrained, so a page outlives its type's
         // registration; it still renders its stored content.

@@ -45,6 +45,7 @@ use Tbtop\Cms\Frontend\Http\Middleware\EnableSsr;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
+use Tbtop\Cms\Frontend\Support\CurrentPage;
 use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
@@ -157,6 +158,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(RedirectResolver::class);
         $this->app->scoped(ErrorPageResolver::class);
         $this->app->scoped(ErrorResponse::class);
+        $this->app->scoped(CurrentPage::class);
         $this->app->scoped(Settings::class);
         $this->app->scoped(CmsMailer::class);
         $this->app->scoped(Cms::class);

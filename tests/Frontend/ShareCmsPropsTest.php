@@ -108,6 +108,36 @@ it('serves a fresh layout after a slot is saved via LayoutForm::save()', functio
         ->assertJsonPath('props.cms.layout.header.0.props.title', 'Hi');
 });
 
+it('caches layout content per locale and never leaks an incomplete-class object into the payload', function (): void {
+    // 'file' really serializes (the 'array' store used elsewhere in this
+    // file does not); disallowing object classes on unserialize matches a
+    // hardened host's cache config and is what turns a cached ResolvedBlock
+    // into __PHP_Incomplete_Class on the next read if one were ever cached.
+    config(['cache.default' => 'file', 'cache.serializable_classes' => false]);
+    Language::factory()->default()->create(['locale' => 'en']);
+    Language::factory()->create(['locale' => 'uk', 'is_frontend_active' => true]);
+
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    Layout::query()->create([
+        'slot' => Slots::HEADER,
+        'content' => [
+            ['id' => 'h1', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Header EN', 'uk' => 'Header UA']]],
+        ],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $en = $this->get('/about', ['X-Inertia' => 'true'])->assertOk();
+    $uk = $this->get('/uk/about', ['X-Inertia' => 'true'])->assertOk();
+
+    $en->assertJsonPath('props.cms.layout.header.0.props.title', 'Header EN');
+    $uk->assertJsonPath('props.cms.layout.header.0.props.title', 'Header UA');
+
+    expect($en->getContent())->not->toContain('__PHP_Incomplete_Class_Name');
+    expect($uk->getContent())->not->toContain('__PHP_Incomplete_Class_Name');
+});
+
 it('skips an inactive block in a layout slot', function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
 

@@ -11,8 +11,12 @@ use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Cache\CmsCache;
+use Tbtop\Cms\Frontend\Form\FormActionBinder;
+use Tbtop\Cms\Frontend\Support\CurrentPage;
+use Tbtop\Cms\Frontend\Support\HomePage;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
+use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 
 class ShareCmsProps
@@ -22,6 +26,8 @@ class ShareCmsProps
         private readonly Settings $settings,
         private readonly LayoutResolver $layoutResolver,
         private readonly CmsCache $cache,
+        private readonly FormActionBinder $forms,
+        private readonly CurrentPage $currentPage,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -64,11 +70,55 @@ class ShareCmsProps
      * models directly), so caching at the call site keeps admin reads live
      * without LayoutResolver needing to know which caller it's serving.
      *
+     * Keyed and cached per locale, as plain arrays rather than ResolvedBlock
+     * objects — some cache stores unserialize with allowed_classes: false
+     * (Laravel's own file/database store default), which silently turns a
+     * cached object into __PHP_Incomplete_Class on the next read. `action`
+     * is bound after the cache read, per request, since it depends on the
+     * current page rather than the (page-independent) layout content.
+     *
      * @return array<string, list<ResolvedBlock>>
      */
     private function resolveLayout(): array
     {
-        return $this->cache->remember('layout', fn (): array => $this->layoutResolver->resolve());
+        $locale = (string) app()->getLocale();
+
+        /** @var array<string, list<array<string, mixed>>> $cached */
+        $cached = $this->cache->remember(
+            'layout:' . $locale,
+            fn (): array => array_map(
+                static fn (array $blocks): array => array_map(static fn (ResolvedBlock $block): array => $block->toArray(), $blocks),
+                $this->layoutResolver->resolve(),
+            ),
+        );
+
+        return $this->bindForms(array_map(
+            static fn (array $blocks): array => array_map(
+                static fn (array $block): ResolvedBlock => new ResolvedBlock((string) $block['id'], (string) $block['kind'], (array) $block['props']),
+                $blocks,
+            ),
+            $cached,
+        ));
+    }
+
+    /**
+     * The current page if one is on screen, else the home page — decision
+     * for this fallback lives in the docs (docs/host/ai/blocks.md). Neither
+     * present (host route with no CMS page, no seeded home) leaves layout
+     * form blocks unbound rather than pointing at a made-up page.
+     *
+     * @param  array<string, list<ResolvedBlock>>  $slots
+     * @return array<string, list<ResolvedBlock>>
+     */
+    private function bindForms(array $slots): array
+    {
+        $page = $this->currentPage->get() ?? HomePage::find();
+
+        if (! $page instanceof Page) {
+            return $slots;
+        }
+
+        return array_map(fn (array $blocks): array => $this->forms->bind($blocks, $page), $slots);
     }
 
     private function validationErrors(Request $request): object

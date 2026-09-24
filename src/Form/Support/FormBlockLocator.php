@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form\Support;
 
+use Illuminate\Support\Facades\Schema;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\SubmitContext;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Layout\Models\Layout;
+use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Page\Models\Page;
 
 class FormBlockLocator
@@ -19,9 +22,13 @@ class FormBlockLocator
         private readonly Languages $languages,
     ) {}
 
+    /**
+     * Searches the page's own content first, then the active blocks of the
+     * layout slots (header/footer) — a form block can live in either.
+     */
     public function locate(Page $page, string $blockId, ?string $locale = null): ?LocatedFormBlock
     {
-        $raw = $this->findBlock($page->content ?? [], $blockId);
+        $raw = $this->findBlock($page->content ?? [], $blockId) ?? $this->findInLayouts($blockId);
 
         if ($raw === null) {
             return null;
@@ -53,6 +60,25 @@ class FormBlockLocator
         foreach ($content as $raw) {
             if (is_array($raw) && ($raw['id'] ?? null) === $blockId && ($raw['active'] ?? true) !== false) {
                 return $raw;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array<array-key, mixed>|null */
+    private function findInLayouts(string $blockId): ?array
+    {
+        if (! Schema::hasTable((new Layout)->getTable())) {
+            return null;
+        }
+
+        foreach (Slots::all() as $slot) {
+            $layout = Layout::query()->where('slot', $slot)->first();
+            $found = $layout instanceof Layout ? $this->findBlock($layout->content ?? [], $blockId) : null;
+
+            if ($found !== null) {
+                return $found;
             }
         }
 

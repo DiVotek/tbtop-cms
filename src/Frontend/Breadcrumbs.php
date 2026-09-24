@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend;
 
+use Tbtop\Cms\Frontend\Support\HomePage;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
@@ -83,23 +84,12 @@ class Breadcrumbs
         return $crumbs;
     }
 
-    /**
-     * The seeded site root (PageSeeder). Nothing at the schema level
-     * guarantees one exists — a host that never ran the installer has none —
-     * so this is nullable by contract, not merely defensively. Memoized
-     * including the miss: a SeoAudit sweep asks once per page.
-     */
+    /** Memoized including the miss: a SeoAudit sweep asks once per page. */
     private function home(): ?Page
     {
         if (! $this->homeLoaded) {
             $this->homeLoaded = true;
-            $this->home = Page::query()
-                ->where('is_system', true)
-                ->whereNull('parent_id')
-                // Error pages are system roots too; without this the trail
-                // could start at the 404 page on a host that seeded it first.
-                ->whereNull('error_class')
-                ->first();
+            $this->home = HomePage::find();
         }
 
         return $this->home;

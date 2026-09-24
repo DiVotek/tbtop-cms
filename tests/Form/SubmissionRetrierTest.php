@@ -11,6 +11,8 @@ use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Layout\Models\Layout;
+use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -225,6 +227,40 @@ it('re-runs the bell fan-out on retry, notifying every current admin', function 
     app(SubmissionRetrier::class)->retry($submission);
 
     expect($admin->notifications()->count())->toBe(1);
+});
+
+it('retries a submission whose form block lives in a layout slot, not the page content', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$handled = 0;
+
+    // The page carries no content of its own — the block being retried
+    // lives only in the header layout slot, same as a real submission
+    // through it would have been located at submit time.
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [],
+    ]);
+
+    Layout::query()->create([
+        'slot' => Slots::HEADER,
+        'content' => [['id' => 'h1', 'kind' => 'Recording', 'active' => true, 'data' => []]],
+    ]);
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'h1',
+        'kind' => 'Recording',
+        'locale' => 'en',
+        'payload' => ['value' => 'hello'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'mail server unreachable',
+    ]);
+
+    app(SubmissionRetrier::class)->retry($submission);
+
+    expect(RecordingFormBlock::$handled)->toBe(1)
+        ->and($submission->refresh()->status)->toBe(SubmissionStatus::Handled);
 });
 
 it('keeps the submission failed with a joined error when the fan-out still fails on retry', function (): void {
