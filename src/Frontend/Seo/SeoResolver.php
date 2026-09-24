@@ -242,18 +242,12 @@ class SeoResolver
             $objects[] = $website;
         }
 
-        // Same title→name cascade Breadcrumbs::label() uses for ancestors,
-        // so the current page's own item is labeled consistently with the
-        // rest of the trail rather than falling back to the (possibly
-        // suffixed-elsewhere) og title.
-        $currentLabel = (string) $page->getTranslation('title', $locale, false)
-            ?: (string) $page->getTranslation('name', $locale, false);
-        // The same trail as the `breadcrumbs` prop, minus its last crumb:
-        // the page's own item is re-added with the canonical URL (which an
-        // editor may have overridden) instead of the slug path. Not
-        // resolve()'s $breadcrumbs — that one is ancestry for {parent}.
+        // The last crumb is re-added with the canonical URL (an editor may
+        // override it); resolve()'s $breadcrumbs is only ancestry for {parent}.
+        $trail = $this->breadcrumbs->forPage($page, $locale);
+        $currentLabel = $trail === [] ? '' : $trail[count($trail) - 1]['label'];
         $breadcrumbList = $this->jsonLd->breadcrumbList(
-            array_slice($this->breadcrumbs->forPage($page, $locale), 0, -1),
+            array_slice($trail, 0, -1),
             $currentLabel !== '' ? $currentLabel : $ogTitle,
             $canonical,
         );

@@ -60,10 +60,6 @@ it('renders the full head tag set server-side for a plain GET on a published nes
     $parent = Page::factory()->category()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'Guides', 'uk' => 'Hurydy'],
-        // Breadcrumbs::label() prefers title over name — clear the
-        // factory's random default title so the breadcrumb label is
-        // deterministically the page's name.
-        'title' => ['en' => ''],
     ]);
     $page = Page::factory()->article()->create([
         'status' => PageStatus::Published,
@@ -172,6 +168,35 @@ it('prepends home to an existing nested trail without reordering it', function (
     expect($html)->toContain('"position":1,"name":"Home"')
         ->toContain('"position":2,"name":"Guides"')
         ->toContain('"position":3,"name":"Setup Guide"');
+});
+
+it('labels every BreadcrumbList item by name, not by the SEO-length title', function (): void {
+    // Google may show these crumbs in place of the URL; a title like
+    // "Camera repair in Dnipro — Autofocus" reads as spam there.
+    app(Cms::class)->frontendRoutes();
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'is_system' => true,
+        'name' => ['en' => 'Home'],
+        'title' => ['en' => 'Camera repair in Dnipro — Autofocus'],
+    ]);
+    $parent = Page::factory()->category()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Services'],
+        'title' => ['en' => 'Photo and video repair services in Dnipro'],
+    ]);
+    $page = Page::factory()->article()->create([
+        'status' => PageStatus::Published,
+        'parent_id' => $parent->getKey(),
+        'name' => ['en' => 'DSLR cameras'],
+        'title' => ['en' => 'DSLR camera repair in Dnipro'],
+    ]);
+
+    $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
+
+    expect($html)->toContain('"position":1,"name":"Home"')
+        ->toContain('"position":2,"name":"Services"')
+        ->toContain('"position":3,"name":"DSLR cameras"');
 });
 
 it('omits the WebSite object when site.name is empty', function (): void {

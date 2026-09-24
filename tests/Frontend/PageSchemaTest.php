@@ -53,8 +53,8 @@ it('lists only live indexable children in a category hasPart', function (): void
         'name' => ['en' => 'Blog'],
     ]);
 
-    // title, not name: a child is labelled by the same title→name cascade the
-    // breadcrumb trail uses, and the factory fills title with a random string.
+    // title, not name: CollectionPage labels a child title→name, and the
+    // factory fills title with a random string.
     $live = Page::factory()->create([
         'type' => 'article',
         'parent_id' => $category->getKey(),

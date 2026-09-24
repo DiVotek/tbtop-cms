@@ -40,10 +40,11 @@ Field-by-field:
   The `{title}` placeholder is the *own* title cascade: `seo.title` →
   `page.title` → `page.name` (`PageOwnSeo::title()`). Templates also support
   `{site_name}`, `{sep}` (`seo.title_separator`, default `—`), `{parent}`
-  (immediate breadcrumb ancestor), `{date}` (published date, only when the
-  page `isLive()`). `SeoResolver::cleanupRendered()` collapses whitespace and
-  strips dangling separators left by an empty placeholder — one template can
-  serve both a top-level and a nested page.
+  (immediate breadcrumb ancestor, labelled `name` → `title`), `{date}`
+  (published date, only when the page `isLive()`).
+  `SeoResolver::cleanupRendered()` collapses whitespace and strips dangling
+  separators left by an empty placeholder — one template can serve both a
+  top-level and a nested page.
 - **description** — same two-rung template lookup
   (`seo.description_template` / per-type), wrapping the base cascade
   `seo.description` → `page.summary` → `seo.default_description`
@@ -163,7 +164,7 @@ order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
    `{parent}` does not read this trail: it uses `Breadcrumbs::ancestors()`,
    so it stays empty on a top-level page.
 
-   The root crumb is labelled from the home page's `title`/`name` with the
+   The root crumb is labelled from the home page's `name`/`title` with the
    usual locale → default-locale fallback; `PageSeeder` writes those only in
    the default locale, so until an editor translates the home page the crumb
    shows the default-locale label in every locale.

@@ -246,8 +246,9 @@ exposed) — it delegates to `PageResolver::resolve($path, $locale, false)`.
 `AncestorChain::forPage()` (root-first), prepends the seeded site root
 (`is_system`, no parent, not an error page — it is a *sibling* of top-level
 pages, not their parent) unless it is already in the chain, and appends the
-page itself. Each crumb is labelled with its `title` falling back to `name`,
-current locale falling back to the default locale. Fewer than two crumbs
+page itself. Each crumb is labelled with its `name` falling back to `title`
+(`title` feeds `<title>` and tends to be SEO-length), current locale falling
+back to the default locale. `{parent}` gets the same label. Fewer than two crumbs
 yields `[]`, so the home page has no trail: `/services` → `[Home, Services]`,
 `/blog/post` → `[Home, Blog, Post]`. The JSON-LD `BreadcrumbList` is built
 from the same trail (see seo.md). `{parent}` does **not** read it — that

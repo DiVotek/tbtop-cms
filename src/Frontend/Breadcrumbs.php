@@ -122,12 +122,14 @@ class Breadcrumbs
             ->all();
     }
 
+    // name before title: editors write SEO-length phrases into title (it feeds
+    // <title>), and Google may show BreadcrumbList in place of the URL.
     private function label(Page $page, string $locale): string
     {
         $default = $this->languages->defaultLocale();
 
         foreach ([$locale, $default] as $loc) {
-            foreach (['title', 'name'] as $key) {
+            foreach (['name', 'title'] as $key) {
                 $value = (string) $page->getTranslation($key, $loc, false);
 
                 if ($value !== '') {
