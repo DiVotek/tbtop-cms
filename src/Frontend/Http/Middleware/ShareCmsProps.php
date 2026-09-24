@@ -71,9 +71,9 @@ class ShareCmsProps
      * without LayoutResolver needing to know which caller it's serving.
      *
      * Keyed and cached per locale, as plain arrays rather than ResolvedBlock
-     * objects — some cache stores unserialize with allowed_classes: false
-     * (Laravel's own file/database store default), which silently turns a
-     * cached object into __PHP_Incomplete_Class on the next read. `action`
+     * objects — a host whose cache.serializable_classes excludes ResolvedBlock
+     * (e.g. `false`) makes the file/database stores turn a cached object into
+     * __PHP_Incomplete_Class on the next read. `action`
      * is bound after the cache read, per request, since it depends on the
      * current page rather than the (page-independent) layout content.
      *
