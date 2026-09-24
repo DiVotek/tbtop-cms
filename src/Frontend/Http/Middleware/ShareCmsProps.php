@@ -94,7 +94,7 @@ class ShareCmsProps
 
         return $this->bindForms(array_map(
             static fn (array $blocks): array => array_map(
-                static fn (array $block): ResolvedBlock => new ResolvedBlock((string) $block['id'], (string) $block['kind'], (array) $block['props']),
+                ResolvedBlock::fromArray(...),
                 $blocks,
             ),
             $cached,

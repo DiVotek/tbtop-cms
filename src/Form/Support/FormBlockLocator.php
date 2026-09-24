@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form\Support;
 
-use Illuminate\Support\Facades\Schema;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\SubmitContext;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Layout\Models\Layout;
-use Tbtop\Cms\Layout\Slots;
+use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Page\Models\Page;
 
 class FormBlockLocator
@@ -20,6 +18,7 @@ class FormBlockLocator
     public function __construct(
         private readonly BlockRegistry $registry,
         private readonly Languages $languages,
+        private readonly LayoutResolver $layouts,
     ) {}
 
     /**
@@ -69,13 +68,8 @@ class FormBlockLocator
     /** @return array<array-key, mixed>|null */
     private function findInLayouts(string $blockId): ?array
     {
-        if (! Schema::hasTable((new Layout)->getTable())) {
-            return null;
-        }
-
-        foreach (Slots::all() as $slot) {
-            $layout = Layout::query()->where('slot', $slot)->first();
-            $found = $layout instanceof Layout ? $this->findBlock($layout->content ?? [], $blockId) : null;
+        foreach ($this->layouts->content() as $content) {
+            $found = $this->findBlock($content, $blockId);
 
             if ($found !== null) {
                 return $found;
