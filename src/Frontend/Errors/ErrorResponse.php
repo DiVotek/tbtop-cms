@@ -10,8 +10,10 @@ use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Frontend\Errors\Support\FallbackProps;
+use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
+use Tbtop\Cms\Frontend\Support\CurrentPage;
 use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Models\Page;
 use Throwable;
@@ -32,6 +34,8 @@ class ErrorResponse
         private readonly BlockContentResolver $blocks,
         private readonly PageSpecAssembler $assembler,
         private readonly SeoResolver $seo,
+        private readonly FormActionBinder $forms,
+        private readonly CurrentPage $currentPage,
     ) {}
 
     public function render(Request $request, int $status): Response
@@ -72,8 +76,10 @@ class ErrorResponse
     /** @return array<string, mixed> */
     private function propsFor(Page $page): array
     {
+        $this->currentPage->set($page);
+
         $locale = (string) app()->getLocale();
-        $resolved = $this->blocks->resolve($page->content ?? [], $page);
+        $resolved = $this->forms->bind($this->blocks->resolve($page->content ?? [], $page), $page);
         $seo = $this->seo->resolve($page, $locale, []);
         // Error pages carry no slug (see PageSlugWriter), so canonical/ogUrl
         // as computed by SeoResolver would point at a made-up '/' path —

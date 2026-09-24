@@ -10,6 +10,7 @@ use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\SubmitContext;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Page\Models\Page;
 
 class FormBlockLocator
@@ -17,11 +18,16 @@ class FormBlockLocator
     public function __construct(
         private readonly BlockRegistry $registry,
         private readonly Languages $languages,
+        private readonly LayoutResolver $layouts,
     ) {}
 
+    /**
+     * Searches the page's own content first, then the active blocks of the
+     * layout slots (header/footer) — a form block can live in either.
+     */
     public function locate(Page $page, string $blockId, ?string $locale = null): ?LocatedFormBlock
     {
-        $raw = $this->findBlock($page->content ?? [], $blockId);
+        $raw = $this->findBlock($page->content ?? [], $blockId) ?? $this->findInLayouts($blockId);
 
         if ($raw === null) {
             return null;
@@ -53,6 +59,20 @@ class FormBlockLocator
         foreach ($content as $raw) {
             if (is_array($raw) && ($raw['id'] ?? null) === $blockId && ($raw['active'] ?? true) !== false) {
                 return $raw;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array<array-key, mixed>|null */
+    private function findInLayouts(string $blockId): ?array
+    {
+        foreach ($this->layouts->content() as $content) {
+            $found = $this->findBlock($content, $blockId);
+
+            if ($found !== null) {
+                return $found;
             }
         }
 

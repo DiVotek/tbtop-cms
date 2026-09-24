@@ -59,9 +59,13 @@ like any record, see below) with a
 `TODO` comment and a command warning — it does not fail the run.
 `HandlesFormSubmission` blocks get `action`/`honeypotField` appended
 automatically (FormActionBinder injects them after `resolve()` runs), typed
-or not. Both are optional: only page rendering runs the binder, so a form
-block on an error page or in a layout slot arrives without `action` — guard
-the submit. An untyped form block falls back to `z.object({action?, honeypotField?}).catchall(z.unknown())`; declare
+or not. `action` is required — page rendering, error pages, and layout slots
+(header/footer) all run the binder against a page (the current one, or, for
+a layout slot, the home page — see [Layout blocks](#layout-blocks)); the
+only gap is a layout slot rendered with neither a current nor a home page,
+which is left unbound rather than pointing at a made-up page. `honeypotField`
+stays optional (omitted when `tbtop-cms.forms.honeypot_field` is unset). An
+untyped form block falls back to `z.object({action, honeypotField?}).catchall(z.unknown())`; declare
 either key in the docblock yourself and the command errors. A PHPDoc
 construct the converter has no zod mapping for (inside an otherwise-typed
 shape) is a hard error naming the block and the key path — fix the docblock,
@@ -364,7 +368,15 @@ props never hardcode this URL — `FormActionBinder`
 (`src/Frontend/Form/FormActionBinder.php`) injects it as `props.action` for
 every resolved block whose registered `Block` instance implements
 `HandlesFormSubmission`, since json-render components only ever see their
-own `props`, never their element id.
+own `props`, never their element id. `PageController` and `ErrorResponse`
+each run the binder against the page they're rendering; a form block in a
+layout slot (header/footer) is bound by `ShareCmsProps` against the current
+page (`Tbtop\Cms\Frontend\Support\CurrentPage`, set by whichever of the two
+rendered the request) or, absent one, the home page — see
+[Layout blocks](#layout-blocks). Submitting a layout-slot form still posts
+to the current page's `{page}` id: `FormBlockLocator` looks in the page's
+own content first, then the active blocks of both layout slots, so the same
+block id resolves under whichever page happened to render it.
 
 **Honeypot**: `tbtop-cms.forms.honeypot_field` (default `'website'`) names a
 field the frontend must render hidden-but-focusable (not `display:none` or
@@ -448,12 +460,25 @@ supported alternative to the catalog/registry contract.
 Blocks placed in the header/footer slots are a different delivery path from
 a page's own content: they're resolved by `LayoutResolver` and shared as the
 Inertia prop `cms.layout.{slot}` (via `ShareCmsProps` middleware, cached
-under the `layout` cache key), not assembled into the page's `render` spec.
+under a `layout:{locale}` cache key — one entry per locale, since resolved
+props are locale-dependent), not assembled into the page's `render` spec.
 The catalog/registry contract is identical either way — a header block still
 needs a matching `kind()`/catalog entry/registry entry — but a host renders
 `cms.layout.header`/`cms.layout.footer` itself, typically from a `SiteChrome`
 component wrapping `<Renderer spec={render} .../>`. See
 [./wiring.md](./wiring.md) for how `SiteChrome` is wired into `CmsPage.tsx`.
+
+A `HandlesFormSubmission` block in a layout slot works like any other: it
+still needs `action`, but layout content has no page of its own to build the
+submit route from. `ShareCmsProps` binds it, after the cache read, against
+`Tbtop\Cms\Frontend\Support\CurrentPage` — the page `PageController` or
+`ErrorResponse` set for this request — or, when nothing set one (a host
+route that shares `cms` without going through either), the home page. With
+neither, the block is left as `resolve()` produced it, with no `action`.
+Submitting posts to `tbtop-cms.form.submit` with that page's id;
+`FormBlockLocator` finds the block by searching the page's own content
+first, then the layout slots, so the submission and any later retry
+(`SubmissionRetrier`) locate it regardless of which page rendered it.
 
 ## Where does my code go
 

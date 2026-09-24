@@ -18,9 +18,9 @@ Compose it from layout blocks placed in the `header`/`footer` slots
 React component that reads `cms.layout.header`/`cms.layout.footer` off the
 shared Inertia prop and renders each slot's resolved blocks through the same
 `json-render` renderer as page content. `Tbtop\Cms\Frontend\Http\Middleware\
-ShareCmsProps::resolveLayout()` supplies that prop, cached via `CmsCache::
-remember('layout', ...)` — see "Custom cached frontend read" below for what
-that caching implies. Both real hosts hand-roll a chrome component rather than
+ShareCmsProps::resolveLayout()` supplies that prop, cached per locale via
+`CmsCache::remember('layout:{locale}', ...)` — see "Custom cached frontend
+read" below for what that caching implies. Both real hosts hand-roll a chrome component rather than
 using anything the package ships (there is no package `SiteChrome`):
 `divotek_com_ua/resources/js/cms/SiteChrome.tsx`,
 `autofocus/resources/js/cms/CmsPage.tsx` (chrome wrapping is inline in this

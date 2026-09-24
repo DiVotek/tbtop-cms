@@ -142,7 +142,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `locale` | `string` | current app locale |
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
-| `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached under key `layout` via `CmsCache::remember` |
+| `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::remember`; `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
 

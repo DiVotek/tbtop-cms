@@ -18,6 +18,20 @@ class LayoutResolver
     /** @return array<string, list<ResolvedBlock>> */
     public function resolve(): array
     {
+        return array_map(
+            fn (array $content): array => $this->blockContentResolver->resolve($content),
+            $this->content(),
+        );
+    }
+
+    /**
+     * Stored, unresolved block content of every slot, keyed by slot — an
+     * empty list for a slot with no saved layout.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public function content(): array
+    {
         if (! Schema::hasTable((new Layout)->getTable())) {
             return array_fill_keys(Slots::all(), []);
         }
@@ -25,21 +39,9 @@ class LayoutResolver
         $slots = [];
 
         foreach (Slots::all() as $slot) {
-            $slots[$slot] = $this->resolveSlot($slot);
+            $slots[$slot] = Layout::query()->where('slot', $slot)->first()->content ?? [];
         }
 
         return $slots;
-    }
-
-    /** @return list<ResolvedBlock> */
-    private function resolveSlot(string $slot): array
-    {
-        $layout = Layout::query()->where('slot', $slot)->first();
-
-        if (! $layout instanceof Layout || $layout->content === null) {
-            return [];
-        }
-
-        return $this->blockContentResolver->resolve($layout->content);
     }
 }

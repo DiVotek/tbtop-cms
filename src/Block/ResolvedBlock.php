@@ -18,6 +18,12 @@ final readonly class ResolvedBlock implements Arrayable
         public array $props,
     ) {}
 
+    /** @param  array<string, mixed>  $data  the shape toArray() produces */
+    public static function fromArray(array $data): self
+    {
+        return new self((string) $data['id'], (string) $data['kind'], (array) $data['props']);
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
