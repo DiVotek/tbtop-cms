@@ -161,7 +161,7 @@ it('localizes breadcrumb paths and labels for a non-default locale', function ()
 
     $this->get('/uk/' . $article->pathFor('uk'), ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.breadcrumbs.0.label', 'Blog UA')
+        ->assertJsonPath('props.breadcrumbs.0.label', 'Bloh')
         ->assertJsonPath('props.breadcrumbs.0.url', '/uk/' . $category->pathFor('uk'));
 });
 
