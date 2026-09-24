@@ -98,17 +98,18 @@ class PageHierarchy
             return;
         }
 
-        $descendants = [[$page->id, $depth]];
+        // One query per level of the moved subtree, not per descendant.
+        $frontier = [$page->id];
 
-        while ($descendants !== []) {
-            [$parentId, $parentDepth] = array_shift($descendants);
+        while ($frontier !== []) {
+            $depth++;
+            $descendants = Page::query()->whereIn('parent_id', $frontier)->get();
 
-            foreach (Page::query()->where('parent_id', $parentId)->get() as $descendant) {
-                $descendantDepth = $parentDepth + 1;
-
-                self::assertPageDepth($descendant, $descendantDepth, $registry);
-                $descendants[] = [$descendant->id, $descendantDepth];
+            foreach ($descendants as $descendant) {
+                self::assertPageDepth($descendant, $depth, $registry);
             }
+
+            $frontier = $descendants->modelKeys();
         }
     }
 
