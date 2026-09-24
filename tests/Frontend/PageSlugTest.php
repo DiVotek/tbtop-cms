@@ -296,3 +296,62 @@ it('applies overrides per locale, leaving other locales untouched', function ():
     expect($page->fresh()->pathFor('en'))->toBe('new-slug')
         ->and($page->fresh()->pathFor('uk'))->toBe('pro-nas');
 });
+
+/**
+ * Builds a category with $width articles and returns the SELECTs on pages and
+ * page slugs that $action runs against it.
+ *
+ * @return list<string>
+ */
+function subtreeSelects(string $name, int $width, Closure $action): array
+{
+    $category = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => $name, 'uk' => $name]]);
+
+    foreach (range(1, $width) as $i) {
+        Page::factory()->article()->create([
+            'status' => PageStatus::Published,
+            'parent_id' => $category->id,
+            'name' => ['en' => "{$name} post {$i}", 'uk' => "{$name} dopys {$i}"],
+        ]);
+    }
+
+    $selects = [];
+    DB::listen(function ($query) use (&$selects): void {
+        if (str_starts_with(strtolower($query->sql), 'select') && preg_match('/tbtop_page(s|_slugs)\b/', $query->sql)) {
+            $selects[] = $query->sql;
+        }
+    });
+
+    $action($category->fresh());
+
+    return $selects;
+}
+
+it('cascades a slug change through a subtree without a read per descendant', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $writer = app(PageSlugWriter::class);
+
+    $narrow = subtreeSelects('Narrow', 2, fn (Page $category) => $writer->sync($category, ['en' => 'narrow-new', 'uk' => 'narrow-new']));
+    $wide = subtreeSelects('Wide', 12, fn (Page $category) => $writer->sync($category, ['en' => 'wide-new', 'uk' => 'wide-new']));
+
+    expect(count($wide))->toBe(count($narrow))
+        ->and(Page::query()->where('name->en', 'Wide post 12')->first()->pathFor('uk'))->toBe('wide-new/wide-dopys-12');
+});
+
+it('backfills a newly activated locale without a read per page', function (): void {
+    $narrow = subtreeSelects('Narrow', 2, fn () => Language::factory()->create(['locale' => 'uk']));
+    $wide = subtreeSelects('Wide', 12, fn () => Language::factory()->create(['locale' => 'de']));
+
+    expect(count($wide))->toBe(count($narrow))
+        ->and(Page::query()->where('name->en', 'Wide post 12')->first()->pathFor('de'))->toBe('wide/wide-post-12');
+});
+
+it('reparents a subtree without a read per descendant', function (): void {
+    $target = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Target']]);
+
+    $narrow = subtreeSelects('Narrow', 2, fn (Page $category) => $category->update(['parent_id' => $target->id]));
+    $wide = subtreeSelects('Wide', 12, fn (Page $category) => $category->update(['parent_id' => $target->id]));
+
+    expect(count($wide))->toBe(count($narrow))
+        ->and(Page::query()->where('name->en', 'Wide post 12')->first()->pathFor('en'))->toBe('target/wide/wide-post-12');
+});
