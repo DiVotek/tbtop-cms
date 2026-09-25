@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages;
 
 use Illuminate\Validation\ValidationException;
+use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
@@ -14,6 +15,7 @@ use Tbtop\Cms\Frontend\Seo\GtmContainerId;
 use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\RobotsTxt;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
+use Tbtop\Cms\Frontend\Seo\SiteIdentity;
 use Tbtop\Cms\Frontend\Seo\VerificationToken;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
@@ -92,6 +94,19 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_identity_name' => 'seo.identity.name',
             'seo_identity_logo' => 'seo.identity.logo',
             'seo_identity_same_as' => 'seo.identity.same_as',
+            'seo_identity_legal_name' => 'seo.identity.legal_name',
+            'seo_identity_telephone' => 'seo.identity.telephone',
+            'seo_identity_email' => 'seo.identity.email',
+            'seo_identity_street' => 'seo.identity.address.street',
+            'seo_identity_locality' => 'seo.identity.address.locality',
+            'seo_identity_region' => 'seo.identity.address.region',
+            'seo_identity_postal_code' => 'seo.identity.address.postal_code',
+            'seo_identity_country' => 'seo.identity.address.country',
+            'seo_identity_subtype' => 'seo.identity.subtype',
+            'seo_identity_subtype_custom' => 'seo.identity.subtype_custom',
+            'seo_identity_opening_hours' => 'seo.identity.opening_hours',
+            'seo_identity_latitude' => 'seo.identity.geo.latitude',
+            'seo_identity_longitude' => 'seo.identity.geo.longitude',
             'seo_twitter_card' => 'seo.twitter_card',
             'seo_not_found_enabled' => 'seo.not_found.enabled',
             'seo_not_found_retention_days' => 'seo.not_found.retention_days',
@@ -102,7 +117,7 @@ class SeoSettingsPage extends SettingsPageBase
     #[\Override]
     protected function defaults(): array
     {
-        return ['seo_twitter_card' => 'auto', 'seo_identity_type' => 'none'];
+        return ['seo_twitter_card' => 'auto', 'seo_identity_type' => 'none', 'seo_identity_subtype' => SiteIdentity::SUBTYPES[0]];
     }
 
     /**
@@ -270,20 +285,152 @@ class SeoSettingsPage extends SettingsPageBase
         ];
     }
 
-    /** @return list<Field|Node|TextBlock> */
+    /**
+     * The organisation and local-business sections are hidden, not removed,
+     * for the types they do not apply to: the client still submits hidden
+     * values, so their rules must tolerate a stale value — see onlyFor().
+     *
+     * @return list<Field|Node|TextBlock>
+     */
     private function identityFields(S $s): array
     {
+        $types = array_map(
+            static fn (string $type): array => ['value' => $type, 'label' => __("tbtop-cms::settings.seo.identity_type.{$type}")],
+            SiteIdentity::TYPES,
+        );
+
         return [
             $s->select('seo_identity_type')->label(__('tbtop-cms::settings.seo.fields.identity_type'))
-                ->options([
-                    ['value' => 'none', 'label' => __('tbtop-cms::settings.seo.identity_type.none')],
-                    ['value' => 'organization', 'label' => __('tbtop-cms::settings.seo.identity_type.organization')],
-                    ['value' => 'person', 'label' => __('tbtop-cms::settings.seo.identity_type.person')],
-                ])
+                ->options($types)
                 ->helperText(__('tbtop-cms::settings.seo.helpers.identity_type'))
-                ->rules('nullable|in:none,organization,person'),
+                ->rules('nullable|in:' . implode(',', SiteIdentity::TYPES)),
             $s->tags('seo_identity_same_as')->label(__('tbtop-cms::settings.seo.fields.identity_same_as'))
                 ->rules('nullable|array')->helperText(__('tbtop-cms::settings.seo.helpers.identity_same_as')),
+            $s->section([
+                'title' => __('tbtop-cms::settings.seo.sections.identity_organization'),
+                'hiddenIf' => Cond::notIn('seo_identity_type', SiteIdentity::ORGANISATION_TYPES),
+            ], $this->organisationFields($s)),
+            $s->section([
+                'title' => __('tbtop-cms::settings.seo.sections.identity_local_business'),
+                'hiddenIf' => Cond::neq('seo_identity_type', 'local_business'),
+            ], $this->localBusinessFields($s)),
+        ];
+    }
+
+    /**
+     * Street and locality are required for a local business in the default
+     * locale only: RuleWalker applies a translatable field's own rules to
+     * the default content locale and `nullable` to the rest, and the
+     * frontend falls back to the default locale for an untranslated part.
+     *
+     * @return list<Field|Node|TextBlock>
+     */
+    private function organisationFields(S $s): array
+    {
+        $organisation = SiteIdentity::ORGANISATION_TYPES;
+        $requiredForLocalBusiness = self::onlyFor($organisation, 'nullable|required_if:seo_identity_type,local_business|max:255');
+
+        return [
+            $s->text('seo_identity_legal_name')->label(__('tbtop-cms::settings.seo.fields.identity_legal_name'))
+                ->rules(self::onlyFor($organisation, 'nullable|string|max:255')),
+            $s->text('seo_identity_telephone')->label(__('tbtop-cms::settings.seo.fields.identity_telephone'))
+                ->placeholder('+380 44 123 4567')
+                ->rules(self::onlyFor($organisation, 'nullable|string|max:50')),
+            $s->text('seo_identity_email')->label(__('tbtop-cms::settings.seo.fields.identity_email'))
+                ->rules(self::onlyFor($organisation, 'nullable|email|max:255')),
+            $s->displayText(__('tbtop-cms::settings.seo.helpers.identity_address'))->variant('muted'),
+            $s->text('seo_identity_street')->label(__('tbtop-cms::settings.seo.fields.identity_street'))
+                ->translatable()
+                ->rules($requiredForLocalBusiness),
+            $s->text('seo_identity_locality')->label(__('tbtop-cms::settings.seo.fields.identity_locality'))
+                ->translatable()
+                ->rules($requiredForLocalBusiness),
+            $s->text('seo_identity_region')->label(__('tbtop-cms::settings.seo.fields.identity_region'))
+                ->translatable()
+                ->rules(self::onlyFor($organisation, 'nullable|max:255')),
+            $s->text('seo_identity_postal_code')->label(__('tbtop-cms::settings.seo.fields.identity_postal_code'))
+                ->rules(self::onlyFor($organisation, 'nullable|string|max:20')),
+            $s->text('seo_identity_country')->label(__('tbtop-cms::settings.seo.fields.identity_country'))
+                ->placeholder('UA')
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_country'))
+                ->rules(self::onlyFor($organisation, ['nullable', 'regex:/^[A-Za-z]{2}$/'])),
+        ];
+    }
+
+    /**
+     * The custom subtype is excluded a second time, unless "other" is the
+     * chosen subtype, for the same stale-value reason as onlyFor().
+     *
+     * @return list<Field|Node|TextBlock>
+     */
+    private function localBusinessFields(S $s): array
+    {
+        $localBusiness = ['local_business'];
+
+        $subtypes = array_map(
+            static fn (string $subtype): array => ['value' => $subtype, 'label' => $subtype],
+            SiteIdentity::SUBTYPES,
+        );
+        $days = array_map(
+            static fn (string $day): array => ['value' => $day, 'label' => __('tbtop-cms::settings.seo.days.' . strtolower($day))],
+            SiteIdentity::DAYS,
+        );
+
+        return [
+            $s->select('seo_identity_subtype')->label(__('tbtop-cms::settings.seo.fields.identity_subtype'))
+                ->options([...$subtypes, ['value' => SiteIdentity::CUSTOM_SUBTYPE, 'label' => __('tbtop-cms::settings.seo.identity_subtype_other')]])
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_subtype'))
+                ->rules(self::onlyFor($localBusiness, 'nullable|in:' . implode(',', [...SiteIdentity::SUBTYPES, SiteIdentity::CUSTOM_SUBTYPE]))),
+            $s->text('seo_identity_subtype_custom')->label(__('tbtop-cms::settings.seo.fields.identity_subtype_custom'))
+                ->placeholder('Bakery')
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_subtype_custom'))
+                ->hiddenIf(Cond::neq('seo_identity_subtype', SiteIdentity::CUSTOM_SUBTYPE))
+                ->rules(self::onlyFor($localBusiness, [
+                    'exclude_unless:seo_identity_subtype,' . SiteIdentity::CUSTOM_SUBTYPE,
+                    'required_if:seo_identity_subtype,' . SiteIdentity::CUSTOM_SUBTYPE,
+                    'nullable',
+                    'regex:' . SiteIdentity::SUBTYPE_PATTERN,
+                ])),
+            $s->repeater('seo_identity_opening_hours')->label(__('tbtop-cms::settings.seo.fields.identity_opening_hours'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_opening_hours'))
+                // Excluding the repeater key excludes its row keys too.
+                ->rules(self::onlyFor($localBusiness, 'nullable|array'))
+                ->fields([
+                    $s->select('days')->label(__('tbtop-cms::settings.seo.fields.identity_days'))
+                        ->multiple()
+                        ->options($days)
+                        ->rules('required|in:' . implode(',', SiteIdentity::DAYS)),
+                    $s->time('opens')->label(__('tbtop-cms::settings.seo.fields.identity_opens'))
+                        ->rules('required|date_format:H:i'),
+                    $s->time('closes')->label(__('tbtop-cms::settings.seo.fields.identity_closes'))
+                        ->rules('required|date_format:H:i'),
+                ]),
+            $s->number('seo_identity_latitude')->label(__('tbtop-cms::settings.seo.fields.identity_latitude'))
+                ->step('any')
+                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_geo'))
+                ->rules(self::onlyFor($localBusiness, 'nullable|numeric|between:-90,90')),
+            $s->number('seo_identity_longitude')->label(__('tbtop-cms::settings.seo.fields.identity_longitude'))
+                ->step('any')
+                ->rules(self::onlyFor($localBusiness, 'nullable|numeric|between:-180,180')),
+        ];
+    }
+
+    /**
+     * Prefixes $rules with an exclusion unless the identity type is one of
+     * $types, so a value left in a section hidden for the current type is
+     * neither validated nor saved (the stored value stays as it was).
+     * Exclusion must come first: Laravel checks it only after each rule has
+     * run, so a rule ahead of it would already have failed on the stale value.
+     *
+     * @param  list<string>  $types
+     * @param  string|list<string>  $rules  Pipe-joined, or a list when a rule (a regex) may contain a pipe.
+     * @return list<string>
+     */
+    private static function onlyFor(array $types, string | array $rules): array
+    {
+        return [
+            'exclude_unless:seo_identity_type,' . implode(',', $types),
+            ...(is_string($rules) ? explode('|', $rules) : $rules),
         ];
     }
 
@@ -400,6 +547,10 @@ class SeoSettingsPage extends SettingsPageBase
 
         if (isset($form['seo_verification_bing']) && is_string($form['seo_verification_bing'])) {
             $form['seo_verification_bing'] = self::guardVerification(VerificationToken::bing(), 'seo_verification_bing', $form['seo_verification_bing']);
+        }
+
+        if (isset($form['seo_identity_country']) && is_string($form['seo_identity_country'])) {
+            $form['seo_identity_country'] = strtoupper($form['seo_identity_country']);
         }
 
         if (isset($form['seo_identity_same_as']) && is_array($form['seo_identity_same_as'])) {

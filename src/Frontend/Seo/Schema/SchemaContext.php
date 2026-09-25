@@ -16,8 +16,8 @@ use Tbtop\Cms\Page\Models\Page;
 final readonly class SchemaContext
 {
     /**
-     * @param  array{'@type': string, name: string}|null  $author
-     * @param  array{'@type': string, name: string, url: string, logo?: string}|null  $publisher
+     * @param  array{'@type': string, name: string, '@id'?: string}|null  $author
+     * @param  array{'@type': string, name: string, url: string, logo?: string, '@id'?: string}|null  $publisher
      */
     public function __construct(
         public Page $page,

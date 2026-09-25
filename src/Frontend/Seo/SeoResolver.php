@@ -264,7 +264,7 @@ class SeoResolver
             $objects[] = $node;
         }
 
-        $identity = $this->identity();
+        $identity = $this->identity($locale);
 
         if ($identity !== null) {
             $objects[] = $identity;
@@ -273,10 +273,16 @@ class SeoResolver
         return $objects;
     }
 
-    /** @return array<string, mixed>|null */
-    private function identity(): ?array
+    /**
+     * One node for the whole site, @id-linked to the Article author and
+     * publisher (SchemaContextFactory) so consumers merge them into one
+     * entity. $locale only picks the translatable address parts.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function identity(string $locale): ?array
     {
-        $type = (string) $this->settings->get('seo.identity.type', 'none');
+        $identity = new SiteIdentity($this->settings);
         // Shared with SchemaContextFactory::identityAuthor() via the same
         // method, so the identity node and the Article author name the same
         // entity.
@@ -284,7 +290,16 @@ class SeoResolver
 
         $logo = $this->factory->identityLogo();
 
-        return $this->jsonLd->identity($type, $name, url('/'), $logo, $this->sameAs());
+        return $this->jsonLd->identity(
+            $identity->type(),
+            $name,
+            url('/'),
+            $logo,
+            $this->sameAs(),
+            $identity->schemaType(),
+            SiteIdentity::id(),
+            $identity->properties($locale, $this->languages->defaultLocale()),
+        );
     }
 
     /**

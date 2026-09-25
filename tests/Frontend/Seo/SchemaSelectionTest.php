@@ -59,7 +59,7 @@ it('derives the Article author and articleAuthor from the site identity settings
     $result = app(SeoResolver::class)->resolve($page, 'en');
     $article = collect($result['jsonLd'])->firstWhere('@type', 'Article');
 
-    expect($article['author'])->toBe(['@type' => 'Organization', 'name' => 'Acme Inc'])
+    expect($article['author'])->toBe(['@type' => 'Organization', 'name' => 'Acme Inc', '@id' => 'http://localhost#identity'])
         ->and($result['articleAuthor'])->toBe('Acme Inc');
 });
 

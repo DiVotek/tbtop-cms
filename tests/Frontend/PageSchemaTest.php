@@ -120,6 +120,6 @@ it('names the identity as article publisher only when it is an organization', fu
 
     expect($node['publisher'] ?? null)->toBe($publisher);
 })->with([
-    'organization' => ['organization', ['@type' => 'Organization', 'name' => 'Acme Co', 'url' => 'http://localhost']],
+    'organization' => ['organization', ['@type' => 'Organization', 'name' => 'Acme Co', 'url' => 'http://localhost', '@id' => 'http://localhost#identity']],
     'person' => ['person', null],
 ]);

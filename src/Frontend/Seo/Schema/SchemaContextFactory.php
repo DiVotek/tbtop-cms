@@ -8,6 +8,7 @@ use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Frontend\Seo\AbsoluteUrl;
 use Tbtop\Cms\Frontend\Seo\LocalizedSeo;
 use Tbtop\Cms\Frontend\Seo\PageOwnSeo;
+use Tbtop\Cms\Frontend\Seo\SiteIdentity;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\PageUrl;
@@ -234,46 +235,51 @@ final class SchemaContextFactory
     /**
      * Comes from site identity settings, not per-page data — reuses
      * identityName() so the identity node and the Article author name the
-     * same entity.
+     * same entity, and carries the identity node's @id so consumers merge
+     * the two. Inline @type + name stay: Google reads them from the author
+     * itself, not from the node the @id points at.
      *
-     * @return array{'@type': string, name: string}|null
+     * @return array{'@type': string, name: string, '@id'?: string}|null
      */
     private function identityAuthor(): ?array
     {
-        $type = (string) $this->settings->get('seo.identity.type', 'none');
+        $identity = new SiteIdentity($this->settings);
+        $schemaType = $identity->schemaType();
         $name = $this->identityName();
 
-        if ($name === '') {
+        if ($name === '' || $schemaType === null || ! ($identity->type() === 'person' || $identity->isOrganisation())) {
             return null;
         }
 
-        return match ($type) {
-            'organization' => ['@type' => 'Organization', 'name' => $name],
-            'person' => ['@type' => 'Person', 'name' => $name],
-            default => null,
-        };
+        return ['@type' => $schemaType, 'name' => $name, '@id' => SiteIdentity::id()];
     }
 
     /**
      * Google reads Article `publisher` as an Organization only; a Person
-     * identity is the author, not a publisher, so it yields null here.
+     * identity is the author, not a publisher, so it yields null here. Every
+     * organisation type (OnlineStore and the LocalBusiness subtypes are
+     * Organizations) qualifies.
      *
-     * @return array{'@type': string, name: string, url: string, logo?: string}|null
+     * @return array{'@type': string, name: string, url: string, logo?: string, '@id'?: string}|null
      */
     private function identityPublisher(): ?array
     {
+        $identity = new SiteIdentity($this->settings);
+        $schemaType = $identity->schemaType();
         $name = $this->identityName();
 
-        if ($this->settings->get('seo.identity.type', 'none') !== 'organization' || $name === '') {
+        if (! $identity->isOrganisation() || $schemaType === null || $name === '') {
             return null;
         }
 
-        $publisher = ['@type' => 'Organization', 'name' => $name, 'url' => url('/')];
+        $publisher = ['@type' => $schemaType, 'name' => $name, 'url' => url('/')];
         $logo = $this->identityLogo();
 
         if ($logo !== null) {
             $publisher['logo'] = $logo;
         }
+
+        $publisher['@id'] = SiteIdentity::id();
 
         return $publisher;
     }

@@ -32,27 +32,51 @@ final class JsonLd
     }
 
     /**
+     * The trailing parameters are optional so a host calling this with the
+     * original five keeps working: $schemaType overrides the @type derived
+     * from $type (a LocalBusiness subtype), $id links the node to the
+     * Article author/publisher, and $properties are further ready-built
+     * properties (see SiteIdentity::properties()), placed before sameAs.
+     *
      * @param  list<string>  $sameAs  Non-empty profile URLs only — callers filter blanks before calling.
-     * @return array{'@context': string, '@type': string, name: string, url: string, logo?: string, sameAs?: list<string>}|null
+     * @param  array<string, mixed>  $properties
+     * @return array<string, mixed>|null
      */
-    public function identity(string $type, string $name, string $url, ?string $logo, array $sameAs): ?array
-    {
+    public function identity(
+        string $type,
+        string $name,
+        string $url,
+        ?string $logo,
+        array $sameAs,
+        ?string $schemaType = null,
+        ?string $id = null,
+        array $properties = [],
+    ): ?array {
         if ($type === 'none' || $name === '') {
             return null;
         }
 
         $object = [
             '@context' => 'https://schema.org',
-            '@type' => $type === 'person' ? 'Person' : 'Organization',
-            'name' => $name,
-            'url' => $url,
+            '@type' => $schemaType ?? SiteIdentity::schemaTypeFor($type),
         ];
+
+        if ($id !== null && $id !== '') {
+            $object['@id'] = $id;
+        }
+
+        $object['name'] = $name;
+        $object['url'] = $url;
 
         // Logo is an Organization-only property in schema.org's Person/Organization
         // vocabulary — a Person's photo would be a different property (`image`),
         // which this settings field isn't scoped to represent.
-        if ($type === 'organization' && $logo !== null && $logo !== '') {
+        if (in_array($type, SiteIdentity::ORGANISATION_TYPES, true) && $logo !== null && $logo !== '') {
             $object['logo'] = $logo;
+        }
+
+        foreach ($properties as $key => $value) {
+            $object[$key] = $value;
         }
 
         if ($sameAs !== []) {

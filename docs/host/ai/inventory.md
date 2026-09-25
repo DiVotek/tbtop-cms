@@ -249,6 +249,19 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.identity.name` | `SeoSettingsPage` | no | yes |
 | `seo.identity.logo` | `SeoSettingsPage` | no | yes (media URL) |
 | `seo.identity.same_as` | `SeoSettingsPage` | no | yes |
+| `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.telephone` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.email` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.region` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.postal_code` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.country` (ISO 3166-1 alpha-2) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.subtype` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.subtype_custom` (`local_business` only, used when the subtype is `other`) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.opening_hours` (`local_business` only; list of `{days, opens, closes}`) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.geo.latitude` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.geo.longitude` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.twitter_card` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.enabled` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.retention_days` | `SeoSettingsPage` | no | yes |
@@ -352,7 +365,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `Hero` | `src/Block/Blocks/HeroBlock.php` | Full-width intro section: headline, optional subtitle, image, CTA button |
 | `ContactForm` | `src/Block/Blocks/ContactForm.php` | Reference anonymous contact form (name/email/message fields, editable copy); `handleSubmit()` is an intentional no-op — notification fan-out happens off `SubmissionReceived` via `SubmissionNotifier` |
 
-**Page types** — `src/Page/PageTypeRegistry.php::boot()` always registers `PageType`, `CategoryType`, `ArticleType` (hardcoded, not config-gated), then adds `config('tbtop-cms.pages.types')` and `PageTypeRegistry::extend()` contributions.
+**Page types** — `src/Page/PageTypeRegistry.php::boot()` always registers `PageType`, `CategoryType`, `ArticleType` (hardcoded, not config-gated), then adds `config('tbtop-cms.pages.types')` and `PageTypeRegistry::extend()` contributions. The three built-ins are resolved through the container (`app($class)`), so a host overrides one by binding a subclass in its service provider's `register()` — e.g. to widen `schemaTypes()`; see recipes.md → *Different schema for some articles*. Registering a second class under an existing key via config still throws `already registered`.
 
 | Key | Class path | Purpose |
 |---|---|---|
