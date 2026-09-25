@@ -481,6 +481,25 @@ it('saves general and SEO fields including the seo json column', function (): vo
         ]);
 });
 
+it('keeps host-owned seo keys on save while form-owned keys take the submitted values', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'seo' => ['host_key' => ['x' => 1], 'title' => ['en' => 'Old title']],
+    ]);
+
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...PageEditHelpers::baseEditPayload(), 'seo_title' => ['en' => 'New title']],
+    )->assertRedirect();
+
+    $seo = $page->refresh()->seo;
+
+    expect($seo['host_key'] ?? null)->toBe(['x' => 1])
+        ->and($seo['title'] ?? null)->toBe(['en' => 'New title']);
+});
+
 it('placeholders seo_title/seo_description/og_title/og_description with the computed final value for the default locale', function (): void {
     app(Settings::class)->set('seo.title_suffix', '— Acme');
     $page = Page::create([

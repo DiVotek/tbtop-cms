@@ -114,6 +114,9 @@ Field-by-field:
 | 404 log toggle / retention | `Settings` (`seo.not_found.enabled`, `seo.not_found.retention_days`) | SEO settings → *Not found* tab |
 | Sitemap enabled at all, chunk-size fresh-install default, 404 noise patterns, 404 auto-prune schedule | `config/tbtop-cms.php` (`seo.sitemap.enabled`/`.per_chunk`, `not_found.ignore`, `not_found.auto_prune`) | Host config only — no admin UI |
 
+An admin save rewrites only the SEO tab's own `page.seo` keys (and
+`schema` when the form shows it); any other key a host stores there survives.
+
 All `Settings`-backed values are read through a single reader class
 (`IndexingSetting`, `SeoTemplates`, `GtmContainerId`, `VerificationToken`)
 rather than ad hoc `Settings::get()` calls scattered around — reuse those

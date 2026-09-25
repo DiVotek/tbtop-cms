@@ -551,7 +551,7 @@ class PageForm
             // indexable by default; edits keep the form-submitted value.
             'is_indexable' => $isCreate ? true : (bool) ($form['is_indexable'] ?? false),
             'sort_order' => (int) ($form['sort_order'] ?? 0),
-            'seo' => self::seoAttribute($form),
+            'seo' => self::seoAttribute($page, $form),
         ];
 
         if ($page->exists && $page->is_system) {
@@ -620,28 +620,18 @@ class PageForm
     }
 
     /**
-     * Rebuilds the `seo` JSON bag wholesale on every save — any key not
-     * listed here is dropped, so every persisted seo key must be listed.
-     * title/description/focus_keyword/og_title/og_description are
-     * translatable (stringMap() per key, same as name/title); og_image and
-     * canonical follow the same shapes as their form fields (scalar and
-     * translatable respectively).
-     *
-     * `schema` is omitted entirely when the form carried no `schema_type`
-     * (a category, or any caller submitting only the classic SEO keys)
-     * rather than written as an empty array — SchemaSelector reads a
-     * missing key and an unknown one identically (falls back to the type's
-     * default), so an empty bag would only add noise to every row's JSON.
-     * A page type change after this was saved can leave a stale
-     * `seo.schema.type` outside the new type's schemaTypes() — SchemaSelector
-     * simply ignores it and falls back to the default.
+     * Overlays the form-owned keys on the stored bag, so keys the form does not own (a host's) survive.
+     * `schema` is written only when the form sent `schema_type`; otherwise the stored value stays.
      *
      * @param  array<string, mixed>  $form
-     * @return array{title: array<string, string>, description: array<string, string>, focus_keyword: array<string, string>, og_title: array<string, string>, og_description: array<string, string>, og_image: string, canonical: array<string, string>, schema?: array{type: string}}
+     * @return array<string, mixed>
      */
-    private static function seoAttribute(array $form): array
+    private static function seoAttribute(Page $page, array $form): array
     {
+        $stored = is_array($page->seo) ? $page->seo : [];
+
         return [
+            ...$stored,
             'title' => self::stringMap($form['seo_title'] ?? null),
             'description' => self::stringMap($form['seo_description'] ?? null),
             'focus_keyword' => self::stringMap($form['seo_focus_keyword'] ?? null),
