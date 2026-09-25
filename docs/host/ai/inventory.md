@@ -159,12 +159,19 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.summary` | `string` | translated summary |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
-| `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md |
+| `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; `[]` when fewer than two crumbs (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
 
 Each `render.elements[id].props` (and root's `props`) serializes as `{}` not `[]` when empty — the block/root has no props.
+
+**Frontend exports** (`resources/js/cms`, imported via the `@cms` alias):
+
+| Import | Export | Purpose |
+|---|---|---|
+| `@cms/CmsPage` | default `CmsPage` | The stock `Cms/Page` component: `CmsHead` + preview banner + `Renderer` |
+| `@cms/CmsHead` | `CmsHead({ seo })`, types `Seo`, `SeoAlternate` | The SEO `<Head>` block, key-matched with `head.blade.php` — render it from a host-owned `CmsPage.tsx` instead of copying the tags |
 
 ## 5. Extension contracts and base classes
 
@@ -324,7 +331,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `bump(): void` | Invalidates every previously cached versioned key |
 | `Tbtop\Cms\Mail\CmsMailer` | `send(Mailable $mailable, array\|string $to): void` | Sends mail via an on-demand mailer built from admin `mail.*` settings, or the host's default mailer if `mail.host` is unset |
 | | `transportConfig(): array` | Builds the Laravel mail transport config array from `mail.*` settings |
-| `Tbtop\Cms\Richtext\RichtextHtmlRenderer` | `render(mixed $value): string` | Renders a Lexical-shaped richtext value to HTML; plain strings wrap as one paragraph; empty/unrecognized input renders `''` |
+| `Tbtop\Cms\Richtext\RichtextHtmlRenderer` | `render(mixed $value): string` | Renders a Lexical-shaped richtext value to HTML; a legacy HTML string (one the admin editor reads as HTML) is rebuilt through the same node renderer, never passed through; other plain strings wrap as one paragraph; empty/unrecognized input renders `''` |
 | `Tbtop\Cms\Link\LinkResolver` | `resolve(mixed $value, string $locale): ?array` | Resolves a `link` field value to `{href, type, label}`; `null` for malformed input, a non-live page, or a page with no slug in that locale. Reached from a block via `$ctx->link()` |
 | `Tbtop\Cms\Language\Languages` | `all(): array` | All configured languages (cached) |
 | | `default(): ?array` | The language row flagged `is_default` |

@@ -108,6 +108,22 @@ it('falls back to an empty render with the lang-file heading when the 4xx page r
         ->assertJsonPath('props.page.heading', __('tbtop-cms::errors.4xx.heading'));
 });
 
+it('gives the fallback 404 the same seo keys as a normal page', function (): void {
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    app(Cms::class)->frontendRoutes();
+
+    $pageSeo = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo');
+    $fallbackSeo = $this->get('/nonexistent', ['X-Inertia' => 'true'])->assertNotFound()->json('props.seo');
+
+    $pageKeys = array_keys($pageSeo);
+    $fallbackKeys = array_keys($fallbackSeo);
+    sort($pageKeys);
+    sort($fallbackKeys);
+
+    expect($fallbackKeys)->toBe($pageKeys)
+        ->and($fallbackSeo['noindex'])->toBeTrue();
+});
+
 // Contract 3
 it('still logs a NotFoundHit and lets a redirect win over the 404 page', function (): void {
     seedErrorPage(ErrorClass::ClientError);
