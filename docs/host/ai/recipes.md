@@ -76,6 +76,40 @@ $ctx, $blockNodes)` passing that same context plus its own list of ready
 nodes. `SeoResolver` and `SchemaContextFactory` are public services meant to
 be recomposed, not subclassed.
 
+### Different schema for some articles
+
+Service pages stored as `article` emit an `Article` node next to their
+block's `Service` node. The fix is a container binding, not a new page type:
+`PageTypeRegistry::boot()` resolves the built-in `PageType`, `CategoryType`
+and `ArticleType` through the container (`app($class)`), so a host binds a
+subclass whose `schemaTypes()` offers more keys:
+
+```php
+use Tbtop\Cms\Page\Types\ArticleType;
+
+class HostArticleType extends ArticleType
+{
+    /** @return non-empty-list<string> */
+    #[\Override]
+    public function schemaTypes(): array
+    {
+        // 'WebPage' is built in; a host `Service` schema type registered via
+        // config('tbtop-cms.seo.schema_types') works the same way.
+        return [...parent::schemaTypes(), 'WebPage'];
+    }
+}
+
+// AppServiceProvider::register() — before anything resolves PageTypeRegistry.
+$this->app->bind(ArticleType::class, HostArticleType::class);
+```
+
+With two or more keys the page edit form shows the *Schema* select, and the
+editor picks `WebPage` on the pages that need it; the first key stays the
+default, so untouched articles keep `Article`. `PageType` and `CategoryType`
+are overridden the same way. Registering a second class for the `article`
+key through `config('tbtop-cms.pages.types')` still throws
+`already registered` — the binding is the supported path.
+
 ### A "section" page type that can hold plain pages
 
 `CategoryType::allowedChildren()` is hard-coded to `['category', 'article']`; a

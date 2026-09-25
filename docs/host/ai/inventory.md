@@ -352,7 +352,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `Hero` | `src/Block/Blocks/HeroBlock.php` | Full-width intro section: headline, optional subtitle, image, CTA button |
 | `ContactForm` | `src/Block/Blocks/ContactForm.php` | Reference anonymous contact form (name/email/message fields, editable copy); `handleSubmit()` is an intentional no-op — notification fan-out happens off `SubmissionReceived` via `SubmissionNotifier` |
 
-**Page types** — `src/Page/PageTypeRegistry.php::boot()` always registers `PageType`, `CategoryType`, `ArticleType` (hardcoded, not config-gated), then adds `config('tbtop-cms.pages.types')` and `PageTypeRegistry::extend()` contributions.
+**Page types** — `src/Page/PageTypeRegistry.php::boot()` always registers `PageType`, `CategoryType`, `ArticleType` (hardcoded, not config-gated), then adds `config('tbtop-cms.pages.types')` and `PageTypeRegistry::extend()` contributions. The three built-ins are resolved through the container (`app($class)`), so a host overrides one by binding a subclass in its service provider's `register()` — e.g. to widen `schemaTypes()`; see recipes.md → *Different schema for some articles*. Registering a second class under an existing key via config still throws `already registered`.
 
 | Key | Class path | Purpose |
 |---|---|---|

@@ -98,6 +98,7 @@ class PageTypeRegistry
         }
 
         foreach ([PageType::class, CategoryType::class, ArticleType::class] as $class) {
+            // Container-resolved on purpose: hosts override a built-in type by binding a subclass (docs/host/ai/recipes.md).
             /** @var PageTypeInterface $type */
             $type = app($class);
             $this->types[$type->key()] = $type;
