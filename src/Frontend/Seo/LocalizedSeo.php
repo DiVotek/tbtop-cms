@@ -31,4 +31,21 @@ final class LocalizedSeo
 
         return '';
     }
+
+    /**
+     * value(), falling back to the default locale's value when $locale has
+     * none. A separate method rather than a change to value(): existing
+     * fields deliberately render empty for an untranslated locale. An empty
+     * $defaultLocale (no language marked default) means no fallback.
+     */
+    public static function valueWithFallback(mixed $raw, string $locale, string $defaultLocale): string
+    {
+        $value = self::value($raw, $locale);
+
+        if ($value !== '' || $defaultLocale === '' || $defaultLocale === $locale) {
+            return $value;
+        }
+
+        return self::value($raw, $defaultLocale);
+    }
 }

@@ -249,6 +249,19 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.identity.name` | `SeoSettingsPage` | no | yes |
 | `seo.identity.logo` | `SeoSettingsPage` | no | yes (media URL) |
 | `seo.identity.same_as` | `SeoSettingsPage` | no | yes |
+| `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.telephone` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.email` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.region` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.postal_code` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.country` (ISO 3166-1 alpha-2) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.subtype` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.subtype_custom` (`local_business` only, used when the subtype is `other`) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.opening_hours` (`local_business` only; list of `{days, opens, closes}`) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.geo.latitude` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.geo.longitude` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.twitter_card` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.enabled` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.retention_days` | `SeoSettingsPage` | no | yes |

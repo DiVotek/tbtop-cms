@@ -99,13 +99,13 @@ Field-by-field:
 | OG title/description/image | `page.seo.og_title` / `og_description` / `og_image` | SEO tab → *Social* section (`og_image` is a plain scalar, not translatable — an image isn't per-locale) |
 | Canonical override | `page.seo.canonical` (translatable) | SEO tab: *Canonical URL* (validated `url:http,https`) |
 | Schema.org node type | `page.seo.schema.type` | SEO tab → *Schema* section, only present when the page type's `schemaTypes()` offers more than one key |
-| Article author | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab — same value used for the site-wide Organization/Person node |
+| Article author / publisher | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab — same entity (same `@id`) as the site-wide identity node |
 | `is_indexable` | `page.is_indexable` column | Page edit sidebar → *Publication* card, not the SEO tab |
 | Site title/description templates, separator, suffix | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`, `seo.title_suffix`) | Admin → SEO settings → *Titles* tab |
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
-| Site identity (Organization/Person) | `Settings` (`seo.identity.*`) | SEO settings → *Identity* tab exposes type and profile links (sameAs) only; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win) |
+| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`) | SEO settings → *Identity* tab exposes type, profile links (sameAs) and, for the organisation types, legal name, telephone, email, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win) |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
 | Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
@@ -200,11 +200,12 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    `name`/`description`/`url`/`image` inputs the rendered head tags use
    (plus `imageAlt`/`imageMime`/`imageWidth`/`imageHeight` for the og:
    tags, so the media lookup runs once),
-   and `author` (`array{'@type': 'Organization'|'Person', name: string}|null`,
+   and `author` (`array{'@type': string, name: string, '@id'?: string}|null`,
    derived from the site identity settings, null when the identity type is
    `none` or the name is empty — `SeoResolver` always supplies this
-   argument), and `publisher` (`array{'@type': 'Organization', name, url,
-   logo?}|null` — set only when the identity type is `organization`).
+   argument), and `publisher` (`array{'@type': string, name, url,
+   logo?, '@id'?}|null` — set only for an organisation identity type:
+   `organization`, `online_store` or `local_business`).
    `SchemaContext::baseNode(string $type): array` is the
    standard node every built-in starts from — `@context`/`@type`/`name`/
    `url` always, `description`/`image` if non-empty, `datePublished`/
@@ -245,11 +246,16 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    **Article author**: not a per-page field any more. `SchemaContext::$author`
    and, through it, the Article node's `author` and
    `articleAuthor`/`article:author` all come from the site identity settings
-   (`seo.identity.type` + `.name`): `organization` →
-   `{"@type":"Organization","name":...}`, `person` → `Person`, `none` or an
-   empty name → no author at all. This is the exact type mapping
-   `JsonLd::identity()` already applies to the standalone
-   identity node (below) — the two are meant to name the same entity.
+   (`seo.identity.type` + `.name`): the author carries the identity node's
+   actual `@type` (`Person`, `Organization`, `OnlineStore` or the chosen
+   LocalBusiness subtype such as `AutoRepair`), its `name`, and its `@id`
+   (`{home url}#identity`); `none` or an empty name → no author at all.
+   `publisher` is the same entity inline (`@type`, `name`, `url`, `logo` when
+   set, `@id`) for the three organisation types, and absent for a `person`
+   identity. The type mapping lives in `SiteIdentity::schemaType()`
+   (`Frontend/Seo/SiteIdentity.php`) and is shared with the standalone
+   identity node (below), so consumers merge the author, the publisher and
+   the identity node into one entity.
 
    Removed with no migration of stored data: `ProfilePage` and its
    `profile_*` fields, `schema.article_type`
@@ -328,11 +334,39 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
        ];
    }
    ```
-5. **Identity** (`JsonLd::identity()`) — an `Organization` or `Person` node
-   from `seo.identity.*` settings (type/name/logo/sameAs), or nothing when
-   `seo.identity.type` is `none`. Name and logo fall back to the site's own
-   `site.name`/`site.logo` when no `seo.identity.name`/`seo.identity.logo`
-   is set.
+5. **Identity** (`JsonLd::identity()`) — one node for the whole site, on
+   every page, with `@id` = `{home url}#identity` (`SiteIdentity::id()`), or
+   nothing when `seo.identity.type` is `none`. Name and logo fall back to
+   the site's own `site.name`/`site.logo` when no
+   `seo.identity.name`/`seo.identity.logo` is set.
+
+   | `seo.identity.type` | `@type` | Extra properties |
+   |---|---|---|
+   | `person` | `Person` | none (no `logo`) |
+   | `organization` | `Organization` | `logo`, `legalName`, `telephone`, `email`, `address` |
+   | `online_store` | `OnlineStore` | same as `organization` |
+   | `local_business` | `seo.identity.subtype` (curated list in `SiteIdentity::SUBTYPES`, or `seo.identity.subtype_custom` when the subtype is `other`) | as `organization`, plus `geo` and `openingHoursSpecification` |
+
+   Empty values are omitted, never emitted as `""`/`null`. `address` is a
+   `PostalAddress` emitted only when street or locality is set; its
+   `streetAddress`/`addressLocality`/`addressRegion` are translatable and
+   fall back to the default locale's value (`LocalizedSeo::valueWithFallback()`),
+   `postalCode` and `addressCountry` (ISO 3166-1 alpha-2) are not. Each
+   opening-hours row becomes an `OpeningHoursSpecification` with schema.org
+   day URLs (`https://schema.org/Monday`), all-day is `00:00`–`23:59`, a
+   closed day has no row. `geo` is `GeoCoordinates`, emitted only when both
+   latitude and longitude are set. Every stored value is re-validated at
+   emit time (scripts can write settings): an unknown subtype falls back to
+   `LocalBusiness`, a row with no valid day or a non-`HH:MM` time is
+   dropped, non-numeric coordinates drop `geo`. In the SEO settings form,
+   fields of a section hidden for the chosen type are neither validated nor
+   saved (`exclude_unless` on the type), so a stale value behind a hidden
+   section never blocks a save and its stored value is kept.
+
+   `JsonLd::identity()` keeps its original five positional parameters; the
+   optional trailing `$schemaType`, `$id` and `$properties` carry the
+   subtype, the `@id` and the extra properties above. Without `$schemaType`
+   the `@type` comes from `SiteIdentity::schemaTypeFor($type)`.
 
 **What the host cannot add**: there is no hook or filter to append nodes to
 this list beyond registering a new `SchemaTypeInterface` key, and
