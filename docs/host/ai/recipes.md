@@ -48,8 +48,12 @@ autofocus's version adds a draft-preview banner keyed off `isPreview` and
 swaps in its own block `registry` (`autofocus/resources/js/cms/CmsPage.tsx`).
 Treat "own your `CmsPage.tsx`" as the norm, not the exception, the moment a
 host needs chrome, a React context provider, or extra `<head>` tags — the
-package's version has no extension point for any of those (`resources/js/cms/
-CmsPage.tsx` is a single default export, not a slotted component).
+package's `CmsPage` default export has no slots for any of those. **Do not
+copy the `<Head>` block**: render the package's exported `CmsHead`
+(`import { CmsHead, type Seo } from '@cms/CmsHead'`, from
+`resources/js/cms/CmsHead.tsx`) as `<CmsHead seo={seo} />` inside the host's
+`CmsPage.tsx`, so the SEO tags keep matching `head.blade.php` across package
+updates. Host-only head tags go in a separate `<Head>` next to it.
 
 ### Block-derived JSON-LD (FAQ, Service, …)
 

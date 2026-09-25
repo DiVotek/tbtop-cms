@@ -129,7 +129,9 @@ see wiring.md) reads `$page['props']['seo']` off the raw Inertia payload and
 renders every tag (title, meta description, canonical, robots, favicon,
 verification meta tags, hreflang `<link>`s, OG/Twitter meta, article meta,
 JSON-LD `<script>` tags) with a `data-inertia="<key>"` attribute. Client-side,
-`resources/js/cms/CmsPage.tsx` renders the identical set through Inertia's
+`resources/js/cms/CmsHead.tsx` (the exported `CmsHead` component that
+`CmsPage.tsx` renders — a host-owned `CmsPage.tsx` renders it too, see
+recipes.md) renders the identical set through Inertia's
 `<Head>` with matching `head-key` props — Inertia's head manager recognizes
 matching keys on hydration and updates in place instead of duplicating
 (`<title>` is the one exception, matched by tag name). Both sides must stay
@@ -139,7 +141,7 @@ reintroduces duplicate tags on hydration.
 `head.blade.php` renders **nothing** when SSR is enabled
 (`tbtop-cms.ssr.enabled`) and the SSR gateway actually served this request —
 in that case the gateway's own head output (produced by the same
-`CmsPage.tsx` code) already covers everything, and `Inertia\Ssr\SsrState` is
+`CmsHead.tsx` code) already covers everything, and `Inertia\Ssr\SsrState` is
 consulted once per request (memoized) to make this check free. If SSR is
 down, returns null, or is off, the Blade fallback renders exactly as if SSR
 never existed — SSR failure never means "no head". It also renders nothing
@@ -150,7 +152,7 @@ routes.
 
 Two classes build everything the package emits automatically, assembled by
 `SeoResolver::jsonLd()` into the `seo.jsonLd` list (rendered in that fixed
-order — `head.blade.php` and `CmsPage.tsx` both key on array index, not
+order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
 `@type`, so order must not change):
 
 1. **`JsonLd::website()`** — a `WebSite` node (name + root URL), emitted
@@ -367,7 +369,7 @@ output. Shape, from `divotek_com_ua`:
   serialized JSON (`JSON.stringify(graph).replace(/</g, '\\u003c')` /
   PHP `json_encode(..., JSON_HEX_TAG)`) so a block's text content
   containing `</script>` cannot break out of the tag — the package does this
-  in both `head.blade.php` (`JSON_HEX_TAG`) and `CmsPage.tsx`
+  in both `head.blade.php` (`JSON_HEX_TAG`) and `CmsHead.tsx`
   (`.replace(/</g, "\\u003c")`); a host-built script tag must do the same.
 
 ## Sitemap

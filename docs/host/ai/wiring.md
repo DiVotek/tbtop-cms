@@ -215,8 +215,9 @@ The local copy adds a `SiteChrome` component rendering `cms.layout.header` /
 frontend receives" below) around the page body, plus concerns the vendor file
 has no reason to carry: a `ContactModalContext` provider, a `schema`/JSON-LD
 prop, spacing that depends on which block kind opens the page. Neither host
-declares a `@cms` Vite/tsconfig alias, because once `CmsPage.tsx` is local,
-nothing else needs to reach into `vendor/tbtop/cms/resources/js/cms`.
+surveyed declares a `@cms` Vite/tsconfig alias, but a local `CmsPage.tsx`
+should render the package's SEO head via `@cms/CmsHead` rather than copy it
+(see recipes.md, "Host-owned `CmsPage.tsx`"), which needs the alias.
 
 **When the plain re-export is enough:** no persistent header/footer chrome
 around CMS pages, or still at the bare-wiring stage (`cms-starter-kit`) — no
@@ -234,10 +235,10 @@ pulls it in, copied or not: `npm install @json-render/core @json-render/react
 ## The `@cms` alias
 
 Only needed when host TSX imports something from the package's own
-`resources/js/cms` directly — the admin blocks side-effect import below, and
-(if using the plain re-export) `Cms/Page.tsx` itself. A host with its own
-local `CmsPage.tsx`/`registry.tsx` (the copy-and-adapt norm above) may still
-need it just for `@cms/admin/blocks`.
+`resources/js/cms` directly — the admin blocks side-effect import below,
+(if using the plain re-export) `Cms/Page.tsx` itself, and `@cms/CmsHead`. A
+host with its own local `CmsPage.tsx`/`registry.tsx` (the copy-and-adapt norm
+above) still needs it for `@cms/CmsHead` and `@cms/admin/blocks`.
 
 ```ts
 // vite.config.ts — a fresh laravel new --react scaffold ships no `resolve`
@@ -341,7 +342,7 @@ response:
 | `page.id`, `.type`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` already resolved to the request locale via `getTranslation()` |
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
 | `render` | `Spec` (json-render) | The assembled page spec — resolved block content passed through `PageSpecAssembler`; see blocks.md for the block/envelope/resolved-block vocabulary |
-| `seo` | `object` | Full SEO tag set (title, description, canonical, OG/Twitter, hreflang alternates, JSON-LD, `noindex`) — see seo.md for field-by-field detail; `CmsPage.tsx`'s `<Head>` and `head.blade.php` both render this same payload |
+| `seo` | `object` | Full SEO tag set (title, description, canonical, OG/Twitter, hreflang alternates, JSON-LD, `noindex`) — see seo.md for field-by-field detail; `CmsHead.tsx`'s `<Head>` and `head.blade.php` both render this same payload |
 | `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` — home › ancestors › the page itself; `[]` on the home page and on error pages. Render every crumb but the last as a link |
 | `path` | `string` | The resolved request path |
 | `isPreview` | `bool` | `true` for draft/scheduled/expired pages reachable only via preview access — `seo.noindex` is forced `true` alongside it |
@@ -375,7 +376,7 @@ both the same directive:
 Inertia root view's own `$page` array directly (not a prop passed to the
 include) and renders nothing when it's absent — safe on a root view reused by
 non-CMS routes. Client-side Inertia navigation keeps the same tags in sync
-via `CmsPage.tsx`'s `<Head>`; both sides key every tag with matching
+via `CmsHead.tsx`'s `<Head>`; both sides key every tag with matching
 `data-inertia`/`head-key` attributes so hydration reconciles instead of
 duplicating.
 
@@ -384,7 +385,7 @@ duplicating.
   this view renders the full fallback tag set itself.
 - SSR flag on and the gateway responded (`SsrState::dispatch() !== null`) —
   this view renders nothing; the SSR-rendered `<Head>` (same client code
-  `CmsPage.tsx` uses) already covers it. The request-attribute check runs
+  `CmsHead.tsx` uses) already covers it. The request-attribute check runs
   first, so the non-SSR path never even touches `SsrState`.
 
 The head is never silently empty — a broken SSR process falls back to the

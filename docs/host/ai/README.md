@@ -57,7 +57,7 @@ If the table can't place it, ask.
 ## Ground rules
 
 - **Three layers, one change.** A block's PHP `resolve()` shape and its zod schema are kept in sync by hand; the renderer validates and drops mismatches with only a console warning.
-- **The host owns `CmsPage.tsx`.** Copy the package's `resources/js/cms/CmsPage.tsx` the moment you need chrome, a provider, or an extra `<head>` tag; the vendor file has no slots.
+- **The host owns `CmsPage.tsx`.** Copy the package's `resources/js/cms/CmsPage.tsx` the moment you need chrome, a provider, or an extra `<head>` tag; the vendor file has no slots. Keep the SEO tags by rendering `<CmsHead seo={seo} />` from `@cms/CmsHead`, not by copying the `<Head>` block.
 - **`Cms::frontendRoutes()` is the last line of `routes/web.php`.** It ends in a catch-all.
 - **Content is seeded, not clicked.** Seeders are idempotent by slug and split per section.
 - **Vendor is read-only.** A bug in `vendor/tbtop/cms` is reported, not patched in place; a missing hook is a finding to flag, not something to work around silently.
