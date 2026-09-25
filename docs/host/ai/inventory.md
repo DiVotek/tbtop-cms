@@ -324,7 +324,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `bump(): void` | Invalidates every previously cached versioned key |
 | `Tbtop\Cms\Mail\CmsMailer` | `send(Mailable $mailable, array\|string $to): void` | Sends mail via an on-demand mailer built from admin `mail.*` settings, or the host's default mailer if `mail.host` is unset |
 | | `transportConfig(): array` | Builds the Laravel mail transport config array from `mail.*` settings |
-| `Tbtop\Cms\Richtext\RichtextHtmlRenderer` | `render(mixed $value): string` | Renders a Lexical-shaped richtext value to HTML; plain strings wrap as one paragraph; empty/unrecognized input renders `''` |
+| `Tbtop\Cms\Richtext\RichtextHtmlRenderer` | `render(mixed $value): string` | Renders a Lexical-shaped richtext value to HTML; a legacy HTML string (one the admin editor reads as HTML) is rebuilt through the same node renderer, never passed through; other plain strings wrap as one paragraph; empty/unrecognized input renders `''` |
 | `Tbtop\Cms\Link\LinkResolver` | `resolve(mixed $value, string $locale): ?array` | Resolves a `link` field value to `{href, type, label}`; `null` for malformed input, a non-live page, or a page with no slug in that locale. Reached from a block via `$ctx->link()` |
 | `Tbtop\Cms\Language\Languages` | `all(): array` | All configured languages (cached) |
 | | `default(): ?array` | The language row flagged `is_default` |

@@ -6,8 +6,12 @@ namespace Tbtop\Cms\Richtext;
 
 class RichtextHtmlRenderer
 {
+    /** The admin editor's own test for "this stored string is HTML" (richtextInitialState.ts). */
+    private const HTML_PATTERN = '/^\s*<[a-z][a-z0-9]*[\s\/>]/i';
+
     public function __construct(
         private readonly RichtextNodeRenderer $nodeRenderer = new RichtextNodeRenderer,
+        private readonly RichtextHtmlToNodes $htmlToNodes = new RichtextHtmlToNodes,
     ) {}
 
     public function render(mixed $value): string
@@ -52,6 +56,10 @@ class RichtextHtmlRenderer
 
         if (trim($value) === '') {
             return null;
+        }
+
+        if (preg_match(self::HTML_PATTERN, $value) === 1) {
+            return $this->htmlToNodes->convert($value);
         }
 
         return [

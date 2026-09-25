@@ -6,9 +6,9 @@ namespace Tbtop\Cms\Richtext;
 
 class RichtextNodeRenderer
 {
-    private const MAX_DEPTH = 64;
+    public const MAX_DEPTH = 64;
 
-    private const MAX_NODES = 10000;
+    public const MAX_NODES = 10000;
 
     /** @var array<string, string> */
     private const ALIGNMENTS = [

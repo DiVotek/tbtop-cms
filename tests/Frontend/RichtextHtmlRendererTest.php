@@ -302,3 +302,17 @@ it('returns an empty string for garbage input', function (): void {
 it('wraps non-json bare strings as a legacy paragraph', function (): void {
     expect($this->renderer->render('not json {'))->toBe('<p>not json {</p>');
 });
+
+it('renders a legacy html string as markup, the way the editor reads it', function (): void {
+    expect($this->renderer->render('<p>Hello <strong>world</strong></p>'))
+        ->toBe('<p>Hello <strong>world</strong></p>');
+});
+
+it('sanitises a legacy html string by rebuilding it through the node renderer', function (): void {
+    $html = $this->renderer->render(
+        '<p onclick="alert(1)" class="x">Hi<script>alert(2)</script><style>p{}</style>'
+        . ' <a href="javascript:alert(3)" onmouseover="alert(4)">bad</a></p>',
+    );
+
+    expect($html)->toBe('<p>Hi bad</p>');
+});
