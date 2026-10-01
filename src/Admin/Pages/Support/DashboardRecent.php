@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Facades\Route;
+use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Form\LeadStatus;
@@ -33,7 +34,7 @@ class DashboardRecent
         return $s->section([
             'title' => __('tbtop-cms::dashboard.recent.pages_title'),
             'variant' => 'card',
-            ...self::actionFor('tbtop-cms::dashboard.recent.open_pages', 'tbtop.cms.pages-page'),
+            ...self::actionFor($s, 'dashboardOpenPages', 'tbtop-cms::dashboard.recent.open_pages', 'tbtop.cms.pages-page'),
         ], [$list]);
     }
 
@@ -44,7 +45,7 @@ class DashboardRecent
         return $s->section([
             'title' => __('tbtop-cms::dashboard.recent.submissions_title'),
             'variant' => 'card',
-            ...self::actionFor('tbtop-cms::dashboard.recent.open_submissions', 'tbtop.cms.form-submissions-page'),
+            ...self::actionFor($s, 'dashboardOpenSubmissions', 'tbtop-cms::dashboard.recent.open_submissions', 'tbtop.cms.form-submissions-page'),
         ], [$list]);
     }
 
@@ -106,11 +107,11 @@ class DashboardRecent
         };
     }
 
-    /** @return array{action?: array{label: string, url: string}} */
-    private static function actionFor(string $labelKey, string $route): array
+    /** @return array{actions?: list<ActionBuilder>} */
+    private static function actionFor(S $s, string $name, string $labelKey, string $route): array
     {
         return Route::has($route)
-            ? ['action' => ['label' => __($labelKey), 'url' => route($route)]]
+            ? ['actions' => [$s->action($name)->label(__($labelKey))->url(route($route))->link()->size('sm')]]
             : [];
     }
 }
