@@ -323,10 +323,8 @@ it('renders recently updated pages as a card-list with status color and an "open
     $pagesCard = collect($sections)->firstWhere('title', __('tbtop-cms::dashboard.recent.pages_title'));
 
     expect($pagesCard['variant'])->toBe('card')
-        ->and($pagesCard['action'])->toBe([
-            'label' => __('tbtop-cms::dashboard.recent.open_pages'),
-            'url' => route('tbtop.cms.pages-page'),
-        ]);
+        ->and($pagesCard['actions'][0]['options']['label'])->toBe(__('tbtop-cms::dashboard.recent.open_pages'))
+        ->and($pagesCard['actions'][0]['options']['spec']['href'])->toBe(route('tbtop.cms.pages-page'));
 
     $lists = [];
     collectDashboardNodesByKind($structure, 'list', $lists);
@@ -375,10 +373,8 @@ it('colors the latest-submissions list by lead status', function (): void {
     $submissionsCard = collect($sections)->firstWhere('title', __('tbtop-cms::dashboard.recent.submissions_title'));
 
     expect($submissionsCard['variant'])->toBe('card')
-        ->and($submissionsCard['action'])->toBe([
-            'label' => __('tbtop-cms::dashboard.recent.open_submissions'),
-            'url' => route('tbtop.cms.form-submissions-page'),
-        ]);
+        ->and($submissionsCard['actions'][0]['options']['label'])->toBe(__('tbtop-cms::dashboard.recent.open_submissions'))
+        ->and($submissionsCard['actions'][0]['options']['spec']['href'])->toBe(route('tbtop.cms.form-submissions-page'));
 
     // 5.4: title is now the lead's identity (LeadIdentity::label()), not the
     // bare form kind — every fixture here submits the same payload
@@ -517,6 +513,6 @@ it('gives each recent-activity card-list an "open" action', function (): void {
     $pagesCard = collect($sections)->firstWhere('title', __('tbtop-cms::dashboard.recent.pages_title'));
     $submissionsCard = collect($sections)->firstWhere('title', __('tbtop-cms::dashboard.recent.submissions_title'));
 
-    expect($pagesCard['action']['url'])->toBe(route('tbtop.cms.pages-page'))
-        ->and($submissionsCard['action']['url'])->toBe(route('tbtop.cms.form-submissions-page'));
+    expect($pagesCard['actions'][0]['options']['spec']['href'])->toBe(route('tbtop.cms.pages-page'))
+        ->and($submissionsCard['actions'][0]['options']['spec']['href'])->toBe(route('tbtop.cms.form-submissions-page'));
 });
