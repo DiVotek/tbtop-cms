@@ -10,10 +10,25 @@ return [
     'site' => [
         'title' => 'Site settings',
         'subtitle' => 'General site identity: name, logo, and favicon.',
+        'tabs' => [
+            'branding' => 'Branding',
+            'contacts' => 'Contacts',
+        ],
+        'helpers' => [
+            'contacts' => 'Phones, emails and social profiles for the header, footer and contact blocks. The first phone and email, and every social link, also feed the SEO identity markup unless SEO settings override them.',
+        ],
         'fields' => [
             'site_name' => 'Site name',
             'logo' => 'Logo',
             'favicon' => 'Favicon',
+            'phones' => 'Phones',
+            'phone_number' => 'Number',
+            'emails' => 'Emails',
+            'email_address' => 'Address',
+            'socials' => 'Social profiles',
+            'social_label' => 'Short label',
+            'social_name' => 'Full name',
+            'social_href' => 'Link',
         ],
     ],
     'seo' => [
