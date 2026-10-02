@@ -22,11 +22,14 @@ use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Frontend\Support\CurrentPage;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Support\PageTranslation;
 use Tbtop\Cms\Redirect\RedirectResolver;
+use Tbtop\Cms\Richtext\RichtextHtmlRenderer;
 
 class PageController
 {
@@ -42,6 +45,8 @@ class PageController
         private readonly SchemaContextFactory $schemaContextFactory,
         private readonly BlockRegistry $blockRegistry,
         private readonly CurrentPage $currentPage,
+        private readonly Languages $languages,
+        private readonly RichtextHtmlRenderer $richtext,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -144,6 +149,7 @@ class PageController
                 'title' => $page->getTranslation('title', $locale),
                 'heading' => $page->getTranslation('heading', $locale),
                 'summary' => $page->getTranslation('summary', $locale),
+                'body' => $this->bodyHtml($page, $locale),
                 'image' => $this->resolveImage($page->image),
             ],
             'render' => $this->assembler->assemble($resolved),
@@ -152,6 +158,12 @@ class PageController
             'path' => $path,
             'isPreview' => $isPreview,
         ];
+    }
+
+    /** The Body as HTML in the active locale, falling back to the default locale; '' when empty. */
+    private function bodyHtml(Page $page, string $locale): string
+    {
+        return $this->richtext->render(PageTranslation::get($page, 'body', $locale, $this->languages->defaultLocale()));
     }
 
     private function component(): string
