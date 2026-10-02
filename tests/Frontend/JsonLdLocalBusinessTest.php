@@ -110,3 +110,38 @@ it('links the article author and publisher to the identity node', function (stri
     'local business' => ['local_business', 'AutoRepair', true],
     'person' => ['person', 'Person', false],
 ]);
+
+it('fills telephone, email and sameAs from Site settings contacts when the SEO identity leaves them blank', function (): void {
+    $settings = app(Settings::class);
+    $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001'], ['number' => '+380 44 555 0002']]);
+    $settings->set('site.contacts.emails', [['address' => 'hello@example.com']]);
+    $settings->set('site.contacts.socials', [
+        ['label' => 'FB', 'name' => 'Facebook', 'href' => 'https://facebook.com/acme'],
+        ['label' => 'TG', 'name' => null, 'href' => 'https://t.me/acme'],
+    ]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $identity = identityNodes(localBusinessJsonLd('/about'));
+
+    expect($identity)->toHaveCount(1)
+        ->and($identity[0]['telephone'])->toBe('+380 44 555 0001')
+        ->and($identity[0]['email'])->toBe('hello@example.com')
+        ->and($identity[0]['sameAs'])->toBe(['https://facebook.com/acme', 'https://t.me/acme']);
+});
+
+it('lets the explicit SEO identity fields override the Site settings contacts', function (): void {
+    $settings = app(Settings::class);
+    $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001']]);
+    $settings->set('site.contacts.emails', [['address' => 'hello@example.com']]);
+    $settings->set('site.contacts.socials', [['label' => 'FB', 'name' => null, 'href' => 'https://facebook.com/acme']]);
+    $settings->set('seo.identity.telephone', '+380 44 123 4567');
+    $settings->set('seo.identity.email', 'press@example.com');
+    $settings->set('seo.identity.same_as', ['https://www.wikidata.org/wiki/Q1']);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $identity = identityNodes(localBusinessJsonLd('/about'));
+
+    expect($identity[0]['telephone'])->toBe('+380 44 123 4567')
+        ->and($identity[0]['email'])->toBe('press@example.com')
+        ->and($identity[0]['sameAs'])->toBe(['https://www.wikidata.org/wiki/Q1']);
+});

@@ -235,6 +235,9 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.name` | `SiteSettingsPage` | no | yes |
 | `site.logo` | `SiteSettingsPage` | no | yes (media URL) |
 | `site.favicon` | `SiteSettingsPage` | no | yes (media URL) |
+| `site.contacts.phones` (`[{number}]`) | `SiteSettingsPage` | no | yes — public contact data; read via `Tbtop\Cms\Settings\SiteContacts`, first entry is the identity JSON-LD `telephone` unless `seo.identity.telephone` is set |
+| `site.contacts.emails` (`[{address}]`) | `SiteSettingsPage` | no | yes — same, feeds the identity `email` unless `seo.identity.email` is set |
+| `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s feed the identity `sameAs` unless `seo.identity.same_as` is set |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
 | `seo.description_template` | `SeoSettingsPage` | no | yes |

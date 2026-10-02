@@ -16,6 +16,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Settings\SiteContacts;
 
 /**
  * @phpstan-type Alternate array{locale: string, url: string}
@@ -313,13 +314,14 @@ class SeoResolver
     private function sameAs(): array
     {
         $raw = $this->settings->get('seo.identity.same_as', []);
-
-        if (! is_array($raw)) {
-            return [];
+        $urls = is_array($raw) ? $raw : [];
+        // An explicit SEO list wins; otherwise the Site-settings social profiles.
+        if ($urls === []) {
+            $urls = array_column((new SiteContacts($this->settings))->socials(), 'href');
         }
 
         return array_values(array_filter(
-            $raw,
+            $urls,
             static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
         ));
     }
