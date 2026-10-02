@@ -112,7 +112,8 @@ every review thread resolved. Auto-merge is off: merge with
 `gh pr merge --squash`. Auto-review is `pr-agent-pilot[bot]`: its verdict is
 the `triage` check-run, its findings are inline review comments. A clean re-run
 posts no new review, so poll the check-run, not reviews. Validate each finding,
-fix or reply, then resolve the thread (GraphQL `resolveReviewThread`).
+fix or reply, then resolve the thread (GraphQL `resolveReviewThread`). The
+`Devin Review` check passes without reviewing (no credits left).
 
 ## Docs
 
