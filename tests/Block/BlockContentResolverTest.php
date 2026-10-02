@@ -11,6 +11,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\BrokenBlock;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\LinkBlock;
+use Tbtop\Cms\Tests\Fixtures\PageTextBlock;
 use Tbtop\Cms\Tests\Fixtures\SourceAwareBlock;
 use Tbtop\Cms\Tests\Fixtures\SourcedThing;
 
@@ -20,7 +21,7 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     Language::factory()->create(['locale' => 'uk']);
     app()->setLocale('en');
-    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, BrokenBlock::class, SourceAwareBlock::class, LinkBlock::class]);
+    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, BrokenBlock::class, SourceAwareBlock::class, LinkBlock::class, PageTextBlock::class]);
 });
 
 it('resolves a block with locale-flattened props', function (): void {
@@ -179,4 +180,28 @@ it('throws with the original error as previous when strict mode is enabled', fun
         ->and($caught?->kind)->toBe('Broken')
         ->and($caught?->getPrevious())->toBeInstanceOf(RuntimeException::class)
         ->and($caught?->getPrevious()?->getMessage())->toBe('boom');
+});
+
+it('hands a block the page texts with a blank active-locale translation falling back to the default locale', function (): void {
+    app()->setLocale('uk');
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        // The editor stores '' and an empty document for a locale left untouched.
+        'heading' => ['en' => 'English heading', 'uk' => ''],
+        'body' => [
+            'en' => ['root' => ['type' => 'root', 'children' => [['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => 'English body', 'format' => 0]]]]]],
+            'uk' => ['root' => ['type' => 'root', 'children' => []]],
+        ],
+    ]);
+
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'pt-1', 'kind' => 'PageText', 'data' => []],
+    ], $page);
+
+    expect($out[0]->props)->toBe(['heading' => 'English heading', 'bodyHtml' => '<p>English body</p>']);
+
+    $none = app(BlockContentResolver::class)->resolve([['id' => 'pt-2', 'kind' => 'PageText', 'data' => []]]);
+
+    expect($none[0]->props)->toBe(['heading' => null, 'bodyHtml' => '']);
 });
