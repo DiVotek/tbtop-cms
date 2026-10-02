@@ -99,7 +99,7 @@ final class PageEditBlockTabs
             $s->flex([self::removeAction($s, $page, $id), $s->spacer()]),
         ]);
 
-        $tab = ['label' => $kind, 'body' => $body];
+        $tab = ['label' => BlockPicker::label($registry, $kind), 'body' => $body];
         if (! $active) {
             $tab['badge'] = '·';
         }
@@ -171,21 +171,20 @@ final class PageEditBlockTabs
     /** @return array{label: string, body: mixed} */
     private static function addBlockTab(S $s, Page $page, BlockRegistry $registry): array
     {
-        $actions = [];
-        foreach (array_keys($registry->forPlacement($page->type)) as $kind) {
-            $actions[] = self::addAction($s, $page, $kind);
-        }
-
         return [
             'label' => __('tbtop-cms::pages.tabs_edit.add_block'),
-            'body' => $s->stack([$s->actionsRow($actions, ['variant' => 'grid'])]),
+            'body' => BlockPicker::build(
+                $s,
+                $registry->forPlacement($page->type),
+                static fn (string $kind): ActionBuilder => self::addAction($s, $page, $kind),
+            ),
         ];
     }
 
     private static function addAction(S $s, Page $page, string $kind): ActionBuilder
     {
         return $s->action("pageBlockAdd_{$kind}")
-            ->label(__('tbtop-cms::pages.blocks.add', ['kind' => $kind]))
+            ->label(__('tbtop-cms::pages.blocks.add'))
             ->withoutValidation(self::skipsGate($page))
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleAdd($ctx, $page, $kind),

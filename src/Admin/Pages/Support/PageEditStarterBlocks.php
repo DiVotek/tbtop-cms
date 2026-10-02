@@ -94,9 +94,13 @@ final class PageEditStarterBlocks
                 $s->section(['variant' => 'card'], [
                     $s->stack($elements === []
                         ? [$s->displayText(__('tbtop-cms::pages.starter_blocks.empty'))->variant('muted')]
-                        : self::rows($s, $page, $type, $elements)),
+                        : self::rows($s, $page, $type, $elements, $registry)),
                 ]),
-                $s->actionsRow(self::addActions($s, $page, $type, $registry), ['variant' => 'grid']),
+                BlockPicker::build(
+                    $s,
+                    $registry->forPlacement($type),
+                    static fn (string $kind): ActionBuilder => self::addAction($s, $page, $type, $kind),
+                ),
                 $s->flex([self::applyAction($s, $page, $type), $s->spacer()]),
             ]),
         ];
@@ -106,7 +110,7 @@ final class PageEditStarterBlocks
      * @param  list<array<string, mixed>>  $elements
      * @return list<Node>
      */
-    private static function rows(S $s, Page $page, string $type, array $elements): array
+    private static function rows(S $s, Page $page, string $type, array $elements, BlockRegistry $registry): array
     {
         $last = count($elements) - 1;
         $rows = [];
@@ -116,7 +120,7 @@ final class PageEditStarterBlocks
             $kind = (string) ($element['kind'] ?? '');
 
             $rows[] = $s->flex([
-                $s->displayText($kind),
+                $s->displayText(BlockPicker::label($registry, $kind)),
                 $s->spacer(),
                 self::moveAction($s, $page, $type, $id, 'up')->when($index > 0),
                 self::moveAction($s, $page, $type, $id, 'down')->when($index < $last),
@@ -127,21 +131,10 @@ final class PageEditStarterBlocks
         return $rows;
     }
 
-    /** @return list<ActionBuilder> */
-    private static function addActions(S $s, Page $page, string $type, BlockRegistry $registry): array
-    {
-        $actions = [];
-        foreach (array_keys($registry->forPlacement($type)) as $kind) {
-            $actions[] = self::addAction($s, $page, $type, $kind);
-        }
-
-        return $actions;
-    }
-
     private static function addAction(S $s, Page $page, string $type, string $kind): ActionBuilder
     {
         return $s->action("pageStarterBlockAdd_{$type}_{$kind}")
-            ->label(__('tbtop-cms::pages.blocks.add', ['kind' => $kind]))
+            ->label(__('tbtop-cms::pages.blocks.add'))
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleAdd($page, $type, $kind),
                 needs: [],

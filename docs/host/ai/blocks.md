@@ -118,12 +118,15 @@ abstract methods:
 
 Overridable, all with sane defaults:
 
-- **`label(): string`** — showcase display name. Defaults to
+- **`label(): string`** — display name: the block's tab in the page and layout
+  editors, its card in the add-block picker and the showcase. Defaults to
   `Str::headline($this->kind())` (`"ContactForm"` → `"Contact Form"`).
-- **`description(): ?string`** — one-line showcase blurb. `null` (default)
-  hides the line.
-- **`category(): ?string`** — showcase grouping bucket (e.g. `'content'`,
-  `'forms'`). `null` (default) leaves the block ungrouped.
+- **`description(): ?string`** — one-line blurb under the label in the add-block
+  picker and the showcase. `null` (default) hides the line.
+- **`category(): ?string`** — grouping bucket (e.g. `'content'`, `'forms'`): the
+  add-block picker shows one headed group per category, uncategorized blocks
+  last, and no heading when every offered block shares one group. `null`
+  (default) leaves the block ungrouped.
 - **`placements(): array`** — where the block may be added: a list of
   page-type keys and/or `Tbtop\Cms\Block\Placement::LAYOUT`. Default is
   `[Placement::PAGES]`, a wildcard meaning every page type (including a
