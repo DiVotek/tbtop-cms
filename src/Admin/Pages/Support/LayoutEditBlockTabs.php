@@ -142,21 +142,20 @@ final class LayoutEditBlockTabs
     /** @return array{label: string, body: mixed} */
     private static function addBlockTab(S $s, string $slot, BlockRegistry $registry): array
     {
-        $actions = [];
-        foreach (array_keys($registry->forPlacement(Placement::LAYOUT)) as $kind) {
-            $actions[] = self::addAction($s, $slot, $kind);
-        }
-
         return [
             'label' => __('tbtop-cms::pages.tabs_edit.add_block'),
-            'body' => $s->stack([$s->actionsRow($actions, ['variant' => 'grid'])]),
+            'body' => BlockPicker::build(
+                $s,
+                $registry->forPlacement(Placement::LAYOUT),
+                static fn (string $kind): ActionBuilder => self::addAction($s, $slot, $kind),
+            ),
         ];
     }
 
     private static function addAction(S $s, string $slot, string $kind): ActionBuilder
     {
         return $s->action("layoutBlockAdd_{$kind}")
-            ->label(__('tbtop-cms::pages.blocks.add', ['kind' => $kind]))
+            ->label(__('tbtop-cms::pages.blocks.add'))
             ->handle(
                 fn (ActionCtx $ctx): Effects => self::handleAdd($ctx, $slot, $kind),
                 needs: ['form'],

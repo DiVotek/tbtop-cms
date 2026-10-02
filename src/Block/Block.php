@@ -17,7 +17,8 @@ abstract class Block
     abstract public function form(S $s): array;
 
     /**
-     * Human name for the blocks showcase. Defaults to a title-cased kind
+     * Human name shown on the block's editor tab, in the add-block picker
+     * and in the blocks showcase. Defaults to a title-cased kind
      * ("ContactForm" -> "Contact Form"); override for a nicer label.
      */
     public function label(): string
@@ -26,7 +27,8 @@ abstract class Block
     }
 
     /**
-     * One-line explanation shown in the showcase. Null hides the line —
+     * One-line explanation shown in the add-block picker and the showcase.
+     * Null hides the line —
      * override to document what the block is for.
      */
     public function description(): ?string
@@ -35,7 +37,8 @@ abstract class Block
     }
 
     /**
-     * Optional grouping bucket for the showcase (e.g. "content", "layout").
+     * Optional grouping bucket for the add-block picker and the showcase
+     * (e.g. "content", "layout").
      * Null leaves the block ungrouped.
      */
     public function category(): ?string
