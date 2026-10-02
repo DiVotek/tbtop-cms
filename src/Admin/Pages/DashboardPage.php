@@ -53,14 +53,14 @@ class DashboardPage extends Page
     {
         $actions = [
             $s->action('dashboardRefresh')->label(__('tbtop-cms::dashboard.actions.refresh'))
-                ->icon('refresh-cw')->visit(url()->current()),
+                ->icon('refresh-cw')->url(url()->current()),
             $s->action('dashboardViewSite')->label(__('tbtop-cms::dashboard.actions.view_site'))
-                ->icon('external-link')->visit(url('/'), newTab: true),
+                ->icon('external-link')->url(url('/'))->openUrlInNewTab(),
         ];
 
         if (Route::has('tbtop.cms.pages-page')) {
             $actions[] = $s->action('dashboardNewPage')->label(__('tbtop-cms::dashboard.actions.new_page'))
-                ->color('primary')->visit(route('tbtop.cms.pages-page'));
+                ->color('primary')->url(route('tbtop.cms.pages-page'));
         }
 
         return $actions;

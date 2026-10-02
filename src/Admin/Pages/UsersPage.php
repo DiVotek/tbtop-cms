@@ -104,10 +104,10 @@ class UsersPage extends AdminPage
                 Column::make('has_access')->label(__('tbtop-cms::users.columns.access'))
                     ->formatUsing($this->accessLabel(...))
                     ->badge([
-                        __('tbtop-cms::users.access.granted') => Color::Info,
-                        __('tbtop-cms::users.access.owner') => Color::Success,
-                        __('tbtop-cms::users.access.none') => Color::Gray,
-                        __('tbtop-cms::users.access.managed') => Color::Gray,
+                        __('tbtop-cms::users.access.granted') => ['color' => Color::Info],
+                        __('tbtop-cms::users.access.owner') => ['color' => Color::Success],
+                        __('tbtop-cms::users.access.none') => ['color' => Color::Gray],
+                        __('tbtop-cms::users.access.managed') => ['color' => Color::Gray],
                     ]),
                 // Not shown by default — projected purely so hiddenIf() can
                 // gate row actions client-side (mirrors PagesPage's

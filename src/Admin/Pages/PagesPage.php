@@ -99,10 +99,10 @@ class PagesPage extends AdminPage
                 Column::make('display_state')->label(__('tbtop-cms::pages.columns.status'))
                     ->formatUsing($this->statusLabel(...))
                     ->badge([
-                        __('tbtop-cms::pages.status.published') => 'success',
-                        __('tbtop-cms::pages.status.draft') => 'warning',
-                        __('tbtop-cms::pages.status.scheduled') => 'gray',
-                        __('tbtop-cms::pages.status.expired') => 'gray',
+                        __('tbtop-cms::pages.status.published') => ['color' => 'success'],
+                        __('tbtop-cms::pages.status.draft') => ['color' => 'warning'],
+                        __('tbtop-cms::pages.status.scheduled') => ['color' => 'gray'],
+                        __('tbtop-cms::pages.status.expired') => ['color' => 'gray'],
                     ]),
                 // Sortable ascending = worst first, which is the sweep this
                 // badge exists for ("show me what needs work"). That ordering
@@ -113,9 +113,9 @@ class PagesPage extends AdminPage
                     ->tooltip($this->seoStateTooltip(...))
                     ->sortable()
                     ->badge([
-                        __('tbtop-cms::pages.seo_state.fail') => 'danger',
-                        __('tbtop-cms::pages.seo_state.warn') => 'warning',
-                        __('tbtop-cms::pages.seo_state.pass') => 'success',
+                        __('tbtop-cms::pages.seo_state.fail') => ['color' => 'danger'],
+                        __('tbtop-cms::pages.seo_state.warn') => ['color' => 'warning'],
+                        __('tbtop-cms::pages.seo_state.pass') => ['color' => 'success'],
                     ])
                     ->toggleable(),
                 Column::make('updated_at')->label(__('tbtop-cms::pages.columns.updated'))
@@ -353,7 +353,7 @@ class PagesPage extends AdminPage
         // label('') → icon-only; the tooltip carries the accessible name.
         return $s->action('pageView')->label('')->link()->icon('external-link')
             ->tooltip(__('tbtop-cms::pages.actions.view_on_site'))
-            ->visit('/{path}', newTab: true)
+            ->url('/{path}')->openUrlInNewTab()
             // A trashed page has no live path (its slugs were removed by
             // PageObserver::deleting()) — the link would 404.
             ->hiddenIf('deleted_at', 'not empty');
