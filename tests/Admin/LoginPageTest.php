@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Testing\TestResponse;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
 uses(RefreshDatabase::class);
@@ -177,15 +178,23 @@ it('keeps remember-me a checkbox, not a boolean switch', function (): void {
         ->and($remember['kind'])->toBe('checkbox');
 });
 
-it('renders the configured panel brand in the card', function (): void {
-    $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
-        ->assertOk()->json('props.structure');
+it('heads the card with the site name, falling back to the panel brand until one is set', function (): void {
+    $heading = static function (): ?string {
+        $structure = test()->get('/admin/login', ['X-Inertia' => 'true'])
+            ->assertOk()->json('props.structure');
 
-    $texts = loginCollectByKind($structure, 'displayText');
-    $brand = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['variant'] ?? null) === 'heading'));
+        $texts = loginCollectByKind($structure, 'displayText');
+        $headings = array_values(array_filter($texts, static fn (array $t): bool => ($t['options']['variant'] ?? null) === 'heading'));
+        expect($headings)->toHaveCount(1);
 
-    expect($brand)->toHaveCount(1)
-        ->and($brand[0]['options']['content'] ?? null)->toBe('TableTop CMS');
+        return $headings[0]['options']['content'] ?? null;
+    };
+
+    app(Settings::class)->set('site.name', '');
+    expect($heading())->toBe('TableTop CMS');
+
+    app(Settings::class)->set('site.name', 'Acme Shop');
+    expect($heading())->toBe('Acme Shop');
 });
 
 it('rejects an invalid password with the cms-owned translation, not the host app key', function (): void {

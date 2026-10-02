@@ -16,6 +16,7 @@ use Tbtop\Admin\Panels\CurrentPanel;
 use Tbtop\Admin\Panels\PanelConfig;
 use Tbtop\Cms\Admin\Http\Middleware\RedirectIfCmsAuthenticated;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
+use Tbtop\Cms\Settings\Settings;
 
 // Deliberately no can() override: must be reachable unauthenticated, gated
 // by the guest-redirect middleware below instead. See SectionAbilitiesTest.
@@ -80,7 +81,7 @@ class LoginPage extends Page
                 // TextBlock (displayText's return type) has no class() escape hatch,
                 // so centering wraps the brand/subtitle group in a stack instead.
                 $s->stack([
-                    $s->displayText($this->brand())->variant('heading'),
+                    $s->displayText($this->heading())->variant('heading'),
                     $s->displayText(__('tbtop-cms::login.subtitle'))->variant('muted'),
                 ], ['class' => 'text-center gap-1']),
                 $form,
@@ -94,8 +95,9 @@ class LoginPage extends Page
         );
 
         return $s->stack([
-            // Placeholder product mark until a real logo lands in the panel
-            // config; inline SVG with currentColor so it follows the theme.
+            // The product mark: tbtop.dev's hero tiles (t·b·t·o·p) over the product
+            // name, the name stretched to the tiles' width. Inline SVG; the name
+            // uses currentColor so it follows the theme.
             $s->displayHtml(self::LOGO_SVG),
             $card,
             $s->displayHtml($siteLink),
@@ -109,12 +111,8 @@ class LoginPage extends Page
         ], ['class' => 'gap-6 pb-14']);
     }
 
-    /**
-     * A d6 die in the lucide line style — the tabletop nod. Stroke inherits
-     * currentColor, so it stays visible in both themes.
-     */
     private const LOGO_SVG = <<<'SVG'
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto h-12 w-12 text-foreground" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 212 68" class="mx-auto h-16 w-auto text-foreground" role="img" aria-label="TableTop CMS" font-family="ui-sans-serif, system-ui, sans-serif"><defs><linearGradient id="tt0" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient><linearGradient id="tt1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f472b6"/><stop offset="1" stop-color="#db2777"/></linearGradient><linearGradient id="tt2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f5b83d"/><stop offset="1" stop-color="#d97706"/></linearGradient><linearGradient id="tt3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a3e635"/><stop offset="1" stop-color="#65a30d"/></linearGradient><linearGradient id="tt4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#0891b2"/></linearGradient><linearGradient id="ttgloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><g><rect x="0" y="0" width="36" height="36" rx="8" fill="url(#tt0)"/><rect x="0" y="0" width="36" height="36" rx="8" fill="url(#ttgloss)"/><text x="18" y="26" text-anchor="middle" font-size="28" font-weight="800" fill="#0a0a12">t</text><rect x="44" y="0" width="36" height="36" rx="8" fill="url(#tt1)"/><rect x="44" y="0" width="36" height="36" rx="8" fill="url(#ttgloss)"/><text x="62" y="26" text-anchor="middle" font-size="28" font-weight="800" fill="#0a0a12">b</text><rect x="88" y="0" width="36" height="36" rx="8" fill="url(#tt2)"/><rect x="88" y="0" width="36" height="36" rx="8" fill="url(#ttgloss)"/><text x="106" y="26" text-anchor="middle" font-size="28" font-weight="800" fill="#0a0a12">t</text><rect x="132" y="0" width="36" height="36" rx="8" fill="url(#tt3)"/><rect x="132" y="0" width="36" height="36" rx="8" fill="url(#ttgloss)"/><text x="150" y="26" text-anchor="middle" font-size="28" font-weight="800" fill="#0a0a12">o</text><rect x="176" y="0" width="36" height="36" rx="8" fill="url(#tt4)"/><rect x="176" y="0" width="36" height="36" rx="8" fill="url(#ttgloss)"/><text x="194" y="26" text-anchor="middle" font-size="28" font-weight="800" fill="#0a0a12">p</text></g><text x="0" y="64" textLength="212" lengthAdjust="spacing" font-size="24" font-weight="700" fill="currentColor">TableTop CMS</text></svg>
         SVG;
 
     private function footerLine(): string
@@ -132,6 +130,14 @@ class LoginPage extends Page
         }
 
         return $line;
+    }
+
+    /** The site's name from Site settings — which project this login opens — or the product brand until it is set. */
+    private function heading(): string
+    {
+        $siteName = trim((string) app(Settings::class)->get('site.name', ''));
+
+        return $siteName !== '' ? $siteName : $this->brand();
     }
 
     private function brand(): string
