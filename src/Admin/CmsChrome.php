@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Panels\Chrome;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Settings\Settings;
 
 /**
  * CMS shell chrome for the full-width top bar layout. The brand and
@@ -45,13 +46,21 @@ class CmsChrome extends Chrome
             $s->notifications(),
             $this->inbox($s),
             $s->action('view-site')
-                ->label(__('tbtop-cms::chrome.view_site.label'))
+                ->label($this->siteLabel())
                 ->icon('external-link')
                 ->tooltip(__('tbtop-cms::chrome.view_site.tooltip'))
                 ->size('sm')
                 ->url('/')->openUrlInNewTab(),
             $s->userMenu(['locales' => false]),
         ];
+    }
+
+    /** The site's name from Site settings — says which project this panel runs — or a generic label until it is set. */
+    private function siteLabel(): string
+    {
+        $siteName = trim((string) app(Settings::class)->get('site.name', ''));
+
+        return $siteName !== '' ? $siteName : __('tbtop-cms::chrome.view_site.label');
     }
 
     /** Inbox link with an unread-lead count badge. */
