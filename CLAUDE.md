@@ -33,11 +33,6 @@ run the same tools against git-changed PHP files — prefer them during developm
 Headless checks: `vendor/bin/testbench route:list`, `vendor/bin/testbench tinker
 --execute=…`, or a one-off Pest test on the existing TestCase.
 
-Parallel agents each get their own git worktree. On a tree another agent is
-writing to, stage by exact pathspec and leave `git stash`, `reset`,
-`commit --amend` and `lint:changed` unused — each one rewrites the other
-agent's work.
-
 Workbench quirks:
 
 - `composer serve` needs `CACHE_STORE=array`: the seeder bumps the content-version
@@ -56,7 +51,7 @@ Workbench quirks:
   (seeded admin@admin.com / password).
 - Workbench has no SSR, so JSON-LD and props are not in the HTML body: read them
   from the JSON in `<script data-page>` of the GET response.
-- The sibling tbtop demo app often holds the usual ports. Check
+- The tbtop demo app often holds the usual ports. Check
   `lsof -iTCP:<port>` and pass another `--port` rather than stopping a server
   you did not start.
 
@@ -90,16 +85,13 @@ in filename order, and only listed files are loaded.
 
 The admin chrome (header, notifications, tabs, fields, slide-overs) and the PHP
 DSL (`S`, `Page`, `Column`, actions) are not in this repo. They come from the
-monorepo DiVotek/tbtop, checked out next to this one at `../tbtop`:
+monorepo https://github.com/DiVotek/tbtop: `packages/php` is composer
+`tbtop/admin`, `packages/client` is npm `@tbtop/inertia-admin`. Admin UI bugs
+are fixed there — check its open PRs for the same fix first.
 
-- `packages/php` → composer `tbtop/admin`; installed copy at
-  `vendor/tbtop/admin/packages/php/src` (there is no `vendor/tbtop/admin/src`).
-  Field builders resolve through `S::__call` to `Dsl/Fields/<Name>.php`.
-- `packages/client` → npm `@tbtop/inertia-admin`; fix admin UI bugs in
-  `../tbtop/packages/client/src`, after checking open tbtop PRs for the same fix.
-- `apps/demo/app/Admin` → working examples of the DSL.
-- Its agent guide: `vendor/tbtop/admin/docs/ai/` (`authoring-pages.md`,
-  `fields.md`). The vendor copy is the version in use; `../tbtop` may be ahead.
+Read the installed version in vendor: its agent guide is
+`vendor/tbtop/admin/docs/ai/`, its PHP source
+`vendor/tbtop/admin/packages/php/src` (there is no `vendor/tbtop/admin/src`).
 
 Bump `tbtop/admin` in `composer.json` and `@tbtop/inertia-admin` in
 `package.json` together. `bun.lock` is committed, `composer.lock` is not.
