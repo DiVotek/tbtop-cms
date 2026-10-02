@@ -24,7 +24,8 @@ those boundaries are the whole architecture:
 
 The admin panel is `tbtop/admin`: block forms use its `S` field DSL, admin
 pages its `Page` class. Its own guide is at `vendor/tbtop/admin/docs/ai/`
-(`fields.md` for every field type) — this guide never restates it.
+(`fields.md` for every field type) — this guide never restates it. Its PHP
+source is under `vendor/tbtop/admin/packages/php/src/`.
 
 ## Where does my code go
 

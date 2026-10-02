@@ -17,7 +17,9 @@ Translatable (spatie/laravel-translatable, `$translatable`), stored as
 `['uk' => 'Головна', 'en' => 'Home', ...]` per locale: `name`, `title`,
 `heading`, `summary`, `body`. Read/write a locale with
 `getTranslation('name', $locale)` / `setTranslations('name', [...])`, or
-assign the whole array through `fill()`/mass assignment.
+assign the whole array through `fill()`/mass assignment. `body` is admin-only
+richtext and never reaches the frontend `page` prop; what the frontend renders
+is `content`, the block list.
 
 Plain (not translatable): `type`, `source_id`, `parent_id`, `status`,
 `published_at`, `unpublish_at`, `content` (array cast, block envelope — see
