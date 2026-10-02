@@ -155,7 +155,7 @@ it('still renders a layout-only kind on the frontend and still shows its edit ta
     // The block's own edit tab still shows (tabs go through has()/get(), not the filtered list).
     $tabs = PageEditHelpers::formTabs($page->id);
     $labels = array_column($tabs, 'label');
-    expect($labels)->toContain('LayoutOnly');
+    expect($labels)->toContain('Layout Only');
 });
 
 /** @return array<string, mixed> */

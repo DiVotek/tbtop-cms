@@ -155,7 +155,7 @@ return [
         'type' => 'Block type',
         'active' => 'Active',
         'sort' => 'Order',
-        'add' => 'Add :kind',
+        'add' => 'Add',
         'added' => 'Block added (inactive) and saved. Configure and activate it when ready.',
         'remove' => 'Remove block',
         'remove_title' => 'Remove block?',
