@@ -117,3 +117,26 @@ it('drops a block with a duplicate id, keeping the first occurrence', function (
         ->assertJsonPath('props.render.elements.$root.children', ['hero-1'])
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'First');
 });
+
+it('ships the Body as HTML in page props, falling back to the default locale when the active one is blank', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $paragraph = static fn (string $text): array => [
+        'root' => ['type' => 'root', 'children' => [
+            ['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => $text, 'format' => 0]]],
+        ]],
+    ];
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        // The editor saves an empty document for every locale it showed.
+        'body' => ['en' => $paragraph('English body'), 'uk' => ['root' => ['type' => 'root', 'children' => []]]],
+        'content' => [],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.page.body', '<p>English body</p>');
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.page.body', '<p>English body</p>');
+});
