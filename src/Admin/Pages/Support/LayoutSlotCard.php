@@ -66,13 +66,13 @@ class LayoutSlotCard
         return $s->flex([
             $text,
             $s->displayValue(__('tbtop-cms::layout.blocks.inactive_badge'))
-                ->badge([__('tbtop-cms::layout.blocks.inactive_badge') => Color::Gray]),
+                ->badge([__('tbtop-cms::layout.blocks.inactive_badge') => ['color' => Color::Gray]]),
         ], align: 'center');
     }
 
     private static function footer(S $s, string $slot, ?Layout $layout): Node
     {
-        $editAction = $s->action('edit-' . $slot)->label(__('tbtop-cms::layout.actions.edit'))->visit(
+        $editAction = $s->action('edit-' . $slot)->label(__('tbtop-cms::layout.actions.edit'))->url(
             route('tbtop.cms.layout-edit-page', ['slot' => $slot]),
         );
 

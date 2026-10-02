@@ -49,7 +49,7 @@ class CmsChrome extends Chrome
                 ->icon('external-link')
                 ->tooltip(__('tbtop-cms::chrome.view_site.tooltip'))
                 ->size('sm')
-                ->visit('/', newTab: true),
+                ->url('/')->openUrlInNewTab(),
             $s->userMenu(['locales' => false]),
         ];
     }
@@ -63,7 +63,7 @@ class CmsChrome extends Chrome
             ->icon('inbox')
             ->tooltip(__('tbtop-cms::chrome.inbox.tooltip'))
             ->size('sm')
-            ->visit('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions');
+            ->url('/' . trim((string) config('tbtop-cms.admin.prefix', 'admin'), '/') . '/form-submissions');
 
         // authorize() takes a non-null string and an undefined gate denies —
         // with roles off, calling it unconditionally would hide the inbox

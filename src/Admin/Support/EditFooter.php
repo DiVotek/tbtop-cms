@@ -19,7 +19,7 @@ final class EditFooter
     {
         $cancel = $s->action('cancel')
             ->label(__('tbtop-cms::common.actions.cancel'))
-            ->visit($cancelUrl);
+            ->url($cancelUrl);
 
         $children = $delete !== null
             ? [$delete, $s->spacer(), $cancel, $save]

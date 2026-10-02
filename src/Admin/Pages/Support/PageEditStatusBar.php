@@ -118,7 +118,7 @@ final class PageEditStatusBar
         $state = $page->displayState();
         $label = __('tbtop-cms::pages.status.' . $state->value);
 
-        return $s->displayValue($label)->badge([$label => self::colorFor($state)]);
+        return $s->displayValue($label)->badge([$label => ['color' => self::colorFor($state)]]);
     }
 
     private static function colorFor(PageDisplayState $state): string

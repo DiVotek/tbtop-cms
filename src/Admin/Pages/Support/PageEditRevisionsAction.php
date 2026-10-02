@@ -114,7 +114,7 @@ final class PageEditRevisionsAction
             $s->spacer(),
             $isNewest
                 ? $s->displayValue(__('tbtop-cms::pages.revisions.current'))->badge([
-                    __('tbtop-cms::pages.revisions.current') => 'success',
+                    __('tbtop-cms::pages.revisions.current') => ['color' => 'success'],
                 ])
                 : self::restoreAction($s, $page, $revision),
         ], align: 'center', gap: 3, variant: 'card');

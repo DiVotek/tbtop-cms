@@ -77,9 +77,9 @@ class SiteHealthPage extends AdminPage
                 Column::make('status')->label(__('tbtop-cms::health.columns.status'))
                     ->formatUsing($this->statusLabel(...))
                     ->badge([
-                        __('tbtop-cms::health.statuses.ok') => Color::Success,
-                        __('tbtop-cms::health.statuses.warning') => Color::Warning,
-                        __('tbtop-cms::health.statuses.error') => Color::Danger,
+                        __('tbtop-cms::health.statuses.ok') => ['color' => Color::Success],
+                        __('tbtop-cms::health.statuses.warning') => ['color' => Color::Warning],
+                        __('tbtop-cms::health.statuses.error') => ['color' => Color::Danger],
                     ]),
                 Column::make('label')->label(__('tbtop-cms::health.columns.check'))->emphasized(),
                 Column::make('message')->label(__('tbtop-cms::health.columns.message'))->wrap(),

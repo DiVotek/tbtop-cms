@@ -92,10 +92,10 @@ class FormSubmissionsPage extends AdminPage
                 Column::make('lead_status')->label(__('tbtop-cms::form-submissions.columns.status'))
                     ->formatUsing($this->leadStatusLabel(...))
                     ->badge([
-                        __('tbtop-cms::form-submissions.statuses.new') => Color::Danger,
-                        __('tbtop-cms::form-submissions.statuses.read') => Color::Info,
-                        __('tbtop-cms::form-submissions.statuses.processed') => Color::Success,
-                        __('tbtop-cms::form-submissions.statuses.discarded') => Color::Gray,
+                        __('tbtop-cms::form-submissions.statuses.new') => ['color' => Color::Danger],
+                        __('tbtop-cms::form-submissions.statuses.read') => ['color' => Color::Info],
+                        __('tbtop-cms::form-submissions.statuses.processed') => ['color' => Color::Success],
+                        __('tbtop-cms::form-submissions.statuses.discarded') => ['color' => Color::Gray],
                     ]),
                 Column::make('created_at')->label(__('tbtop-cms::form-submissions.columns.submitted'))
                     ->datetime(__('tbtop-cms::form-submissions.date_format'))->muted(),

@@ -201,7 +201,7 @@ class PageEditPage extends AdminPage
         $path = $this->page()->pathFor($this->defaultLocale());
 
         return $s->action('pageEditView')->label(__('tbtop-cms::pages.actions.view_on_site'))
-            ->icon('external-link')->visit('/' . ltrim((string) $path, '/'), newTab: true);
+            ->icon('external-link')->url('/' . ltrim((string) $path, '/'))->openUrlInNewTab();
     }
 
     /**

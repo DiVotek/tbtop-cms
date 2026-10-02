@@ -91,7 +91,7 @@ class FormSubmissionPage extends AdminPage
     private function footer(S $s): Node
     {
         $back = $s->action('back')->label(__('tbtop-cms::form-submissions.actions.close'))
-            ->visit(route('tbtop.cms.form-submissions-page'));
+            ->url(route('tbtop.cms.form-submissions-page'));
 
         return $s->flex([$this->deleteAction($s), $s->spacer(), $back], justify: 'end');
     }
@@ -107,9 +107,9 @@ class FormSubmissionPage extends AdminPage
                 $s,
                 __('tbtop-cms::form-submissions.columns.delivery'),
                 $s->displayValue($this->deliveryLabel($submission->status))->badge([
-                    __('tbtop-cms::form-submissions.delivery.pending') => 'warning',
-                    __('tbtop-cms::form-submissions.delivery.handled') => 'success',
-                    __('tbtop-cms::form-submissions.delivery.failed') => 'danger',
+                    __('tbtop-cms::form-submissions.delivery.pending') => ['color' => 'warning'],
+                    __('tbtop-cms::form-submissions.delivery.handled') => ['color' => 'success'],
+                    __('tbtop-cms::form-submissions.delivery.failed') => ['color' => 'danger'],
                 ]),
             ),
         ];
