@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Frontend\Seo;
 
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Settings\SiteContacts;
 
 /**
  * The site identity node's type rules and its organisation details, read
@@ -52,7 +53,12 @@ final class SiteIdentity
 
     private const string TIME_PATTERN = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
 
-    public function __construct(private readonly Settings $settings) {}
+    private readonly SiteContacts $contacts;
+
+    public function __construct(private readonly Settings $settings, ?SiteContacts $contacts = null)
+    {
+        $this->contacts = $contacts ?? new SiteContacts($settings);
+    }
 
     public function type(): string
     {
@@ -109,8 +115,9 @@ final class SiteIdentity
 
         $properties = array_filter([
             'legalName' => $this->string('seo.identity.legal_name'),
-            'telephone' => $this->string('seo.identity.telephone'),
-            'email' => $this->string('seo.identity.email'),
+            // An explicit SEO value wins; otherwise the first Site-settings contact.
+            'telephone' => $this->string('seo.identity.telephone') ?: ($this->contacts->phones()[0] ?? ''),
+            'email' => $this->string('seo.identity.email') ?: ($this->contacts->emails()[0] ?? ''),
         ], static fn (string $value): bool => $value !== '');
 
         $address = $this->address($locale, $defaultLocale);
