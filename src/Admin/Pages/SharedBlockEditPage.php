@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Cms\Admin\Pages\Support\BlockPicker;
+use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
 use Tbtop\Cms\Admin\Pages\Support\SharedBlockForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
@@ -73,22 +74,19 @@ class SharedBlockEditPage extends Page
         return $s->stack([$form]);
     }
 
-    /** Where the block is placed: an edit here changes every page listed. */
+    /** Where the block is placed: an edit here changes every page and slot listed. */
     private function usage(S $s, SharedBlock $block): Node
     {
-        $pages = SharedBlockUsage::pagesUsing((int) $block->getKey());
-        $hasEdit = Route::has('tbtop.cms.page-edit-page');
+        $containers = SharedBlockUsage::using((int) $block->getKey());
 
-        $rows = [$s->displayText(trans_choice('tbtop-cms::shared-blocks.usage_count', count($pages)))->variant('muted')];
-        foreach ($pages as $page) {
-            $name = $this->pageName($page);
-            $rows[] = $hasEdit
-                ? $s->flex([
-                    $s->action('sharedBlockUsage_' . $page->getKey())->label($name)
-                        ->url(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()])),
-                    $s->spacer(),
-                ])
-                : $s->displayText($name);
+        $rows = [$s->displayText(trans_choice('tbtop-cms::shared-blocks.usage_count', count($containers)))->variant('muted')];
+        foreach ($containers as $i => $container) {
+            [$name, $url] = $container instanceof CmsPage
+                ? [$this->pageName($container), Route::has('tbtop.cms.page-edit-page') ? route('tbtop.cms.page-edit-page', ['page' => $container->getKey()]) : null]
+                : [LayoutForm::label($container->slot), Route::has('tbtop.cms.layout-edit-page') ? route('tbtop.cms.layout-edit-page', ['slot' => $container->slot]) : null];
+            $rows[] = $url === null
+                ? $s->displayText($name)
+                : $s->flex([$s->action('sharedBlockUsage_' . $i)->label($name)->url($url), $s->spacer()]);
         }
 
         return $s->section(['title' => __('tbtop-cms::shared-blocks.usage_title'), 'variant' => 'plain'], [$s->stack($rows, ['gap' => 1])]);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Layout\Models\Layout;
+use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
@@ -139,6 +141,49 @@ it('refuses to delete a shared block that pages still place, and hides delete on
 
     $this->postJson("/admin/shared-blocks/actions/sharedBlockDelete_{$shared->id}", ['payload' => []])->assertNotFound();
     expect(SharedBlock::count())->toBe(1);
+});
+
+it('counts a layout slot as a placement and refuses to delete a block a slot still references', function (): void {
+    $shared = sharedSimple();
+    Layout::query()->create(['slot' => Slots::FOOTER, 'content' => [['id' => 'f1', 'kind' => 'Simple', 'active' => true, 'shared' => $shared->id, 'data' => []]]]);
+
+    $edit = json_encode(sharedActing()->get("/admin/shared-blocks/{$shared->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'), JSON_UNESCAPED_SLASHES);
+    expect($edit)->toContain('/admin/layout/' . Slots::FOOTER . '/edit');
+
+    $structure = json_encode($this->get('/admin/shared-blocks', ['X-Inertia' => 'true'])->assertOk()->json('props.structure'));
+    expect($structure)->not->toContain("sharedBlockDelete_{$shared->id}");
+});
+
+it('rechecks usage when deleting, so a placement made after the card rendered is not orphaned', function (): void {
+    $shared = sharedSimple();
+    // Build the delete handler while the block is unplaced, then place it before the handler runs.
+    $structure = json_encode(sharedActing()->get('/admin/shared-blocks', ['X-Inertia' => 'true'])->assertOk()->json('props.structure'));
+    expect($structure)->toContain("sharedBlockDelete_{$shared->id}");
+
+    SharedBlock::query()->getConnection()->beforeExecuting(static function (string $sql) use ($shared): void {
+        static $placed = false;
+        // The handler's own find(): the page structure (and its usage scan) is already built by then.
+        if (! $placed && str_contains($sql, 'tbtop_shared_blocks') && str_contains($sql, 'limit 1')) {
+            $placed = true;
+            sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'shared' => $shared->id, 'data' => []]]);
+        }
+    });
+
+    $response = $this->postJson("/admin/shared-blocks/actions/sharedBlockDelete_{$shared->id}", ['payload' => []])->assertOk();
+
+    expect($response->json('effects.0.kind'))->toBe('notify')
+        ->and($response->json('effects.0.level'))->toBe('error')
+        ->and(SharedBlock::count())->toBe(1);
+});
+
+it('shows a reference whose target has another kind as missing, with no edit or detach', function (): void {
+    $other = SharedBlock::query()->create(['name' => 'Other', 'kind' => 'Hero', 'data' => []]);
+    $page = sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $other->id, 'data' => []]]);
+
+    $tabs = PageEditHelpers::formTabs($page->id);
+    $json = json_encode($tabs[2]);
+    expect($tabs[2]['label'])->toBe("Simple · #{$other->id}")
+        ->and($json)->not->toContain('pageBlockDetach_ref1')->not->toContain('pageBlockEditShared_ref1');
 });
 
 it('deletes a shared block nothing places', function (): void {

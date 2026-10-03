@@ -604,12 +604,13 @@ a pointer whose target has another kind, or no longer exists, resolves to
 the same "missing shared block" error as any broken block (thrown in
 `blocks.strict`, a placeholder otherwise) — the data stays in the page, the
 editor says which block is missing. Deleting a shared block that pages still
-place has no delete button — its card shows the page count instead;
-`SharedBlockUsage` scans page content for the pointers. Saving or deleting a shared block fires
+place has no delete button — its card shows the placement count instead —
+and the delete handler re-checks before deleting; `SharedBlockUsage` scans
+page content and layout slots for the pointers. Saving or deleting a shared block fires
 `SharedBlockSaved` / `SharedBlockDeleted`, which bump the content cache like
 a page save does. Layout slots accept the same `shared` pointer in their
-content rows (the resolver is the same), but the layout editor has no UI for
-placing one.
+content rows (the resolver is the same) and count as placements, but the
+layout editor has no UI for placing one.
 
 ## Where does my code go
 

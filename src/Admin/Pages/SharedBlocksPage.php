@@ -183,8 +183,8 @@ class SharedBlocksPage extends AdminPage
 
     /**
      * Built only while nothing places the block — the usage line says why the
-     * button is absent — so the server never registers a delete for a block
-     * in use: a stale page posting one gets a 404, not a deleted block.
+     * button is absent — and the handler checks again: a placement made
+     * between render and click must not leave a dangling reference.
      */
     private function deleteAction(S $s, SharedBlock $block): ActionBuilder
     {
@@ -198,6 +198,11 @@ class SharedBlocksPage extends AdminPage
                 $block = SharedBlock::query()->find($id);
                 if (! $block instanceof SharedBlock) {
                     return Effects::make()->redirect(route('tbtop.cms.shared-blocks-page'));
+                }
+
+                $inUse = count(SharedBlockUsage::using($id));
+                if ($inUse > 0) {
+                    return Effects::make()->notify(trans_choice('tbtop-cms::shared-blocks.actions.delete_in_use', $inUse), 'error');
                 }
 
                 $block->delete();

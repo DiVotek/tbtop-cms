@@ -223,7 +223,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `PageRestored` | `src/Page/Events/PageRestored.php` | `PagesPage` restore action | `Page $page` |
 | `LayoutSaved` | `src/Layout/Events/LayoutSaved.php` | `LayoutForm::save()` after `Layout::updateOrCreate` | `Layout $layout` |
 | `SharedBlockSaved` | `src/SharedBlock/Events/SharedBlockSaved.php` | `SharedBlockForm::create()` / `update()` after the write | `SharedBlock $block` |
-| `SharedBlockDeleted` | `src/SharedBlock/Events/SharedBlockDeleted.php` | `SharedBlocksPage` delete action, after `delete()` (offered only while no page places the block) | `SharedBlock $block` |
+| `SharedBlockDeleted` | `src/SharedBlock/Events/SharedBlockDeleted.php` | `SharedBlocksPage` delete action, after `delete()` (offered only while nothing places the block, re-checked server-side) | `SharedBlock $block` |
 | `LanguagesChanged` | `src/Language/Events/LanguagesChanged.php` | `LanguageObserver`, on any create/update/soft-delete/restore/force-delete of a `Language` | none |
 | `SettingsSaved` | `src/Settings/Events/SettingsSaved.php` | `SettingsForm::apply()`, once per form submission that wrote at least one key | `array $keys` (dotted store keys written) |
 | `SubmissionReceived` | `src/Form/Events/SubmissionReceived.php` | `FormSubmitController::__invoke()`, after validation and storage, before `handleSubmit()` | `?FormSubmission $submission`, `array $payload`, `Page $page`, `string $blockId`, `string $locale` |

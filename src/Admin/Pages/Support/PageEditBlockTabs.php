@@ -132,7 +132,13 @@ final class PageEditBlockTabs
     {
         $id = (string) $block['id'];
         $kind = (string) $block['kind'];
+        // The row's kind decides the component (as in the resolver): a target
+        // of another kind is as unusable as a deleted one, and must not be
+        // detached into this row.
         $source = SharedBlock::query()->find($shared);
+        if ($source instanceof SharedBlock && $source->kind !== $kind) {
+            $source = null;
+        }
         $label = BlockPicker::label($registry, $kind);
 
         $info = $source instanceof SharedBlock

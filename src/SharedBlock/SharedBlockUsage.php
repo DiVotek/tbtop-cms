@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\SharedBlock;
 
+use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
- * Which pages reference each shared block. Read from every page's envelope
- * rather than a join table: the pointer lives inside the JSON content, and a
- * page save is the only thing that changes it.
+ * Which pages and layout slots reference each shared block. Read from
+ * every container's envelope rather than a join table: the pointer lives
+ * inside the JSON content, and a page or layout save is the only thing
+ * that changes it. Layouts count because the resolver honours a pointer
+ * there too — a shared block a slot places must not look deletable.
  */
 final class SharedBlockUsage
 {
-    /** @return array<int, list<Page>> pages by shared block id, in page sort order */
+    /** @return array<int, list<Page|Layout>> containers by shared block id, pages in sort order then layouts */
     public static function index(): array
     {
         $index = [];
@@ -23,17 +26,22 @@ final class SharedBlockUsage
                 $index[$ref][] = $page;
             }
         }
+        foreach (Layout::query()->orderBy('slot')->get() as $layout) {
+            foreach (self::refsIn($layout->content) as $ref) {
+                $index[$ref][] = $layout;
+            }
+        }
 
         return $index;
     }
 
-    /** @return list<Page> */
-    public static function pagesUsing(int $id): array
+    /** @return list<Page|Layout> */
+    public static function using(int $id): array
     {
         return self::index()[$id] ?? [];
     }
 
-    /** @return list<int> distinct shared ids a page's content points at */
+    /** @return list<int> distinct shared ids a content list points at */
     public static function refsIn(mixed $content): array
     {
         $refs = [];

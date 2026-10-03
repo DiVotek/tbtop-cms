@@ -15,7 +15,7 @@ return [
         'kind' => 'Block type',
         'usage' => 'Used on',
     ],
-    'usage_count' => '{0} Not placed on any page|{1} Placed on :count page|[2,*] Placed on :count pages',
+    'usage_count' => '{0} Not placed anywhere|{1} Placed in :count place|[2,*] Placed in :count places',
     'usage_title' => 'Where it is placed',
     'tabs' => [
         'all' => 'All',
@@ -39,6 +39,7 @@ return [
         'delete' => 'Delete',
         'delete_title' => 'Delete shared block?',
         'delete_confirm' => 'The block is placed on no page; this cannot be undone.',
+        'delete_in_use' => '{1} Still placed in :count place — remove it there first.|[2,*] Still placed in :count places — remove it there first.',
         'deleted' => 'Shared block deleted',
     ],
     'share' => [
