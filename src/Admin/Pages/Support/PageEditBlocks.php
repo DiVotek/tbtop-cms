@@ -6,8 +6,10 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Fields\BlockContent;
+use Tbtop\Cms\Block\BlockEnvelope;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\TypeBlocks;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 
 /**
@@ -44,11 +46,13 @@ final class PageEditBlocks
             $kind = (string) $block['kind'];
 
             $shared = SharedBlocks::refOf($block);
+            $owner = TypeBlocks::ownerOf($block);
             $rows[] = [
                 'id' => $id,
                 'kind' => $kind,
                 'active' => self::activeFor($form, $id, $block),
                 'sort' => self::sortFromForm($form, $id, $block),
+                ...($owner !== null ? ['owner' => $owner] : []),
                 // A shared reference has no field tab: the pointer is the whole row.
                 ...($shared !== null ? ['shared' => $shared]
                     : ($registry->has($kind) ? self::dataFor($form, $id, $registry, $kind) : self::existingData($block))),
@@ -56,6 +60,38 @@ final class PageEditBlocks
         }
 
         usort($rows, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
+
+        // Rows of another type have no tab and no form keys: they ride along
+        // unchanged so a save never loses them (see TypeBlocks).
+        return [...$rows, ...self::dormant($page)];
+    }
+
+    /**
+     * Dormant envelope entries re-shaped as rows (flat data + envelope keys),
+     * the same shape BlockContent::toRows() gives the create form, so
+     * toEnvelope() folds them back without nesting their `data`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function dormant(Page $page): array
+    {
+        $rows = [];
+        foreach (BlockEnvelope::blocksOf($page->getAttribute('content')) as $block) {
+            $owner = TypeBlocks::ownerOf($block);
+            if ($owner === null || $owner === $page->type) {
+                continue;
+            }
+            $shared = SharedBlocks::refOf($block);
+            $rows[] = [
+                ...self::existingData($block),
+                'id' => (string) ($block['id'] ?? ''),
+                'kind' => (string) ($block['kind'] ?? ''),
+                'active' => (bool) ($block['active'] ?? true),
+                'owner' => $owner,
+                ...(is_int($block['sort'] ?? null) ? ['sort' => $block['sort']] : []),
+                ...($shared !== null ? ['shared' => $shared] : []),
+            ];
+        }
 
         return $rows;
     }
@@ -88,7 +124,7 @@ final class PageEditBlocks
         $blocks = [];
         $index = 0;
         foreach ($content as $block) {
-            if (is_array($block) && isset($block['id'], $block['kind'])) {
+            if (is_array($block) && isset($block['id'], $block['kind']) && (TypeBlocks::ownerOf($block) ?? $page->type) === $page->type) {
                 $block['sort'] = self::sortFor($block, $index);
                 $blocks[] = $block;
             }

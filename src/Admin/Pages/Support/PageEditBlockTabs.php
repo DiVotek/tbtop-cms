@@ -10,10 +10,13 @@ use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\TypeBlock;
+use Tbtop\Cms\Page\TypeBlocks;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Tbtop\Cms\SharedBlock\SharedBlockUsage;
@@ -36,8 +39,13 @@ final class PageEditBlockTabs
         $registry = app(BlockRegistry::class);
         $tabs = [];
 
+        $typeBlocks = app(TypeBlocks::class);
+
         foreach (PageEditBlocks::blocks($page) as $block) {
-            $tabs[] = self::blockTab($s, $page, $registry, $block);
+            // A general type block has no tab: PageEditTypeFields puts its form on the General tab.
+            if (! $typeBlocks->isGeneral($block)) {
+                $tabs[] = self::blockTab($s, $page, $registry, $block);
+            }
         }
 
         $tabs[] = self::addBlockTab($s, $page, $registry);
@@ -99,17 +107,21 @@ final class PageEditBlockTabs
             )
             : [];
 
+        // A type-owned block is part of the page type: it cannot be removed
+        // (its fields would go with it) nor shared, only switched off or moved.
+        $isOwned = TypeBlocks::ownerOf($block) !== null;
+
         $body = $s->stack([
             ...$fields,
             $s->flex([
                 $s->boolean("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
                 $s->number("block_{$id}_sort")->label(__('tbtop-cms::pages.blocks.sort')),
             ], gap: 4, align: 'end'),
-            $s->flex([
+            ...($isOwned ? [] : [$s->flex([
                 self::removeAction($s, $page, $id),
                 $s->spacer(),
                 ...($registry->has($kind) ? [self::shareAction($s, $page, $registry, $id, $kind)] : []),
-            ]),
+            ])]),
         ]);
 
         $tab = ['label' => BlockPicker::label($registry, $kind), 'body' => $body];
@@ -287,7 +299,7 @@ final class PageEditBlockTabs
      * filtered to the form's schema). Inactive blocks never trip the gate:
      * PrefixedField::rename() conditions their `required` on the active flag.
      */
-    private static function skipsGate(Page $page): bool
+    public static function skipsGate(Page $page): bool
     {
         return $page->status !== PageStatus::Published;
     }
@@ -301,7 +313,7 @@ final class PageEditBlockTabs
      * @param  list<array<string, mixed>>  $rows
      * @return array<string, mixed>
      */
-    private static function structuralForm(array $form, Page $page, array $rows): array
+    public static function structuralForm(array $form, Page $page, array $rows): array
     {
         return [...$form, 'content' => $rows, 'status' => $page->status->value];
     }
@@ -310,7 +322,7 @@ final class PageEditBlockTabs
     {
         $rows = array_values(array_filter(
             PageEditBlocks::toRows($ctx->form, $page),
-            static fn (array $row): bool => (string) $row['id'] !== $id,
+            static fn (array $row): bool => (string) $row['id'] !== $id || TypeBlocks::ownerOf($row) !== null,
         ));
 
         // Same stale-form guard as PageEditPage::save() — this action saves
@@ -338,7 +350,7 @@ final class PageEditBlockTabs
             'label' => __('tbtop-cms::pages.tabs_edit.add_block'),
             'body' => BlockPicker::build(
                 $s,
-                $registry->forPlacement($page->type),
+                self::offered($registry, $page),
                 static fn (string $kind): ActionBuilder => $shared->has($kind)
                     ? self::addChoiceAction($s, $page, $registry, $kind, $shared->get($kind)->all(), $usage)
                     : self::addAction($s, $page, $kind),
@@ -423,6 +435,27 @@ final class PageEditBlockTabs
 
         return Effects::make()->notify(__('tbtop-cms::pages.blocks.added'))
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
+    }
+
+    /**
+     * The kinds "+ Add block" offers: the type's placement minus the general
+     * kinds of every type (those live on a General tab, never in the flow)
+     * and minus the kinds this page's type already carries.
+     *
+     * @return array<string, Block>
+     */
+    private static function offered(BlockRegistry $registry, Page $page): array
+    {
+        $typeBlocks = app(TypeBlocks::class);
+        $excluded = [
+            ...$typeBlocks->generalKinds(),
+            ...array_map(static fn (TypeBlock $block): string => $block->kind, $typeBlocks->declared($page->type)),
+        ];
+
+        return array_filter(
+            $registry->forPlacement($page->type),
+            static fn (Block $block): bool => ! in_array($block->kind(), $excluded, true),
+        );
     }
 
     /**

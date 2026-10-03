@@ -371,6 +371,62 @@ has one; `source($page)` must handle a null `source_id` itself.
 `template()` is called on every render with no caching between the call
 and block resolution — an expensive template build costs a full request.
 
+## Page subtypes
+
+The editor picks a type in two steps: "Type" lists the top-level types,
+"Subtype" the types whose `base()` is `page` (plus "— none —" = a plain
+page) and is hidden unless "Type" is page. `PageTypeInterface::base()`
+returns the type's own key by default; a host type that is a kind of page
+returns `'page'`:
+
+```php
+public function base(): string { return 'page'; }
+```
+
+The page stores one key either way (`src/Page/PageSubtype.php` folds the
+two selects into `type` on save and splits it on load), so `allowedChildren`,
+type blocks and anything keyed on `type` see the subtype's key. Subtypes of
+category and article are not offered yet.
+
+## Type blocks
+
+A page type can carry blocks of its own: `PageTypeInterface::blocks()`
+returns a list of `TypeBlock` (empty from `BasePageType`), each either
+`TypeBlock::content('Kind')` — a block in the content flow, with its own
+tab, `active` and `sort` like any other — or `TypeBlock::general('Kind')`,
+whose form sits on the General tab (under the page's own fields) and whose
+resolved props ship as the `page.fields` prop and as `ResolveContext::field()`
+for every other block on the page. Both kinds are ordinary registered
+`Block` classes; a general one needs no React component — `cms:blocks:types`
+leaves it out of the registry and "+ Add block" never offers it.
+
+```php
+public function blocks(): array
+{
+    return [TypeBlock::general('ContactsGeneral'), TypeBlock::content('ContactDetails')];
+}
+```
+
+How it is stored and what the rules are (`src/Page/TypeBlocks.php`):
+
+- The rows live in the page's `content` envelope with `owner` set to the
+  type key. `PageObserver::saving` adds any declared row the page lacks, so
+  every path that saves a page (form, seeder, API, revision restore) gets
+  them — a seeder may create a page of the type with `content => []` and
+  fill the rows afterwards.
+- An owned row has no "Remove block" or "Make shared" in the editor, "+ Add block" does not offer its kind again, and no
+  `pageBlockRemove_{id}` action is registered for it. It can be switched
+  off and reordered. Editor-added and shared blocks interleave freely by
+  `sort`.
+- A type switch keeps the old type's rows **dormant**: still in `content`,
+  not shown in the editor, not resolved on the site, carried through every
+  save unchanged. Switching back wakes them with their data. The General tab
+  shows a "Hidden data of another page type" section with a
+  `pageTypeBlocksPurge` action that drops them; revisions keep every version.
+- `BlockContentResolver::resolveWithFields()` is the render entry:
+  `{blocks, fields}`; `resolve()` returns the blocks only. Both skip dormant
+  rows when given a page.
+
 ## Revisions
 
 Config-gated content-snapshot history per page, `config('tbtop-cms.revisions.keep', 25)`

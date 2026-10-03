@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Page\Contracts;
 
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\TypeBlock;
 
 interface PageTypeInterface
 {
@@ -51,4 +52,21 @@ interface PageTypeInterface
      * @return non-empty-list<string>
      */
     public function schemaTypes(): array;
+
+    /**
+     * The type this one is a subtype of, or its own key for a top-level
+     * type. The editor offers top-level types in "Type" and the subtypes of
+     * `page` in "Subtype"; the stored `type` is always this type's key.
+     */
+    public function base(): string;
+
+    /**
+     * Blocks every page of this type carries: created with the page, never
+     * removable in the editor, their fields are the type's own fields. A
+     * general block has no place in the content flow — its form shows on
+     * the General tab and its resolved props become the page's `fields`.
+     *
+     * @return list<TypeBlock>
+     */
+    public function blocks(): array;
 }

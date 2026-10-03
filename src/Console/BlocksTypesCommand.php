@@ -16,6 +16,7 @@ use Tbtop\Cms\BlockTypes\RegistryEmitter;
 use Tbtop\Cms\BlockTypes\TypeAliasCollector;
 use Tbtop\Cms\BlockTypes\TypeScriptEmitter;
 use Tbtop\Cms\BlockTypes\UnsupportedShapeException;
+use Tbtop\Cms\Page\TypeBlocks;
 
 class BlocksTypesCommand extends Command
 {
@@ -111,8 +112,11 @@ class BlocksTypesCommand extends Command
             return null;
         }
 
+        // A general type block resolves into page.fields and is never rendered: no component to import.
+        $general = app(TypeBlocks::class)->generalKinds();
+
         return (new RegistryEmitter)->emit(
-            array_values($registry->all()),
+            array_values(array_filter($registry->all(), static fn (Block $block): bool => ! in_array($block->kind(), $general, true))),
             self::relativeModule(dirname($registryPath), $typesPath),
             $componentsImport,
             $componentsDir,
