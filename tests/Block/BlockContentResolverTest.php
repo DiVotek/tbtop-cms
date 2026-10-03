@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockResolutionException;
+use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -36,17 +37,27 @@ it('resolves a block with locale-flattened props', function (): void {
 });
 
 it('does not discard a non-translatable field coincidentally shaped like a locale map', function (): void {
-    $out = app(BlockContentResolver::class)->resolve([
-        ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'data' => [
-            'title' => ['en' => 'Hello', 'uk' => 'Pryvit'],
-            'image' => ['en' => 'not-a-translation', 'url' => '/about'],
-        ]],
-    ]);
+    // Checked at the flattener: the form-driven resolve() keeps only form fields, so the block output cannot show it.
+    $flat = LocaleFlattener::flattenData(
+        ['title' => ['en' => 'Hello', 'uk' => 'Pryvit'], 'image' => ['en' => 'not-a-translation', 'url' => '/about']],
+        'en',
+        'en',
+        ['en', 'uk'],
+        ['title'],
+    );
 
-    expect($out[0]->props)->toBe([
+    expect($flat)->toBe([
         'title' => 'Hello',
         'image' => ['en' => 'not-a-translation', 'url' => '/about'],
     ]);
+});
+
+it('drops input that has no field in the form', function (): void {
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Hello'], 'stray' => 'x']],
+    ]);
+
+    expect($out[0]->props)->toBe(['title' => 'Hello']);
 });
 
 it('leaves a link field value untouched through the flattener', function (): void {

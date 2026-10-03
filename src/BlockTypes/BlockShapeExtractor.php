@@ -16,8 +16,10 @@ use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
 use ReflectionMethod;
 use RuntimeException;
+use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\HandlesFormSubmission;
+use Tbtop\Cms\Block\Support\FormResolver;
 
 /**
  * Reads one block's `resolve()` docblock and turns its `@return array{...}`
@@ -43,7 +45,7 @@ final class BlockShapeExtractor
     public function extract(Block $block): BlockShape
     {
         $kind = $block->kind();
-        $returnType = $this->returnTypeOf($block);
+        $returnType = $this->formType($block) ?? $this->returnTypeOf($block);
 
         // No docblock, `array<string, mixed>`, bare `array`, or any other
         // non-`array{}` top-level type all degrade to the untyped fallback
@@ -117,6 +119,24 @@ final class BlockShapeExtractor
             : ZodConverter::acceptEmptyArray('z.record(z.string(), z.unknown())');
 
         return new BlockShape($kind, $fragment, isTyped: false, usedAliases: []);
+    }
+
+    /**
+     * A block that keeps the base resolve() gets its shape from the form,
+     * printed as the array type FormResolver guarantees and parsed like a
+     * docblock would be — one rule set for the props and their schema. Checked
+     * before the docblock: the base method's own `array<string, mixed>` would
+     * otherwise win and degrade the block to the untyped fallback.
+     */
+    private function formType(Block $block): ?TypeNode
+    {
+        if ((new ReflectionMethod($block, 'resolve'))->getDeclaringClass()->getName() !== Block::class) {
+            return null;
+        }
+
+        $type = (new FormResolver)->phpType($block->form(new S));
+
+        return $this->parser->parse(new TokenIterator($this->lexer->tokenize("/** @return {$type} */")))->getReturnTagValues()[0]->type ?? null;
     }
 
     private function returnTypeOf(Block $block): ?TypeNode
