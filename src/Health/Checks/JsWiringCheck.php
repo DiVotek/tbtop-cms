@@ -33,6 +33,11 @@ final class JsWiringCheck implements HealthCheck
 
     private const string TAILWIND_SOURCE_NEEDLE = 'vendor/tbtop/cms';
 
+    /** An `import { …, Renderer, … } from '@json-render/react'` — the raw renderer that drops a broken block silently. */
+    private const string RAW_RENDERER_IMPORT = '/import\s*\{[^}]*\bRenderer\b[^}]*\}\s*from\s*[\'"]@json-render\/react[\'"]/';
+
+    private const string CMS_RENDERER_IMPORT = '@cms/CmsRenderer';
+
     /**
      * The admin entry comes first: `admin:install` publishes a dedicated
      * resources/js/admin.tsx so the panel bundle stays out of the public
@@ -71,6 +76,7 @@ final class JsWiringCheck implements HealthCheck
             ...$this->checkBlocksImport(),
             ...$this->checkAdminPageComponent(),
             ...$this->checkTailwindSource(),
+            ...$this->checkRawRenderer(),
         ];
 
         if ($problems === []) {
@@ -174,6 +180,46 @@ final class JsWiringCheck implements HealthCheck
         }
 
         return [];
+    }
+
+    /**
+     * Every host source file is scanned, not one entry: the page component or a
+     * layout slot is where `<Renderer>` ends up, and hosts name those freely.
+     * Only reported when `@cms/CmsRenderer` is not imported anywhere — a host
+     * that uses both is adopting it, not missing it.
+     *
+     * @return list<string>
+     */
+    private function checkRawRenderer(): array
+    {
+        $dir = base_path('resources/js');
+
+        if (! File::isDirectory($dir)) {
+            return [];
+        }
+
+        $raw = [];
+        foreach (File::allFiles($dir) as $file) {
+            if (! in_array($file->getExtension(), ['ts', 'tsx', 'js', 'jsx'], true)) {
+                continue;
+            }
+            $source = $this->readFile($file->getPathname());
+            if ($source === null) {
+                continue;
+            }
+            if (str_contains($source, self::CMS_RENDERER_IMPORT)) {
+                return [];
+            }
+            if (preg_match(self::RAW_RENDERER_IMPORT, $source) === 1) {
+                $raw[] = $file->getPathname();
+            }
+        }
+
+        if ($raw === []) {
+            return [];
+        }
+
+        return [__('tbtop-cms::health.checks.js_wiring.hints.raw_renderer', ['paths' => implode(', ', $raw)])];
     }
 
     /** @param  list<string>  $relativeCandidates */

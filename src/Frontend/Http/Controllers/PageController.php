@@ -184,6 +184,10 @@ class PageController
         $nodes = [];
 
         foreach ($resolved as $block) {
+            // A block that failed to resolve has no props to build a node from, and an unregistered kind no class.
+            if ($block->error !== null) {
+                continue;
+            }
             $node = $this->blockRegistry->get($block->kind)->toSchema($block->props, $ctx);
 
             if ($node !== null) {

@@ -44,6 +44,8 @@ class ShareCmsProps
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
             'layout' => $this->resolveLayout(),
+            // Lets CmsRenderer draw broken-block placeholders where a visitor must never see them.
+            'debug' => (bool) config('app.debug'),
         ]);
 
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));
