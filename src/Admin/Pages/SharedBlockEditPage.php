@@ -164,9 +164,9 @@ class SharedBlockEditPage extends Page
     private function detach(ActionCtx $ctx, SharedBlock $block): Effects
     {
         $container = $this->container((string) ($ctx->row['id'] ?? ''));
-        // This page sits under the design ability; a page is content, so
-        // the detach is gated like the page editor it stands in for.
-        if ($container instanceof CmsPage && ! $this->allows('tbtop-cms.pages')) {
+        // Gated like the editor it stands in for: a page is content, a
+        // layout is design (the ability this page already holds).
+        if ($container !== null && ! $this->allows($container instanceof CmsPage ? 'tbtop-cms.pages' : 'tbtop-cms.design')) {
             abort(403);
         }
         if ($container === null || SharedBlockDetacher::detach($block, $container) === 0) {
