@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Admin\Pages;
 
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
@@ -163,12 +164,24 @@ class SharedBlockEditPage extends Page
     private function detach(ActionCtx $ctx, SharedBlock $block): Effects
     {
         $container = $this->container((string) ($ctx->row['id'] ?? ''));
+        // This page sits under the design ability; a page is content, so
+        // the detach is gated like the page editor it stands in for.
+        if ($container instanceof CmsPage && ! $this->allows('tbtop-cms.pages')) {
+            abort(403);
+        }
         if ($container === null || SharedBlockDetacher::detach($block, $container) === 0) {
             return Effects::make()->notify(__('tbtop-cms::shared-blocks.usage.gone'), 'error')->refreshTable();
         }
 
         return Effects::make()->notify(__('tbtop-cms::shared-blocks.reference.detached'))
             ->redirect(route('tbtop.cms.shared-block-edit-page', ['sharedBlock' => $block->getKey()]));
+    }
+
+    private function allows(string $ability): bool
+    {
+        $gate = CmsAbilities::for($ability);
+
+        return $gate === null || Gate::allows($gate);
     }
 
     /** The table row id is `page:<id>` or `layout:<slot>`. */

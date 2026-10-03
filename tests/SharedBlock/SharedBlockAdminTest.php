@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Layout\Slots;
@@ -179,6 +180,18 @@ it('lists every page and slot placing the block in the usage table, and detaches
         ->and($content[1])->not->toHaveKey('shared')
         ->and($other->fresh()->content[0]['shared'])->toBe($shared->id)
         ->and($page->fresh()->lock_version)->toBeGreaterThan($lockBefore);
+});
+
+it('refuses to detach from a page when the editor lacks the pages ability', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.design', static fn (): bool => true);
+    Gate::define('tbtop-cms.pages', static fn (): bool => false);
+    $shared = sharedSimple();
+    $page = sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []]]);
+
+    sharedActing()->postJson("/admin/shared-blocks/{$shared->id}/edit/actions/sharedBlockUsageDetachConfirm", ['payload' => ['row' => ['id' => "page:{$page->id}"]]])->assertForbidden();
+
+    expect($page->fresh()->content[0]['shared'])->toBe($shared->id);
 });
 
 it('rechecks usage when deleting, so a placement made after the card rendered is not orphaned', function (): void {
