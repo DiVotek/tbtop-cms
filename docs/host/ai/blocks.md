@@ -606,7 +606,10 @@ the same "missing shared block" error as any broken block (thrown in
 editor says which block is missing. Deleting a shared block that pages still
 place has no delete button — its card shows the placement count instead —
 and the delete handler re-checks before deleting; `SharedBlockUsage` scans
-page content and layout slots for the pointers. Saving or deleting a shared block fires
+page content and layout slots for the pointers. The edit page lists those
+placements as a table; each row opens the page or slot editor, or detaches
+the block there (`SharedBlockDetacher`: the content is copied into that
+container, the pointer dropped) without opening the page. Saving or deleting a shared block fires
 `SharedBlockSaved` / `SharedBlockDeleted`, which bump the content cache like
 a page save does. Layout slots accept the same `shared` pointer in their
 content rows (the resolver is the same) and count as placements, but the
