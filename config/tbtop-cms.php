@@ -20,6 +20,8 @@ use Tbtop\Cms\Admin\Pages\ProfilePage;
 use Tbtop\Cms\Admin\Pages\RedirectsPage;
 use Tbtop\Cms\Admin\Pages\SeoReportPage;
 use Tbtop\Cms\Admin\Pages\SeoSettingsPage;
+use Tbtop\Cms\Admin\Pages\SharedBlockEditPage;
+use Tbtop\Cms\Admin\Pages\SharedBlocksPage;
 use Tbtop\Cms\Admin\Pages\SiteHealthPage;
 use Tbtop\Cms\Admin\Pages\SiteSettingsPage;
 use Tbtop\Cms\Admin\Pages\UsersPage;
@@ -216,6 +218,8 @@ return [
             'site_health' => SiteHealthPage::class,
             'layout' => LayoutPage::class,
             'layout_edit' => LayoutEditPage::class,
+            'shared_blocks' => SharedBlocksPage::class,
+            'shared_block_edit' => SharedBlockEditPage::class,
             'blocks' => BlocksPage::class,
             'form_submissions' => FormSubmissionsPage::class,
             'form_submission' => FormSubmissionPage::class,

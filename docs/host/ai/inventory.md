@@ -124,6 +124,8 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | SiteHealthPage | `site-health` |
 | LayoutPage | `layout` |
 | LayoutEditPage | `layout/{slot}/edit` |
+| SharedBlocksPage | `shared-blocks` |
+| SharedBlockEditPage | `shared-blocks/{sharedBlock}/edit` |
 | BlocksPage | `blocks` |
 | FormSubmissionsPage | `form-submissions` |
 | FormSubmissionPage | `form-submissions/{submission}` |
@@ -220,6 +222,8 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `PageDeleted` | `src/Page/Events/PageDeleted.php` | `PageEditPage` soft-delete action (`forced: false`), `PagesPage` force-delete action (`forced: true`) | `Page $page`, `bool $forced` |
 | `PageRestored` | `src/Page/Events/PageRestored.php` | `PagesPage` restore action | `Page $page` |
 | `LayoutSaved` | `src/Layout/Events/LayoutSaved.php` | `LayoutForm::save()` after `Layout::updateOrCreate` | `Layout $layout` |
+| `SharedBlockSaved` | `src/SharedBlock/Events/SharedBlockSaved.php` | `SharedBlockForm::create()` / `update()` after the write | `SharedBlock $block` |
+| `SharedBlockDeleted` | `src/SharedBlock/Events/SharedBlockDeleted.php` | `SharedBlocksPage` delete action, after `delete()` (offered only while no page places the block) | `SharedBlock $block` |
 | `LanguagesChanged` | `src/Language/Events/LanguagesChanged.php` | `LanguageObserver`, on any create/update/soft-delete/restore/force-delete of a `Language` | none |
 | `SettingsSaved` | `src/Settings/Events/SettingsSaved.php` | `SettingsForm::apply()`, once per form submission that wrote at least one key | `array $keys` (dotted store keys written) |
 | `SubmissionReceived` | `src/Form/Events/SubmissionReceived.php` | `FormSubmitController::__invoke()`, after validation and storage, before `handleSubmit()` | `?FormSubmission $submission`, `array $payload`, `Page $page`, `string $blockId`, `string $locale` |
@@ -300,7 +304,7 @@ Source: `src/Admin/Support/CmsAbilities.php`. Gates are host-answered only when 
 | `tbtop-cms.submissions` | `src/Admin/Pages/FormSubmissionsPage.php`, `src/Admin/Pages/FormSubmissionPage.php` |
 | `tbtop-cms.redirects` | `src/Admin/Pages/RedirectsPage.php`, `src/Admin/Pages/NotFoundLogPage.php`, `src/Admin/Pages/SeoReportPage.php` |
 | `tbtop-cms.settings` | `src/Admin/Pages/SettingsPageBase.php` (inherited by `SiteSettingsPage`, `SeoSettingsPage`, `NotificationSettingsPage`), `src/Admin/Pages/SiteHealthPage.php` |
-| `tbtop-cms.design` | `src/Admin/Pages/BlocksPage.php`, `src/Admin/Pages/LayoutPage.php`, `src/Admin/Pages/LayoutEditPage.php` |
+| `tbtop-cms.design` | `src/Admin/Pages/BlocksPage.php`, `src/Admin/Pages/LayoutPage.php`, `src/Admin/Pages/LayoutEditPage.php`, `src/Admin/Pages/SharedBlocksPage.php`, `src/Admin/Pages/SharedBlockEditPage.php` |
 | `tbtop-cms.languages` | `src/Admin/Pages/LanguagesPage.php` |
 | `tbtop-cms.users` | `src/Admin/Pages/UsersPage.php` |
 | `tbtop-cms.audit` | `src/Admin/Pages/AuditLogPage.php`, `src/Admin/Pages/AuditActivityPage.php` |
@@ -321,6 +325,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_settings` | `src/Settings/Models/Setting.php` | Yes | |
 | `tbtop_form_submissions` | `src/Form/Models/FormSubmission.php` | Yes | gained `lead_status` in a later migration |
 | `tbtop_layouts` | `src/Layout/Models/Layout.php` | Yes | |
+| `tbtop_shared_blocks` | `src/SharedBlock/Models/SharedBlock.php` | Yes | `name`, `kind`, json `data` (same shape as a page content row's `data`); page content rows point at it via a top-level `shared` key |
 | `tbtop_page_revisions` | `src/Page/Models/PageRevision.php` | Yes | `user_id` via `UserKeyColumn::define` (nullable) |
 | `tbtop_form_submission_comments` | `src/Form/Models/FormSubmissionComment.php` | Yes | `user_id` via `UserKeyColumn::define` |
 | `notifications` | Laravel's built-in notifications table, used by `src/Notifications/*` | No | UUID primary key, standard Laravel shape |

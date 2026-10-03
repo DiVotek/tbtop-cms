@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Block;
 
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Throwable;
 
 class BlockContentResolver
@@ -16,6 +18,7 @@ class BlockContentResolver
         private readonly BlockRegistry $registry,
         private readonly Languages $languages,
         private readonly MediaUrlResolver $mediaUrlResolver,
+        private readonly SharedBlocks $sharedBlocks,
     ) {}
 
     /**
@@ -94,8 +97,10 @@ class BlockContentResolver
             return new ResolvedBlock($raw['id'], $kind, [], "Block [{$kind}] is not registered.");
         }
 
-        /** @var array<string, mixed> $data */
-        $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+        $data = $this->dataOf($raw, $kind);
+        if ($data === null) {
+            return new ResolvedBlock($raw['id'], $kind, [], self::missingSharedMessage($raw, $kind, $strict));
+        }
         $block = $this->registry->get($kind);
 
         try {
@@ -120,6 +125,45 @@ class BlockContentResolver
         }
 
         return new ResolvedBlock($raw['id'], $kind, $props);
+    }
+
+    /**
+     * A row pointing at a shared block takes that block's data; the row's own
+     * `data` is ignored even if present. A kind mismatch is also "missing":
+     * the page row decides the component, and the shared row was retargeted.
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>|null null when the referenced shared block does not exist
+     */
+    private function dataOf(array $raw, string $kind): ?array
+    {
+        $ref = SharedBlocks::refOf($raw);
+        if ($ref === null) {
+            /** @var array<string, mixed> $data */
+            $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+
+            return $data;
+        }
+
+        $shared = $this->sharedBlocks->find($ref);
+        if ($shared === null || $shared->kind !== $kind) {
+            return null;
+        }
+
+        return $shared->data;
+    }
+
+    /** @param  array<string, mixed>  $raw */
+    private static function missingSharedMessage(array $raw, string $kind, bool $strict): string
+    {
+        $message = "Block [{$kind}] points at shared block #" . SharedBlocks::refOf($raw) . ', which does not exist.';
+        Log::warning('block.shared_missing', ['kind' => $kind, 'id' => $raw['id'], 'shared' => SharedBlocks::refOf($raw)]);
+
+        if ($strict) {
+            throw BlockResolutionException::resolveFailed($kind, new RuntimeException($message));
+        }
+
+        return $message;
     }
 
     /** The exception text reaches the browser as page props, so outside debug it is kept generic. */

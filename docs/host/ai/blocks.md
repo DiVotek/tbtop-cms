@@ -578,6 +578,39 @@ Submitting posts to `tbtop-cms.form.submit` with that page's id;
 first, then the layout slots, so the submission and any later retry
 (`SubmissionRetrier`) locate it regardless of which page rendered it.
 
+## Shared blocks
+
+A block whose content should be the same on many pages (a CTA banner, a
+contact strip) is created once under **Design → Shared blocks**
+(`SharedBlocksPage`, the same card grid as Blocks with a tab per kind as
+the type filter; table `tbtop_shared_blocks`: `name`, `kind`, `data` in
+the same per-locale shape a page row's `data` has) and placed on pages by
+reference. In the page editor the "+ Add block" tab lists kinds only; the
+Add button of a kind that has shared blocks opens a chooser — one of them
+by reference, or a fresh inline block — and a reference writes a content row
+`{id, kind, shared: <shared block id>, active: false, sort, data: []}` —
+the pointer lives next to `kind`, never inside `data`. The row's tab then
+shows no fields, only a link to the shared block's editor and **Detach**,
+which copies the shared `data` into the row and drops `shared`, so a page
+can diverge without losing content. The reverse is **Make shared** on an
+inline block's tab: the content as currently in the form (unsaved edits
+included) becomes a new shared block named "<block label> — <page name>"
+(numbered while taken) and the row a reference to it.
+
+`BlockContentResolver` resolves a reference by taking `data` from the shared
+block instead of the row, then proceeds exactly as for an inline block
+(locale flattening, `resolve()`, `error` marking). The row's `kind` wins:
+a pointer whose target has another kind, or no longer exists, resolves to
+the same "missing shared block" error as any broken block (thrown in
+`blocks.strict`, a placeholder otherwise) — the data stays in the page, the
+editor says which block is missing. Deleting a shared block that pages still
+place has no delete button — its card shows the page count instead;
+`SharedBlockUsage` scans page content for the pointers. Saving or deleting a shared block fires
+`SharedBlockSaved` / `SharedBlockDeleted`, which bump the content cache like
+a page save does. Layout slots accept the same `shared` pointer in their
+content rows (the resolver is the same), but the layout editor has no UI for
+placing one.
+
 ## Where does my code go
 
 | Concern | Goes in |
