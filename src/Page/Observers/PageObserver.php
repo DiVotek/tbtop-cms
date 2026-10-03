@@ -14,12 +14,14 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageHierarchy;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
+use Tbtop\Cms\Page\TypeBlocks;
 
 class PageObserver
 {
     public function __construct(
         private readonly PageTypeRegistry $registry,
         private readonly PageSlugWriter $slugs,
+        private readonly TypeBlocks $typeBlocks,
     ) {}
 
     public function saved(Page $page): void
@@ -149,6 +151,10 @@ class PageObserver
      */
     public function saving(Page $page): void
     {
+        // Before the dirty check: a type's blocks are part of the page from
+        // its first save, whatever path (form, seeder, API, restore) saves it.
+        $this->typeBlocks->ensure($page);
+
         if (! $page->exists) {
             return;
         }

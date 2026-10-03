@@ -9,6 +9,7 @@ use RuntimeException;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\TypeBlocks;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Throwable;
 
@@ -19,6 +20,7 @@ class BlockContentResolver
         private readonly Languages $languages,
         private readonly MediaUrlResolver $mediaUrlResolver,
         private readonly SharedBlocks $sharedBlocks,
+        private readonly TypeBlocks $typeBlocks,
     ) {}
 
     /**
@@ -34,21 +36,56 @@ class BlockContentResolver
      */
     public function resolve(array $content, ?Page $page = null, ?object $source = null): array
     {
+        return $this->resolveWithFields($content, $page, $source)['blocks'];
+    }
+
+    /**
+     * Rows owned by a type other than the page's are dormant and skipped
+     * (see TypeBlocks). The page type's general blocks resolve first, into
+     * `fields`, and never enter the block list.
+     *
+     * @param  array<int, mixed>  $content
+     * @return array{blocks: list<ResolvedBlock>, fields: array<string, mixed>}
+     */
+    public function resolveWithFields(array $content, ?Page $page = null, ?object $source = null): array
+    {
         $locale = app()->getLocale();
         $fallback = $this->languages->defaultLocale();
         $locales = array_column($this->languages->all(), 'locale');
         $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver, source: $source);
         $strict = (bool) config('tbtop-cms.blocks.strict', false);
 
-        $resolved = [];
+        if ($page !== null) {
+            $content = TypeBlocks::visible($content, $page->type);
+        }
+
+        $fields = [];
+        $flow = [];
         foreach (self::sorted($content) as $raw) {
+            if (is_array($raw) && $this->typeBlocks->isGeneral($raw)) {
+                $general = $this->resolveOne($raw, $ctx, $locales, $strict);
+                if ($general instanceof ResolvedBlock && $general->error === null) {
+                    $fields = [...$fields, ...$general->props];
+                }
+
+                continue;
+            }
+            $flow[] = $raw;
+        }
+
+        if ($fields !== []) {
+            $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver, source: $source, fields: $fields);
+        }
+
+        $resolved = [];
+        foreach ($flow as $raw) {
             $block = $this->resolveOne($raw, $ctx, $locales, $strict);
             if ($block instanceof ResolvedBlock) {
                 $resolved[] = $block;
             }
         }
 
-        return $resolved;
+        return ['blocks' => $resolved, 'fields' => $fields];
     }
 
     /**

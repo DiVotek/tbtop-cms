@@ -53,6 +53,19 @@ the block-content editor field outside cms's own page/layout forms.
 the repeater under a different form field. There is no compatibility shim —
 update any reference to the old class name.
 
+## Page types can declare their own blocks and a base
+
+`PageTypeInterface` gains `blocks(): list<TypeBlock>` and `base(): string`;
+`BasePageType` returns `[]` and the type's own key, so a type extending it is
+unaffected. A host type that returns `'page'` from `base()` moves from the
+"Type" select to the new "Subtype" select (form field `subtype`, folded into
+`type` on save by `PageSubtype`). A host implementing the interface
+directly must add the method. Rows a type owns carry `owner` on the content
+envelope; `BlockContent::toEnvelope()` keeps that key out of `data`. The
+page props gain `page.fields` and `ResolveContext` gains `fields` /
+`field()`; `BlockContentResolver::resolveWithFields()` is the new render
+entry, `resolve()` still returns the block list. See pages.md, "Type blocks".
+
 ## Pages can be backed by a source (source-backed page types)
 
 `tbtop_pages` gains one nullable column, `source_id` (indexed together with

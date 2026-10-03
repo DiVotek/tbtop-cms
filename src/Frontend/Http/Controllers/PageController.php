@@ -124,7 +124,8 @@ class PageController
     private function props(Page $page, string $locale, string $path, ?PageTypeInterface $type, ?object $source): array
     {
         $content = $page->content ?? $type?->template($page) ?? [];
-        $resolved = $this->forms->bind($this->blocks->resolve($content, $page, $source), $page);
+        ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($content, $page, $source);
+        $resolved = $this->forms->bind($blocks, $page);
         // Not live covers draft, scheduled (published_at in the future), and
         // expired (unpublish_at in the past): reaching this page at all with
         // any of those means the caller has preview access (PageResolver's
@@ -151,6 +152,7 @@ class PageController
                 'summary' => $page->getTranslation('summary', $locale),
                 'body' => $this->bodyHtml($page, $locale),
                 'image' => $this->resolveImage($page->image),
+                'fields' => $fields,
             ],
             'render' => $this->assembler->assemble($resolved),
             'seo' => $seo,

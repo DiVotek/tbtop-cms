@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NoIdentifierKindBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\AlphaBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\BetaBlock;
+use Tbtop\Cms\Tests\Fixtures\GeneralBetaPageType;
 
 beforeEach(function (): void {
     $this->dir = sys_get_temp_dir() . '/tbtop-cms-registry-test-' . uniqid();
@@ -140,4 +142,16 @@ it('reports a stale registry under --check even when the types file is current',
     $this->artisan('cms:blocks:types', ['--check' => true, '--path' => $this->typesPath])->assertExitCode(1);
 
     expect(file_get_contents($this->registryPath))->toBe("// stale\n");
+});
+
+it('leaves a general type block out of the registry: it resolves into page.fields and has no component', function (): void {
+    BlockRegistry::extend(fn (): array => [AlphaBlock::class, BetaBlock::class]);
+    PageTypeRegistry::extend(fn (): array => [GeneralBetaPageType::class]);
+    touch($this->dir . '/blocks/Alpha.tsx');
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    $registry = file_get_contents($this->registryPath);
+    expect($registry)->toContain('import { Alpha }')
+        ->not->toContain('Beta');
 });

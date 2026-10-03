@@ -17,6 +17,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditRevisionsAction;
 use Tbtop\Cms\Admin\Pages\Support\PageEditSidebar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStarterBlocks;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
+use Tbtop\Cms\Admin\Pages\Support\PageEditTypeFields;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
@@ -154,6 +155,7 @@ class PageEditPage extends AdminPage
                 'label' => __('tbtop-cms::pages.tabs_edit.general'),
                 'body' => $s->stack([
                     ...PageForm::generalFields($s, ! $page->is_system),
+                    ...($isSourceBacked ? [] : PageEditTypeFields::build($s, $page)),
                     ...($isSourceBacked ? [] : PageEditStarterBlocks::build($s, $page)),
                 ]),
             ],
