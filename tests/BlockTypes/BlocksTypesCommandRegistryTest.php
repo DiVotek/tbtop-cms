@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
+use Tbtop\Cms\Tests\Fixtures\BlockTypes\NoIdentifierKindBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\AlphaBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\BetaBlock;
 
@@ -108,6 +109,16 @@ it('resolves a relative --path against the working directory when the registry p
     }
 
     expect(file_get_contents($this->registryPath))->toContain('import { blockProps } from "./blocks.generated";');
+});
+
+it('fails when a kind has no characters usable as a component name', function (): void {
+    BlockRegistry::extend(fn (): array => [NoIdentifierKindBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])
+        ->expectsOutputToContain('Block [--] cannot be mapped to a component name')
+        ->assertExitCode(1);
+
+    expect(is_file($this->registryPath))->toBeFalse();
 });
 
 it('reports a stale registry under --check even when the types file is current', function (): void {

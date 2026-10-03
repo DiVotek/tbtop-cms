@@ -71,6 +71,9 @@ final class RegistryEmitter
     {
         $kind = $block->kind();
         $component = self::componentName($kind);
+        if ($component === '') {
+            throw new RuntimeException("Block [{$kind}] cannot be mapped to a component name: the kind has no letters or digits.");
+        }
         if (! is_file("{$componentsDir}/{$component}.tsx") && ! is_file("{$componentsDir}/{$component}.jsx")) {
             throw new RuntimeException("Block [{$kind}] has no component: expected {$componentsDir}/{$component}.tsx exporting `{$component}`.");
         }
