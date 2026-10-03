@@ -57,11 +57,24 @@ return [
         ],
     ],
     'blocks' => [
+        // Block classes listed by hand. Keep for blocks outside the discovered
+        // folders; everything else goes through 'discover'.
         'types' => [],
+        // Folders scanned for Block subclasses, namespace => directory, e.g.
+        // ['App\\Cms\\Blocks' => app_path('Cms/Blocks')]. Subfolders map to
+        // sub-namespaces; traits and abstract classes are skipped. Registered
+        // in path order, after 'types'.
+        'discover' => [],
         'strict' => false,
         // Where `cms:blocks:types` writes the generated zod schemas / TS types.
         // Null means resources/js/cms/blocks.generated.ts; --path= overrides.
         'types_path' => null,
+        // The generated catalog + component registry. Null means
+        // registry.generated.ts next to the types file.
+        'registry_path' => null,
+        // Import prefix of the block components, relative to the registry
+        // file; <Kind>.tsx exporting <Kind> is expected under it.
+        'components_dir' => './blocks',
     ],
     'seo' => [
         // Host schema.org node classes merged into SchemaTypeRegistry.

@@ -15,17 +15,31 @@ A block is three things, in three places:
 
 | Layer | Where | Owns |
 |---|---|---|
-| PHP class | extends `Tbtop\Cms\Block\Block`, registered in `tbtop-cms.blocks.types` (or `BlockRegistry::extend()` for programmatic registration) | `kind()`, the editor form, `resolve()` — untrusted input to typed props |
-| Zod schema | generated into `blocks.generated.ts`, keyed by `kind()` under `blockProps`, imported by host's `resources/js/cms/catalog.ts` | the prop *contract* the renderer validates against |
-| React component | host's `resources/js/cms/registry.tsx`, keyed by the same `kind()` | presentation |
+| PHP class | extends `Tbtop\Cms\Block\Block`, found under a `tbtop-cms.blocks.discover` folder (or listed in `tbtop-cms.blocks.types`, or `BlockRegistry::extend()` for programmatic registration) | `kind()`, the editor form, `resolve()` — untrusted input to typed props |
+| Zod schema | generated into `blocks.generated.ts`, keyed by `kind()` under `blockProps` | the prop *contract* the renderer validates against |
+| React component | host's `resources/js/cms/blocks/<Kind>.tsx` exporting `<Kind>`, wired into the catalog and the registry by the generated `registry.generated.ts` | presentation |
 
 They match by string identity: PHP `kind()` == the catalog's component key
-== the registry's component key. Two of three wired is a broken block —
-nothing enforces the tie at compile time. The one enforcement that does
-exist is runtime: `@json-render/react`'s `Renderer` validates each element's
-`props` against the catalog schema for its `type` before handing them to the
+== the registry's component key. With the generated registry the tie is
+checked at generation time — a registered block without its component file
+fails `cms:blocks:types` (and `--check` in CI). The runtime enforcement
+stays: `@json-render/react`'s `Renderer` validates each element's `props`
+against the catalog schema for its `type` before handing them to the
 component, so a `resolve()` shape that drifts from the zod schema fails
 loudly in the browser console, not silently.
+
+Adding a block is therefore two files: `app/Cms/Blocks/<Kind>Block.php`
+and `resources/js/cms/blocks/<Kind>.tsx` — then `php artisan
+cms:blocks:types`.
+
+### Discovering block classes
+
+`tbtop-cms.blocks.discover` maps a namespace to a folder
+(`['App\\Cms\\Blocks' => app_path('Cms/Blocks')]`). Every `.php` file under
+it whose class (derived from the path, PSR-4) is a concrete `Block` subclass
+is registered, in relative-path order after `blocks.types`; traits, abstract
+classes and helpers in subfolders are skipped by the same test. A folder that
+does not exist contributes nothing.
 
 ### Generating the zod schema: `cms:blocks:types`
 
@@ -51,6 +65,37 @@ when it's already current.
 `--check` compares bytes, so the file must stay exactly as generated: add its
 path to the host's `.prettierignore` (and any other formatter's ignore list).
 A reformatted file keeps working at runtime but fails `--check`.
+
+### Generating the catalog and registry: `registry.generated.ts`
+
+When the component folder exists (`tbtop-cms.blocks.components_dir`,
+default `./blocks` next to the types file) the same command also writes
+`registry.generated.ts` (`tbtop-cms.blocks.registry_path`, default beside
+the types file) with two objects: `blockCatalog` — per kind `{ props,
+description }`, the description from `Block::description()` — and
+`blockComponents` — per kind the component imported from
+`<components_dir>/<StudlyKind>.tsx` (named export `<StudlyKind>`). The host
+spreads them and keeps only what is its own:
+
+```ts
+// resources/js/cms/catalog.ts
+import { blockCatalog } from "./registry.generated";
+export const catalog = defineCatalog(schema, {
+    components: { Fragment: { props: z.object({}), slots: ["default"] }, ...blockCatalog },
+});
+
+// resources/js/cms/registry.tsx
+import { blockComponents } from "./registry.generated";
+export const { registry } = defineRegistry(catalog, {
+    components: { Fragment: ({ children }) => <>{children}</>, ...blockComponents },
+});
+```
+
+A registered block whose component file is missing is a command error —
+nothing is written — because the import would not resolve and leaving the
+kind out would render nothing on the site. Without a component folder the
+command writes only the types file. `--check` covers both files; add the
+registry to `.prettierignore` too.
 
 A block with no typed `@return array{...}` on `resolve()` (no docblock, a
 bare `array`/`array<string, mixed>` return, or an unparsable top-level type)

@@ -12,6 +12,7 @@ use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\BlockTypes\BlockShape;
 use Tbtop\Cms\BlockTypes\BlockShapeExtractor;
+use Tbtop\Cms\BlockTypes\RegistryEmitter;
 use Tbtop\Cms\BlockTypes\TypeAliasCollector;
 use Tbtop\Cms\BlockTypes\TypeScriptEmitter;
 use Tbtop\Cms\BlockTypes\UnsupportedShapeException;
@@ -22,55 +23,91 @@ class BlocksTypesCommand extends Command
         {--check : Exit 1 when the file on disk differs from the generated output, without writing}
         {--path= : Override the output path (default: config(tbtop-cms.blocks.types_path))}';
 
-    protected $description = 'Generate zod schemas and TS types for registered CMS blocks from their resolve() docblocks.';
+    protected $description = 'Generate zod schemas, TS types and the catalog/component registry for registered CMS blocks.';
 
     public function handle(BlockRegistry $registry): int
     {
         $path = $this->outputPath();
+        $registryPath = $this->registryPath($path);
 
         try {
             $output = $this->generate($registry);
+            $registryContents = $this->generateRegistry($registry, $path, $registryPath);
         } catch (RuntimeException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;
         }
 
+        foreach ($output->warnings as $warning) {
+            $this->warn($warning);
+        }
+
         if ($this->option('check')) {
-            return $this->check($path, $output);
+            $typesOk = $this->check($path, $output->contents) === self::SUCCESS;
+            $registryOk = $registryContents === null || $this->check($registryPath, $registryContents) === self::SUCCESS;
+
+            return $typesOk && $registryOk ? self::SUCCESS : self::FAILURE;
         }
 
         File::ensureDirectoryExists(dirname($path));
         File::put($path, $output->contents);
-
-        foreach ($output->warnings as $warning) {
-            $this->warn($warning);
-        }
-
         $this->info("Wrote {$path}");
+
+        if ($registryContents !== null) {
+            File::put($registryPath, $registryContents);
+            $this->info("Wrote {$registryPath}");
+        }
 
         return self::SUCCESS;
     }
 
-    private function check(string $path, GeneratedOutput $output): int
+    private function check(string $path, string $contents): int
     {
-        foreach ($output->warnings as $warning) {
-            $this->warn($warning);
-        }
-
         if (! File::exists($path)) {
             $this->error("{$path} does not exist. Run `php artisan cms:blocks:types` to generate it.");
 
             return self::FAILURE;
         }
 
-        if (File::get($path) !== $output->contents) {
+        if (File::get($path) !== $contents) {
             $this->error("{$path} is out of date. Run `php artisan cms:blocks:types` to regenerate it.");
 
             return self::FAILURE;
         }
 
         return self::SUCCESS;
+    }
+
+    /** The registry sits next to the types file so the two import each other by bare name. */
+    private function registryPath(string $typesPath): string
+    {
+        $configured = config('tbtop-cms.blocks.registry_path');
+
+        return is_string($configured) && $configured !== '' ? $configured : dirname($typesPath) . '/registry.generated.ts';
+    }
+
+    /**
+     * The component folder is the opt-in: a host without one (another
+     * renderer, components elsewhere) gets only the types file. With the
+     * folder present, every registered block must have its component there.
+     */
+    private function generateRegistry(BlockRegistry $registry, string $typesPath, string $registryPath): ?string
+    {
+        $componentsImport = config('tbtop-cms.blocks.components_dir');
+        $componentsImport = is_string($componentsImport) && $componentsImport !== '' ? rtrim($componentsImport, '/') : './blocks';
+        $componentsDir = dirname($registryPath) . '/' . $componentsImport;
+
+        if (! is_dir($componentsDir)) {
+            return null;
+        }
+
+        return (new RegistryEmitter)->emit(
+            array_values($registry->all()),
+            './' . pathinfo($typesPath, PATHINFO_FILENAME),
+            $componentsImport,
+            $componentsDir,
+        );
     }
 
     private function outputPath(): string
