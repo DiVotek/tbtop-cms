@@ -54,7 +54,8 @@ function brokenReason(
     if (errors?.[id]) {
         return errors[id];
     }
-    if (!(kind in registry)) {
+    // Own keys only: `constructor` or `toString` stored as a kind must not pass as a component.
+    if (!Object.hasOwn(registry, kind)) {
         return `Block [${kind}] has no component in the registry.`;
     }
     const schema = catalog.data.components?.[kind]?.props;

@@ -43,6 +43,12 @@ it("names a kind with no registered component", () => {
     expect(out.elements.a.props).toEqual({ kind: "Ghost", message: "Block [Ghost] has no component in the registry." });
 });
 
+it("treats a prototype property name stored as a kind as unregistered", () => {
+    const out = markBrokenBlocks(spec({ a: { type: "constructor", props: {} } }), catalog, registry);
+
+    expect(out.elements.a.props).toEqual({ kind: "constructor", message: "Block [constructor] has no component in the registry." });
+});
+
 it("names the props that fail the catalog schema", () => {
     const out = markBrokenBlocks(spec({ a: { type: "Hero", props: { title: 42 } } }), catalog, registry);
 
