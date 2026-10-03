@@ -44,8 +44,9 @@ does not exist contributes nothing.
 ### Generating the zod schema: `cms:blocks:types`
 
 `php artisan cms:blocks:types` reads every registered block's `resolve()`
-`@return array{...}` docblock (parsed with `phpstan/phpdoc-parser`) and
-writes a zod schema + TS type per block, plus a `blockProps` map keyed by
+`@return array{...}` docblock (parsed with `phpstan/phpdoc-parser`) — or,
+for a block that keeps the base `resolve()`, the shape `FormResolver`
+guarantees for its form — and writes a zod schema + TS type per block, plus a `blockProps` map keyed by
 `kind()`, to `config('tbtop-cms.blocks.types_path')` (default
 `resource_path('js/cms/blocks.generated.ts')`, override per-invocation with
 `--path=`). Import the generated consts from `catalog.ts` instead of hand-
@@ -187,9 +188,29 @@ Overridable, all with sane defaults:
   via `has()`/`get()`, never filtered by placement).
 - **`resolve(array $input, ResolveContext $ctx): array`** — turns raw,
   already locale-flattened editor `data` into the props the React component
-  receives. Default is identity (`return $input;`) — override this in almost
-  every real block; the identity default only suits a block whose stored
-  shape already matches its props 1:1.
+  receives. **Default: resolved by the form** (`Block\Support\FormResolver`),
+  so a block whose props are its fields one-to-one needs no `resolve()` and
+  no docblock at all — `cms:blocks:types` derives its zod schema from the
+  same rules. Per field kind:
+
+  | field | prop |
+  |---|---|
+  | text, textarea, select, radio, togglebuttons, slug, date, time, … | trimmed `string\|null` (blank → null) |
+  | richtext | rendered HTML `string\|null` |
+  | media | URL `string\|null`; `->multiple()` → `list<string>` of existing media |
+  | link | `{href, type, label}\|null` via `$ctx->link()` |
+  | number, slider | `float\|null` (numeric strings parsed) |
+  | boolean, checkbox | `bool` |
+  | tags, checkboxlist, select `->multiple()` | `list<string>` |
+  | keyvalue | `array<string, string>` |
+  | repeater | `list<row>` with the same rules per row; rows with no filled field dropped |
+
+  Input not matching the kind yields the empty value (null, `[]`, `false`);
+  input with no field in the form is dropped. Override `resolve()` when the
+  props differ from the fields (a label + href merged into one `cta`, rows
+  filtered on two fields, a computed value) — then declare the shape in a
+  `@return array{...}` docblock; `parent::resolve($input, $ctx)` is a fine
+  starting point to reshape from.
 - **`translatableFields(): array`** — dotted paths (e.g. `'items.caption'`)
   the flattener treats as locale maps. Default: walks `form()`'s field tree
   and collects every field marked `->translatable()`, at any repeater

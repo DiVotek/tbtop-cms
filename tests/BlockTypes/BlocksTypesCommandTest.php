@@ -29,6 +29,7 @@ use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\ValueOfImportBlock;
+use Tbtop\Cms\Tests\Fixtures\FormResolver\EveryKindBlock;
 
 beforeEach(function (): void {
     $this->outputPath = sys_get_temp_dir() . '/tbtop-cms-blocks-types-test-' . uniqid() . '.ts';
@@ -312,4 +313,21 @@ it('errors with exit 1 naming the block and key path for an unsupported nested c
         ->assertExitCode(1);
 
     expect(is_file($this->outputPath))->toBeFalse();
+});
+
+it('derives the schema from the form for a block that keeps the base resolve()', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [EveryKindBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])->assertExitCode(0);
+
+    $contents = file_get_contents($this->outputPath);
+
+    expect($contents)->toContain('export const everyKindProps = z.object({')
+        ->toContain('title: z.string().nullable(),')
+        ->toContain('gallery: z.array(z.string()),')
+        ->toContain("cta: z.object({\n        href: z.string(),\n        type: z.string(),\n        label: z.string(),\n    }).nullable(),")
+        ->toContain('featured: z.boolean(),')
+        ->toContain("items: z.array(z.object({\n        label: z.string().nullable(),\n        qty: z.number().nullable(),\n    })),")
+        ->not->toContain('TODO: add @return');
 });

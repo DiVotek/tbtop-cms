@@ -73,7 +73,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
 | `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `CmsServiceProvider::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
 | `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
-| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock, plus `registry.generated.ts` (catalog entries + component map) when the component folder exists | No |
+| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists | No |
 
 All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 

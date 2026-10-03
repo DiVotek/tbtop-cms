@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Block;
 use Illuminate\Support\Str;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Block\Support\FormResolver;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 
 abstract class Block
@@ -58,12 +59,19 @@ abstract class Block
     }
 
     /**
+     * Props for the React component. Without an override the form decides:
+     * every field is resolved by its kind (see FormResolver), and
+     * cms:blocks:types derives the zod schema from the same rules. Override
+     * for a shape the form cannot express, optionally starting from
+     * parent::resolve() and reshaping; then declare the shape in a
+     * `@return array{...}` docblock.
+     *
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public function resolve(array $input, ResolveContext $ctx): array
     {
-        return $input;
+        return (new FormResolver)->resolve($this->form(new S), $input, $ctx);
     }
 
     /** @return list<string> */
