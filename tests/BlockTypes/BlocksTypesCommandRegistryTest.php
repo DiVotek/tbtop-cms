@@ -94,6 +94,22 @@ it('writes a registry configured in another folder, importing the types file by 
     rmdir($this->dir . '/generated');
 });
 
+it('resolves a relative --path against the working directory when the registry path is absolute', function (): void {
+    config()->set('tbtop-cms.blocks.registry_path', $this->dir . '/registry.generated.ts');
+    BlockRegistry::extend(fn (): array => [BetaBlock::class]);
+    touch($this->dir . '/blocks/Beta.tsx');
+    $cwd = getcwd();
+    chdir($this->dir);
+
+    try {
+        $this->artisan('cms:blocks:types', ['--path' => 'blocks.generated.ts'])->assertExitCode(0);
+    } finally {
+        chdir((string) $cwd);
+    }
+
+    expect(file_get_contents($this->registryPath))->toContain('import { blockProps } from "./blocks.generated";');
+});
+
 it('reports a stale registry under --check even when the types file is current', function (): void {
     BlockRegistry::extend(fn (): array => [BetaBlock::class]);
     touch($this->dir . '/blocks/Beta.tsx');

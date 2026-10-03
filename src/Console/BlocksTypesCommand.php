@@ -115,6 +115,23 @@ class BlocksTypesCommand extends Command
         );
     }
 
+    /**
+     * The nearest existing ancestor goes through realpath() so a symlinked
+     * segment (macOS /var → /private/var) compares equal on both sides, even
+     * for a folder that is about to be created.
+     */
+    private static function absolute(string $path): string
+    {
+        $path = self::collapse(str_starts_with($path, '/') ? $path : getcwd() . '/' . $path);
+        $missing = [];
+        while (! is_dir($path) && $path !== '/' && $path !== '') {
+            array_unshift($missing, basename($path));
+            $path = dirname($path);
+        }
+
+        return implode('/', [(string) realpath($path), ...$missing]);
+    }
+
     private static function collapse(string $path): string
     {
         $parts = [];
@@ -136,8 +153,9 @@ class BlocksTypesCommand extends Command
      */
     private static function relativeModule(string $fromDir, string $file): string
     {
-        $from = array_values(array_filter(explode('/', $fromDir), static fn (string $s): bool => $s !== '' && $s !== '.'));
-        $to = array_values(array_filter(explode('/', dirname($file)), static fn (string $s): bool => $s !== '' && $s !== '.'));
+        // A relative --path with an absolute registry_path (or the reverse) must compare on one base: the working directory.
+        $from = explode('/', self::collapse(self::absolute($fromDir)));
+        $to = explode('/', self::collapse(self::absolute(dirname($file))));
 
         while ($from !== [] && $to !== [] && $from[0] === $to[0]) {
             array_shift($from);
