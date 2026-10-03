@@ -12,6 +12,7 @@ use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\BlockTypes\BlockShape;
 use Tbtop\Cms\BlockTypes\BlockShapeExtractor;
+use Tbtop\Cms\BlockTypes\RegistryEmitter;
 use Tbtop\Cms\BlockTypes\TypeAliasCollector;
 use Tbtop\Cms\BlockTypes\TypeScriptEmitter;
 use Tbtop\Cms\BlockTypes\UnsupportedShapeException;
@@ -22,55 +23,152 @@ class BlocksTypesCommand extends Command
         {--check : Exit 1 when the file on disk differs from the generated output, without writing}
         {--path= : Override the output path (default: config(tbtop-cms.blocks.types_path))}';
 
-    protected $description = 'Generate zod schemas and TS types for registered CMS blocks from their resolve() docblocks.';
+    protected $description = 'Generate zod schemas, TS types and the catalog/component registry for registered CMS blocks.';
 
     public function handle(BlockRegistry $registry): int
     {
         $path = $this->outputPath();
+        $registryPath = $this->registryPath($path);
 
         try {
             $output = $this->generate($registry);
+            $registryContents = $this->generateRegistry($registry, $path, $registryPath);
         } catch (RuntimeException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;
         }
 
-        if ($this->option('check')) {
-            return $this->check($path, $output);
-        }
-
-        File::ensureDirectoryExists(dirname($path));
-        File::put($path, $output->contents);
-
         foreach ($output->warnings as $warning) {
             $this->warn($warning);
         }
 
+        if ($this->option('check')) {
+            $typesOk = $this->check($path, $output->contents) === self::SUCCESS;
+            $registryOk = $registryContents === null || $this->check($registryPath, $registryContents) === self::SUCCESS;
+
+            return $typesOk && $registryOk ? self::SUCCESS : self::FAILURE;
+        }
+
+        File::ensureDirectoryExists(dirname($path));
+        if ($registryContents !== null) {
+            File::ensureDirectoryExists(dirname($registryPath));
+        }
+
+        File::put($path, $output->contents);
         $this->info("Wrote {$path}");
+
+        if ($registryContents !== null) {
+            File::put($registryPath, $registryContents);
+            $this->info("Wrote {$registryPath}");
+        }
 
         return self::SUCCESS;
     }
 
-    private function check(string $path, GeneratedOutput $output): int
+    private function check(string $path, string $contents): int
     {
-        foreach ($output->warnings as $warning) {
-            $this->warn($warning);
-        }
-
         if (! File::exists($path)) {
             $this->error("{$path} does not exist. Run `php artisan cms:blocks:types` to generate it.");
 
             return self::FAILURE;
         }
 
-        if (File::get($path) !== $output->contents) {
+        if (File::get($path) !== $contents) {
             $this->error("{$path} is out of date. Run `php artisan cms:blocks:types` to regenerate it.");
 
             return self::FAILURE;
         }
 
         return self::SUCCESS;
+    }
+
+    /** The registry sits next to the types file so the two import each other by bare name. */
+    private function registryPath(string $typesPath): string
+    {
+        $configured = config('tbtop-cms.blocks.registry_path');
+
+        return is_string($configured) && $configured !== '' ? $configured : dirname($typesPath) . '/registry.generated.ts';
+    }
+
+    /**
+     * The component folder is the opt-in: a host without one (another
+     * renderer, components elsewhere) gets only the types file. With the
+     * folder present, every registered block must have its component there.
+     */
+    private function generateRegistry(BlockRegistry $registry, string $typesPath, string $registryPath): ?string
+    {
+        $componentsImport = config('tbtop-cms.blocks.components_dir');
+        $componentsImport = is_string($componentsImport) && $componentsImport !== '' ? rtrim($componentsImport, '/') : './blocks';
+        // A bare `components` would import a package by that name; the folder is always relative to the registry file.
+        if (! str_starts_with($componentsImport, './') && ! str_starts_with($componentsImport, '../')) {
+            $componentsImport = './' . $componentsImport;
+        }
+        // Collapsed by string: with `../blocks` the registry folder may not exist yet, which defeats is_dir() on the raw path.
+        $componentsDir = self::collapse(dirname($registryPath) . '/' . $componentsImport);
+
+        if (! is_dir($componentsDir)) {
+            return null;
+        }
+
+        return (new RegistryEmitter)->emit(
+            array_values($registry->all()),
+            self::relativeModule(dirname($registryPath), $typesPath),
+            $componentsImport,
+            $componentsDir,
+        );
+    }
+
+    /**
+     * The nearest existing ancestor goes through realpath() so a symlinked
+     * segment (macOS /var → /private/var) compares equal on both sides, even
+     * for a folder that is about to be created.
+     */
+    private static function absolute(string $path): string
+    {
+        $path = self::collapse(str_starts_with($path, '/') ? $path : getcwd() . '/' . $path);
+        $missing = [];
+        while (! is_dir($path) && $path !== '/' && $path !== '') {
+            array_unshift($missing, basename($path));
+            $path = dirname($path);
+        }
+
+        return implode('/', [(string) realpath($path), ...$missing]);
+    }
+
+    private static function collapse(string $path): string
+    {
+        $parts = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '..' && $parts !== [] && end($parts) !== '..') {
+                array_pop($parts);
+            } elseif ($segment !== '.' && $segment !== '') {
+                $parts[] = $segment;
+            }
+        }
+
+        return (str_starts_with($path, '/') ? '/' : '') . implode('/', $parts);
+    }
+
+    /**
+     * Import specifier of a .ts file from another directory: `./x` beside it,
+     * `../a/x` elsewhere. String-based on purpose — neither path need exist
+     * yet when --check runs.
+     */
+    private static function relativeModule(string $fromDir, string $file): string
+    {
+        // A relative --path with an absolute registry_path (or the reverse) must compare on one base: the working directory.
+        $from = explode('/', self::collapse(self::absolute($fromDir)));
+        $to = explode('/', self::collapse(self::absolute(dirname($file))));
+
+        while ($from !== [] && $to !== [] && $from[0] === $to[0]) {
+            array_shift($from);
+            array_shift($to);
+        }
+
+        $up = $from === [] ? ['.'] : array_fill(0, count($from), '..');
+
+        return implode('/', [...$up, ...$to, pathinfo($file, PATHINFO_FILENAME)]);
     }
 
     private function outputPath(): string

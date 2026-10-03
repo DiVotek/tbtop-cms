@@ -23,6 +23,9 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `pages.errors.5xx.name` / `.title` | `string` | `'Something went wrong'` | Name/title given to the seeded 5xx error page | pages.md |
 | `blocks.types` | `array<string,class-string<Block>>` | `[]` | Host block classes merged into `BlockRegistry` (`Block/BlockRegistry.php`) | blocks.md |
 | `blocks.strict` | `bool` | `false` | When true, `BlockContentResolver` throws on an unknown block kind instead of skipping it | blocks.md |
+| `blocks.discover` | `array<string,string>` | `[]` | Namespace → folder pairs scanned for concrete `Block` subclasses (`Block/BlockDiscovery.php`), registered after `blocks.types` in relative-path order | blocks.md |
+| `blocks.registry_path` | `?string` | `null`, falls back to `registry.generated.ts` next to the types file | Output path for the generated catalog entries + component map (`BlockTypes/RegistryEmitter.php`); written only when the component folder exists | blocks.md |
+| `blocks.components_dir` | `string` | `./blocks` | Import prefix of the block components relative to the registry file; `<Kind>.tsx` exporting `<Kind>` is expected under it | blocks.md |
 | `blocks.types_path` | `?string` | `null`, falls back to `resource_path('js/cms/blocks.generated.ts')` | Output path for `php artisan cms:blocks:types`'s generated zod schemas/TS types; override per-invocation with `--path=` | blocks.md |
 | `seo.schema_types` | `array<string,class-string<SchemaTypeInterface>>` | `[]` | Host schema.org node classes merged into `SchemaTypeRegistry` (`Frontend/Seo/Schema/SchemaTypeRegistry.php`) | seo.md |
 | `seo.robots.disallow` | `list<string>` | `[]` | Extra paths robots.txt closes to crawlers, on top of the admin prefix and `/login` (`Frontend/Seo/RobotsRegistry.php`) | seo.md |
@@ -70,7 +73,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
 | `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `CmsServiceProvider::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
 | `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
-| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock | No |
+| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock, plus `registry.generated.ts` (catalog entries + component map) when the component folder exists | No |
 
 All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
@@ -362,7 +365,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 
 ## 11. Built-in blocks and page types
 
-**Blocks** — `src/Block/BlockRegistry.php::boot()` registers only classes from `config('tbtop-cms.blocks.types')` (empty by default) plus classes contributed via `BlockRegistry::extend()`. `Hero` and `ContactForm` are reference/example blocks, not auto-registered — a host opts in via config or `extend()`.
+**Blocks** — `src/Block/BlockRegistry.php::boot()` registers classes from `config('tbtop-cms.blocks.types')`, then the concrete `Block` subclasses found under `config('tbtop-cms.blocks.discover')` folders (both empty by default), plus classes contributed via `BlockRegistry::extend()`. `Hero` and `ContactForm` are reference/example blocks, not auto-registered — a host opts in via config or `extend()`.
 
 | Kind | Class path | Purpose |
 |---|---|---|

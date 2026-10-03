@@ -92,6 +92,15 @@ class BlockRegistry
             $this->register($class);
         }
 
+        /** @var array<string, string> $discover */
+        $discover = (array) config('tbtop-cms.blocks.discover', []);
+
+        foreach ($discover as $namespace => $directory) {
+            foreach (BlockDiscovery::classes($namespace, $directory) as $class) {
+                $this->register($class);
+            }
+        }
+
         foreach (self::$extensions as $extension) {
             foreach ($extension() as $class) {
                 $this->register($class);
