@@ -12,8 +12,17 @@ return [
     ],
     'columns' => [
         'name' => 'Name',
-        'kind' => 'Block type',
-        'usage' => 'Used on',
+        'kind' => 'Type',
+        'usage' => 'Usage',
+        'container' => 'Placed in',
+    ],
+    'containers' => [
+        'page' => 'Page',
+        'layout' => 'Layout',
+    ],
+    'usage' => [
+        'open' => 'Open',
+        'gone' => 'This placement no longer references the block.',
     ],
     'usage_count' => '{0} Not placed anywhere|{1} Placed in :count place|[2,*] Placed in :count places',
     'usage_title' => 'Where it is placed',

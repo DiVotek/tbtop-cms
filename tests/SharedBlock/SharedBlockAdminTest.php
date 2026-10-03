@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Layout\Slots;
@@ -147,11 +148,50 @@ it('counts a layout slot as a placement and refuses to delete a block a slot sti
     $shared = sharedSimple();
     Layout::query()->create(['slot' => Slots::FOOTER, 'content' => [['id' => 'f1', 'kind' => 'Simple', 'active' => true, 'shared' => $shared->id, 'data' => []]]]);
 
-    $edit = json_encode(sharedActing()->get("/admin/shared-blocks/{$shared->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'), JSON_UNESCAPED_SLASHES);
-    expect($edit)->toContain('/admin/layout/' . Slots::FOOTER . '/edit');
+    $rows = sharedActing()->getJson("/admin/shared-blocks/{$shared->id}/edit/tables/sharedBlockUsage")->assertOk()->json('data.data');
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['id'])->toBe('layout:' . Slots::FOOTER)
+        ->and($rows[0]['container'])->toBe('layout');
 
     $structure = json_encode($this->get('/admin/shared-blocks', ['X-Inertia' => 'true'])->assertOk()->json('props.structure'));
     expect($structure)->not->toContain("sharedBlockDelete_{$shared->id}");
+});
+
+it('lists every page and slot placing the block in the usage table, and detaches one from there', function (): void {
+    $shared = sharedSimple();
+    $page = sharedPage([
+        ['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []],
+        ['id' => 'ref2', 'kind' => 'Simple', 'active' => false, 'sort' => 1, 'shared' => $shared->id, 'data' => []],
+    ]);
+    $other = sharedPage([['id' => 'ref3', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []]]);
+
+    $lockBefore = $page->fresh()->lock_version;
+    $rows = sharedActing()->getJson("/admin/shared-blocks/{$shared->id}/edit/tables/sharedBlockUsage")->assertOk()->json('data.data');
+    expect(array_column($rows, 'id'))->toBe(["page:{$page->id}", "page:{$other->id}"])
+        ->and($rows[0]['name'])->toBe('About');
+
+    $response = $this->postJson("/admin/shared-blocks/{$shared->id}/edit/actions/sharedBlockUsageDetachConfirm", ['payload' => ['row' => ['id' => "page:{$page->id}"]]])->assertOk();
+    expect($response->json('effects.1.href'))->toContain("/admin/shared-blocks/{$shared->id}/edit");
+
+    $content = $page->fresh()->content;
+    expect($content[0])->not->toHaveKey('shared')
+        ->and($content[0]['data'])->toBe(['heading' => 'Shared heading', 'body' => 'Shared body'])
+        ->and($content[1]['active'])->toBeFalse()
+        ->and($content[1])->not->toHaveKey('shared')
+        ->and($other->fresh()->content[0]['shared'])->toBe($shared->id)
+        ->and($page->fresh()->lock_version)->toBeGreaterThan($lockBefore);
+});
+
+it('refuses to detach from a page when the editor lacks the pages ability', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.design', static fn (): bool => true);
+    Gate::define('tbtop-cms.pages', static fn (): bool => false);
+    $shared = sharedSimple();
+    $page = sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []]]);
+
+    sharedActing()->postJson("/admin/shared-blocks/{$shared->id}/edit/actions/sharedBlockUsageDetachConfirm", ['payload' => ['row' => ['id' => "page:{$page->id}"]]])->assertForbidden();
+
+    expect($page->fresh()->content[0]['shared'])->toBe($shared->id);
 });
 
 it('rechecks usage when deleting, so a placement made after the card rendered is not orphaned', function (): void {
