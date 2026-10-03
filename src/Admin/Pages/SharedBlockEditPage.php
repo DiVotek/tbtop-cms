@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
+use Tbtop\Admin\Dsl\Color;
+use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page;
@@ -18,8 +22,10 @@ use Tbtop\Cms\Admin\Pages\Support\SharedBlockForm;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Page\Models\Page as CmsPage;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
+use Tbtop\Cms\SharedBlock\SharedBlockDetacher;
 use Tbtop\Cms\SharedBlock\SharedBlockUsage;
 
 class SharedBlockEditPage extends Page
@@ -74,22 +80,118 @@ class SharedBlockEditPage extends Page
         return $s->stack([$form]);
     }
 
-    /** Where the block is placed: an edit here changes every page and slot listed. */
+    /**
+     * Where the block is placed, as a table over the page and layout rows
+     * that reference it. A detach here copies the content into that
+     * container, so a page can take its own copy without opening its editor.
+     * The rows come from a literal union — usage lives in JSON content, not
+     * in a table the DSL could query — and the row id names the container.
+     */
     private function usage(S $s, SharedBlock $block): Node
     {
         $containers = SharedBlockUsage::using((int) $block->getKey());
+        $count = $s->displayText(trans_choice('tbtop-cms::shared-blocks.usage_count', count($containers)))->variant('muted');
 
-        $rows = [$s->displayText(trans_choice('tbtop-cms::shared-blocks.usage_count', count($containers)))->variant('muted')];
-        foreach ($containers as $i => $container) {
-            [$name, $url] = $container instanceof CmsPage
-                ? [$this->pageName($container), Route::has('tbtop.cms.page-edit-page') ? route('tbtop.cms.page-edit-page', ['page' => $container->getKey()]) : null]
-                : [LayoutForm::label($container->slot), Route::has('tbtop.cms.layout-edit-page') ? route('tbtop.cms.layout-edit-page', ['slot' => $container->slot]) : null];
-            $rows[] = $url === null
-                ? $s->displayText($name)
-                : $s->flex([$s->action('sharedBlockUsage_' . $i)->label($name)->url($url), $s->spacer()]);
+        if ($containers === []) {
+            return $s->section(['title' => __('tbtop-cms::shared-blocks.usage_title'), 'variant' => 'plain'], [$count]);
         }
 
-        return $s->section(['title' => __('tbtop-cms::shared-blocks.usage_title'), 'variant' => 'plain'], [$s->stack($rows, ['gap' => 1])]);
+        $table = $s->table('sharedBlockUsage')
+            ->query(fn (): QueryBuilder => $this->usageQuery($containers))
+            ->columns([
+                Column::make('name')->label(__('tbtop-cms::shared-blocks.columns.name')),
+                Column::make('container')->label(__('tbtop-cms::shared-blocks.columns.container'))->badge([
+                    'page' => ['label' => __('tbtop-cms::shared-blocks.containers.page'), 'color' => Color::Info],
+                    'layout' => ['label' => __('tbtop-cms::shared-blocks.containers.layout'), 'color' => Color::Gray],
+                ]),
+            ])
+            ->toolbar(false)
+            ->embedded()
+            ->recordUrl(fn (object $row): ?string => $this->containerUrl((string) $row->id))
+            ->rowActions([
+                $s->action('sharedBlockUsageOpen')->label('')->link()->icon('pencil')
+                    ->tooltip(__('tbtop-cms::shared-blocks.usage.open'))
+                    ->handle(fn (ActionCtx $ctx): Effects => $this->open($ctx), needs: ['row']),
+                $this->detachAction($s, $block),
+            ]);
+
+        return $s->section(['title' => __('tbtop-cms::shared-blocks.usage_title'), 'variant' => 'plain'], [$s->stack([$count, $table], ['gap' => 2])]);
+    }
+
+    /** @param  list<CmsPage|Layout>  $containers */
+    private function usageQuery(array $containers): QueryBuilder
+    {
+        $union = null;
+        foreach ($containers as $container) {
+            $row = $container instanceof CmsPage
+                ? ['page:' . $container->getKey(), $this->pageName($container), 'page']
+                : ['layout:' . $container->slot, LayoutForm::label($container->slot), 'layout'];
+            $select = DB::query()->selectRaw('? as id, ? as name, ? as container', $row);
+            $union = $union instanceof QueryBuilder ? $union->unionAll($select) : $select;
+        }
+
+        return DB::query()->fromSub($union, 'usage');
+    }
+
+    /**
+     * A modal rather than confirm(): the client labels a confirm button with
+     * the action's own label, and an icon-only action has none to give.
+     */
+    private function detachAction(S $s, SharedBlock $block): ActionBuilder
+    {
+        $cancel = $s->action('sharedBlockUsageDetachCancel')->label(__('tbtop-cms::common.actions.cancel'))
+            ->handle(static fn (): Effects => Effects::make()->closeModal());
+        $detach = $s->action('sharedBlockUsageDetachConfirm')->label(__('tbtop-cms::shared-blocks.reference.detach'))
+            ->color('danger')
+            ->handle(fn (ActionCtx $ctx): Effects => $this->detach($ctx, $block), needs: ['row']);
+
+        return $s->action('sharedBlockUsageDetach')->label('')->link()->icon('unlink')
+            ->tooltip(__('tbtop-cms::shared-blocks.reference.detach'))
+            ->modal(__('tbtop-cms::shared-blocks.reference.detach_title'), $s->stack([
+                $s->displayText(__('tbtop-cms::shared-blocks.reference.detach_confirm', ['name' => $block->name]))->variant('muted'),
+                $s->flex([$s->spacer(), $cancel, $detach], justify: 'end'),
+            ], ['gap' => 4]));
+    }
+
+    private function open(ActionCtx $ctx): Effects
+    {
+        $url = $this->containerUrl((string) ($ctx->row['id'] ?? ''));
+
+        return $url === null ? Effects::make() : Effects::make()->redirect($url);
+    }
+
+    private function detach(ActionCtx $ctx, SharedBlock $block): Effects
+    {
+        $container = $this->container((string) ($ctx->row['id'] ?? ''));
+        if ($container === null || SharedBlockDetacher::detach($block, $container) === 0) {
+            return Effects::make()->notify(__('tbtop-cms::shared-blocks.usage.gone'), 'error')->refreshTable();
+        }
+
+        return Effects::make()->notify(__('tbtop-cms::shared-blocks.reference.detached'))
+            ->redirect(route('tbtop.cms.shared-block-edit-page', ['sharedBlock' => $block->getKey()]));
+    }
+
+    /** The table row id is `page:<id>` or `layout:<slot>`. */
+    private function container(string $rowId): CmsPage | Layout | null
+    {
+        [$type, $key] = array_pad(explode(':', $rowId, 2), 2, '');
+
+        return match ($type) {
+            'page' => ctype_digit($key) ? CmsPage::query()->find((int) $key) : null,
+            'layout' => Layout::query()->where('slot', $key)->first(),
+            default => null,
+        };
+    }
+
+    private function containerUrl(string $rowId): ?string
+    {
+        [$type, $key] = array_pad(explode(':', $rowId, 2), 2, '');
+
+        return match (true) {
+            $type === 'page' && Route::has('tbtop.cms.page-edit-page') => route('tbtop.cms.page-edit-page', ['page' => $key]),
+            $type === 'layout' && Route::has('tbtop.cms.layout-edit-page') => route('tbtop.cms.layout-edit-page', ['slot' => $key]),
+            default => null,
+        };
     }
 
     private function pageName(CmsPage $page): string
