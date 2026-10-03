@@ -26,6 +26,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageSubtype;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\StarterBlocks;
 use Tbtop\Cms\Page\Types\PageType;
@@ -58,12 +59,21 @@ class PageForm
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
                     ->required()->options(PageFormOptions::types(includeSourceBacked: false))
                     ->default(app(PageType::class)->key()),
+                self::subtypeField($s),
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
                     ->query(static fn (): Builder => self::parentQuery())
                     ->labelKey('name')->searchable()
                     ->hiddenIf(Cond::notIn('type', ['category', 'article'])),
             ]),
         ];
+    }
+
+    /** The "Subtype" select: only visible while "Type" is the page base. */
+    public static function subtypeField(S $s): Field
+    {
+        return $s->select('subtype')->label(__('tbtop-cms::pages.fields.subtype'))
+            ->options(PageFormOptions::subtypes())->default('')
+            ->hiddenIf(Cond::neq('type', PageSubtype::BASE));
     }
 
     /**
@@ -367,6 +377,7 @@ class PageForm
      */
     public static function save(array $form, ?int $id = null): Page
     {
+        $form = PageSubtype::resolve($form);
         $page = $id !== null ? Page::query()->findOrFail($id) : new Page;
         $isCreate = ! $page->exists;
         $statusBefore = $page->exists ? $page->status : null;
@@ -655,7 +666,8 @@ class PageForm
             'heading' => $page->getTranslations('heading'),
             'summary' => $page->getTranslations('summary'),
             'body' => $page->getTranslations('body'),
-            'type' => $page->type,
+            'type' => PageSubtype::baseOf($page->type),
+            'subtype' => PageSubtype::subtypeOf($page->type),
             // Raw id string (or null) — the relation picker resolves its
             // label via the relation-search endpoint's resolve mode, which
             // looks the value up by primary key; the old NO_PARENT sentinel

@@ -252,6 +252,11 @@ Overridable, all with sane defaults:
   pages.md for what "source-backed" means. A block that reads `$ctx->source`
   is coupled to running only on that page type — check for `null` /
   `instanceof` before use.
+- **`field(string $name): mixed`** / **`fields`** — the resolved props of the
+  page type's *general* blocks (see pages.md, "Type blocks"), e.g. the
+  address a contacts page declares on its General tab; `null` / `[]` on a
+  page whose type declares none and in a layout slot. The same array ships
+  as the `page.fields` prop.
 - **`mediaUrl(string|int $id): ?string`** — resolves a stored media id
   (never store URLs directly in block `data`) to a public URL via
   `MediaUrlResolver`, `null` if the media row is missing or has no path.

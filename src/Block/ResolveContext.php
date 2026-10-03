@@ -19,7 +19,20 @@ final readonly class ResolveContext
         private ?RichtextHtmlRenderer $richtextHtmlRenderer = null,
         public ?object $source = null,
         private ?LinkResolver $linkResolver = null,
+        /**
+         * Resolved props of the page type's general blocks (see TypeBlocks),
+         * filled before the content blocks resolve so any of them can read a
+         * type field such as an address or a deadline.
+         *
+         * @var array<string, mixed>
+         */
+        public array $fields = [],
     ) {}
+
+    public function field(string $name): mixed
+    {
+        return $this->fields[$name] ?? null;
+    }
 
     public function mediaUrl(string | int $id): ?string
     {

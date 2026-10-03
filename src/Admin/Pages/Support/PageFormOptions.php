@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\PageSubtype;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 class PageFormOptions
@@ -32,11 +33,31 @@ class PageFormOptions
         $options = [];
 
         foreach ($registry->all() as $type) {
-            if (! $includeSourceBacked && $type->isSourceBacked()) {
+            if ((! $includeSourceBacked && $type->isSourceBacked()) || $type->base() !== $type->key()) {
                 continue;
             }
 
             $options[] = ['value' => $type->key(), 'label' => self::typeLabel($type->key(), $type->label())];
+        }
+
+        return $options;
+    }
+
+    /**
+     * The subtypes of $base an admin may pick, after a "none" entry whose
+     * value is '' (= the plain base type). Source-backed subtypes are left
+     * out for the same reason as in types().
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public static function subtypes(string $base = PageSubtype::BASE): array
+    {
+        $options = [['value' => '', 'label' => __('tbtop-cms::pages.fields.subtype_none')]];
+
+        foreach (app(PageTypeRegistry::class)->all() as $type) {
+            if ($type->base() === $base && $type->key() !== $base && ! $type->isSourceBacked()) {
+                $options[] = ['value' => $type->key(), 'label' => self::typeLabel($type->key(), $type->label())];
+            }
         }
 
         return $options;

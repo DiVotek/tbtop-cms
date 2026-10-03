@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Page\Types;
 
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\TypeBlock;
 
 abstract class BasePageType implements PageTypeInterface
 {
@@ -51,5 +52,16 @@ abstract class BasePageType implements PageTypeInterface
     public function schemaTypes(): array
     {
         return ['WebPage', 'AboutPage', 'ContactPage', 'ItemPage'];
+    }
+
+    public function base(): string
+    {
+        return $this->key();
+    }
+
+    /** @return list<TypeBlock> */
+    public function blocks(): array
+    {
+        return [];
     }
 }
