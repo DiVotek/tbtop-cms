@@ -72,6 +72,7 @@ return [
                 'admin_page_import_missing' => "The admin page component at :path does not import from '@tbtop/inertia-admin' — Inertia will fail to resolve the admin/page component.",
                 'css_not_found' => 'No CSS entry file found (looked for: :candidates).',
                 'source_missing' => 'The stylesheet at :path has no @source line for vendor/tbtop/cms — admin DSL classes may compile to nothing and render unstyled.',
+                'raw_renderer' => "Blocks are rendered with the raw '@json-render/react' Renderer at :paths — import CmsRenderer from '@cms/CmsRenderer' instead, so a block that fails to resolve or render shows a placeholder in preview and debug rather than vanishing silently.",
             ],
         ],
         'package_versions_match' => [

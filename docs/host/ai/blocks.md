@@ -22,11 +22,14 @@ A block is three things, in three places:
 They match by string identity: PHP `kind()` == the catalog's component key
 == the registry's component key. With the generated registry the tie is
 checked at generation time — a registered block without its component file
-fails `cms:blocks:types` (and `--check` in CI). The runtime enforcement
-stays: `@json-render/react`'s `Renderer` validates each element's `props`
-against the catalog schema for its `type` before handing them to the
-component, so a `resolve()` shape that drifts from the zod schema fails
-loudly in the browser console, not silently.
+fails `cms:blocks:types` (and `--check` in CI). The runtime enforcement is
+`CmsRenderer` (`@cms/CmsRenderer`, the wrapper every host renders pages
+and layout slots with — see "Client side"): it checks each element's `props`
+against the catalog schema for its `type` before the component sees them, so
+a `resolve()` shape that drifts from the zod schema shows up as a broken-block
+placeholder in preview and debug, not as a crash inside the component.
+`@json-render/react`'s bare `Renderer` does no such check — it hands props
+through as they are.
 
 Adding a block is therefore two files: `app/Cms/Blocks/<Kind>Block.php`
 and `resources/js/cms/blocks/<Kind>.tsx` — then `php artisan
@@ -300,21 +303,27 @@ order:
    existed — falls back to array index; PHP's stable `usort()` keeps
    original order among ties).
 2. Skip if `active === false`, or if `kind`/`id` aren't strings.
-3. Look up `kind` in `BlockRegistry`. Unknown kind: skipped (with a
-   `block.unknown` warning log), *unless* `tbtop-cms.blocks.strict` is true,
-   in which case it throws `BlockResolutionException::unknownKind()`.
+3. Look up `kind` in `BlockRegistry`. Unknown kind: kept with empty props
+   and `error` "Block [Kind] is not registered." (plus a `block.unknown`
+   warning log) so the placeholder shows where it stood, *unless*
+   `tbtop-cms.blocks.strict` is true, in which case it throws
+   `BlockResolutionException::unknownKind()`.
 4. Flatten `data` for the current locale via `LocaleFlattener`, using the
    block's `translatableFields()`.
 5. Call `$block->resolve($flat, $ctx)`. An uncaught exception here is
-   caught, logged as `block.resolve_failed`, and the block is skipped —
-   again unless `blocks.strict` is true, which rethrows as
-   `BlockResolutionException::resolveFailed()`. One broken block never takes
-   down the rest of the page.
+   caught, logged as `block.resolve_failed`, and the block **stays in the
+   list with empty props and `ResolvedBlock::$error` set** (the exception
+   message with `app.debug`, a generic "Block [Kind] failed to resolve."
+   without) — unless `blocks.strict` is true, which rethrows as
+   `BlockResolutionException::resolveFailed()`. `PageSpecAssembler` lists
+   those ids under `render.errors`, and `CmsRenderer` draws a placeholder in
+   the block's place. One broken block never takes down the rest of the
+   page, and never vanishes without a trace either.
 
 **`blocks.strict`** (`config/tbtop-cms.php`, default `false`): non-strict is
-the resilient default for production frontend rendering (skip bad blocks,
-log, move on). Flip it on for tests, CI, or admin preview flows where a
-silently-dropped block is a bug you want to catch, not paper over. See
+the resilient default for production frontend rendering (mark bad blocks,
+log, move on). Flip it on for tests or CI where a broken block should fail
+the run rather than render as a placeholder. See
 `tests/Block/BlockContentResolverTest.php` ("throws on an unknown kind when
 strict mode is enabled", "throws with the original error as previous when
 strict mode is enabled").
@@ -493,13 +502,22 @@ are the client's half of the three-layer contract:
   itself in the spec.
 - **`registry.tsx`** maps the same keys to React components
   (`defineRegistry(catalog, {components: {...}})`).
-- **Unknown kind**: if a spec element's `type` has no entry in the registry
-  (and no `fallback` prop was passed to `<Renderer>` — `CmsPage.tsx` in this
-  package and both real hosts surveyed pass none), `@json-render/react`
-  logs `console.warn('No renderer for component type: ...')` and renders
-  nothing for that element. A block missing its client-side wiring doesn't
-  crash the page — it silently vanishes. Check the browser console when a
-  block "isn't showing up."
+- **`CmsRenderer.tsx`** (`@cms/CmsRenderer`) is what renders a spec —
+  `<CmsRenderer spec={render} catalog={catalog} registry={registry}
+  showErrors={isPreview || cms.debug} />` — never `@json-render/react`'s
+  bare `<Renderer>` (`cms:doctor` warns when a host file imports it). It
+  turns every block that cannot render into a placeholder in its place,
+  for four causes: the server failed to resolve it (`render.errors[id]`),
+  its kind has no component in the registry, its props fail the catalog
+  schema, or its component throws while rendering (caught client-side; the
+  SSR pass lets the throw escape and Inertia falls back to client render).
+  With `showErrors` the placeholder is a red box naming the block and the
+  reason (`data-testid="cms-block-error"`); without it the block renders
+  nothing, so a visitor never sees the diagnostics. A layout slot built
+  from `cms.layout.header`/`footer` passes each block's `error` through as
+  `spec.errors[id]` the same way. The pure spec rewrite is
+  `markBrokenBlocks()` in `blockErrors.ts`, for a host that builds its own
+  render path.
 - **Extending vs. rewriting the catalog**: the package ships exactly two
   built-in blocks (`Hero`, `ContactForm`) with their own `catalog.ts`/
   `registry.tsx` as a working example, importable via the `@cms` alias. In
@@ -514,7 +532,7 @@ are the client's half of the three-layer contract:
 - **Host-only client interactivity**: state that spans multiple blocks on a
   page (e.g. divotek's `ContactModalContext` — a CTA in one block opens a
   contact form rendered by a different block) is not a package concern.
-  Provide it as a React context around `<Renderer>` in the host's own
+  Provide it as a React context around `<CmsRenderer>` in the host's own
   `CmsPage.tsx`, with a no-op fallback value so a page without the relevant
   block still renders (see `ContactModalContext.tsx`'s `NOOP` value in
   divotek_com_ua). The package's `ResolveContext`/props contract has no

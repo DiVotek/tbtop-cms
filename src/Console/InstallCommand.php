@@ -137,16 +137,22 @@ class InstallCommand extends Command
         $this->line("       import '@cms/admin/blocks';");
         $this->newLine();
 
-        $this->line('  5. Let Tailwind scan this package (resources/css/admin.css):');
+        $this->line('  5. Render pages and layout slots with CmsRenderer, never the bare @json-render Renderer,');
+        $this->line('     so a block that fails to resolve or render shows a placeholder instead of vanishing:');
+        $this->line("       import { CmsRenderer } from '@cms/CmsRenderer';");
+        $this->line('       <CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={isPreview || cms.debug} />');
+        $this->newLine();
+
+        $this->line('  6. Let Tailwind scan this package (resources/css/admin.css):');
         $this->line("       @source '../../vendor/tbtop/cms/src/**/*.php';");
         $this->line("       @source '../../vendor/tbtop/cms/resources/js/cms/admin/**/*.tsx';");
         $this->newLine();
 
-        $this->line('  6. Delete public/robots.txt if your skeleton shipped one — Laravel serves files');
+        $this->line('  7. Delete public/robots.txt if your skeleton shipped one — Laravel serves files');
         $this->line('     under public/ before any route runs, so it shadows the dynamic /robots.txt.');
         $this->newLine();
 
-        $this->line('  7. Point an agent building on this host at the host-builder guide — add this line');
+        $this->line('  8. Point an agent building on this host at the host-builder guide — add this line');
         $this->line('     to your AGENTS.md or CLAUDE.md:');
         $this->line('       Building on tbtop/cms → read vendor/tbtop/cms/docs/host/ai/README.md first.');
         $this->newLine();

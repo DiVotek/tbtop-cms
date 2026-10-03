@@ -174,7 +174,9 @@ Each `render.elements[id].props` (and root's `props`) serializes as `{}` not `[]
 
 | Import | Export | Purpose |
 |---|---|---|
-| `@cms/CmsPage` | default `CmsPage` | The stock `Cms/Page` component: `CmsHead` + preview banner + `Renderer` |
+| `@cms/CmsPage` | default `CmsPage` | The stock `Cms/Page` component: `CmsHead` + preview banner + `CmsRenderer` |
+| `@cms/CmsRenderer` | `CmsRenderer({ spec, catalog, registry, showErrors })`, `BlockErrorPlaceholder` | The renderer for pages and layout slots: a block that fails to resolve, has no component, fails its schema or throws becomes a placeholder (visible with `showErrors`) instead of vanishing — see blocks.md#client-side |
+| `@cms/blockErrors` | `markBrokenBlocks(spec, catalog, registry)`, `BLOCK_ERROR_KIND`, types `RenderSpec`, `BlockErrorProps`, `CatalogLike` | The pure spec rewrite behind `CmsRenderer`, for a host with its own render path |
 | `@cms/CmsHead` | `CmsHead({ seo })`, types `Seo`, `SeoAlternate` | The SEO `<Head>` block, key-matched with `head.blade.php` — render it from a host-owned `CmsPage.tsx` instead of copying the tags |
 
 ## 5. Extension contracts and base classes

@@ -1,13 +1,17 @@
 import { usePage } from "@inertiajs/react";
-import { JSONUIProvider, Renderer, type Spec } from "@json-render/react";
+import { JSONUIProvider } from "@json-render/react";
 import type { CSSProperties } from "react";
+import type { RenderSpec } from "./blockErrors";
+import { catalog } from "./catalog";
 import { CmsHead, type Seo } from "./CmsHead";
+import { CmsRenderer } from "./CmsRenderer";
 import { registry } from "./registry";
 
 interface CmsPageProps {
-    render: Spec;
+    render: RenderSpec;
     seo: Seo;
     isPreview?: boolean;
+    cms?: { debug?: boolean };
     [key: string]: unknown;
 }
 
@@ -23,14 +27,14 @@ const bannerStyle: CSSProperties = {
 };
 
 export default function CmsPage() {
-    const { render, seo, isPreview } = usePage<CmsPageProps>().props;
+    const { render, seo, isPreview, cms } = usePage<CmsPageProps>().props;
 
     return (
         <>
             <CmsHead seo={seo} />
             {isPreview ? <div style={bannerStyle}>Draft preview — this page is not published.</div> : null}
             <JSONUIProvider registry={registry}>
-                <Renderer spec={render} registry={registry} />
+                <CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={isPreview === true || cms?.debug === true} />
             </JSONUIProvider>
         </>
     );

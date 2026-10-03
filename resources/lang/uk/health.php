@@ -72,6 +72,7 @@ return [
                 'admin_page_import_missing' => "Компонент admin-сторінки :path не імпортує з '@tbtop/inertia-admin' — Inertia не зможе розпізнати компонент admin/page.",
                 'css_not_found' => 'CSS-точку входу не знайдено (шукали: :candidates).',
                 'source_missing' => 'У стилях :path немає рядка @source для vendor/tbtop/cms — класи admin DSL можуть не потрапити до збірки й рендеритися без стилів.',
+                'raw_renderer' => "Блоки рендеряться «сирим» Renderer з '@json-render/react' у :paths — замість нього імпортуйте CmsRenderer з '@cms/CmsRenderer', щоб блок, який не вдалося зрезолвити чи відрендерити, показував заглушку в прев'ю та debug, а не зникав мовчки.",
             ],
         ],
         'package_versions_match' => [
