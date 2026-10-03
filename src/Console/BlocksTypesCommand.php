@@ -100,6 +100,10 @@ class BlocksTypesCommand extends Command
     {
         $componentsImport = config('tbtop-cms.blocks.components_dir');
         $componentsImport = is_string($componentsImport) && $componentsImport !== '' ? rtrim($componentsImport, '/') : './blocks';
+        // A bare `components` would import a package by that name; the folder is always relative to the registry file.
+        if (! str_starts_with($componentsImport, './') && ! str_starts_with($componentsImport, '../')) {
+            $componentsImport = './' . $componentsImport;
+        }
         // Collapsed by string: with `../blocks` the registry folder may not exist yet, which defeats is_dir() on the raw path.
         $componentsDir = self::collapse(dirname($registryPath) . '/' . $componentsImport);
 

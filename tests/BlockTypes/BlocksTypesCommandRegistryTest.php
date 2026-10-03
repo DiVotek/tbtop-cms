@@ -121,6 +121,16 @@ it('fails when a kind has no characters usable as a component name', function ()
     expect(is_file($this->registryPath))->toBeFalse();
 });
 
+it('imports components relatively when components_dir is given without a leading dot', function (): void {
+    config()->set('tbtop-cms.blocks.components_dir', 'blocks');
+    BlockRegistry::extend(fn (): array => [BetaBlock::class]);
+    touch($this->dir . '/blocks/Beta.tsx');
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->registryPath))->toContain('import { Beta } from "./blocks/Beta";');
+});
+
 it('reports a stale registry under --check even when the types file is current', function (): void {
     BlockRegistry::extend(fn (): array => [BetaBlock::class]);
     touch($this->dir . '/blocks/Beta.tsx');
