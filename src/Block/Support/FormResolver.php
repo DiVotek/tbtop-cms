@@ -102,11 +102,16 @@ final class FormResolver
             ],
             $kind === 'keyvalue' => [
                 'type' => 'array<string, string>',
-                'resolve' => static fn (mixed $v): array => array_filter(
-                    is_array($v) ? $v : [],
-                    static fn (mixed $value, mixed $key): bool => is_string($key) && is_scalar($value),
-                    ARRAY_FILTER_USE_BOTH,
-                ),
+                'resolve' => static function (mixed $v): array {
+                    $out = [];
+                    foreach (is_array($v) ? $v : [] as $key => $value) {
+                        if (is_string($key) && is_scalar($value)) {
+                            $out[$key] = (string) $value;
+                        }
+                    }
+
+                    return $out;
+                },
             ],
             // text, textarea, select, radio, togglebuttons, slug, date, time, colorpicker, embed…: one trimmed string.
             default => [

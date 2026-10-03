@@ -38,7 +38,7 @@ it('resolves each field by its kind without a resolve() on the block', function 
         'featured' => '1',
         'keywords' => ['a', ' b ', ''],
         'sizes' => ['s', 'm'],
-        'meta' => ['k' => 'v', 0 => 'dropped', 'arr' => []],
+        'meta' => ['k' => 'v', 'n' => 7, 'b' => true, 0 => 'dropped', 'arr' => []],
         'items' => [
             ['label' => 'One', 'qty' => 2],
             ['label' => '', 'qty' => null],
@@ -57,7 +57,7 @@ it('resolves each field by its kind without a resolve() on the block', function 
         'featured' => true,
         'keywords' => ['a', 'b'],
         'sizes' => ['s', 'm'],
-        'meta' => ['k' => 'v'],
+        'meta' => ['k' => 'v', 'n' => '7', 'b' => '1'],
         'items' => [['label' => 'One', 'qty' => 2]],
     ]);
 });
