@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\SharedBlock\SharedBlocks;
 
 /**
  * Builds the "Blocks" repeater and maps its rows to and from the stored
@@ -81,9 +82,18 @@ final class BlockContent
                 $entry['sort'] = (int) $row['sort'];
             }
 
+            // A reference to a shared block carries no data of its own; the
+            // pointer stays on the envelope, never inside `data`.
+            $shared = SharedBlocks::refOf($row);
+            if ($shared !== null) {
+                $out[] = [...$entry, 'shared' => $shared, 'data' => []];
+
+                continue;
+            }
+
             $out[] = [
                 ...$entry,
-                'data' => Arr::except($row, ['id', 'kind', 'active', 'sort']),
+                'data' => Arr::except($row, ['id', 'kind', 'active', 'sort', 'shared']),
             ];
         }
 
@@ -108,12 +118,17 @@ final class BlockContent
 
             $data = is_array($block['data'] ?? null) ? $block['data'] : [];
 
-            $rows[] = [
+            $row = [
                 ...$data,
                 'id' => (string) ($block['id'] ?? ''),
                 'kind' => (string) ($block['kind'] ?? ''),
                 'active' => (bool) ($block['active'] ?? true),
             ];
+            $shared = SharedBlocks::refOf($block);
+            if ($shared !== null) {
+                $row['shared'] = $shared;
+            }
+            $rows[] = $row;
         }
 
         return $rows;

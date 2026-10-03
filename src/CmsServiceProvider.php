@@ -87,6 +87,9 @@ use Tbtop\Cms\Redirect\RedirectResolver;
 use Tbtop\Cms\Seo\Commands\SnapshotSeoAuditCommand;
 use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\SharedBlock\Events\SharedBlockDeleted;
+use Tbtop\Cms\SharedBlock\Events\SharedBlockSaved;
+use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Tbtop\Cms\Telegram\TelegramClient;
 use Tbtop\Cms\Telegram\TelegramInvites;
 
@@ -130,6 +133,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_09_01_000000_create_notification_templates_table')
             ->hasMigration('2026_09_15_000000_add_error_class_to_pages_table')
             ->hasMigration('2026_09_23_000000_add_og_locale_to_languages_table')
+            ->hasMigration('2026_10_03_000002_create_shared_blocks_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -153,6 +157,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->singleton(RobotsRegistry::class);
         $this->app->singleton(SchemaTypeRegistry::class);
         $this->app->scoped(BlockContentResolver::class);
+        $this->app->scoped(SharedBlocks::class);
         $this->app->scoped(LayoutResolver::class);
         $this->app->scoped(PageResolver::class);
         $this->app->scoped(RedirectResolver::class);
@@ -387,6 +392,11 @@ class CmsServiceProvider extends PackageServiceProvider
      */
     private function wireContentCacheInvalidation(): void
     {
+        // The per-request shared-block memo must not outlive a save in the same request (editor actions re-render).
+        foreach ([SharedBlockSaved::class, SharedBlockDeleted::class] as $event) {
+            Event::listen($event, fn () => $this->app->make(SharedBlocks::class)->forget());
+        }
+
         foreach ([
             PageSaved::class,
             PagePublished::class,
@@ -394,6 +404,8 @@ class CmsServiceProvider extends PackageServiceProvider
             PageDeleted::class,
             PageRestored::class,
             LayoutSaved::class,
+            SharedBlockSaved::class,
+            SharedBlockDeleted::class,
             SettingsSaved::class,
             LanguagesChanged::class,
         ] as $event) {
