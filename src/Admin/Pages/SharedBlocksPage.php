@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
@@ -200,12 +201,23 @@ class SharedBlocksPage extends AdminPage
                     return Effects::make()->redirect(route('tbtop.cms.shared-blocks-page'));
                 }
 
-                $inUse = count(SharedBlockUsage::using($id));
+                // Check and delete in one transaction. The pointer lives in
+                // page JSON, so no FK can refuse the delete; a save that
+                // lands inside this window leaves a reference the page
+                // editor shows as missing — visible and recoverable, never
+                // silent.
+                $inUse = DB::transaction(static function () use ($block, $id): int {
+                    $inUse = count(SharedBlockUsage::using($id));
+                    if ($inUse === 0) {
+                        $block->delete();
+                    }
+
+                    return $inUse;
+                });
                 if ($inUse > 0) {
                     return Effects::make()->notify(trans_choice('tbtop-cms::shared-blocks.actions.delete_in_use', $inUse), 'error');
                 }
 
-                $block->delete();
                 event(new SharedBlockDeleted($block));
 
                 return Effects::make()->notify(__('tbtop-cms::shared-blocks.actions.deleted'))
