@@ -91,7 +91,7 @@ class BlockContentResolver
 
             Log::warning('block.unknown', ['kind' => $kind]);
 
-            return null;
+            return new ResolvedBlock($raw['id'], $kind, [], "Block [{$kind}] is not registered.");
         }
 
         /** @var array<string, mixed> $data */
@@ -114,9 +114,19 @@ class BlockContentResolver
 
             Log::warning('block.resolve_failed', ['kind' => $kind, 'id' => $raw['id'], 'error' => $e->getMessage()]);
 
-            return null;
+            // The block stays in the list, marked: the page keeps its place and the client can show what failed,
+            // instead of the block vanishing with only a log line to explain it.
+            return new ResolvedBlock($raw['id'], $kind, [], self::errorMessage($kind, $e));
         }
 
         return new ResolvedBlock($raw['id'], $kind, $props);
+    }
+
+    /** The exception text reaches the browser as page props, so outside debug it is kept generic. */
+    private static function errorMessage(string $kind, Throwable $e): string
+    {
+        return (bool) config('app.debug')
+            ? "Block [{$kind}] failed to resolve: " . $e->getMessage()
+            : "Block [{$kind}] failed to resolve.";
     }
 }

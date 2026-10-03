@@ -56,7 +56,7 @@ it('orders rendered blocks by sort, not by their position in content', function 
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'Second');
 });
 
-it('drops a block that throws while resolving', function (): void {
+it('keeps a block that throws while resolving as an empty element listed under errors', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
@@ -68,8 +68,22 @@ it('drops a block that throws while resolving', function (): void {
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.render.elements.$root.children', ['hero-1'])
-        ->assertJsonMissingPath('props.render.elements.broken-1');
+        ->assertJsonPath('props.render.elements.$root.children', ['hero-1', 'broken-1'])
+        ->assertJsonPath('props.render.elements.broken-1.type', 'Broken')
+        ->assertJsonPath('props.render.errors.broken-1', 'Block [Broken] failed to resolve.');
+});
+
+it('still renders a page whose stored content names a kind that is not registered', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [['id' => 'ghost-1', 'kind' => 'Ghost', 'data' => []]],
+    ]);
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.render.elements.ghost-1.type', 'Ghost')
+        ->assertJsonPath('props.render.errors.ghost-1', 'Block [Ghost] is not registered.');
 });
 
 it('renders a valid empty spec for a page with no blocks', function (): void {

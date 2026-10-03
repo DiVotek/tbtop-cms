@@ -55,6 +55,6 @@ class FormActionBinder
             $props['honeypotField'] = $honeypotField;
         }
 
-        return new ResolvedBlock($block->id, $block->kind, $props);
+        return new ResolvedBlock($block->id, $block->kind, $props, $block->error);
     }
 }

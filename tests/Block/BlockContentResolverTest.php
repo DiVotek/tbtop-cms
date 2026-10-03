@@ -109,22 +109,40 @@ it('skips an inactive block', function (): void {
     expect($out)->toBeEmpty();
 });
 
-it('skips an unknown kind without throwing', function (): void {
+it('keeps an unknown kind in place, marked, without throwing', function (): void {
     $out = app(BlockContentResolver::class)->resolve([
         ['id' => 'a', 'kind' => 'Ghost', 'active' => true, 'data' => []],
     ]);
 
-    expect($out)->toBeEmpty();
+    expect($out)->toHaveCount(1)
+        ->and($out[0]->props)->toBe([])
+        ->and($out[0]->error)->toBe('Block [Ghost] is not registered.');
 });
 
-it('isolates a failing block and still resolves its siblings', function (): void {
+it('keeps a failing block in place, marked with its error, and still resolves its siblings', function (): void {
+    config()->set('app.debug', true);
+
     $out = app(BlockContentResolver::class)->resolve([
         ['id' => 'x', 'kind' => 'Broken', 'active' => true, 'data' => []],
         ['id' => 'y', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Hello']]],
     ]);
 
-    expect($out)->toHaveCount(1)
-        ->and($out[0]->id)->toBe('y');
+    expect($out)->toHaveCount(2)
+        ->and($out[0]->id)->toBe('x')
+        ->and($out[0]->props)->toBe([])
+        ->and($out[0]->error)->toStartWith('Block [Broken] failed to resolve: ')
+        ->and($out[1]->id)->toBe('y')
+        ->and($out[1]->error)->toBeNull();
+});
+
+it('keeps the failure reason out of the page props outside debug', function (): void {
+    config()->set('app.debug', false);
+
+    $out = app(BlockContentResolver::class)->resolve([
+        ['id' => 'x', 'kind' => 'Broken', 'active' => true, 'data' => []],
+    ]);
+
+    expect($out[0]->error)->toBe('Block [Broken] failed to resolve.');
 });
 
 it('preserves block order', function (): void {

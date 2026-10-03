@@ -107,3 +107,29 @@ it('reads the admin entry rather than the app entry when both exist', function (
         File::deleteDirectory(base_path('resources/css'));
     }
 });
+
+it('warns when a host file renders blocks with the raw Renderer and nothing imports CmsRenderer', function (): void {
+    File::ensureDirectoryExists(base_path('resources/js/cms'));
+    File::put(base_path('resources/js/cms/SiteChrome.tsx'), <<<'TSX'
+        import { JSONUIProvider, Renderer, type Spec } from "@json-render/react";
+        TSX);
+
+    try {
+        expect((new JsWiringCheck)->run()->hint())
+            ->toContain(__('tbtop-cms::health.checks.js_wiring.hints.raw_renderer', ['paths' => base_path('resources/js/cms/SiteChrome.tsx')]));
+    } finally {
+        File::deleteDirectory(base_path('resources/js'));
+    }
+});
+
+it('does not report the raw Renderer once any host file imports CmsRenderer', function (): void {
+    File::ensureDirectoryExists(base_path('resources/js/cms'));
+    File::put(base_path('resources/js/cms/SiteChrome.tsx'), "import { Renderer } from '@json-render/react';");
+    File::put(base_path('resources/js/cms/CmsPage.tsx'), "import { CmsRenderer } from '@cms/CmsRenderer';");
+
+    try {
+        expect((new JsWiringCheck)->run()->hint())->not->toContain('@json-render/react');
+    } finally {
+        File::deleteDirectory(base_path('resources/js'));
+    }
+});

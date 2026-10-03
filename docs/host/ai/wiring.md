@@ -332,6 +332,7 @@ response:
 | `cms.locale` | `string` | Current request locale |
 | `cms.defaultLocale` | `string` | Configured default content locale (`Languages::defaultLocale()`) |
 | `cms.languages` | `list<{locale, name, is_default}>` | Active frontend languages (`Languages::frontendActive()`) |
+| `cms.debug` | `bool` | `config('app.debug')` — with `isPreview`, what `CmsRenderer`'s `showErrors` is wired to, so broken-block placeholders show for developers and editors only |
 | `cms.layout` | `array<string, list<ResolvedBlock>>` | Resolved `header`/`footer` block lists — cached across requests per locale under the content version (`CmsCache::remember('layout:{locale}', ...)`) at this call site, not inside `LayoutResolver`, so the admin layout editor reads live data. A `HandlesFormSubmission` block gets `action` bound after the cache read, against the current page or the home page — see blocks.md#layout-blocks |
 
 **Page props** (`Tbtop\Cms\Frontend\Http\Controllers\PageController::props`)
@@ -341,7 +342,7 @@ response:
 |---|---|---|
 | `page.id`, `.type`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` already resolved to the request locale via `getTranslation()` |
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
-| `render` | `Spec` (json-render) | The assembled page spec — resolved block content passed through `PageSpecAssembler`; see blocks.md for the block/envelope/resolved-block vocabulary |
+| `render` | `Spec & {errors}` (json-render) | The assembled page spec — resolved block content passed through `PageSpecAssembler`, plus `errors: {[elementId]: message}` for blocks whose `resolve()` threw (kept as empty elements; `CmsRenderer` draws their placeholder); see blocks.md for the block/envelope/resolved-block vocabulary |
 | `seo` | `object` | Full SEO tag set (title, description, canonical, OG/Twitter, hreflang alternates, JSON-LD, `noindex`) — see seo.md for field-by-field detail; `CmsHead.tsx`'s `<Head>` and `head.blade.php` both render this same payload |
 | `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` — home › ancestors › the page itself; `[]` on the home page and on error pages. Render every crumb but the last as a link |
 | `path` | `string` | The resolved request path |
