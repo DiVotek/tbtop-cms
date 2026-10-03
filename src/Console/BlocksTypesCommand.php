@@ -51,6 +51,10 @@ class BlocksTypesCommand extends Command
         }
 
         File::ensureDirectoryExists(dirname($path));
+        if ($registryContents !== null) {
+            File::ensureDirectoryExists(dirname($registryPath));
+        }
+
         File::put($path, $output->contents);
         $this->info("Wrote {$path}");
 
@@ -96,7 +100,8 @@ class BlocksTypesCommand extends Command
     {
         $componentsImport = config('tbtop-cms.blocks.components_dir');
         $componentsImport = is_string($componentsImport) && $componentsImport !== '' ? rtrim($componentsImport, '/') : './blocks';
-        $componentsDir = dirname($registryPath) . '/' . $componentsImport;
+        // Collapsed by string: with `../blocks` the registry folder may not exist yet, which defeats is_dir() on the raw path.
+        $componentsDir = self::collapse(dirname($registryPath) . '/' . $componentsImport);
 
         if (! is_dir($componentsDir)) {
             return null;
@@ -104,10 +109,44 @@ class BlocksTypesCommand extends Command
 
         return (new RegistryEmitter)->emit(
             array_values($registry->all()),
-            './' . pathinfo($typesPath, PATHINFO_FILENAME),
+            self::relativeModule(dirname($registryPath), $typesPath),
             $componentsImport,
             $componentsDir,
         );
+    }
+
+    private static function collapse(string $path): string
+    {
+        $parts = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '..' && $parts !== [] && end($parts) !== '..') {
+                array_pop($parts);
+            } elseif ($segment !== '.' && $segment !== '') {
+                $parts[] = $segment;
+            }
+        }
+
+        return (str_starts_with($path, '/') ? '/' : '') . implode('/', $parts);
+    }
+
+    /**
+     * Import specifier of a .ts file from another directory: `./x` beside it,
+     * `../a/x` elsewhere. String-based on purpose — neither path need exist
+     * yet when --check runs.
+     */
+    private static function relativeModule(string $fromDir, string $file): string
+    {
+        $from = array_values(array_filter(explode('/', $fromDir), static fn (string $s): bool => $s !== '' && $s !== '.'));
+        $to = array_values(array_filter(explode('/', dirname($file)), static fn (string $s): bool => $s !== '' && $s !== '.'));
+
+        while ($from !== [] && $to !== [] && $from[0] === $to[0]) {
+            array_shift($from);
+            array_shift($to);
+        }
+
+        $up = $from === [] ? ['.'] : array_fill(0, count($from), '..');
+
+        return implode('/', [...$up, ...$to, pathinfo($file, PATHINFO_FILENAME)]);
     }
 
     private function outputPath(): string

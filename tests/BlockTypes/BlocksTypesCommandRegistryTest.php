@@ -79,6 +79,21 @@ it('skips the registry when the host has no component folder', function (): void
     mkdir($this->dir . '/blocks');
 });
 
+it('writes a registry configured in another folder, importing the types file by its relative path', function (): void {
+    config()->set('tbtop-cms.blocks.registry_path', $this->dir . '/generated/registry.ts');
+    config()->set('tbtop-cms.blocks.components_dir', '../blocks');
+    BlockRegistry::extend(fn (): array => [BetaBlock::class]);
+    touch($this->dir . '/blocks/Beta.tsx');
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->dir . '/generated/registry.ts'))
+        ->toContain('import { Beta } from "../blocks/Beta";')
+        ->toContain('import { blockProps } from "../blocks.generated";');
+    unlink($this->dir . '/generated/registry.ts');
+    rmdir($this->dir . '/generated');
+});
+
 it('reports a stale registry under --check even when the types file is current', function (): void {
     BlockRegistry::extend(fn (): array => [BetaBlock::class]);
     touch($this->dir . '/blocks/Beta.tsx');
