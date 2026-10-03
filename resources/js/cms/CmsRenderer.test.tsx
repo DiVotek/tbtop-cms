@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { JSONUIProvider, type Spec } from "@json-render/react";
 import { expect, it, mock } from "bun:test";
 import { BLOCK_ERROR_KIND, markBrokenBlocks, type RenderSpec } from "./blockErrors";
@@ -83,5 +84,32 @@ it("catches a component that throws while rendering and shows the placeholder in
         expect(getByTestId("cms-block-error").textContent).toBe("Block [Hero] threw while rendering: boom");
     } finally {
         console.error = original;
+    }
+});
+
+it("renders the placeholder in place of a throwing component on the server, where no boundary runs", () => {
+    const originalError = console.error;
+    console.error = mock(() => undefined);
+    const win = globalThis.window;
+    // A fresh registry object: the guarded registry is memoised per registry, and the client/server choice is made there.
+    const throwing = {
+        ...registry,
+        Hero: () => {
+            throw new Error("boom");
+        },
+    };
+    try {
+        // happy-dom defines window for every test; the server pass is the one without it.
+        Object.defineProperty(globalThis, "window", { value: undefined, configurable: true, writable: true });
+        const html = renderToString(
+            <JSONUIProvider registry={registry}>
+                <CmsRenderer spec={spec({ a: { type: "Hero", props: hero } })} catalog={catalog} registry={throwing} showErrors={true} />
+            </JSONUIProvider>,
+        );
+
+        expect(html).toContain("Block [Hero] threw while rendering: boom");
+    } finally {
+        Object.defineProperty(globalThis, "window", { value: win, configurable: true, writable: true });
+        console.error = originalError;
     }
 });

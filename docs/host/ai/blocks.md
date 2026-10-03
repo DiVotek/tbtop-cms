@@ -509,8 +509,10 @@ are the client's half of the three-layer contract:
   turns every block that cannot render into a placeholder in its place,
   for four causes: the server failed to resolve it (`render.errors[id]`),
   its kind has no component in the registry, its props fail the catalog
-  schema, or its component throws while rendering (caught client-side; the
-  SSR pass lets the throw escape and Inertia falls back to client render).
+  schema, or its component throws while rendering (an error boundary on the
+  client; on the server, where React runs no boundaries, a try/catch around
+  the block's own render body — a throw in a component the block nests still
+  escapes the SSR pass, and Inertia falls back to client render).
   With `showErrors` the placeholder is a red box naming the block and the
   reason (`data-testid="cms-block-error"`); without it the block renders
   nothing, so a visitor never sees the diagnostics. A layout slot built

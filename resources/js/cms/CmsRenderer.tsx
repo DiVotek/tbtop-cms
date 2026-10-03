@@ -44,9 +44,9 @@ interface BoundaryProps {
 }
 
 /**
- * Catches a block component that throws while rendering. json-render's own boundary logs and renders
- * nothing; this one draws the same placeholder the other failure causes get. Only the client catches —
- * React's server renderer lets the throw escape, and Inertia then falls back to client-side rendering.
+ * Catches a block component that throws while rendering on the client. json-render's own boundary logs
+ * and renders nothing; this one draws the same placeholder the other failure causes get. React's server
+ * renderer does not run boundaries, so the SSR path is guardServerRender() instead.
  */
 class BlockBoundary extends Component<BoundaryProps, { error: Error | null }> {
     state = { error: null as Error | null };
@@ -61,22 +61,45 @@ class BlockBoundary extends Component<BoundaryProps, { error: Error | null }> {
 
     render() {
         if (this.state.error) {
-            return (
-                <BlockErrorPlaceholder
-                    kind={this.props.kind}
-                    message={`Block [${this.props.kind}] threw while rendering: ${this.state.error.message}`}
-                    visible={this.props.showErrors}
-                />
-            );
+            return throwPlaceholder(this.props.kind, this.state.error, this.props.showErrors);
         }
 
         return this.props.children;
     }
 }
 
+function throwPlaceholder(kind: string, error: unknown, showErrors: boolean) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return <BlockErrorPlaceholder kind={kind} message={`Block [${kind}] threw while rendering: ${message}`} visible={showErrors} />;
+}
+
+/**
+ * The server has no error boundaries, and a throw there aborts the whole SSR response. A registry entry
+ * from defineRegistry() already calls the host's component as a plain function inside its own render, so
+ * on the server that call is wrapped in try/catch — one-shot rendering makes a hook-order change after a
+ * throw harmless there, which is exactly why the client cannot do the same and uses BlockBoundary. Only
+ * the block's own render body is covered: a throw in a component it nests still escapes the server pass,
+ * and Inertia then falls back to client-side rendering, where the boundary catches it.
+ */
+function guardServerRender(kind: string, component: RegistryComponent, showErrors: boolean): RegistryComponent {
+    return (props) => {
+        try {
+            return component(props);
+        } catch (error) {
+            console.error(`[tbtop-cms] Block [${kind}] threw while rendering:`, error);
+
+            return throwPlaceholder(kind, error, showErrors);
+        }
+    };
+}
+
 const wrapped = new WeakMap<object, Map<boolean, Registry>>();
 
-/** The registry with every block wrapped in a BlockBoundary and the placeholder kind added, memoised per registry. */
+/**
+ * The registry with every block guarded and the placeholder kind added, memoised per registry. The
+ * server/client choice is made here, per registry, so one bundle serves both passes.
+ */
 function guardedRegistry(registry: Record<string, unknown>, showErrors: boolean): Registry {
     const perRegistry = wrapped.get(registry) ?? new Map<boolean, Registry>();
     wrapped.set(registry, perRegistry);
@@ -87,6 +110,10 @@ function guardedRegistry(registry: Record<string, unknown>, showErrors: boolean)
 
     const guarded: Registry = {};
     for (const [kind, component] of Object.entries(registry as Registry)) {
+        if (typeof window === "undefined") {
+            guarded[kind] = guardServerRender(kind, component, showErrors);
+            continue;
+        }
         // Rendered as an element, not called: a throw must happen inside the boundary's subtree to be caught.
         const Block = component as FC<Parameters<RegistryComponent>[0]>;
         guarded[kind] = (props) => (
