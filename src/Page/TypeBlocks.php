@@ -120,18 +120,18 @@ final class TypeBlocks
     }
 
     /**
-     * Kinds some registered type declares as general. The role itself is per
-     * type (see isGeneral()); this list only tells the registry emitter which
-     * kinds may be fields and nothing else.
+     * Kinds some registered type carries in the content flow. Tells the
+     * registry emitter that a block placeable nowhere is still drawn — on
+     * the pages of that type.
      *
      * @return list<string>
      */
-    public function generalKinds(): array
+    public function contentKinds(): array
     {
         $kinds = [];
         foreach ($this->types->all() as $type) {
             foreach ($type->blocks() as $block) {
-                if ($block->isGeneral) {
+                if (! $block->isGeneral) {
                     $kinds[$block->kind] = true;
                 }
             }

@@ -402,7 +402,8 @@ only**: on a page of another type the same kind is a normal block, offered
 in "+ Add block" and drawn by its component. A block that is General-tab
 fields and nothing else says so itself by returning `[]` from
 `placements()` — then no picker offers it anywhere and `cms:blocks:types`
-asks for no component:
+asks for no component (it would only if some type carried the kind as a
+content block):
 
 ```php
 /** @return list<string> */

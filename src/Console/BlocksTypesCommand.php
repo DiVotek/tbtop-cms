@@ -118,14 +118,14 @@ class BlocksTypesCommand extends Command
             return null;
         }
 
-        // Fields and nothing else — general for some type and placeable nowhere — is never rendered: no component to
-        // import. A block one type uses as fields but others place in the flow keeps its component.
-        $general = app(TypeBlocks::class)->generalKinds();
+        // A component is needed where the block is drawn: wherever an editor may place it, and on the pages of a type
+        // that carries it as content. A block placeable nowhere and at most General-tab fields is never rendered.
+        $typeContent = app(TypeBlocks::class)->contentKinds();
 
         return (new RegistryEmitter)->emit(
             array_values(array_filter(
                 $registry->all(),
-                static fn (Block $block): bool => $block->placements() !== [] || ! in_array($block->kind(), $general, true),
+                static fn (Block $block): bool => $block->placements() !== [] || in_array($block->kind(), $typeContent, true),
             )),
             self::relativeModule(dirname($registryPath), $typesPath),
             $componentsImport,

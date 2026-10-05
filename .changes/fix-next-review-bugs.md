@@ -11,7 +11,9 @@ Bugs found reviewing #233–#242, each small and closed on its own:
 - "General" was a global property of a kind: one type declaring `Hero` as
   general removed `Hero` from "+ Add block" and from the generated registry
   for every page. It is now a role on the declaring type; the block opts out
-  globally through `placements(): []`.
+  globally through `placements(): []`. The registry asks for a component
+  exactly where a block is drawn: placeable somewhere, or carried as content
+  by a type (`TypeBlocks::contentKinds()` replaces `generalKinds()`).
 - Assigning a type to a live page (or adding a block to a type) put an empty
   content block on the public page at the next save. It now starts inactive.
 - A general block resolving `null` for a key wiped the value an earlier

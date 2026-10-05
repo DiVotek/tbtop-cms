@@ -12,6 +12,7 @@ use Tbtop\Cms\Tests\Fixtures\FieldsOnlyBlock;
 use Tbtop\Cms\Tests\Fixtures\FieldsOnlyPageType;
 use Tbtop\Cms\Tests\Fixtures\GeneralBetaPageType;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
+use Tbtop\Cms\Tests\Fixtures\TypeOnlyContentPageType;
 
 beforeEach(function (): void {
     $this->dir = sys_get_temp_dir() . '/tbtop-cms-registry-test-' . uniqid();
@@ -157,6 +158,25 @@ it('leaves a block that is General-tab fields and nothing else out of the regist
 
     expect(file_get_contents($this->registryPath))->toContain('import { Alpha }')
         ->not->toContain('FieldsOnly');
+});
+
+it('asks for no component of a block placeable nowhere that no type declares', function (): void {
+    BlockRegistry::extend(fn (): array => [AlphaBlock::class, FieldsOnlyBlock::class]);
+    touch($this->dir . '/blocks/Alpha.tsx');
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->registryPath))->not->toContain('FieldsOnly');
+});
+
+it('keeps the component of a block placeable nowhere that a type carries as content: its pages draw it', function (): void {
+    BlockRegistry::extend(fn (): array => [FieldsOnlyBlock::class]);
+    PageTypeRegistry::extend(fn (): array => [TypeOnlyContentPageType::class]);
+    touch($this->dir . '/blocks/FieldsOnly.tsx');
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->registryPath))->toContain('import { FieldsOnly }');
 });
 
 it('keeps the component of a block one type uses as fields: pages of other types still place it', function (): void {
