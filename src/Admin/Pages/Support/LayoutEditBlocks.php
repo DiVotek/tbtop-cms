@@ -8,6 +8,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Fields\BlockContent;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Layout\Models\Layout;
+use Tbtop\Cms\SharedBlock\SharedBlocks;
 
 /**
  * Folds the per-block-tab form fields (`block_{id}_{field}`,
@@ -44,12 +45,15 @@ final class LayoutEditBlocks
             $id = (string) $block['id'];
             $kind = (string) $block['kind'];
 
+            $shared = SharedBlocks::refOf($block);
             $rows[] = [
                 'id' => $id,
                 'kind' => $kind,
                 'active' => self::activeFor($form, $id, $block),
                 'sort' => self::sortFromForm($form, $id, $block),
-                ...($registry->has($kind) ? self::dataFor($form, $id, $registry, $kind) : self::existingData($block)),
+                // A shared reference has no field tab: the pointer is the whole row (as in PageEditBlocks).
+                ...($shared !== null ? ['shared' => $shared]
+                    : ($registry->has($kind) ? self::dataFor($form, $id, $registry, $kind) : self::existingData($block))),
             ];
         }
 

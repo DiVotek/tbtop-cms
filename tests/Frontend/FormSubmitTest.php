@@ -14,6 +14,7 @@ use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 
@@ -253,6 +254,22 @@ it('processes a submission under the locale carried by the action url', function
 
     expect(RecordingFormBlock::$locale)->toBe('uk')
         ->and(RecordingFormBlock::$data['label'])->toBe('UA copy');
+});
+
+it('hands a form placed by reference the shared block\'s settings, not the empty row', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$data = [];
+    $shared = SharedBlock::query()->create(['name' => 'Lead form', 'kind' => 'Recording', 'data' => ['label' => ['en' => 'Shared copy'], 'config' => 'crm']]);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recorder'],
+        'content' => [['id' => 'rec-1', 'kind' => 'Recording', 'active' => true, 'shared' => $shared->getKey(), 'data' => []]],
+    ]);
+
+    $this->post(submitUrl($page, 'rec-1'), ['value' => 'hello'])->assertRedirect();
+
+    expect(RecordingFormBlock::$data)->toBe(['label' => 'Shared copy', 'config' => 'crm']);
 });
 
 it('does not discard a non-translatable form field coincidentally shaped like a locale map', function (): void {

@@ -72,7 +72,8 @@ return [
         // Null means resources/js/cms/blocks.generated.ts; --path= overrides.
         'types_path' => null,
         // The generated catalog + component registry. Null means
-        // registry.generated.ts next to the types file.
+        // registry.generated.ts next to the types file; false turns the
+        // registry off for a host that keeps its catalog and registry by hand.
         'registry_path' => null,
         // Import prefix of the block components, relative to the registry
         // file; <Kind>.tsx exporting <Kind> is expected under it.
