@@ -94,6 +94,23 @@ function guardServerRender(kind: string, component: RegistryComponent, showError
     };
 }
 
+const reported = new Set<string>();
+
+/**
+ * A block hidden from visitors must still leave a trace: the SSR process log on the server, the console in
+ * the browser. A thrown component already logs in its own path; this covers the three causes found before
+ * rendering. The server logs every request, the browser once per page load — a re-render must not repeat it.
+ */
+function reportHidden(kind: string, message: string) {
+    if (typeof window !== "undefined") {
+        if (reported.has(message)) {
+            return;
+        }
+        reported.add(message);
+    }
+    console.error(`[tbtop-cms] Block [${kind}] is hidden from the page: ${message}`);
+}
+
 const wrapped = new WeakMap<object, Map<boolean, Registry>>();
 
 /**
@@ -124,6 +141,9 @@ function guardedRegistry(registry: Record<string, unknown>, showErrors: boolean)
     }
     guarded[BLOCK_ERROR_KIND] = ({ element }) => {
         const { kind, message } = element.props as BlockErrorProps;
+        if (!showErrors) {
+            reportHidden(kind, message);
+        }
 
         return <BlockErrorPlaceholder kind={kind} message={message} visible={showErrors} />;
     };

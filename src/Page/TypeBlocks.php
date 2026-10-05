@@ -25,6 +25,11 @@ final class TypeBlocks
      * Adds the rows the page's type declares and the page does not hold
      * yet (first save, or a type switch to one it never had). Existing rows
      * — visible or dormant — are left as they are.
+     *
+     * A content row added to a page that already exists starts inactive, the
+     * same rule StarterBlockSync follows: an empty block must not go live on
+     * a published page with the next save. General rows are fields, not
+     * output, and are always active — an inactive one would not resolve.
      */
     public function ensure(Page $page): void
     {
@@ -47,7 +52,7 @@ final class TypeBlocks
             if (isset($present[$block->kind])) {
                 continue;
             }
-            $content[] = ['id' => (string) Str::ulid(), 'kind' => $block->kind, 'active' => true, 'sort' => ++$sort, 'owner' => $page->type, 'data' => []];
+            $content[] = ['id' => (string) Str::ulid(), 'kind' => $block->kind, 'active' => $block->isGeneral || ! $page->exists, 'sort' => ++$sort, 'owner' => $page->type, 'data' => []];
             $isChanged = true;
         }
 
@@ -115,8 +120,9 @@ final class TypeBlocks
     }
 
     /**
-     * Kinds some registered type declares as general: never offered in the
-     * block picker and given no React component by the registry emitter.
+     * Kinds some registered type declares as general. The role itself is per
+     * type (see isGeneral()); this list only tells the registry emitter which
+     * kinds may be fields and nothing else.
      *
      * @return list<string>
      */

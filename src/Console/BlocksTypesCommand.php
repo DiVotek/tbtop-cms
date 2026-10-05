@@ -96,9 +96,15 @@ class BlocksTypesCommand extends Command
      * The component folder is the opt-in: a host without one (another
      * renderer, components elsewhere) gets only the types file. With the
      * folder present, every registered block must have its component there.
+     * `registry_path => false` is the explicit off switch for a host that
+     * has the folder but keeps its catalog and registry by hand.
      */
     private function generateRegistry(BlockRegistry $registry, string $typesPath, string $registryPath): ?string
     {
+        if (config('tbtop-cms.blocks.registry_path') === false) {
+            return null;
+        }
+
         $componentsImport = config('tbtop-cms.blocks.components_dir');
         $componentsImport = is_string($componentsImport) && $componentsImport !== '' ? rtrim($componentsImport, '/') : './blocks';
         // A bare `components` would import a package by that name; the folder is always relative to the registry file.
@@ -112,11 +118,15 @@ class BlocksTypesCommand extends Command
             return null;
         }
 
-        // A general type block resolves into page.fields and is never rendered: no component to import.
+        // Fields and nothing else — general for some type and placeable nowhere — is never rendered: no component to
+        // import. A block one type uses as fields but others place in the flow keeps its component.
         $general = app(TypeBlocks::class)->generalKinds();
 
         return (new RegistryEmitter)->emit(
-            array_values(array_filter($registry->all(), static fn (Block $block): bool => ! in_array($block->kind(), $general, true))),
+            array_values(array_filter(
+                $registry->all(),
+                static fn (Block $block): bool => $block->placements() !== [] || ! in_array($block->kind(), $general, true),
+            )),
             self::relativeModule(dirname($registryPath), $typesPath),
             $componentsImport,
             $componentsDir,

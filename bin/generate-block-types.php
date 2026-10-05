@@ -14,7 +14,11 @@ require __DIR__ . '/../vendor/autoload.php';
 $app = require __DIR__ . '/../vendor/orchestra/testbench-core/laravel/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-config(['tbtop-cms.blocks.types' => [HeroBlock::class, ContactForm::class]]);
+config([
+    'tbtop-cms.blocks.types' => [HeroBlock::class, ContactForm::class],
+    // The package ships a handwritten catalog.ts and registry.tsx next to its demo components.
+    'tbtop-cms.blocks.registry_path' => false,
+]);
 
 $options = ['--path' => __DIR__ . '/../resources/js/cms/blocks.generated.ts'];
 

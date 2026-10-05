@@ -66,6 +66,18 @@ page props gain `page.fields` and `ResolveContext` gains `fields` /
 `field()`; `BlockContentResolver::resolveWithFields()` is the new render
 entry, `resolve()` still returns the block list. See pages.md, "Type blocks".
 
+**A fields-only block must return `[]` from `placements()`.** "General" is a
+role a block has on the declaring type only. A kind declared general is
+again offered in "+ Add block" on pages of other types, and
+`cms:blocks:types` again requires its component. A block that exists only to
+feed a General tab opts out of both by returning `[]` from `placements()`;
+without it the command fails with "Block [Kind] has no component".
+
+**Type content blocks start inactive on an existing page.** A content row
+`PageObserver::saving` adds to a page that already exists is created with
+`active => false`; an editor fills it and switches it on. New pages and
+general rows are unchanged.
+
 ## Pages can be backed by a source (source-backed page types)
 
 `tbtop_pages` gains one nullable column, `source_id` (indexed together with

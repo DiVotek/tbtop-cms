@@ -10,6 +10,8 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\ContactsPageType;
 use Tbtop\Cms\Tests\Fixtures\FaqSchemaBlock;
+use Tbtop\Cms\Tests\Fixtures\FieldsOnlyBlock;
+use Tbtop\Cms\Tests\Fixtures\FieldsOnlyPageType;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
@@ -68,7 +70,20 @@ it('creates the type\'s blocks with the page, after any content it was created w
     expect(array_keys($owned))->toBe(['Simple', 'Hero'])
         ->and($owned['Simple']['sort'])->toBe(1)
         ->and($owned['Hero']['sort'])->toBe(2)
+        ->and($owned['Hero']['active'])->toBeTrue()
         ->and($page->content[0]['id'])->toBe('free');
+});
+
+it('adds the content block inactive when an existing page takes the type: nothing empty goes live on the next save', function (): void {
+    $page = contactsPage(type: 'page');
+
+    $page->type = 'contacts';
+    $page->save();
+
+    $owned = ownedRows($page, 'contacts');
+    expect($owned['Hero']['active'])->toBeFalse()
+        // General rows are fields, not output: an inactive one would not resolve.
+        ->and($owned['Simple']['active'])->toBeTrue();
 });
 
 it('puts the general block\'s form on the General tab and the content block in its own tab, without a remove button', function (): void {
@@ -184,14 +199,44 @@ it('renders nothing of a dormant type: no fields, no blocks', function (): void 
         ->and(renderedKinds($props))->toBe(['Hero']);
 });
 
-it('offers neither the type\'s own kinds nor a general kind in "+ Add block"', function (): void {
-    config(['tbtop-cms.blocks.types' => [SimpleBlock::class, HeroBlock::class, FaqSchemaBlock::class]]);
-    $page = contactsPage();
+/** @return list<string> action names on the "+ Add block" tab */
+function addBlockActions(Page $page): array
+{
     $addTab = collect(PageEditHelpers::formTabs($page->id))->firstWhere('label', __('tbtop-cms::pages.tabs_edit.add_block'));
     $actions = [];
     collectNodesByKind($addTab['body'], 'action', $actions);
 
-    expect(array_column($actions, 'name'))->toContain('pageBlockAdd_FaqTest')
+    return array_column($actions, 'name');
+}
+
+it('does not offer the type\'s own kinds in "+ Add block"', function (): void {
+    config(['tbtop-cms.blocks.types' => [SimpleBlock::class, HeroBlock::class, FaqSchemaBlock::class]]);
+
+    expect(addBlockActions(contactsPage()))->toContain('pageBlockAdd_FaqTest')
         ->not->toContain('pageBlockAdd_Hero')
         ->not->toContain('pageBlockAdd_Simple');
+});
+
+it('still offers on other types a kind one type uses as fields, and never a fields-only block', function (): void {
+    config(['tbtop-cms.blocks.types' => [SimpleBlock::class, HeroBlock::class, FieldsOnlyBlock::class]]);
+    config(['tbtop-cms.pages.types' => [ContactsPageType::class, FieldsOnlyPageType::class]]);
+
+    expect(addBlockActions(contactsPage(type: 'page')))->toContain('pageBlockAdd_Simple')
+        ->toContain('pageBlockAdd_Hero')
+        ->not->toContain('pageBlockAdd_FieldsOnly');
+});
+
+it('does not let an empty general block wipe a key an earlier one filled', function (): void {
+    config(['tbtop-cms.blocks.types' => [SimpleBlock::class, FieldsOnlyBlock::class]]);
+    config(['tbtop-cms.pages.types' => [FieldsOnlyPageType::class]]);
+    $page = contactsPage(type: 'fields-only');
+    $owned = ownedRows($page, 'fields-only');
+    $page->content = array_map(
+        static fn (array $row): array => $row['id'] === $owned['Simple']['id'] ? [...$row, 'data' => ['heading' => 'Main office']] : $row,
+        $page->content,
+    );
+    $page->save();
+
+    $props = test()->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])->assertOk()->json('props');
+    expect($props['page']['fields']['heading'])->toBe('Main office');
 });

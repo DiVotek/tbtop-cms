@@ -8,7 +8,10 @@ use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NoIdentifierKindBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\AlphaBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\BetaBlock;
+use Tbtop\Cms\Tests\Fixtures\FieldsOnlyBlock;
+use Tbtop\Cms\Tests\Fixtures\FieldsOnlyPageType;
 use Tbtop\Cms\Tests\Fixtures\GeneralBetaPageType;
+use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
 
 beforeEach(function (): void {
     $this->dir = sys_get_temp_dir() . '/tbtop-cms-registry-test-' . uniqid();
@@ -144,14 +147,39 @@ it('reports a stale registry under --check even when the types file is current',
     expect(file_get_contents($this->registryPath))->toBe("// stale\n");
 });
 
-it('leaves a general type block out of the registry: it resolves into page.fields and has no component', function (): void {
+it('leaves a block that is General-tab fields and nothing else out of the registry: it has no component', function (): void {
+    BlockRegistry::extend(fn (): array => [AlphaBlock::class, SimpleBlock::class, FieldsOnlyBlock::class]);
+    PageTypeRegistry::extend(fn (): array => [FieldsOnlyPageType::class]);
+    touch($this->dir . '/blocks/Alpha.tsx');
+    touch($this->dir . '/blocks/Simple.tsx');
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    expect(file_get_contents($this->registryPath))->toContain('import { Alpha }')
+        ->not->toContain('FieldsOnly');
+});
+
+it('keeps the component of a block one type uses as fields: pages of other types still place it', function (): void {
     BlockRegistry::extend(fn (): array => [AlphaBlock::class, BetaBlock::class]);
     PageTypeRegistry::extend(fn (): array => [GeneralBetaPageType::class]);
     touch($this->dir . '/blocks/Alpha.tsx');
 
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])
+        ->expectsOutputToContain('Block [Beta] has no component')
+        ->assertExitCode(1);
+
+    touch($this->dir . '/blocks/Beta.tsx');
     $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
 
-    $registry = file_get_contents($this->registryPath);
-    expect($registry)->toContain('import { Alpha }')
-        ->not->toContain('Beta');
+    expect(file_get_contents($this->registryPath))->toContain('import { Beta }');
+});
+
+it('writes no registry when registry_path is false, even with a components folder', function (): void {
+    config()->set('tbtop-cms.blocks.registry_path', false);
+    BlockRegistry::extend(fn (): array => [AlphaBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
+
+    expect(is_file($this->typesPath))->toBeTrue()
+        ->and(is_file($this->registryPath))->toBeFalse();
 });

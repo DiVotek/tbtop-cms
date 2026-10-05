@@ -397,8 +397,23 @@ tab, `active` and `sort` like any other — or `TypeBlock::general('Kind')`,
 whose form sits on the General tab (under the page's own fields) and whose
 resolved props ship as the `page.fields` prop and as `ResolveContext::field()`
 for every other block on the page. Both kinds are ordinary registered
-`Block` classes; a general one needs no React component — `cms:blocks:types`
-leaves it out of the registry and "+ Add block" never offers it.
+`Block` classes, and "general" is a role the block has **on that type
+only**: on a page of another type the same kind is a normal block, offered
+in "+ Add block" and drawn by its component. A block that is General-tab
+fields and nothing else says so itself by returning `[]` from
+`placements()` — then no picker offers it anywhere and `cms:blocks:types`
+asks for no component:
+
+```php
+/** @return list<string> */
+public function placements(): array
+{
+    return [];
+}
+```
+
+When two general blocks of one type resolve the same key, the later one
+wins — unless its value is `null`, which never replaces a filled one.
 
 ```php
 public function blocks(): array
@@ -413,7 +428,10 @@ How it is stored and what the rules are (`src/Page/TypeBlocks.php`):
   type key. `PageObserver::saving` adds any declared row the page lacks, so
   every path that saves a page (form, seeder, API, revision restore) gets
   them — a seeder may create a page of the type with `content => []` and
-  fill the rows afterwards.
+  fill the rows afterwards. A content row added to a page that **already
+  exists** (the page took the type, or the type gained a block) starts
+  inactive, so an empty block does not go live on the next save; on a new
+  page it starts active. A general row is always active.
 - An owned row has no "Remove block" or "Make shared" in the editor, "+ Add block" does not offer its kind again, and no
   `pageBlockRemove_{id}` action is registered for it. It can be switched
   off and reordered. Editor-added and shared blocks interleave freely by

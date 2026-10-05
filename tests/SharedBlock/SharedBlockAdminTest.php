@@ -157,6 +157,31 @@ it('counts a layout slot as a placement and refuses to delete a block a slot sti
     expect($structure)->not->toContain("sharedBlockDelete_{$shared->id}");
 });
 
+it('keeps the pointer of a layout slot through a save of that slot', function (): void {
+    $shared = sharedSimple();
+    Layout::query()->create(['slot' => Slots::FOOTER, 'content' => [['id' => 'f1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []]]]);
+
+    sharedActing()->postJson('/admin/layout/' . Slots::FOOTER . '/edit/forms/layoutEditor', ['block_f1_active' => true, 'block_f1_sort' => 0])
+        ->assertRedirect();
+
+    $content = Layout::query()->where('slot', Slots::FOOTER)->firstOrFail()->content;
+    expect($content[0]['shared'])->toBe($shared->id)
+        ->and($content[0]['data'])->toBe([]);
+});
+
+it('shows in the add chooser how many pages and slots place each shared block', function (): void {
+    $shared = sharedSimple();
+    sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []]]);
+    Layout::query()->create(['slot' => Slots::FOOTER, 'content' => [['id' => 'f1', 'kind' => 'Simple', 'active' => true, 'shared' => $shared->id, 'data' => []]]]);
+    $unused = sharedSimple('Spare');
+
+    $tabs = PageEditHelpers::formTabs(sharedPage()->id);
+    $addTab = json_encode(end($tabs));
+
+    expect($addTab)->toContain('Placed in 2 places')->toContain('Not placed anywhere')
+        ->and($unused->exists)->toBeTrue();
+});
+
 it('lists every page and slot placing the block in the usage table, and detaches one from there', function (): void {
     $shared = sharedSimple();
     $page = sharedPage([

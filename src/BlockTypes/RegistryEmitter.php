@@ -75,7 +75,7 @@ final class RegistryEmitter
             throw new RuntimeException("Block [{$kind}] cannot be mapped to a component name: the kind has no letters or digits.");
         }
         if (! is_file("{$componentsDir}/{$component}.tsx") && ! is_file("{$componentsDir}/{$component}.jsx")) {
-            throw new RuntimeException("Block [{$kind}] has no component: expected {$componentsDir}/{$component}.tsx exporting `{$component}`.");
+            throw new RuntimeException("Block [{$kind}] has no component: expected {$componentsDir}/{$component}.tsx exporting `{$component}`. A block that only feeds a page type's General tab returns [] from placements() instead.");
         }
 
         $key = EmitterNames::objectKey($kind);
