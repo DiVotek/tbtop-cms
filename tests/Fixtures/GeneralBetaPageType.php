@@ -7,7 +7,7 @@ namespace Tbtop\Cms\Tests\Fixtures;
 use Tbtop\Cms\Page\TypeBlock;
 use Tbtop\Cms\Page\Types\BasePageType;
 
-/** Declares the Discovery fixture's Beta block as a general block, for the registry-emitter and picker tests. */
+/** Declares the Discovery fixture's Beta block — placeable on every page — as a general block, for the registry-emitter test. */
 class GeneralBetaPageType extends BasePageType
 {
     public function key(): string

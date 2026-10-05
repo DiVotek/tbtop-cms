@@ -12,6 +12,7 @@ use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\SharedBlock\SharedBlocks;
 
 class FormBlockLocator
 {
@@ -19,6 +20,7 @@ class FormBlockLocator
         private readonly BlockRegistry $registry,
         private readonly Languages $languages,
         private readonly LayoutResolver $layouts,
+        private readonly SharedBlocks $sharedBlocks,
     ) {}
 
     /**
@@ -45,9 +47,16 @@ class FormBlockLocator
             return null;
         }
 
+        // A form placed by reference is configured on the shared block, not on the row.
+        $data = $this->sharedBlocks->dataOf($raw, $kind);
+
+        if ($data === null) {
+            return null;
+        }
+
         $resolvedLocale = $locale ?? (string) app()->getLocale();
 
-        return new LocatedFormBlock($block, $this->flatten($raw, $block, $resolvedLocale), $this->context($page, $resolvedLocale));
+        return new LocatedFormBlock($block, $this->flatten($data, $block, $resolvedLocale), $this->context($page, $resolvedLocale));
     }
 
     /**
@@ -80,13 +89,11 @@ class FormBlockLocator
     }
 
     /**
-     * @param  array<array-key, mixed>  $raw
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function flatten(array $raw, Block $block, string $locale): array
+    private function flatten(array $data, Block $block, string $locale): array
     {
-        /** @var array<string, mixed> $data */
-        $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
         $locales = array_column($this->languages->all(), 'locale');
 
         return LocaleFlattener::flattenData(

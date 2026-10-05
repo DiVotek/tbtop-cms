@@ -35,6 +35,27 @@ final class SharedBlockUsage
         return $index;
     }
 
+    /**
+     * Placement counts only, for screens that show a number and never the
+     * containers (the page editor's add-block chooser, on every render):
+     * reads the one `content` column instead of whole pages.
+     *
+     * @return array<int, int> container count by shared block id
+     */
+    public static function counts(): array
+    {
+        $counts = [];
+        foreach ([Page::query(), Layout::query()] as $query) {
+            foreach ($query->pluck('content') as $content) {
+                foreach (self::refsIn($content) as $ref) {
+                    $counts[$ref] = ($counts[$ref] ?? 0) + 1;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
     /** @return list<Page|Layout> */
     public static function using(int $id): array
     {

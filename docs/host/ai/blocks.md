@@ -75,7 +75,8 @@ A reformatted file keeps working at runtime but fails `--check`.
 When the component folder exists (`tbtop-cms.blocks.components_dir`,
 default `./blocks` next to the types file) the same command also writes
 `registry.generated.ts` (`tbtop-cms.blocks.registry_path`, default beside
-the types file) with two objects: `blockCatalog` — per kind `{ props,
+the types file; `false` turns the registry off for a host that writes its
+own) with two objects: `blockCatalog` — per kind `{ props,
 description }`, the description from `Block::description()` — and
 `blockComponents` — per kind the component imported from
 `<components_dir>/<StudlyKind>.tsx` (named export `<StudlyKind>`). The host

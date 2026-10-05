@@ -70,9 +70,20 @@ it("draws the placeholder with showErrors and nothing without, while healthy sib
     expect(shown.getByTestId("cms-block-error").textContent).toBe("Block [Ghost] has no component in the registry.");
     shown.unmount();
 
-    const hidden = renderSpec(s, false);
-    expect(hidden.getByText("Welcome")).toBeDefined();
-    expect(hidden.queryByTestId("cms-block-error")).toBeNull();
+    const original = console.error;
+    const logged = mock((..._args: unknown[]) => undefined);
+    console.error = logged;
+    try {
+        const hidden = renderSpec(s, false);
+        expect(hidden.getByText("Welcome")).toBeDefined();
+        expect(hidden.queryByTestId("cms-block-error")).toBeNull();
+        // Hidden from the visitor, not from whoever reads the log.
+        expect(logged.mock.calls.map((call) => String(call[0]))).toEqual([
+            "[tbtop-cms] Block [Ghost] is hidden from the page: Block [Ghost] has no component in the registry.",
+        ]);
+    } finally {
+        console.error = original;
+    }
 });
 
 it("catches a component that throws while rendering and shows the placeholder in its place", () => {

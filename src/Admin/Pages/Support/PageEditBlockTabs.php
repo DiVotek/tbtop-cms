@@ -344,7 +344,7 @@ final class PageEditBlockTabs
     private static function addBlockTab(S $s, Page $page, BlockRegistry $registry): array
     {
         $shared = SharedBlock::query()->orderBy('name')->get()->groupBy('kind');
-        $usage = $shared->isEmpty() ? [] : SharedBlockUsage::index();
+        $usage = $shared->isEmpty() ? [] : SharedBlockUsage::counts();
 
         return [
             'label' => __('tbtop-cms::pages.tabs_edit.add_block'),
@@ -363,7 +363,7 @@ final class PageEditBlockTabs
      * or a fresh inline one. Kinds without shared blocks add inline at once.
      *
      * @param  list<SharedBlock>  $blocks
-     * @param  array<int, list<Page>>  $usage
+     * @param  array<int, int>  $usage
      */
     private static function addChoiceAction(S $s, Page $page, BlockRegistry $registry, string $kind, array $blocks, array $usage): ActionBuilder
     {
@@ -372,7 +372,7 @@ final class PageEditBlockTabs
             $rows[] = $s->flex([
                 $s->flex([
                     $s->displayText($shared->name)->variant('subheading'),
-                    $s->displayText(trans_choice('tbtop-cms::shared-blocks.usage_count', count($usage[(int) $shared->getKey()] ?? [])))->variant('muted'),
+                    $s->displayText(trans_choice('tbtop-cms::shared-blocks.usage_count', $usage[(int) $shared->getKey()] ?? 0))->variant('muted'),
                 ], direction: 'col', gap: 0),
                 $s->spacer(),
                 self::addSharedAction($s, $page, $shared),
@@ -438,19 +438,17 @@ final class PageEditBlockTabs
     }
 
     /**
-     * The kinds "+ Add block" offers: the type's placement minus the general
-     * kinds of every type (those live on a General tab, never in the flow)
-     * and minus the kinds this page's type already carries.
+     * The kinds "+ Add block" offers: the type's placement minus the kinds
+     * this page's type already carries, general or content. What another
+     * type declares is not this page's business — a block one type uses as
+     * General-tab fields stays addable here. A block that is fields and
+     * nothing else keeps itself out of every picker with `placements(): []`.
      *
      * @return array<string, Block>
      */
     private static function offered(BlockRegistry $registry, Page $page): array
     {
-        $typeBlocks = app(TypeBlocks::class);
-        $excluded = [
-            ...$typeBlocks->generalKinds(),
-            ...array_map(static fn (TypeBlock $block): string => $block->kind, $typeBlocks->declared($page->type)),
-        ];
+        $excluded = array_map(static fn (TypeBlock $block): string => $block->kind, app(TypeBlocks::class)->declared($page->type));
 
         return array_filter(
             $registry->forPlacement($page->type),

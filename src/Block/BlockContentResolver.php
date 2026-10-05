@@ -65,7 +65,8 @@ class BlockContentResolver
             if (is_array($raw) && $this->typeBlocks->isGeneral($raw)) {
                 $general = $this->resolveOne($raw, $ctx, $locales, $strict);
                 if ($general instanceof ResolvedBlock && $general->error === null) {
-                    $fields = [...$fields, ...$general->props];
+                    // Two general blocks may share a key; a later empty one must not wipe what an earlier one filled.
+                    $fields = [...$fields, ...array_filter($general->props, static fn (mixed $value, string | int $key): bool => $value !== null || ! array_key_exists($key, $fields), ARRAY_FILTER_USE_BOTH)];
                 }
 
                 continue;
@@ -134,7 +135,7 @@ class BlockContentResolver
             return new ResolvedBlock($raw['id'], $kind, [], "Block [{$kind}] is not registered.");
         }
 
-        $data = $this->dataOf($raw, $kind);
+        $data = $this->sharedBlocks->dataOf($raw, $kind);
         if ($data === null) {
             return new ResolvedBlock($raw['id'], $kind, [], self::missingSharedMessage($raw, $kind, $strict));
         }
@@ -162,32 +163,6 @@ class BlockContentResolver
         }
 
         return new ResolvedBlock($raw['id'], $kind, $props);
-    }
-
-    /**
-     * A row pointing at a shared block takes that block's data; the row's own
-     * `data` is ignored even if present. A kind mismatch is also "missing":
-     * the page row decides the component, and the shared row was retargeted.
-     *
-     * @param  array<string, mixed>  $raw
-     * @return array<string, mixed>|null null when the referenced shared block does not exist
-     */
-    private function dataOf(array $raw, string $kind): ?array
-    {
-        $ref = SharedBlocks::refOf($raw);
-        if ($ref === null) {
-            /** @var array<string, mixed> $data */
-            $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
-
-            return $data;
-        }
-
-        $shared = $this->sharedBlocks->find($ref);
-        if ($shared === null || $shared->kind !== $kind) {
-            return null;
-        }
-
-        return $shared->data;
     }
 
     /** @param  array<string, mixed>  $raw */
