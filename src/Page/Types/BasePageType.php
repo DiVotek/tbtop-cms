@@ -62,6 +62,11 @@ abstract class BasePageType implements PageTypeInterface
         return $this->key();
     }
 
+    public function childSubtype(): ?string
+    {
+        return null;
+    }
+
     /** @return list<Field> */
     public function fields(S $s): array
     {

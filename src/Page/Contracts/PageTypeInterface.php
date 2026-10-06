@@ -81,4 +81,12 @@ interface PageTypeInterface
      * @return array<string, mixed>
      */
     public function resolveFields(array $input, ResolveContext $ctx): array;
+
+    /**
+     * The subtype a new article under a page of this type gets when none is
+     * picked (a "Services" category's children are services). Read from the
+     * parent's subtype first, then its base; only a subtype of the article
+     * base applies. Null: no default.
+     */
+    public function childSubtype(): ?string;
 }

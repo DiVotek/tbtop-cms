@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo\Schema;
 
-use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
  * Resolves which SchemaTypeInterface key a page publishes: the stored
- * seo.schema.type if it is one of the page type's own schemaTypes(),
+ * seo.schema.type if it is one of the page's schemaTypes (its subtype's, else
+ * its type's — PageTypeRegistry::schemaTypesFor()),
  * otherwise the type's first (default) key. Falls back to
  * SchemaTypeRegistry::FALLBACK_KEY when the page's type is no longer
  * registered in PageTypeRegistry, or (a host contract violation —
@@ -29,15 +29,12 @@ final class SchemaSelector
             return $this->schemaTypes->get(SchemaTypeRegistry::FALLBACK_KEY);
         }
 
-        $pageType = $this->pageTypes->get($page->type);
-        $key = $this->selectedKey($page, $pageType);
-
-        return $this->schemaTypes->get($key);
+        return $this->schemaTypes->get($this->selectedKey($page, $this->pageTypes->schemaTypesFor($page)));
     }
 
-    private function selectedKey(Page $page, PageTypeInterface $pageType): string
+    /** @param  list<string>  $available */
+    private function selectedKey(Page $page, array $available): string
     {
-        $available = $pageType->schemaTypes();
 
         $seo = is_array($page->seo) ? $page->seo : [];
         $schema = is_array($seo['schema'] ?? null) ? $seo['schema'] : [];
