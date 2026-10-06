@@ -135,6 +135,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_09_23_000000_add_og_locale_to_languages_table')
             ->hasMigration('2026_10_03_000002_create_shared_blocks_table')
             ->hasMigration('2026_10_06_000000_add_subtype_and_fields_to_pages_table')
+            ->hasMigration('2026_10_07_000000_add_lock_version_to_shared_blocks_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

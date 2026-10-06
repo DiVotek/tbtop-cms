@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\SharedBlock\Events\SharedBlockSaved;
+use Tbtop\Cms\SharedBlock\Exceptions\SharedBlockConflictException;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 
 /**
@@ -50,7 +51,7 @@ final class SharedBlockForm
     /** @return array<string, mixed> record values for the edit form */
     public static function recordValues(SharedBlock $block): array
     {
-        $values = ['name' => $block->name];
+        $values = ['name' => $block->name, 'lock_version' => $block->lock_version];
         $registry = app(BlockRegistry::class);
         if (! $registry->has($block->kind)) {
             return $values;
@@ -93,9 +94,19 @@ final class SharedBlockForm
         return $block;
     }
 
-    /** @param  array<string, mixed>  $form */
+    /**
+     * @param  array<string, mixed>  $form
+     *
+     * @throws SharedBlockConflictException when the form's lock_version is behind the row
+     */
     public static function update(array $form, SharedBlock $block): SharedBlock
     {
+        // Checked before anything is written; a caller without the key
+        // (none in the admin) skips it, as PageForm::save() does.
+        if (array_key_exists('lock_version', $form) && (int) $form['lock_version'] !== (int) $block->lock_version) {
+            throw new SharedBlockConflictException("Shared block #{$block->getKey()} was changed since this form was loaded.");
+        }
+
         $valid = Validator::make($form, ['name' => ['required', 'string', 'max:255']])->validate();
 
         $data = [];

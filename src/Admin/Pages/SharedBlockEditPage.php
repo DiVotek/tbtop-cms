@@ -25,6 +25,7 @@ use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Page\Models\Page as CmsPage;
+use Tbtop\Cms\SharedBlock\Exceptions\SharedBlockConflictException;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\SharedBlock\SharedBlockDetacher;
 use Tbtop\Cms\SharedBlock\SharedBlockUsage;
@@ -70,6 +71,9 @@ class SharedBlockEditPage extends Page
         $footer = EditFooter::build($s, $this->listUrl(), $this->saveAction($s));
 
         $form = $s->form('sharedBlockEditor', [
+            // A hidden field, not just a record key: the form submit only
+            // keeps keys a field declares (see PageEditPage::view()).
+            $s->number('lock_version')->meta('hidden', true),
             $s->text('name')->label(__('tbtop-cms::shared-blocks.fields.name'))->required(),
             ...SharedBlockForm::dataFields($s, $block),
             $this->usage($s, $block),
@@ -220,10 +224,13 @@ class SharedBlockEditPage extends Page
             ->color('primary')->keybinding('mod+s')->submit('sharedBlockEditor');
     }
 
+    /** A stale form gets a notify only, as on PageEditPage::save(): back() resyncs it to the winner. */
     private function save(ActionCtx $ctx): Effects
     {
         try {
             SharedBlockForm::update($ctx->form, $this->block());
+        } catch (SharedBlockConflictException) {
+            return Effects::make()->notify(__('tbtop-cms::shared-blocks.conflict.message'), 'error');
         } catch (ValidationException $e) {
             $first = collect($e->errors())->flatten()->first();
 
