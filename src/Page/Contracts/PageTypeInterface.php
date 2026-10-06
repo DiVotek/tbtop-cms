@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Contracts;
 
+use Tbtop\Admin\Dsl\Fields\Field;
+use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\TypeBlock;
 
 interface PageTypeInterface
 {
@@ -55,18 +57,28 @@ interface PageTypeInterface
 
     /**
      * The type this one is a subtype of, or its own key for a top-level
-     * type. The editor offers top-level types in "Type" and the subtypes of
-     * `page` in "Subtype"; the stored `type` is always this type's key.
+     * type. A page stores its base in `type` and a subtype's key in
+     * `subtype`; tree rules (allowedChildren, requiresParent, maxDepth,
+     * isSourceBacked) are always read from the base.
      */
     public function base(): string;
 
     /**
-     * Blocks every page of this type carries: created with the page, never
-     * removable in the editor, their fields are the type's own fields. A
-     * general block has no place in the content flow — its form shows on
-     * the General tab and its resolved props become the page's `fields`.
+     * The type's own fields, in the same DSL as Block::form(). They show on
+     * the page's General tab, are stored in the page's `fields` column and
+     * reach the site as `page.fields`. A subtype lists only what it adds:
+     * the page gets the base type's fields followed by the subtype's.
      *
-     * @return list<TypeBlock>
+     * @return list<Field>
      */
-    public function blocks(): array;
+    public function fields(S $s): array;
+
+    /**
+     * Values for `page.fields` from the stored input, already flattened to
+     * the current locale. Like Block::resolve(): override to compute values.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function resolveFields(array $input, ResolveContext $ctx): array;
 }

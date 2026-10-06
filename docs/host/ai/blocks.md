@@ -96,8 +96,9 @@ export const { registry } = defineRegistry(catalog, {
 });
 ```
 
-A registered block whose component file is missing is a command error —
-nothing is written — because the import would not resolve and leaving the
+A block whose `placements()` is `[]` is placeable nowhere, so it is never
+drawn and the command asks no component of it. Every other registered block
+needs one: a missing component file is a command error — nothing is written — because the import would not resolve and leaving the
 kind out would render nothing on the site. Without a component folder the
 command writes only the types file. `--check` covers both files; add the
 registry to `.prettierignore` too.
@@ -178,13 +179,16 @@ Overridable, all with sane defaults:
   last, and no heading when every offered block shares one group. `null`
   (default) leaves the block ungrouped.
 - **`placements(): array`** — where the block may be added: a list of
-  page-type keys and/or `Tbtop\Cms\Block\Placement::LAYOUT`. Default is
+  page-type keys (a subtype key included — see pages.md, "Subtypes and type
+  fields") and/or `Tbtop\Cms\Block\Placement::LAYOUT`. Default is
   `[Placement::PAGES]`, a wildcard meaning every page type (including a
   host-registered one). `BlockRegistry::forPlacement(string $placement): array`
   filters `all()` down to blocks that match — a block matches when the
   placement is in its list, or when the placement isn't `Placement::LAYOUT`
-  and `Placement::PAGES` is in its list. The page editor calls
-  `forPlacement($page->type)`, the layout editor calls
+  and `Placement::PAGES` is in its list.
+  `forPlacements(array $placements)` is the union over several keys. The
+  page editor calls `forPlacements([$page->type, $page->subtype])` (the
+  subtype only when set), the layout editor calls
   `forPlacement(Placement::LAYOUT)`, both only for the "add block" picker —
   this does not touch `resolve()`/rendering: existing content holding a kind
   outside its current placements still resolves, renders, and keeps its own
@@ -253,10 +257,10 @@ Overridable, all with sane defaults:
   pages.md for what "source-backed" means. A block that reads `$ctx->source`
   is coupled to running only on that page type — check for `null` /
   `instanceof` before use.
-- **`field(string $name): mixed`** / **`fields`** — the resolved props of the
-  page type's *general* blocks (see pages.md, "Type blocks"), e.g. the
-  address a contacts page declares on its General tab; `null` / `[]` on a
-  page whose type declares none and in a layout slot. The same array ships
+- **`field(string $name): mixed`** / **`fields`** — the page's resolved type
+  fields, base type's and then subtype's (see pages.md, "Subtypes and type
+  fields"), e.g. the address a contacts page declares on its General tab;
+  `null` / `[]` on a page whose types declare none and in a layout slot. The same array ships
   as the `page.fields` prop.
 - **`mediaUrl(string|int $id): ?string`** — resolves a stored media id
   (never store URLs directly in block `data`) to a public URL via

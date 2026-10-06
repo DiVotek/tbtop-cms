@@ -53,30 +53,34 @@ the block-content editor field outside cms's own page/layout forms.
 the repeater under a different form field. There is no compatibility shim —
 update any reference to the old class name.
 
-## Page types can declare their own blocks and a base
+## Page subtypes and type fields
 
-`PageTypeInterface` gains `blocks(): list<TypeBlock>` and `base(): string`;
-`BasePageType` returns `[]` and the type's own key, so a type extending it is
-unaffected. A host type that returns `'page'` from `base()` moves from the
-"Type" select to the new "Subtype" select (form field `subtype`, folded into
-`type` on save by `PageSubtype`). A host implementing the interface
-directly must add the method. Rows a type owns carry `owner` on the content
-envelope; `BlockContent::toEnvelope()` keeps that key out of `data`. The
-page props gain `page.fields` and `ResolveContext` gains `fields` /
-`field()`; `BlockContentResolver::resolveWithFields()` is the new render
-entry, `resolve()` still returns the block list. See pages.md, "Type blocks".
+`PageTypeInterface` gains `base(): string`, `fields(S $s): list<Field>` and
+`resolveFields(array $input, ResolveContext $ctx): array`; `BasePageType`
+returns the type's own key, `[]` and a `FormResolver` pass over `fields()`,
+so a type extending it is unaffected. A host implementing the interface
+directly must add the three methods.
 
-**A fields-only block must return `[]` from `placements()`.** "General" is a
-role a block has on the declaring type only. A kind declared general is
-again offered in "+ Add block" on pages of other types, and
-`cms:blocks:types` again requires its component. A block that exists only to
-feed a General tab opts out of both by returning `[]` from `placements()`;
-without it the command fails with "Block [Kind] has no component".
+`tbtop_pages` gains `subtype` (nullable string) and `fields` (JSON). A type
+whose `base()` is another type's key is a **subtype**: pages of it store
+the base in `type` and the subtype key in `subtype`; tree rules come from
+the base. Its `fields()` show on the General tab and ship as `page.fields`
+(and `ResolveContext::field()`); `page.subtype` ships next to `page.type`.
+`placements()` may name a subtype key.
 
-**Type content blocks start inactive on an existing page.** A content row
-`PageObserver::saving` adds to a page that already exists is created with
-`active => false`; an editor fills it and switches it on. New pages and
-general rows are unchanged.
+The migration `2026_10_06_000000_add_subtype_and_fields_to_pages_table`
+adds the columns and, for every type registered when it runs with
+`base() !== key()`, moves pages from `type = <subtype>` to
+`type = <base>, subtype = <subtype>` — so **register your subtype classes
+before running it**. It also strips the `owner` key from content rows. It
+does not move the data of a former "general" type block into `fields`: the
+package no longer knows which kinds were general where. Those rows stay in
+`content` as ordinary blocks; copy their `data` into `fields` and drop the
+rows in your own migration.
+
+**A block that is placeable nowhere needs no component.** `cms:blocks:types`
+skips a block whose `placements()` is `[]` and requires a component file for
+every other one. See pages.md, "Subtypes and type fields".
 
 ## Pages can be backed by a source (source-backed page types)
 

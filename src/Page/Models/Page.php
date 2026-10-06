@@ -24,6 +24,7 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
 /**
  * @property int $id
  * @property string $type
+ * @property string|null $subtype
  * @property string|null $source_id
  * @property int|null $parent_id
  * @property PageStatus $status
@@ -34,6 +35,7 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
  * @property string|null $heading
  * @property string|null $summary
  * @property array<int, array<string, mixed>>|null $content
+ * @property array<string, mixed>|null $fields
  * @property array{article?: array<int, array<string, mixed>>, category?: array<int, array<string, mixed>>}|null $starter_blocks
  * @property string|null $image
  * @property array<string, mixed>|null $seo
@@ -71,6 +73,7 @@ class Page extends Model
      */
     protected $fillable = [
         'type',
+        'subtype',
         'source_id',
         'parent_id',
         'status',
@@ -83,6 +86,7 @@ class Page extends Model
         'body',
         'image',
         'content',
+        'fields',
         'starter_blocks',
         'seo',
         'is_indexable',
@@ -125,6 +129,7 @@ class Page extends Model
         'published_at' => 'datetime',
         'unpublish_at' => 'datetime',
         'content' => 'array',
+        'fields' => 'array',
         'starter_blocks' => 'array',
         'seo' => 'array',
         'is_indexable' => 'boolean',

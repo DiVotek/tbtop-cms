@@ -3,16 +3,12 @@
 declare(strict_types=1);
 
 use Tbtop\Cms\Block\BlockRegistry;
-use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\DashKindBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\NoIdentifierKindBlock;
+use Tbtop\Cms\Tests\Fixtures\ConcertTicketBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\AlphaBlock;
 use Tbtop\Cms\Tests\Fixtures\Discovery\BetaBlock;
 use Tbtop\Cms\Tests\Fixtures\FieldsOnlyBlock;
-use Tbtop\Cms\Tests\Fixtures\FieldsOnlyPageType;
-use Tbtop\Cms\Tests\Fixtures\GeneralBetaPageType;
-use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
-use Tbtop\Cms\Tests\Fixtures\TypeOnlyContentPageType;
 
 beforeEach(function (): void {
     $this->dir = sys_get_temp_dir() . '/tbtop-cms-registry-test-' . uniqid();
@@ -148,50 +144,20 @@ it('reports a stale registry under --check even when the types file is current',
     expect(file_get_contents($this->registryPath))->toBe("// stale\n");
 });
 
-it('leaves a block that is General-tab fields and nothing else out of the registry: it has no component', function (): void {
-    BlockRegistry::extend(fn (): array => [AlphaBlock::class, SimpleBlock::class, FieldsOnlyBlock::class]);
-    PageTypeRegistry::extend(fn (): array => [FieldsOnlyPageType::class]);
-    touch($this->dir . '/blocks/Alpha.tsx');
-    touch($this->dir . '/blocks/Simple.tsx');
-
-    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
-
-    expect(file_get_contents($this->registryPath))->toContain('import { Alpha }')
-        ->not->toContain('FieldsOnly');
-});
-
-it('asks for no component of a block placeable nowhere that no type declares', function (): void {
-    BlockRegistry::extend(fn (): array => [AlphaBlock::class, FieldsOnlyBlock::class]);
-    touch($this->dir . '/blocks/Alpha.tsx');
-
-    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
-
-    expect(file_get_contents($this->registryPath))->not->toContain('FieldsOnly');
-});
-
-it('keeps the component of a block placeable nowhere that a type carries as content: its pages draw it', function (): void {
-    BlockRegistry::extend(fn (): array => [FieldsOnlyBlock::class]);
-    PageTypeRegistry::extend(fn (): array => [TypeOnlyContentPageType::class]);
-    touch($this->dir . '/blocks/FieldsOnly.tsx');
-
-    $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
-
-    expect(file_get_contents($this->registryPath))->toContain('import { FieldsOnly }');
-});
-
-it('keeps the component of a block one type uses as fields: pages of other types still place it', function (): void {
-    BlockRegistry::extend(fn (): array => [AlphaBlock::class, BetaBlock::class]);
-    PageTypeRegistry::extend(fn (): array => [GeneralBetaPageType::class]);
+it('asks no component of a block placeable nowhere, and one of every other block, a subtype-only one included', function (): void {
+    BlockRegistry::extend(fn (): array => [AlphaBlock::class, FieldsOnlyBlock::class, ConcertTicketBlock::class]);
     touch($this->dir . '/blocks/Alpha.tsx');
 
     $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])
-        ->expectsOutputToContain('Block [Beta] has no component')
+        ->expectsOutputToContain('Block [ConcertTicket] has no component')
         ->assertExitCode(1);
 
-    touch($this->dir . '/blocks/Beta.tsx');
+    touch($this->dir . '/blocks/ConcertTicket.tsx');
     $this->artisan('cms:blocks:types', ['--path' => $this->typesPath])->assertExitCode(0);
 
-    expect(file_get_contents($this->registryPath))->toContain('import { Beta }');
+    expect(file_get_contents($this->registryPath))->toContain('import { Alpha }')
+        ->toContain('import { ConcertTicket }')
+        ->not->toContain('FieldsOnly');
 });
 
 it('writes no registry when registry_path is false, even with a components folder', function (): void {

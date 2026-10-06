@@ -8,11 +8,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 
-/**
- * A block that is General-tab fields and nothing else: placeable nowhere, so
- * no picker offers it and it needs no component. Shares the `heading` key
- * with SimpleBlock for the key-collision test.
- */
+/** Placeable nowhere: no picker offers it and cms:blocks:types asks for no component. */
 class FieldsOnlyBlock extends Block
 {
     public function kind(): string

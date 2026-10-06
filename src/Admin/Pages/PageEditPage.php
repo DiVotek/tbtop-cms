@@ -132,6 +132,7 @@ class PageEditPage extends AdminPage
         ])
             ->record([
                 ...PageForm::loadRow($this->pageId()),
+                ...PageEditTypeFields::recordValues($page),
                 ...($this->isSourceBacked($page) ? [] : PageEditBlockTabs::recordValues($page)),
             ])
             ->onSubmit($this->save(...));
@@ -155,7 +156,7 @@ class PageEditPage extends AdminPage
                 'label' => __('tbtop-cms::pages.tabs_edit.general'),
                 'body' => $s->stack([
                     ...PageForm::generalFields($s, ! $page->is_system),
-                    ...($isSourceBacked ? [] : PageEditTypeFields::build($s, $page)),
+                    ...PageEditTypeFields::build($s, $page),
                     ...($isSourceBacked ? [] : PageEditStarterBlocks::build($s, $page)),
                 ]),
             ],

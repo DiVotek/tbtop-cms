@@ -16,6 +16,7 @@ return [
     'columns' => [
         'title' => 'Title',
         'type' => 'Type',
+        'subtype' => 'Subtype',
         'parent' => 'Parent',
         'status' => 'Status',
         'seo' => 'SEO',
@@ -164,15 +165,6 @@ return [
         'remove_confirm' => 'This cannot be undone.',
         'removed' => 'Block removed',
     ],
-    'type_blocks' => [
-        'dormant_title' => 'Hidden data of another page type',
-        'dormant_hint' => 'Blocks the page had under another type. They are not shown or published; switching the type back brings them back as they were.',
-        'dormant_line' => '{1} ":type" — :count block|[2,*] ":type" — :count blocks',
-        'purge' => 'Delete hidden data',
-        'purge_title' => 'Delete hidden data?',
-        'purge_confirm' => 'The blocks of the other type are removed from this page. A revision still holds them.',
-        'purged' => 'Hidden data deleted.',
-    ],
     'starter_blocks' => [
         'section_title' => 'Starter blocks',
         'section_hint' => 'The block structure new pages under this category start with — which block kinds, in which order. Only the structure: each block still starts empty and is filled in on the page itself. New articles and new subcategories each get their own starter — a subcategory\'s own starter overrides this one for everything under it.',
@@ -234,6 +226,7 @@ return [
     'validation' => [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
+        'subtype_invalid' => ':subtype is not a subtype of :type.',
         'type_source_backed' => 'Pages of type :type are created by their source, not by hand.',
         'status_invalid' => 'Status [:status] is not a valid page status.',
         'delete_has_children' => 'This page has child pages — move or delete them first.',

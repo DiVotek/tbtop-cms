@@ -145,6 +145,7 @@ class PageController
             'page' => [
                 'id' => $page->getKey(),
                 'type' => $page->type,
+                'subtype' => $page->subtype,
                 'status' => $page->status->value,
                 'name' => $page->getTranslation('name', $locale),
                 'title' => $page->getTranslation('title', $locale),

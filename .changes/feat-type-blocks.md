@@ -1,58 +1,68 @@
-# feat(pages): page types declare their own blocks and a base
+# feat(pages): page subtypes and type fields
 
-touches: page type contract, page observer, block content envelope, page editor (General tab, block tabs, block picker), block resolution, page render, blocks:types registry emitter, translations
+touches: page type contract, page model and migration, page editor (General tab, sidebar, create modal, block picker), pages list, block resolution, page render, revisions, blocks:types registry emitter, translations
 
-> ⚠️ **Contract** `PageTypeInterface::blocks(): list<TypeBlock>` and `base(): string` — new methods; `BasePageType` returns `[]` and the own key. A host implementing the interface directly breaks at load.
-> ⚠️ **Contract** page forms gain a `subtype` field; `PageFormOptions::types()` lists top-level types only, `subtypes()` the page subtypes. The stored `type` column is unchanged.
-> ⚠️ **Contract** content envelope rows gain an optional `owner` key (the type key). `BlockContent::toEnvelope()` keeps it on the row, not in `data`; `toRows()` carries it back.
-> ⚠️ **Contract** `BlockContentResolver::resolveWithFields()` returns `{blocks, fields}`; `resolve()` is unchanged in signature and now skips rows owned by a type other than the page's. `ResolveContext` gains a public `fields` array and `field(string)`. Page props gain `page.fields`.
+> ⚠️ **Contract** `PageTypeInterface` gains `base(): string`, `fields(S $s): list<Field>` and `resolveFields(array $input, ResolveContext $ctx): array`; `BasePageType` returns the own key, `[]` and a `FormResolver` pass over `fields()`. A host implementing the interface directly breaks at load.
+> ⚠️ **Contract** `tbtop_pages` gains `subtype` (nullable, indexed) and `fields` (JSON). `type` always holds a top-level type; a subtype key lives in `subtype`. The migration moves existing `type = <subtype>` pages for every subtype registered when it runs.
+> ⚠️ **Contract** page props gain `page.fields` and `page.subtype`. `ResolveContext` gains a public `fields` array and `field(string)`. `BlockContentResolver::resolveWithFields()` returns `{blocks, fields}`; `resolve()` is unchanged.
+> ⚠️ **Contract** `Block::placements()` may name a subtype key; `BlockRegistry::forPlacements(array)` is new. `cms:blocks:types` skips a block whose `placements()` is `[]` and requires a component of every other one.
+> ⚠️ **Contract** page forms gain a `subtype` field; `PageFormOptions::types()` lists top-level types, `subtypes(string $base)` the subtypes of one type (`[]` when there are none).
 
-A page type lists the blocks every page of it carries. A content block is a
-normal block tab without "Remove" and "Make shared"; a general block's form
-sits on the General tab and its resolved props become `page.fields`, readable
-by every other block through `$ctx->field()`; it has no React component —
-the registry emitter skips it and the block picker never offers it.
-`PageObserver::saving` adds the
-missing rows, so seeders and the API get them too. A type switch leaves the
-old type's rows dormant in `content` — hidden in the editor, skipped on the
-site, carried through saves — and the General tab offers to delete them; a
-switch back wakes them with their data.
+A subtype is a key plus fields. A type whose `base()` names another type is
+a subtype of it: pages store the base in `type` and the subtype key in
+`subtype`, so every tree rule, guard and lookup keyed on `type` reads the
+base and needs no look-through. The sidebar "Subtype" select lists only the
+subtypes of the page's type and is hidden when there are none; the create
+modal offers the subtypes of `page`; the pages list gets a Subtype column and
+filter once any subtype is registered.
 
-The editor's type pick is two-step: "Type" (page / category / article and
-any other top-level type) and, for a page, "Subtype" — the host types whose
-`base()` is `page`. `PageSubtype` folds the two into the one stored key on
-save and splits it on load, so nothing keyed on `type` changes. Category and
-article subtypes are deliberately not offered yet.
+`fields()` declares a type's own values. The General tab shows the base
+type's fields and then the subtype's (form names prefixed `field_`), saved
+into the `fields` column by merge — a subtype switch never deletes anything.
+On the site they ship as `page.fields`, locale-flattened, after an optional
+`resolveFields()` pass, and every block reads them through `$ctx->field()`.
+A block placed on a subtype key is offered in "+ Add block" on that subtype
+only. `fields` is an editorial field for revisions; `subtype` is not.
 
-Rejected alternative: a separate `fields` JSON column for the type's fields.
-It would need its own form, its own revision handling and its own place in
-the frontend props; a general block reuses the block form DSL, the envelope,
-the revisions and the resolver as they are, and a content block of the type
-interleaves with free blocks by `sort` without any extra ordering model.
+Rejected alternative: keeping the subtype key in `type` with the fields as a
+component-less "general" block in the content envelope (the shape #242
+shipped). Every path keyed on `type` — tree rules, guards, starter blocks,
+placements — had to look through to the base, and the fields needed a block
+with no component, `owner` markers, dormant rows on a type switch and a
+purge action.
 
-Tests: `tests/Page/PageSubtypeTest.php` covers the option split, create via subtype, the ignored subtype under a non-page type and the load mapping. `tests/Page/TypeBlocksTest.php` drives the feature through the real
-routes — creation on save, the General-tab form, the save round-trip, the
-missing remove action, dormant rows on a type switch and their wake-up, the
-purge action, and the frontend render with and without the type. Fixture
-`ContactsPageType` is new.
+Tests: `tests/Page/PageFieldsTest.php` drives the General tab render and
+save, `page.fields` (base + subtype, translatable flattened, a
+`resolveFields()` override, read from a block via `$ctx->field()`), a subtype
+change keeping `fields`, placement by subtype key in "+ Add block" and the
+revision snapshot/restore. `tests/Page/PageSubtypeTest.php` covers the
+Type/Subtype options with a top-level host type, the save writing `subtype`
+with `type` unchanged, create via subtype, a stale or foreign subtype, tree
+rules from the base and the pages-list filter.
+`tests/Page/PageSubtypesMigrationTest.php` runs the migration class over
+pre-existing rows (type move, `owner` stripped on a trashed page too, rerun
+is a no-op). `tests/BlockTypes/BlocksTypesCommandRegistryTest.php` covers the
+registry rule. Fixtures `EventPageType`, `ConcertPageType` and
+`ConcertTicketBlock` are new; `ContactsPageType` is now a plain subtype.
 
 **Read by eye:**
+- `database/migrations/2026_10_06_000000_add_subtype_and_fields_to_pages_table.php`
 - `src/Page/Contracts/PageTypeInterface.php`
-- `src/Page/TypeBlock.php`
-- `src/Page/TypeBlocks.php`
-- `src/Page/PageSubtype.php`
-- `src/Admin/Pages/Support/PageFormOptions.php`
-- `src/Admin/Pages/Support/PageEditSidebar.php`
-- `src/Page/Observers/PageObserver.php`
-- `src/Admin/Fields/BlockContent.php`
-- `src/Admin/Pages/Support/PageEditBlocks.php`
-- `src/Admin/Pages/Support/PageEditTypeFields.php`
+- `src/Page/Types/BasePageType.php`
+- `src/Page/PageTypeRegistry.php`
+- `src/Page/Models/Page.php`
 - `src/Block/BlockContentResolver.php`
-- `src/Block/ResolveContext.php`
-- `src/Frontend/Http/Controllers/PageController.php`
+- `src/Block/BlockRegistry.php`
+- `src/Admin/Pages/Support/PageForm.php`
+- `src/Admin/Pages/Support/PageFormOptions.php`
+- `src/Admin/Pages/Support/PageEditTypeFields.php`
+- `src/Admin/Pages/Support/PageEditBlockTabs.php`
+- `src/Admin/Pages/PagesPage.php`
+- `src/Page/Support/PageRevisionWriter.php`
 - `src/Console/BlocksTypesCommand.php`
 
 **Assumptions:**
-- A type declares each kind at most once; a second declaration of the same kind is treated as present after the first row exists.
-- Dormant rows are never cleaned automatically; a page that cycles through many types keeps one set per type until an editor deletes them.
-- A dormant row that points at a shared block still counts in that block's usage and still blocks its deletion.
+- A host registers its subtype classes before running the migration; a subtype registered later leaves its old pages with the subtype key in `type` until the host moves them.
+- The host moves the data of former general type blocks into `fields` itself; the package cannot tell which content rows were general.
+- A subtype's own tree-rule, SEO-template and `schemaTypes()` overrides are not read; everything keyed on the page type reads the base.
+- A stored subtype outlives its registration: the page keeps it on save while its type is unchanged.
