@@ -66,7 +66,7 @@ it('creates a page with a subtype from the create modal', function (): void {
     subtypeAdmin()->postJson('/admin/pages/actions/pageCreateSave', [
         'payload' => ['form' => [
             'name' => ['en' => 'Contacts'], 'title' => ['en' => ''], 'slug' => ['en' => 'contacts'],
-            'type' => 'page', 'subtype' => 'contacts', 'parent_id' => null,
+            'type' => 'page', 'subtype_page' => 'contacts', 'parent_id' => null,
         ]],
     ])->assertOk();
 

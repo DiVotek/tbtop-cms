@@ -112,6 +112,22 @@ class PageTypeRegistry
         ]));
     }
 
+    /**
+     * The schema.org keys a page may publish: its subtype's when one is
+     * registered, else its base type's — a subtype is the more specific
+     * declaration (a legal service under the article base is a Service, not
+     * an Article). A subtype extending its base's class inherits the base's
+     * list. Empty for an unregistered type.
+     *
+     * @return list<string>
+     */
+    public function schemaTypesFor(Page $page): array
+    {
+        $types = $this->forPage($page);
+
+        return $types === [] ? [] : $types[array_key_last($types)]->schemaTypes();
+    }
+
     /** @return list<string> */
     public function sourceBackedKeys(): array
     {

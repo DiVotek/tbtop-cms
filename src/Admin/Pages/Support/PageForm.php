@@ -33,6 +33,9 @@ use Tbtop\Cms\Page\Types\PageType;
 
 class PageForm
 {
+    /** The create form's per-base subtype selects are named `subtype_{base}`; save() reads the picked type's one. */
+    private const string CREATE_SUBTYPE_PREFIX = 'subtype_';
+
     /**
      * Fields for the pages-list create modal. A deliberately small subset —
      * heading/summary/is_indexable/sort_order/blocks/status are edit-only;
@@ -59,7 +62,12 @@ class PageForm
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
                     ->required()->options(PageFormOptions::types(includeSourceBacked: false))
                     ->default(app(PageType::class)->key()),
-                ...self::subtypeField($s, app(PageType::class)->key()),
+                // One select per base that has subtypes, each shown only for its base: a
+                // single `subtype` select cannot swap its options when "Type" changes.
+                ...array_merge(...array_map(
+                    static fn (array $type): array => self::subtypeField($s, $type['value'], self::CREATE_SUBTYPE_PREFIX . $type['value']),
+                    PageFormOptions::types(includeSourceBacked: false),
+                )),
                 // A parent is always a category: an article's required one, a subcategory's optional one.
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.category'))
                     ->query(static fn (): Builder => self::parentQuery())
@@ -77,7 +85,7 @@ class PageForm
      *
      * @return list<Field>
      */
-    public static function subtypeField(S $s, string $base): array
+    public static function subtypeField(S $s, string $base, string $name = 'subtype'): array
     {
         $options = PageFormOptions::subtypes($base);
         if ($options === []) {
@@ -85,7 +93,7 @@ class PageForm
         }
 
         return [
-            $s->select('subtype')->label(__('tbtop-cms::pages.fields.subtype'))
+            $s->select($name)->label(__('tbtop-cms::pages.fields.subtype'))
                 ->options($options)->default('')
                 ->hiddenIf(Cond::neq('type', $base)),
         ];
@@ -244,7 +252,7 @@ class PageForm
             return [];
         }
 
-        $keys = app(PageTypeRegistry::class)->get($page->type)->schemaTypes();
+        $keys = app(PageTypeRegistry::class)->schemaTypesFor($page);
 
         if (count($keys) < 2) {
             return [];
@@ -406,9 +414,18 @@ class PageForm
             self::guardLockVersion($page, $form);
         }
 
+        if ($isCreate && is_string($form['type'] ?? null) && array_key_exists(self::CREATE_SUBTYPE_PREFIX . $form['type'], $form)) {
+            $form['subtype'] = $form[self::CREATE_SUBTYPE_PREFIX . $form['type']];
+        }
+
         $parentId = self::nullableInt($form['parent_id'] ?? null);
         if (! ($page->exists && $page->is_system) && is_string($form['type'] ?? null)) {
             ['type' => $form['type'], 'parentId' => $parentId] = PageLeafType::resolve($page, $form['type'], $parentId);
+            // A submitted null clears the subtype (empty strings arrive as null), so only a default is written back.
+            $default = PageLeafType::defaultSubtype($page, $form['type'], $parentId, array_key_exists('subtype', $form) ? $form['subtype'] : $page->subtype);
+            if ($default !== null) {
+                $form['subtype'] = $default;
+            }
         }
         self::guardParent($page, $parentId);
         self::guardTypeAndStatus($page, $form);

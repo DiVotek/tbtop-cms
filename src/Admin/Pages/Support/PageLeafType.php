@@ -6,7 +6,9 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Cond;
+use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
  * A leaf's type follows its place in the tree: under a category it is an
@@ -80,5 +82,33 @@ final class PageLeafType
             ],
             default => null,
         };
+    }
+
+    /**
+     * The subtype an article gets from its category (PageTypeInterface::
+     * childSubtype()) when it arrives there without one: on create, or when a
+     * page becomes an article. An existing article keeps what it has.
+     */
+    public static function defaultSubtype(Page $page, string $type, ?int $parentId, mixed $subtype): ?string
+    {
+        $isArriving = ! $page->exists || $page->type !== self::ARTICLE;
+        if ($type !== self::ARTICLE || ! $isArriving || $parentId === null || (is_string($subtype) && $subtype !== '')) {
+            return null;
+        }
+
+        $parent = Page::query()->find($parentId);
+        if ($parent === null) {
+            return null;
+        }
+
+        $registry = app(PageTypeRegistry::class);
+        $declared = null;
+        foreach ($registry->forPage($parent) as $parentType) {
+            $declared = $parentType->childSubtype() ?? $declared;
+        }
+
+        $subtypes = array_map(static fn (PageTypeInterface $t): string => $t->key(), $registry->subtypesOf(self::ARTICLE));
+
+        return in_array($declared, $subtypes, true) ? $declared : null;
     }
 }
