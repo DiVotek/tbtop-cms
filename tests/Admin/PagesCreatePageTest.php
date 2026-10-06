@@ -3,11 +3,25 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Override;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Types\CategoryType;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+
+/** A host category that parents plain pages, the way a services or portfolio section does. */
+class PagesAcceptingCategoryType extends CategoryType
+{
+    /** @return list<string> */
+    #[Override]
+    public function allowedChildren(): array
+    {
+        return ['page', 'category'];
+    }
+}
 
 uses(RefreshDatabase::class);
 
@@ -69,7 +83,7 @@ it('composes the create form with name/title/slug in Content and type/parent in 
         ->and($byName['slug']['options']['fromField'] ?? null)->toBe('name');
 });
 
-it('hides parent_id unless type is category or article', function (): void {
+it('hides parent_id unless some registered type accepts that type as a child', function (): void {
     $byName = array_column(pageCreateFormChildren(), null, 'name');
     $parentField = $byName['parent_id'];
 
@@ -79,6 +93,29 @@ it('hides parent_id unless type is category or article', function (): void {
         ->and($hiddenIf['op'])->toBe('notIn')
         ->and($hiddenIf['field'])->toBe('type')
         ->and($hiddenIf['value'])->toBe(['category', 'article']);
+});
+
+it('offers a parent to a plain page once a host category accepts pages', function (): void {
+    app()->bind(CategoryType::class, PagesAcceptingCategoryType::class);
+    app()->forgetInstance(PageTypeRegistry::class);
+    $section = Page::factory()->category()->create(['name' => ['en' => 'Cases']]);
+
+    $byName = array_column(pageCreateFormChildren(), null, 'name');
+    $hiddenIf = $byName['parent_id']['meta']['hiddenIf'] ?? $byName['parent_id']['options']['meta']['hiddenIf'] ?? null;
+
+    expect($hiddenIf['value'])->toContain('page');
+
+    $this->postJson('/admin/pages/actions/pageCreateSave', [
+        'payload' => ['form' => [
+            'name' => ['en' => 'Case one'],
+            'title' => ['en' => ''],
+            'slug' => ['en' => 'case-one'],
+            'type' => 'page',
+            'parent_id' => $section->getKey(),
+        ]],
+    ])->assertOk();
+
+    expect(Page::query()->where('type', 'page')->firstWhere('parent_id', $section->getKey()))->not->toBeNull();
 });
 
 it('creates a page as draft when the form sends no status (status is edit-only)', function (): void {

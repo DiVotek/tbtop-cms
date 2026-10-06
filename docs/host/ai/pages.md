@@ -98,22 +98,24 @@ the class from config) and must still render its stored content instead of
 
 `CategoryType::allowedChildren()` is hard-coded to `['category', 'article']`
 — nothing else. A services page, a portfolio grid, a landing-page section:
-none of these are `article`, so a plain `category` cannot parent them. Both
-real hosts hit this and both solved it the same way: a host-owned container
-type.
+none of these are `article`, so a stock `category` cannot parent them.
 
-`autofocus/app/Cms/PageTypes/SectionType.php` (key `section`, children
-`['service', 'guide']`, `maxDepth() = 2`) parents its `ServiceType` and
-`ArticleType` (key `guide`), both `requiresParent() = true` leaves.
-`divotek_com_ua/app/Cms/PageTypes/SectionType.php` does the same for its
-services/portfolio/blog tree (children `['page', 'article', 'section']`,
-`maxDepth() = 3`, sections can nest).
+The fix is the same as for any built-in type: bind a subclass in the host's
+`register()` (`$this->app->bind(CategoryType::class, HostCategoryType::class)`)
+whose `allowedChildren()` lists the host's own child types, e.g.
+`['page', 'category']`. The admin follows the registry: the create form shows
+the parent picker for every type some registered type accepts as a child
+(`PageForm::childTypes()`), and the picker offers every page whose type
+accepts children (`PageForm::parentQuery()`). The pages list's
+"Categories" bucket and the category edit page's starter-block tabs still key
+on the `category` type key, so keep the key when subclassing.
 
-The rule: a section needing children that are not built-in
-`category`/`article` gets a host `SectionType` (or similarly named
-container) rather than an attempt to reconfigure `CategoryType` — its
-`allowedChildren()` is not configurable, only overridable by subclassing
-`BasePageType` directly. `PageHierarchy::assert()`
+A host-owned container type (`SectionType`, key `section`) also works, but
+its pages are not categories to the admin: no "Categories" bucket, no
+`CollectionPage` schema with the children in `hasPart`, no starter-block
+tabs.
+
+`PageHierarchy::assert()`
 (`src/Page/Support/PageHierarchy.php`) enforces `allowedChildren()`,
 `requiresParent()`, and `maxDepth()` on every create/parent-or-type change,
 walking the full ancestor chain and descendant tree — a violation throws

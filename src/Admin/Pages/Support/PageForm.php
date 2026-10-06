@@ -63,9 +63,43 @@ class PageForm
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
                     ->query(static fn (): Builder => self::parentQuery())
                     ->labelKey('name')->searchable()
-                    ->hiddenIf(Cond::notIn('type', ['category', 'article'])),
+                    ->hiddenIf(Cond::notIn('type', self::childTypes())),
             ]),
         ];
+    }
+
+    /**
+     * Type keys some registered type accepts as a child — the types a parent
+     * makes sense for. Read from the registry, not hard-coded to
+     * category/article: a host category may accept plain pages.
+     *
+     * @return list<string>
+     */
+    public static function childTypes(): array
+    {
+        $keys = [];
+        foreach (app(PageTypeRegistry::class)->all() as $type) {
+            $keys = [...$keys, ...$type->allowedChildren()];
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * Type keys that accept children at all — the pages the parent picker offers.
+     *
+     * @return list<string>
+     */
+    private static function parentTypes(): array
+    {
+        $keys = [];
+        foreach (app(PageTypeRegistry::class)->all() as $type) {
+            if ($type->allowedChildren() !== []) {
+                $keys[] = $type->key();
+            }
+        }
+
+        return $keys;
     }
 
     /**
@@ -101,7 +135,7 @@ class PageForm
      */
     public static function parentQuery(?Page $excluding = null): Builder
     {
-        $query = Page::query()->where('type', 'category')->orderBy('sort_order')->orderBy('id');
+        $query = Page::query()->whereIn('type', self::parentTypes())->orderBy('sort_order')->orderBy('id');
 
         if ($excluding !== null && $excluding->exists) {
             $query->whereNotIn('id', [$excluding->getKey(), ...self::descendantIds($excluding)]);
