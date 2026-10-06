@@ -456,8 +456,9 @@ public function backReferences(): array
   `page_ref`). Not translatable — `->translatable()` throws.
 - **Site.** The field resolves to `list<{id: string, name: string, url:
   string}>` of the **live** pages, in stored order, name and url in the
-  request locale (same rules as a page link: no slug or no name in that
-  locale → left out). Unknown, trashed and unpublished ids drop out
+  request locale (same rules as a page link: the name falls back to the
+  default/first filled locale; a page with no slug in that locale, or no
+  name in any locale, is left out). Unknown, trashed and unpublished ids drop out
   silently. Works in a type's `fields()` and in a block's `form()` alike.
 - **Reverse lists.** `backReferences(): array<string, array{field: string,
   from?: string}>` (empty from `BasePageType`) adds a key to `page.fields`
