@@ -9,7 +9,7 @@ use Tbtop\Cms\Settings\SiteContacts;
 
 /**
  * The site identity node's type rules and its organisation details, read
- * from `seo.identity.*`. One place for "which schema.org type is this site"
+ * from `seo.identity.*` — telephone and email from Site settings → Contacts. One place for "which schema.org type is this site"
  * so the standalone identity node and the Article author/publisher never
  * disagree about the entity they share an `@id` with.
  *
@@ -115,9 +115,9 @@ final class SiteIdentity
 
         $properties = array_filter([
             'legalName' => $this->string('seo.identity.legal_name'),
-            // An explicit SEO value wins; otherwise the first Site-settings contact.
-            'telephone' => $this->string('seo.identity.telephone') ?: ($this->contacts->phones()[0] ?? ''),
-            'email' => $this->string('seo.identity.email') ?: ($this->contacts->emails()[0] ?? ''),
+            // Site settings → Contacts is the only source; the first entry is the main one.
+            'telephone' => $this->contacts->phones()[0] ?? '',
+            'email' => $this->contacts->emails()[0] ?? '',
         ], static fn (string $value): bool => $value !== '');
 
         $address = $this->address($locale, $defaultLocale);

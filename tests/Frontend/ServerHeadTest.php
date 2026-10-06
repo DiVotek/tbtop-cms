@@ -253,10 +253,12 @@ it('filters non-URL entries out of the emitted sameAs structured data', function
     app(Cms::class)->frontendRoutes();
     app(Settings::class)->set('site.name', 'Acme Co');
     app(Settings::class)->set('seo.identity.type', 'organization');
-    // Written directly to the store (bypassing the settings form's own
-    // normalize) — emit-time filtering must hold on its own.
-    app(Settings::class)->set('seo.identity.same_as', [
-        'https://github.com/acme', 'not a url', 'javascript:alert(1)',
+    // Written directly to the store (bypassing the Contacts form's url
+    // rule) — emit-time filtering must hold on its own.
+    app(Settings::class)->set('site.contacts.socials', [
+        ['label' => 'GH', 'href' => 'https://github.com/acme'],
+        ['label' => 'X', 'href' => 'not a url'],
+        ['label' => 'JS', 'href' => 'javascript:alert(1)'],
     ]);
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 

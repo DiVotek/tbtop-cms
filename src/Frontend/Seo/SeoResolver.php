@@ -304,25 +304,18 @@ class SeoResolver
     }
 
     /**
-     * Validated again at emit time (not only on save in SeoSettingsPage):
-     * the tags field only enforces "array", so a programmatically-written
-     * setting could hold anything — non-URL entries must never be published
-     * as sameAs structured data.
+     * Re-checked at emit time: the Contacts form only validates on save, so
+     * a programmatically-written setting could hold anything — non-URL
+     * entries must never be published as sameAs structured data.
      *
      * @return list<string>
      */
     private function sameAs(): array
     {
-        $raw = $this->settings->get('seo.identity.same_as', []);
-        $urls = is_array($raw) ? $raw : [];
-        // An explicit SEO list wins; otherwise the Site-settings social profiles.
-        if ($urls === []) {
-            $urls = array_column((new SiteContacts($this->settings))->socials(), 'href');
-        }
-
+        // Site settings → Contacts is the only source of profile links.
         return array_values(array_filter(
-            $urls,
-            static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
+            array_column((new SiteContacts($this->settings))->socials(), 'href'),
+            ProfileUrl::valid(...),
         ));
     }
 

@@ -406,10 +406,12 @@ it('emits no identity object when both seo.identity.name and site.name are empty
     expect(collect($jsonLd)->firstWhere('@type', 'Organization'))->toBeNull();
 });
 
-it('filters blank entries out of seo.identity.same_as', function (): void {
+it('filters blank entries out of the contacts profile links', function (): void {
     app(Settings::class)->set('seo.identity.type', 'organization');
     app(Settings::class)->set('seo.identity.name', 'Acme Inc');
-    app(Settings::class)->set('seo.identity.same_as', ['https://twitter.com/acme', '', 'https://github.com/acme']);
+    app(Settings::class)->set('site.contacts.socials', [
+        ['label' => 'X', 'href' => 'https://twitter.com/acme'], ['label' => 'B', 'href' => ''], ['label' => 'GH', 'href' => 'https://github.com/acme'],
+    ]);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');
