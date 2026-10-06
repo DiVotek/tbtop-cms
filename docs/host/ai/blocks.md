@@ -219,6 +219,7 @@ Overridable, all with sane defaults:
   | richtext | rendered HTML `string\|null` |
   | media | URL `string\|null`; `->multiple()` → `list<string>` of existing media |
   | link | `{href, type, label}\|null` via `$ctx->link()` |
+  | pages | `list<{id, name, url}>` of the live pages picked, in stored order (pages.md, "Page references") |
   | number, slider | `float\|null` (numeric strings parsed) |
   | boolean, checkbox | `bool` |
   | tags, checkboxlist, select / togglebuttons / upload `->multiple()` | `list<string>` |
@@ -432,6 +433,12 @@ here. Block-specific usage:
   exist — `https://wa.me/…`, `https://t.me/…`, `https://signal.me/#p/…`,
   `https://m.me/…` — since a scheme-only link like Viber's silently does
   nothing in a browser without the app installed.
+
+- **Pages fields** (`$s->pages('related')->of('article')`) — a searchable
+  multiple select of pages storing their ids; resolved to `{id, name, url}`
+  of the live ones. Inside a block it resolves forward only: reverse lists
+  (`backReferences()`) index page-type fields, not block data. See pages.md,
+  "Page references".
 
 **Editor caveat** (`src/Admin/Fields/BlockContent.php` docblock): the admin block
 editor unions every registered block's form fields into one flat repeater, so two

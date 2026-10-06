@@ -40,6 +40,7 @@ it('resolves each field by its kind without a resolve() on the block', function 
         'keywords' => ['a', ' b ', ''],
         'sizes' => ['s', 'm'],
         'meta' => ['k' => 'v', 'n' => 7, 'b' => true, 0 => 'dropped', 'arr' => []],
+        'related' => ['999999', 'junk'],
         'items' => [
             ['label' => 'One', 'qty' => 2],
             ['label' => '', 'qty' => null],
@@ -59,6 +60,7 @@ it('resolves each field by its kind without a resolve() on the block', function 
         'keywords' => ['a', 'b'],
         'sizes' => ['s', 'm'],
         'meta' => ['k' => 'v', 'n' => '7', 'b' => '1'],
+        'related' => [],
         'items' => [['label' => 'One', 'qty' => 2]],
     ]);
 });
@@ -74,6 +76,7 @@ it('yields the empty value for malformed input of every kind', function (): void
         'featured' => 'no',
         'keywords' => 'a,b',
         'meta' => 'k=v',
+        'related' => '12',
         'items' => 'rows',
     ], everyKindContext());
 
@@ -89,6 +92,7 @@ it('yields the empty value for malformed input of every kind', function (): void
         'keywords' => [],
         'sizes' => [],
         'meta' => [],
+        'related' => [],
         'items' => [],
     ]);
 });
@@ -97,7 +101,7 @@ it('prints the props shape the same rules guarantee', function (): void {
     expect((new FormResolver)->phpType((new EveryKindBlock)->form(new S)))->toBe(
         'array{title: string|null, note: string|null, body: string|null, image: string|null, gallery: list<string>, '
         . 'cta: array{href: string, type: string, label: string}|null, count: float|null, featured: bool, '
-        . 'keywords: list<string>, sizes: list<string>, meta: array<string, string>, items: list<array{label: string|null, qty: float|null}>}'
+        . 'keywords: list<string>, sizes: list<string>, meta: array<string, string>, related: list<array{id: string, name: string, url: string}>, items: list<array{label: string|null, qty: float|null}>}'
     );
 });
 

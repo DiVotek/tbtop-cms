@@ -371,4 +371,7 @@ return [
             'pass' => 'No other page shares this meta description in this locale.',
         ],
     ],
+    'refs' => [
+        'invalid' => 'This page cannot be referenced here.',
+    ],
 ];
