@@ -19,6 +19,8 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditStarterBlocks;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditTypeFields;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
+use Tbtop\Cms\Admin\Pages\Support\ProblemBlocks;
+use Tbtop\Cms\Admin\Pages\Support\ProblemBlocksAction;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Language\Languages;
@@ -107,6 +109,13 @@ class PageEditPage extends AdminPage
         );
 
         $revisions = PageEditRevisionsAction::enabled() ? PageEditRevisionsAction::build($s, $page) : null;
+        $problemBlocks = $this->isSourceBacked($page) ? null : ProblemBlocksAction::build(
+            $s,
+            'page',
+            ProblemBlocks::of(PageEditBlocks::blocks($page)),
+            PageEditBlockTabs::skipsGate($page),
+            $this->deleteProblemRow(...),
+        );
 
         $form = $s->form('pageEditor', [
             // A real (client-invisible) field, not just a record() key: the
@@ -123,7 +132,7 @@ class PageEditPage extends AdminPage
             // still giving RuleWalker something to collect a ('nullable')
             // rule for.
             $s->number('lock_version')->meta('hidden', true),
-            PageEditStatusBar::build($s, $page, $revisions, $this->viewOnSiteAction($s), $saveTop),
+            PageEditStatusBar::build($s, $page, $revisions, $this->viewOnSiteAction($s), $saveTop, $problemBlocks),
             $s->grid(['cols' => ['sm' => 1, 'lg' => 3], 'gap' => 6], [
                 $s->stack([$s->tabs($this->tabs($s, $page))], ['colSpan' => ['sm' => 1, 'lg' => 2]]),
                 PageEditSidebar::build($s, $page),
@@ -197,6 +206,17 @@ class PageEditPage extends AdminPage
         return Effects::make()->notify(__('tbtop-cms::pages.actions.saved'))->redirect(
             route('tbtop.cms.page-edit-page', ['page' => $this->pageId()]),
         );
+    }
+
+    /** A stale form keeps the modal open with the conflict message; nothing is written. */
+    private function deleteProblemRow(ActionCtx $ctx, string $id): Effects
+    {
+        if (! PageEditBlockTabs::removeRow($ctx->form, $this->page(), $id)) {
+            return Effects::make()->haltModal(__('tbtop-cms::pages.conflict.message'));
+        }
+
+        return Effects::make()->closeModal()->notify(__('tbtop-cms::pages.problem_blocks.deleted'))
+            ->redirect(route('tbtop.cms.page-edit-page', ['page' => $this->pageId()]));
     }
 
     private function viewOnSiteAction(S $s): ActionBuilder

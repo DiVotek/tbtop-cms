@@ -64,7 +64,6 @@ return [
     ],
     'reference' => [
         'info' => 'This block shows the shared block ":name". Edit the content there — every page that places it changes together.',
-        'missing' => 'Shared block #:id no longer exists; this block renders a placeholder. Remove it or detach it.',
         'edit_source' => 'Edit shared block',
         'detach' => 'Detach',
         'detach_title' => 'Detach from the shared block?',

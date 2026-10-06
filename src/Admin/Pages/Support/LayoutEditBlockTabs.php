@@ -40,7 +40,10 @@ final class LayoutEditBlockTabs
         $tabs = [];
 
         foreach (LayoutEditBlocks::blocks($layout) as $block) {
-            $tabs[] = self::blockTab($s, $slot, $registry, $block);
+            // A row the site skips has no tab: it is listed in the Problem blocks modal instead.
+            if (! ProblemBlocks::isProblem($block)) {
+                $tabs[] = self::blockTab($s, $slot, $registry, $block);
+            }
         }
 
         $tabs[] = self::addBlockTab($s, $slot, $registry);
@@ -60,15 +63,14 @@ final class LayoutEditBlockTabs
         $values = [];
 
         foreach (LayoutEditBlocks::blocks($layout) as $block) {
+            if (ProblemBlocks::isProblem($block)) {
+                continue;
+            }
             $id = (string) $block['id'];
             $kind = (string) $block['kind'];
             $data = is_array($block['data'] ?? null) ? $block['data'] : [];
             $values["block_{$id}_active"] = (bool) ($block['active'] ?? true);
             $values["block_{$id}_sort"] = (int) $block['sort'];
-
-            if (! $registry->has($kind)) {
-                continue;
-            }
 
             foreach ($registry->get($kind)->form(new S) as $field) {
                 if (array_key_exists($field->name, $data)) {
@@ -90,12 +92,10 @@ final class LayoutEditBlockTabs
         $kind = (string) $block['kind'];
         $active = (bool) ($block['active'] ?? true);
 
-        $fields = $registry->has($kind)
-            ? array_map(
-                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"),
-                $registry->get($kind)->form($s),
-            )
-            : [];
+        $fields = array_map(
+            static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"),
+            $registry->get($kind)->form($s),
+        );
 
         $body = $s->stack([
             ...$fields,
@@ -106,7 +106,7 @@ final class LayoutEditBlockTabs
             $s->flex([self::removeAction($s, $slot, $id), $s->spacer()]),
         ]);
 
-        $tab = ['label' => $registry->has($kind) ? $registry->get($kind)->label() : $kind, 'body' => $body];
+        $tab = ['label' => $registry->get($kind)->label(), 'body' => $body];
         if (! $active) {
             $tab['badge'] = '·';
         }
@@ -127,16 +127,25 @@ final class LayoutEditBlockTabs
 
     private static function handleRemove(ActionCtx $ctx, string $slot, string $id): Effects
     {
-        $layout = self::layoutFor($slot);
-        $rows = array_values(array_filter(
-            LayoutEditBlocks::toRows($ctx->form, $layout),
-            static fn (array $row): bool => (string) $row['id'] !== $id,
-        ));
-
-        LayoutForm::save([...$ctx->form, 'content' => $rows], $slot);
+        self::removeRow($ctx->form, $slot, $id);
 
         return Effects::make()->notify(__('tbtop-cms::pages.blocks.removed'))
             ->redirect(route('tbtop.cms.layout-edit-page', ['slot' => $slot]));
+    }
+
+    /**
+     * Saves the editor's form without the row `$id` (no lock_version on a layout, so no conflict to report).
+     *
+     * @param  array<string, mixed>  $form
+     */
+    public static function removeRow(array $form, string $slot, string $id): void
+    {
+        $rows = array_values(array_filter(
+            LayoutEditBlocks::toRows($form, self::layoutFor($slot)),
+            static fn (array $row): bool => (string) $row['id'] !== $id,
+        ));
+
+        LayoutForm::save([...$form, 'content' => $rows], $slot);
     }
 
     /** @return array{label: string, body: mixed} */

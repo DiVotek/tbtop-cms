@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Health\Checks;
 
+use Tbtop\Cms\Block\BlockRowProblem;
+use Tbtop\Cms\Health\Checks\Concerns\CountsProblemRows;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
-use Tbtop\Cms\Layout\Models\Layout;
-use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\SharedBlock\SharedBlocks;
 
 /**
  * Rows whose `shared` pointer leads nowhere: the shared block is gone or
- * now has another kind. The renderer draws a placeholder (or hides the
- * block) for each, so a visitor sees a gap nobody was told about. Trashed
- * pages count — a restore brings the gap back. One column per table is
- * read; the shared blocks load once.
+ * now has another kind. The site skips each one without a trace; the editor
+ * lists it under Problem blocks, so this is the operator's count of them.
+ * A row whose kind is unregistered is counted by UnregisteredBlockRowsCheck.
  */
 final class BrokenSharedReferencesCheck implements HealthCheck
 {
+    use CountsProblemRows;
+
     public function id(): string
     {
         return 'broken_shared_references';
@@ -27,21 +27,7 @@ final class BrokenSharedReferencesCheck implements HealthCheck
 
     public function run(): HealthCheckResult
     {
-        $shared = new SharedBlocks;
-        $broken = [];
-
-        foreach (Page::withTrashed()->orderBy('id')->pluck('content', 'id') as $id => $content) {
-            $count = self::brokenIn($shared, $content);
-            if ($count > 0) {
-                $broken[] = "page #{$id}: {$count}";
-            }
-        }
-        foreach (Layout::query()->orderBy('slot')->pluck('content', 'slot') as $slot => $content) {
-            $count = self::brokenIn($shared, $content);
-            if ($count > 0) {
-                $broken[] = "layout {$slot}: {$count}";
-            }
-        }
+        $broken = $this->problemRowCounts([BlockRowProblem::SharedMissing, BlockRowProblem::SharedKindMismatch]);
 
         if ($broken === []) {
             return new HealthCheckResult(
@@ -60,17 +46,5 @@ final class BrokenSharedReferencesCheck implements HealthCheck
             messageReplace: ['containers' => implode('; ', $broken)],
             hintKey: 'tbtop-cms::health.checks.broken_shared_references.hints.warning',
         );
-    }
-
-    private static function brokenIn(SharedBlocks $shared, mixed $content): int
-    {
-        $count = 0;
-        foreach (is_array($content) ? $content : [] as $row) {
-            if (SharedBlocks::refOf($row) !== null && is_array($row) && $shared->dataOf($row, (string) ($row['kind'] ?? '')) === null) {
-                $count++;
-            }
-        }
-
-        return $count;
     }
 }
