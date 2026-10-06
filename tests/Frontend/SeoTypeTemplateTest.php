@@ -12,6 +12,8 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Tests\Fixtures\ConcertPageType;
+use Tbtop\Cms\Tests\Fixtures\EventPageType;
 
 uses(RefreshDatabase::class);
 
@@ -50,6 +52,24 @@ it('prefers a page type template over the site-wide one', function (): void {
     $this->get('/' . $article->pathFor('en'), ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.seo.title', 'Post — Blog — Acme Co');
+});
+
+it('prefers a subtype template over the type\'s, and the type\'s when the subtype has none', function (): void {
+    config(['tbtop-cms.pages.types' => [EventPageType::class, ConcertPageType::class]]);
+    app(Settings::class)->set('site.name', 'Acme Co');
+    app(Settings::class)->set('seo.title_template', '{title} {sep} {site_name}');
+    app(Settings::class)->set(SeoTemplates::key('event', 'title'), 'EVENT {title}');
+    app(Settings::class)->set(SeoTemplates::key('concert', 'title'), 'CONCERT {title}');
+    app(Settings::class)->set(SeoTemplates::key('event', 'description'), 'Event: {description}');
+
+    $concert = Page::factory()->create([
+        'type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Published, 'name' => ['en' => 'Gig'], 'title' => ['en' => ''], 'summary' => ['en' => 'Live.'],
+    ]);
+
+    $this->get('/' . $concert->pathFor('en'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.title', 'CONCERT Gig')
+        ->assertJsonPath('props.seo.description', 'Event: Live.');
 });
 
 it('leaves other page types on the site-wide template', function (): void {

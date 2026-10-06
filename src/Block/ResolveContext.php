@@ -20,9 +20,9 @@ final readonly class ResolveContext
         public ?object $source = null,
         private ?LinkResolver $linkResolver = null,
         /**
-         * Resolved props of the page type's general blocks (see TypeBlocks),
-         * filled before the content blocks resolve so any of them can read a
-         * type field such as an address or a deadline.
+         * The page's resolved type fields (PageTypeInterface::fields(), base
+         * type then subtype), filled before the blocks resolve so any of
+         * them can read a type field such as an address or a deadline.
          *
          * @var array<string, mixed>
          */

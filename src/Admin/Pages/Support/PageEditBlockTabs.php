@@ -10,13 +10,10 @@ use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
-use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\TypeBlock;
-use Tbtop\Cms\Page\TypeBlocks;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Tbtop\Cms\SharedBlock\SharedBlockUsage;
@@ -39,13 +36,8 @@ final class PageEditBlockTabs
         $registry = app(BlockRegistry::class);
         $tabs = [];
 
-        $typeBlocks = app(TypeBlocks::class);
-
         foreach (PageEditBlocks::blocks($page) as $block) {
-            // A general type block has no tab: PageEditTypeFields puts its form on the General tab.
-            if (! $typeBlocks->isGeneral($block)) {
-                $tabs[] = self::blockTab($s, $page, $registry, $block);
-            }
+            $tabs[] = self::blockTab($s, $page, $registry, $block);
         }
 
         $tabs[] = self::addBlockTab($s, $page, $registry);
@@ -107,21 +99,17 @@ final class PageEditBlockTabs
             )
             : [];
 
-        // A type-owned block is part of the page type: it cannot be removed
-        // (its fields would go with it) nor shared, only switched off or moved.
-        $isOwned = TypeBlocks::ownerOf($block) !== null;
-
         $body = $s->stack([
             ...$fields,
             $s->flex([
                 $s->boolean("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
                 $s->number("block_{$id}_sort")->label(__('tbtop-cms::pages.blocks.sort')),
             ], gap: 4, align: 'end'),
-            ...($isOwned ? [] : [$s->flex([
+            $s->flex([
                 self::removeAction($s, $page, $id),
                 $s->spacer(),
                 ...($registry->has($kind) ? [self::shareAction($s, $page, $registry, $id, $kind)] : []),
-            ])]),
+            ]),
         ]);
 
         $tab = ['label' => BlockPicker::label($registry, $kind), 'body' => $body];
@@ -299,7 +287,7 @@ final class PageEditBlockTabs
      * filtered to the form's schema). Inactive blocks never trip the gate:
      * PrefixedField::rename() conditions their `required` on the active flag.
      */
-    public static function skipsGate(Page $page): bool
+    private static function skipsGate(Page $page): bool
     {
         return $page->status !== PageStatus::Published;
     }
@@ -313,7 +301,7 @@ final class PageEditBlockTabs
      * @param  list<array<string, mixed>>  $rows
      * @return array<string, mixed>
      */
-    public static function structuralForm(array $form, Page $page, array $rows): array
+    private static function structuralForm(array $form, Page $page, array $rows): array
     {
         return [...$form, 'content' => $rows, 'status' => $page->status->value];
     }
@@ -322,7 +310,7 @@ final class PageEditBlockTabs
     {
         $rows = array_values(array_filter(
             PageEditBlocks::toRows($ctx->form, $page),
-            static fn (array $row): bool => (string) $row['id'] !== $id || TypeBlocks::ownerOf($row) !== null,
+            static fn (array $row): bool => (string) $row['id'] !== $id,
         ));
 
         // Same stale-form guard as PageEditPage::save() — this action saves
@@ -350,7 +338,7 @@ final class PageEditBlockTabs
             'label' => __('tbtop-cms::pages.tabs_edit.add_block'),
             'body' => BlockPicker::build(
                 $s,
-                self::offered($registry, $page),
+                $registry->forPlacements(self::placements($page)),
                 static fn (string $kind): ActionBuilder => $shared->has($kind)
                     ? self::addChoiceAction($s, $page, $registry, $kind, $shared->get($kind)->all(), $usage)
                     : self::addAction($s, $page, $kind),
@@ -438,22 +426,13 @@ final class PageEditBlockTabs
     }
 
     /**
-     * The kinds "+ Add block" offers: the type's placement minus the kinds
-     * this page's type already carries, general or content. What another
-     * type declares is not this page's business — a block one type uses as
-     * General-tab fields stays addable here. A block that is fields and
-     * nothing else keeps itself out of every picker with `placements(): []`.
+     * A block may name the page's type or its subtype in placements().
      *
-     * @return array<string, Block>
+     * @return list<string>
      */
-    private static function offered(BlockRegistry $registry, Page $page): array
+    private static function placements(Page $page): array
     {
-        $excluded = array_map(static fn (TypeBlock $block): string => $block->kind, app(TypeBlocks::class)->declared($page->type));
-
-        return array_filter(
-            $registry->forPlacement($page->type),
-            static fn (Block $block): bool => ! in_array($block->kind(), $excluded, true),
-        );
+        return is_string($page->subtype) && $page->subtype !== '' ? [$page->type, $page->subtype] : [$page->type];
     }
 
     /**

@@ -79,6 +79,23 @@ class BlockRegistry
         );
     }
 
+    /**
+     * Blocks placeable under any of $placements — a page passes its type and
+     * its subtype, so a block may name either.
+     *
+     * @param  list<string>  $placements
+     * @return array<string, Block>
+     */
+    public function forPlacements(array $placements): array
+    {
+        $matched = [];
+        foreach ($placements as $placement) {
+            $matched += $this->forPlacement($placement);
+        }
+
+        return array_intersect_key($this->blocks, $matched);
+    }
+
     private function boot(): void
     {
         if ($this->booted) {

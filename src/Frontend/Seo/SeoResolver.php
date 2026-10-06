@@ -362,7 +362,7 @@ class SeoResolver
      */
     private function title(Page $page, string $base, string $locale, array $breadcrumbs): string
     {
-        $template = $this->templates->title($page->type, $locale);
+        $template = $this->templates->title($page->type, $locale, $page->subtype);
 
         if ($template === '') {
             return $this->titleWithSuffix($base);
@@ -387,7 +387,7 @@ class SeoResolver
     public function renderedTitle(Page $page, string $locale, Closure $breadcrumbs): string
     {
         $base = PageOwnSeo::title($page, PageOwnSeo::blob($page), $locale);
-        $template = $this->templates->title($page->type, $locale);
+        $template = $this->templates->title($page->type, $locale, $page->subtype);
 
         if ($template === '') {
             return $this->titleWithSuffix($base);
@@ -413,7 +413,7 @@ class SeoResolver
      */
     private function descriptionWithTemplate(Page $page, string $base, string $locale, array $breadcrumbs): string
     {
-        $template = $this->templates->description($page->type, $locale);
+        $template = $this->templates->description($page->type, $locale, $page->subtype);
 
         if ($template === '') {
             return $base;
@@ -440,7 +440,7 @@ class SeoResolver
     {
         $seo = PageOwnSeo::blob($page);
         $base = $this->description($page, $seo, $locale);
-        $template = $this->templates->description($page->type, $locale);
+        $template = $this->templates->description($page->type, $locale, $page->subtype);
 
         if ($template === '') {
             return $base;
