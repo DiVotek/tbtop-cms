@@ -86,6 +86,7 @@ return [
         'source_id' => 'Source ID',
         'source_label' => 'Source',
         'parent' => 'Parent',
+        'category' => 'Category',
         'status' => 'Status',
         'published_at' => 'Publish at',
         'published_at_hint' => 'Leave empty to publish immediately.',
@@ -238,7 +239,15 @@ return [
         // lock_version); the message must say the edits were dropped.
         'message' => 'This page was changed by someone else while you were editing, so your unsaved edits were not applied — the form now shows the latest version. You can restore any earlier version from Revisions.',
     ],
+    'leaf_flip' => [
+        'to_article_title' => 'Turn this page into an article?',
+        'to_article' => 'It now has a category, so it becomes an article: the schema.org type and the type\'s fields switch to the article\'s, and the page moves to the Articles tab. Content and SEO texts stay; the address gains the category segment (a redirect is created).',
+        'to_page_title' => 'Turn this article into a page?',
+        'to_page' => 'Without a category it becomes a standalone page: its category is removed, the schema.org type and the type\'s fields switch to the page\'s, and it moves to the Pages tab. Content and SEO texts stay; the address loses the category segment (a redirect is created).',
+    ],
     'validation' => [
+        'article_needs_category' => 'An article lives in a category — choose one.',
+        'type_change_subtype' => 'This page has the subtype :subtype, which the new type does not have — clear the subtype first.',
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
         'subtype_invalid' => ':subtype is not a subtype of :type.',

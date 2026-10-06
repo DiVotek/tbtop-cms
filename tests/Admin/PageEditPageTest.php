@@ -978,7 +978,8 @@ it('keeps delete in the form footer for regular pages', function (): void {
     $form = findNodeByKind(PageEditHelpers::structure($regular->id)['props']['structure'], 'form');
     $footerActions = footerActionNames($form);
 
-    expect($footerActions)->toBe(['pageEditDelete', 'cancel', 'save']);
+    // saveLeafFlip is the confirming twin shown instead of save while the page would become an article.
+    expect($footerActions)->toBe(['pageEditDelete', 'cancel', 'save', 'saveLeafFlip']);
 });
 
 it('deletes a regular page and redirects to the list', function (): void {

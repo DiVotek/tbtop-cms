@@ -45,7 +45,8 @@ final class PageEditStatusBar
         'expired' => 'gray',
     ];
 
-    public static function build(S $s, Page $page, ?ActionBuilder $revisions, ActionBuilder $viewOnSite, ActionBuilder $saveTop, ?ActionBuilder $problemBlocks = null): Node
+    /** @param ActionBuilder|list<ActionBuilder> $saveTop */
+    public static function build(S $s, Page $page, ?ActionBuilder $revisions, ActionBuilder $viewOnSite, ActionBuilder | array $saveTop, ?ActionBuilder $problemBlocks = null): Node
     {
         return $s->flex([
             self::statusBadge($s, $page),
@@ -57,7 +58,7 @@ final class PageEditStatusBar
             ...($revisions !== null ? [$revisions] : []),
             $viewOnSite,
             ...self::previewLinkAction($s, $page),
-            $saveTop,
+            ...(is_array($saveTop) ? $saveTop : [$saveTop]),
         ], align: 'center', gap: 3, wrap: true, variant: 'card', class: 'text-xs');
     }
 

@@ -60,10 +60,12 @@ class PageForm
                     ->required()->options(PageFormOptions::types(includeSourceBacked: false))
                     ->default(app(PageType::class)->key()),
                 ...self::subtypeField($s, app(PageType::class)->key()),
-                $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
+                // A parent is always a category: an article's required one, a subcategory's optional one.
+                $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.category'))
                     ->query(static fn (): Builder => self::parentQuery())
                     ->labelKey('name')->searchable()
-                    ->hiddenIf(Cond::notIn('type', ['category', 'article'])),
+                    ->hiddenIf(Cond::notIn('type', ['category', PageLeafType::ARTICLE]))
+                    ->requiredIf(Cond::eq('type', PageLeafType::ARTICLE)),
             ]),
         ];
     }
@@ -405,6 +407,9 @@ class PageForm
         }
 
         $parentId = self::nullableInt($form['parent_id'] ?? null);
+        if (! ($page->exists && $page->is_system) && is_string($form['type'] ?? null)) {
+            ['type' => $form['type'], 'parentId' => $parentId] = PageLeafType::resolve($page, $form['type'], $parentId);
+        }
         self::guardParent($page, $parentId);
         self::guardTypeAndStatus($page, $form);
         self::guardScheduling($form);
@@ -610,10 +615,11 @@ class PageForm
 
     /**
      * A subtype must be one of $type's. A missing `subtype` key keeps the
-     * stored one. A value that does not fit is dropped when the type changed
-     * (the select was hidden, its value stale) and rejected otherwise —
-     * except the page's own stored subtype, which outlives its registration
-     * the way `type` does.
+     * stored one. A type change that would leave the stored subtype behind is
+     * rejected; any other value that does not fit is dropped when the type
+     * changed (a stale create-form select) and rejected otherwise — except the
+     * page's own stored subtype, which outlives its registration the way
+     * `type` does.
      *
      * @param  array<string, mixed>  $form
      */
@@ -630,6 +636,13 @@ class PageForm
 
         if (in_array($value, $subtypes, true) || ($isTypeKept && $value === $stored)) {
             return $value;
+        }
+        // Retyping a page would silently strip its subtype (and with it the
+        // subtype's fields from the form); the editor clears it first instead.
+        if ($page->exists && ! $isTypeKept && $value === $stored) {
+            throw ValidationException::withMessages([
+                'type' => __('tbtop-cms::pages.validation.type_change_subtype', ['subtype' => $stored]),
+            ]);
         }
         if (! $isTypeKept) {
             return null;

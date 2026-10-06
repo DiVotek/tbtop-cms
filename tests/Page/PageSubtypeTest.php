@@ -73,15 +73,15 @@ it('creates a page with a subtype from the create modal', function (): void {
     expect(Page::query()->firstOrFail()->only(['type', 'subtype']))->toBe(['type' => 'page', 'subtype' => 'contacts']);
 });
 
-it('drops a subtype that no longer fits when the type changes, and rejects one of another type otherwise', function (): void {
+it('refuses a type change that would leave the subtype behind, and rejects a subtype of another type', function (): void {
     $retyped = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
     $kept = Page::create(['type' => 'event', 'status' => PageStatus::Draft, 'name' => ['en' => 'Other']]);
     subtypeAdmin();
 
-    savePage($retyped, ['type' => 'page', 'subtype' => 'concert'])->assertSessionHasNoErrors();
+    savePage($retyped, ['type' => 'page', 'subtype' => 'concert'])->assertSessionHasErrors('type');
     savePage($kept, ['type' => 'event', 'subtype' => 'contacts'])->assertSessionHasErrors('subtype');
 
-    expect($retyped->refresh()->only(['type', 'subtype']))->toBe(['type' => 'page', 'subtype' => null])
+    expect($retyped->refresh()->only(['type', 'subtype']))->toBe(['type' => 'event', 'subtype' => 'concert'])
         ->and($kept->refresh()->subtype)->toBeNull();
 });
 
