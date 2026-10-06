@@ -321,30 +321,30 @@ public function resolve(array $input, ResolveContext $ctx): array
 
 Blocks with their own `resolve()` are unaffected.
 
-## A block that fails to resolve is sent as a `CmsBlockError` element
+## A block that cannot render is skipped; the editor lists it under Problem blocks
 
-A block whose `resolve()` threw, whose kind is not registered, or whose
-shared block is missing used to reach the client with its own `type` and
-`{}` props, listed under `render.errors`. It now reaches the client as
+A content row whose kind is no longer registered, or whose `shared` pointer
+leads to a missing shared block or one of another kind, is skipped by the
+site: no element in `render`, no entry in `cms.layout`, nothing in the log —
+in preview too. Its data stays in `content` untouched, and the page and
+layout editors list it under **Problem blocks (N)** with the reason, the
+saved data and a "Delete row" action; such a row no longer gets a tab. A
+`resolve()` that throws drops its block as well and is still logged as
+`block.resolve_failed`. `blocks.strict` throws exactly as before.
 
-```json
-{ "type": "CmsBlockError", "props": { "kind": "Hero", "message": "Block [Hero] failed to resolve." } }
-```
+`render` stays `{root, elements}` and a `cms.layout` slot item stays
+`{id, kind, props}`. Hosts render pages and layout slots through
+`@cms/CmsRenderer` (`showErrors={isPreview || cms.debug}`): a block with no
+component, props failing its catalog schema or a component that throws
+renders nothing, and `showErrors` only adds a developer `console.error`
+line. `cms:doctor` gains `unregistered_block_rows` next to
+`broken_shared_references`.
 
-in the same place in `children`; `render.errors[id]` still carries the
-message. `CmsRenderer` behaves as before (a placeholder with `showErrors`,
-nothing plus a console line without). A host that renders with the bare
-json-render `Renderer` no longer has its component called with empty props;
-register a `CmsBlockError` component there to show something, or let
-json-render skip it. A host that read `render.elements[id].type` to find the
-broken block's kind reads `props.kind` instead.
+## `page.fields` is always a JSON object
 
-## `render.errors` and `page.fields` are always JSON objects
-
-Both used to serialise as `[]` when empty (and `render.errors` as a list if
-the block ids were `"0"`, `"1"`, …). They are now always objects — `{}` when
-empty. Code that checked `Array.isArray(...)` or `.length` on either reads it
-as a map instead (`Object.keys(...).length`).
+It used to serialise as `[]` when empty. It is now always an object — `{}`
+when empty. Code that checked `Array.isArray(...)` or `.length` on it reads
+it as a map instead (`Object.keys(...).length`).
 
 ## Page texts fall back to the default language when blank
 

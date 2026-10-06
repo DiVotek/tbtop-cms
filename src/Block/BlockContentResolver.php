@@ -138,20 +138,17 @@ class BlockContentResolver
         }
 
         $kind = $raw['kind'];
-        if (! $this->registry->has($kind)) {
+        // A row the editor has to deal with (see BlockRowProblem) is skipped without a trace on the site or in the
+        // log: the admin editor lists it under "Problem blocks", and its data stays in `content` untouched.
+        $problem = BlockRowProblem::of($raw, $this->registry, $this->sharedBlocks);
+        if ($problem !== null) {
             if ($strict) {
-                throw BlockResolutionException::unknownKind($kind);
+                throw self::strictException($problem, $raw, $kind);
             }
 
-            Log::warning('block.unknown', ['kind' => $kind]);
-
-            return new ResolvedBlock($raw['id'], $kind, [], "Block [{$kind}] is not registered.");
+            return null;
         }
-
-        $data = $this->sharedBlocks->dataOf($raw, $kind);
-        if ($data === null) {
-            return new ResolvedBlock($raw['id'], $kind, [], self::missingSharedMessage($raw, $kind, $strict));
-        }
+        $data = $this->sharedBlocks->dataOf($raw, $kind) ?? [];
         $block = $this->registry->get($kind);
 
         try {
@@ -168,34 +165,25 @@ class BlockContentResolver
                 throw BlockResolutionException::resolveFailed($kind, $e);
             }
 
+            // A throwing resolve() is a developer bug, not an editor matter: logged, and the page renders without it.
             Log::warning('block.resolve_failed', ['kind' => $kind, 'id' => $raw['id'], 'error' => $e->getMessage()]);
 
-            // The block stays in the list, marked: the page keeps its place and the client can show what failed,
-            // instead of the block vanishing with only a log line to explain it.
-            return new ResolvedBlock($raw['id'], $kind, [], self::errorMessage($kind, $e));
+            return null;
         }
 
         return new ResolvedBlock($raw['id'], $kind, $props);
     }
 
-    /** @param  array<string, mixed>  $raw */
-    private static function missingSharedMessage(array $raw, string $kind, bool $strict): string
+    /** @param  array<array-key, mixed>  $raw */
+    private static function strictException(BlockRowProblem $problem, array $raw, string $kind): BlockResolutionException
     {
-        $message = "Block [{$kind}] points at shared block #" . SharedBlocks::refOf($raw) . ', which does not exist.';
-        Log::warning('block.shared_missing', ['kind' => $kind, 'id' => $raw['id'], 'shared' => SharedBlocks::refOf($raw)]);
-
-        if ($strict) {
-            throw BlockResolutionException::resolveFailed($kind, new RuntimeException($message));
+        if ($problem === BlockRowProblem::Unregistered) {
+            return BlockResolutionException::unknownKind($kind);
         }
 
-        return $message;
-    }
-
-    /** The exception text reaches the browser as page props, so outside debug it is kept generic. */
-    private static function errorMessage(string $kind, Throwable $e): string
-    {
-        return (bool) config('app.debug')
-            ? "Block [{$kind}] failed to resolve: " . $e->getMessage()
-            : "Block [{$kind}] failed to resolve.";
+        return BlockResolutionException::resolveFailed(
+            $kind,
+            new RuntimeException("Block [{$kind}] points at shared block #" . SharedBlocks::refOf($raw) . ', which does not exist.'),
+        );
     }
 }

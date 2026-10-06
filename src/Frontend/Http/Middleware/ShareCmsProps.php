@@ -44,7 +44,7 @@ class ShareCmsProps
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
             'layout' => $this->resolveLayout(),
-            // Lets CmsRenderer draw broken-block placeholders where a visitor must never see them.
+            // What CmsRenderer's showErrors is wired to: a developer console line, never anything on the page.
             'debug' => (bool) config('app.debug'),
         ]);
 

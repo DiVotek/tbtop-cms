@@ -138,7 +138,7 @@ class InstallCommand extends Command
         $this->newLine();
 
         $this->line('  5. Render pages and layout slots with CmsRenderer, never the bare @json-render Renderer,');
-        $this->line('     so a block that fails to resolve or render shows a placeholder instead of vanishing:');
+        $this->line('     so a block component that throws renders nothing instead of breaking the page:');
         $this->line("       import { CmsRenderer } from '@cms/CmsRenderer';");
         $this->line('       <CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={isPreview || cms.debug} />');
         $this->newLine();

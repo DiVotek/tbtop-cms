@@ -11,24 +11,17 @@ use Illuminate\Contracts\Support\Arrayable;
  */
 final readonly class ResolvedBlock implements Arrayable
 {
-    /**
-     * @param  array<string, mixed>  $props
-     * @param  string|null  $error  why resolve() failed, in which case $props is empty and the client renders a
-     *                              placeholder instead of the component (see CmsRenderer); null for a healthy block
-     */
+    /** @param  array<string, mixed>  $props */
     public function __construct(
         public string $id,
         public string $kind,
         public array $props,
-        public ?string $error = null,
     ) {}
 
     /** @param  array<string, mixed>  $data  the shape toArray() produces */
     public static function fromArray(array $data): self
     {
-        $error = $data['error'] ?? null;
-
-        return new self((string) $data['id'], (string) $data['kind'], (array) $data['props'], is_string($error) ? $error : null);
+        return new self((string) $data['id'], (string) $data['kind'], (array) $data['props']);
     }
 
     /** @return array<string, mixed> */
@@ -38,7 +31,6 @@ final readonly class ResolvedBlock implements Arrayable
             'id' => $this->id,
             'kind' => $this->kind,
             'props' => $this->props,
-            'error' => $this->error,
         ];
     }
 }
