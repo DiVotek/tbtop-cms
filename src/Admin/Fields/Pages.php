@@ -62,7 +62,7 @@ final class Pages extends Select
         return $this->rules('max:' . $count);
     }
 
-    /** Leaves the page being edited out of the search — a page does not reference itself. Server-only. */
+    /** Leaves the page being edited out of the search and rejects it on save — a page does not reference itself. Server-only. */
     public function exceptPage(int $id): static
     {
         $this->exceptPageId = $id;
@@ -94,7 +94,7 @@ final class Pages extends Select
 
         $isRequired = array_any($declared, static fn (string $rule): bool => str_starts_with($rule, 'required'));
 
-        return [...($isRequired ? [] : ['nullable']), ...$declared, PageRefRule::forFilter($this->filter())];
+        return [...($isRequired ? [] : ['nullable']), ...$declared, PageRefRule::forFilter($this->filter(), $this->exceptPageId)];
     }
 
     private function filter(): PageTypeFilter

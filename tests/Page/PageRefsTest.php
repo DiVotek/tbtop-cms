@@ -176,3 +176,20 @@ it('leaves a page\'s reference to itself out of the reverse index', function ():
 
     expect(DB::table('tbtop_page_refs')->where('page_id', $specialist->id)->pluck('target_id')->all())->toBe([$service->id]);
 });
+
+it('rejects on save a reference to the page being edited', function (): void {
+    $reviewer = refsArticle('reviewer', 'Ivan');
+    $service = refsArticle('legal_service', 'Divorce');
+
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post("/admin/pages/{$reviewer->id}/edit/forms/pageEditor", [
+        ...PageEditHelpers::baseEditPayload(),
+        'name' => ['en' => 'Ivan'],
+        'slug' => ['en' => 'ivan'],
+        'type' => 'article',
+        'subtype' => 'reviewer',
+        'parent_id' => (string) $reviewer->parent_id,
+        'field_services' => [(string) $service->id, (string) $reviewer->id],
+    ])->assertSessionHasErrors('field_services.1');
+
+    expect($reviewer->refresh()->fields['services'] ?? null)->toBeNull();
+});

@@ -10,17 +10,32 @@ use Tbtop\Cms\Page\Models\Page;
 /**
  * Named rule `page_ref:<type or type/subtype>,…` on each id a pages field
  * posts: the page exists (not trashed) and matches the field's of() filter.
- * Drafts pass — an editor may reference a page before publishing it.
+ * Drafts pass — an editor may reference a page before publishing it. An
+ * `except=<id>` parameter rejects the edited page itself, matching the search.
  */
 final class PageRefRule
 {
     public const RULE = 'page_ref';
 
+    private const string EXCEPT = 'except=';
+
     public static function register(): void
     {
         Validator::extend(
             self::RULE,
-            static fn (string $attribute, mixed $value, array $parameters): bool => self::passes($value, PageTypeFilter::of($parameters)),
+            static function (string $attribute, mixed $value, array $parameters): bool {
+                $except = null;
+                $pairs = [];
+                foreach ($parameters as $parameter) {
+                    if (str_starts_with($parameter, self::EXCEPT)) {
+                        $except = PageIds::one(substr($parameter, strlen(self::EXCEPT)));
+                    } else {
+                        $pairs[] = $parameter;
+                    }
+                }
+
+                return self::passes($value, PageTypeFilter::of($pairs), $except);
+            },
         );
 
         Validator::replacer(
@@ -29,15 +44,17 @@ final class PageRefRule
         );
     }
 
-    public static function forFilter(PageTypeFilter $filter): string
+    public static function forFilter(PageTypeFilter $filter, ?int $exceptPageId = null): string
     {
-        return $filter->pairs === [] ? self::RULE : self::RULE . ':' . implode(',', $filter->pairs);
+        $parameters = [...$filter->pairs, ...($exceptPageId === null ? [] : [self::EXCEPT . $exceptPageId])];
+
+        return $parameters === [] ? self::RULE : self::RULE . ':' . implode(',', $parameters);
     }
 
-    public static function passes(mixed $value, PageTypeFilter $filter): bool
+    public static function passes(mixed $value, PageTypeFilter $filter, ?int $exceptPageId = null): bool
     {
         $id = PageIds::one($value);
 
-        return $id !== null && $filter->apply(Page::query()->whereKey($id))->exists();
+        return $id !== null && $id !== $exceptPageId && $filter->apply(Page::query()->whereKey($id))->exists();
     }
 }
