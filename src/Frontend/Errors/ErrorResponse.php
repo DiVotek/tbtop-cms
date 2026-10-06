@@ -14,8 +14,10 @@ use Tbtop\Cms\Frontend\Form\FormActionBinder;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Frontend\Support\CurrentPage;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Support\PageTranslation;
 use Throwable;
 
 /**
@@ -36,6 +38,7 @@ class ErrorResponse
         private readonly SeoResolver $seo,
         private readonly FormActionBinder $forms,
         private readonly CurrentPage $currentPage,
+        private readonly Languages $languages,
     ) {}
 
     public function render(Request $request, int $status): Response
@@ -90,16 +93,17 @@ class ErrorResponse
         // An error page is not a node of the site: a BreadcrumbList or
         // WebPage for it would claim "Home › 404" lives at the home URL.
         $seo['jsonLd'] = [];
+        $fallback = $this->languages->defaultLocale();
 
         return [
             'page' => [
                 'id' => $page->getKey(),
                 'type' => $page->type,
                 'status' => $page->status->value,
-                'name' => $page->getTranslation('name', $locale),
-                'title' => $page->getTranslation('title', $locale),
-                'heading' => $page->getTranslation('heading', $locale),
-                'summary' => $page->getTranslation('summary', $locale),
+                'name' => PageTranslation::text($page, 'name', $locale, $fallback),
+                'title' => PageTranslation::text($page, 'title', $locale, $fallback),
+                'heading' => PageTranslation::text($page, 'heading', $locale, $fallback),
+                'summary' => PageTranslation::text($page, 'summary', $locale, $fallback),
                 'image' => null,
             ],
             'render' => $this->assembler->assemble($resolved),

@@ -174,5 +174,23 @@ return [
                 'warning' => 'Add a shaped @return array{...} docblock to each listed block\'s resolve() so `php artisan cms:blocks:types` can generate real props instead of a permissive z.record() fallback.',
             ],
         ],
+        'block_discovery' => [
+            'label' => 'Block discovery',
+            'ok' => 'Every tbtop-cms.blocks.discover entry registers at least one block.',
+            'empty' => 'These discover entries register no block: :empty.',
+            'malformed' => 'These discover entries are malformed: :malformed.',
+            'both' => 'These discover entries register no block: :empty. These are malformed: :malformed.',
+            'hints' => [
+                'warning' => 'tbtop-cms.blocks.discover is a map of PSR-4 namespace => existing directory, e.g. [\'App\\\\Cms\\\\Blocks\' => app_path(\'Cms/Blocks\')]. Check the namespace matches the classes in the folder and that the folder exists.',
+            ],
+        ],
+        'broken_shared_references' => [
+            'label' => 'Shared block references',
+            'ok' => 'Every page and layout row placed by reference points at a shared block of its kind.',
+            'warning' => 'Rows that point at a missing shared block, or one of another kind, per container: :containers.',
+            'hints' => [
+                'warning' => 'Each such row renders as a placeholder in preview and is hidden from visitors. Open the page or layout slot and remove the row, or place a shared block of the right kind.',
+            ],
+        ],
     ],
 ];

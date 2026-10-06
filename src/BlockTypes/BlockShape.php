@@ -9,6 +9,7 @@ final class BlockShape
 {
     /**
      * @param  array<string, true>  $usedAliases  alias names this block's fragment references, in first-use order
+     * @param  list<string>  $warnings  props typed as unknown, one line each for the command to print
      */
     public function __construct(
         public readonly string $kind,
@@ -16,5 +17,6 @@ final class BlockShape
         public readonly bool $isTyped,
         public readonly array $usedAliases,
         public readonly ?string $leadingComment = null,
+        public readonly array $warnings = [],
     ) {}
 }

@@ -15,6 +15,66 @@ use ReflectionClass;
 final class BlockDiscovery
 {
     /**
+     * The well-formed `namespace => directory` pairs of the discover config.
+     * A malformed entry is skipped here and reported by problems().
+     *
+     * @return array<string, string>
+     */
+    public static function entries(mixed $discover): array
+    {
+        $entries = [];
+        foreach (is_array($discover) ? $discover : [] as $namespace => $directory) {
+            if (self::isWellFormed($namespace, $directory)) {
+                /** @var string $namespace */
+                $entries[$namespace] = $directory;
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Discover entries that register nothing: `malformed` is not a
+     * `'Namespace' => '/directory'` pair (a list, a non-string path),
+     * `empty` is well-formed but resolves to no block class — a wrong
+     * namespace or a directory that does not exist. Each is a label for
+     * the console, `namespace => directory`.
+     *
+     * @return array{empty: list<string>, malformed: list<string>}
+     */
+    public static function problems(mixed $discover): array
+    {
+        $problems = ['empty' => [], 'malformed' => []];
+
+        if (! is_array($discover)) {
+            $problems['malformed'][] = self::describe($discover);
+
+            return $problems;
+        }
+
+        foreach ($discover as $namespace => $directory) {
+            if (! self::isWellFormed($namespace, $directory)) {
+                $problems['malformed'][] = self::describe($namespace) . ' => ' . self::describe($directory);
+            } elseif (self::classes((string) $namespace, $directory) === []) {
+                $problems['empty'][] = "{$namespace} => {$directory}";
+            }
+        }
+
+        return $problems;
+    }
+
+    /** @phpstan-assert-if-true string $directory */
+    private static function isWellFormed(mixed $namespace, mixed $directory): bool
+    {
+        return is_string($namespace) && trim($namespace, '\\ ') !== '' && is_string($directory) && $directory !== '';
+    }
+
+    private static function describe(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : get_debug_type($value);
+    }
+
+    /**
      * @return list<class-string<Block>> sorted by relative path, so the registry order is stable across machines
      */
     public static function classes(string $namespace, string $directory): array

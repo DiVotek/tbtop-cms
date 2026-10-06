@@ -9,6 +9,7 @@ use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\Support\FormResolver;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Tests\Fixtures\FormResolver\ArrayShapesBlock;
 use Tbtop\Cms\Tests\Fixtures\FormResolver\EveryKindBlock;
 
 uses(RefreshDatabase::class);
@@ -98,4 +99,20 @@ it('prints the props shape the same rules guarantee', function (): void {
         . 'cta: array{href: string, type: string, label: string}|null, count: float|null, featured: bool, '
         . 'keywords: list<string>, sizes: list<string>, meta: array<string, string>, items: list<array{label: string|null, qty: float|null}>}'
     );
+});
+
+it('resolves the array-valued field kinds instead of dropping them to null', function (): void {
+    $props = (new ArrayShapesBlock)->resolve([
+        'days' => ['mon', ' tue ', ''],
+        'period' => ['from' => '2026-01-01', 'to' => ''],
+        'files' => ['uploads/a.pdf', 'uploads/b.pdf'],
+        'address' => ['street' => 'Main 1'],
+    ], everyKindContext());
+
+    expect($props)->toBe([
+        'days' => ['mon', 'tue'],
+        'period' => ['from' => '2026-01-01', 'to' => null],
+        'files' => ['uploads/a.pdf', 'uploads/b.pdf'],
+        'address' => ['street' => 'Main 1'],
+    ]);
 });

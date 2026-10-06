@@ -100,22 +100,30 @@ class SiteSettingsPage extends SettingsPageBase
         return [];
     }
 
-    /** @return list<Field|HtmlBlock|Node|TextBlock> */
+    /**
+     * No row field is plainly required: validation runs before
+     * normalizeForm(), so a required() would reject the entirely empty row
+     * that the save promises to drop. A one-field row is empty or complete;
+     * a social row needs its label and link once any of its fields is
+     * filled (`required_with` reads the same row through `*`).
+     *
+     * @return list<Field|HtmlBlock|Node|TextBlock>
+     */
     protected function contactsFields(S $s): array
     {
         return [
             $s->displayText(__('tbtop-cms::settings.site.helpers.contacts'))->variant('muted'),
             $s->displayHtml(self::twoColumnRows('phones', 'emails', 'socials')),
             $s->repeater('phones')->label(__('tbtop-cms::settings.site.fields.phones'))->fields([
-                $s->text('number')->label(__('tbtop-cms::settings.site.fields.phone_number'))->placeholder('+380 44 000 00 00')->required()->rules('max:40'),
+                $s->text('number')->label(__('tbtop-cms::settings.site.fields.phone_number'))->placeholder('+380 44 000 00 00')->rules('nullable|max:40'),
             ]),
             $s->repeater('emails')->label(__('tbtop-cms::settings.site.fields.emails'))->fields([
-                $s->text('address')->label(__('tbtop-cms::settings.site.fields.email_address'))->required()->rules('email|max:190'),
+                $s->text('address')->label(__('tbtop-cms::settings.site.fields.email_address'))->rules('nullable|email|max:190'),
             ]),
             $s->repeater('socials')->label(__('tbtop-cms::settings.site.fields.socials'))->fields([
-                $s->text('label')->label(__('tbtop-cms::settings.site.fields.social_label'))->placeholder('TG')->required()->rules('max:8'),
+                $s->text('label')->label(__('tbtop-cms::settings.site.fields.social_label'))->placeholder('TG')->requiredWith('socials.*.name', 'socials.*.href')->rules('nullable|max:8'),
                 $s->text('name')->label(__('tbtop-cms::settings.site.fields.social_name'))->placeholder('Telegram')->rules('nullable|max:40'),
-                $s->text('href')->label(__('tbtop-cms::settings.site.fields.social_href'))->required()->rules('url|max:255'),
+                $s->text('href')->label(__('tbtop-cms::settings.site.fields.social_href'))->requiredWith('socials.*.label', 'socials.*.name')->rules('nullable|url|max:255'),
             ]),
         ];
     }

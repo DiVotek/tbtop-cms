@@ -12,6 +12,7 @@ use Tbtop\Cms\Frontend\Seo\SiteIdentity;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\PageUrl;
+use Tbtop\Cms\Page\Support\PageTranslation;
 use Tbtop\Cms\Settings\Settings;
 
 /**
@@ -52,8 +53,7 @@ final class SchemaContextFactory
         // The UNtemplated title/description: a schema `name` should be the
         // thing's name, not the browser-tab string with the site name
         // appended.
-        $currentLabel = (string) $page->getTranslation('title', $locale, false)
-            ?: (string) $page->getTranslation('name', $locale, false);
+        $currentLabel = PageTranslation::firstText($page, ['title', 'name'], $locale, $locale);
 
         if ($source === null && $this->pageTypes->isSourceBacked($page->type)) {
             $source = $this->pageTypes->get($page->type)->source($page);
@@ -217,19 +217,8 @@ final class SchemaContextFactory
      */
     public function description(Page $page, array $seo, string $locale): string
     {
-        $override = LocalizedSeo::value($seo['description'] ?? null, $locale);
-
-        if ($override !== '') {
-            return $override;
-        }
-
-        $summary = (string) $page->getTranslation('summary', $locale);
-
-        if ($summary !== '') {
-            return $summary;
-        }
-
-        return LocalizedSeo::value($this->settings->get('seo.default_description', ''), $locale);
+        return PageOwnSeo::description($page, $seo, $locale)
+            ?: LocalizedSeo::value($this->settings->get('seo.default_description', ''), $locale);
     }
 
     /**

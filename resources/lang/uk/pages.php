@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'trashed' => 'У кошику',
     'title' => 'Сторінки',
     'tab_description' => ':tab — категорії групують контент, сторінки самостійні, статті живуть у категорії.',
     'tabs' => [
