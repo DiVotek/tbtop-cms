@@ -9,6 +9,7 @@ use Tbtop\Cms\Frontend\Seo\AbsoluteUrl;
 use Tbtop\Cms\Frontend\Seo\LocalizedSeo;
 use Tbtop\Cms\Frontend\Seo\PageOwnSeo;
 use Tbtop\Cms\Frontend\Seo\SiteIdentity;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\PageUrl;
@@ -53,7 +54,7 @@ final class SchemaContextFactory
         // The UNtemplated title/description: a schema `name` should be the
         // thing's name, not the browser-tab string with the site name
         // appended.
-        $currentLabel = PageTranslation::firstText($page, ['title', 'name'], $locale, $locale);
+        $currentLabel = PageTranslation::firstText($page, ['title', 'name'], $locale, app(Languages::class)->defaultLocale());
 
         if ($source === null && $this->pageTypes->isSourceBacked($page->type)) {
             $source = $this->pageTypes->get($page->type)->source($page);
