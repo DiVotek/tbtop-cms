@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
@@ -37,11 +38,17 @@ final class PageEditTypeFields
 
             $sections[] = $s->section(
                 ['title' => PageFormOptions::typeLabelFor($type->key(), $type->label())],
-                array_map(static fn (Field $field): Field => PrefixedField::rename($field, self::PREFIX . $field->name), $fields),
+                array_map(static fn (Field $field): Field => self::exceptSelf(PrefixedField::rename($field, self::PREFIX . $field->name), $page), $fields),
             );
         }
 
         return $sections;
+    }
+
+    /** A pages field on a page does not offer that page itself. */
+    public static function exceptSelf(Field $field, Page $page): Field
+    {
+        return $field instanceof Pages && $page->exists ? $field->exceptPage((int) $page->getKey()) : $field;
     }
 
     /** @return array<string, mixed> */

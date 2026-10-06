@@ -47,7 +47,9 @@ final class PrefixedField
     public static function rename(Field $field, string $newName, ?string $activeField = null): Field
     {
         $node = $field->toNode();
-        $clone = S::makeField($node->kind, $newName);
+        // The field's own class, not S::makeField($node->kind): a field that
+        // serializes as a built-in kind (Pages is a `select`) must come back as itself.
+        $clone = $field::make($newName);
 
         foreach ($node->options as $key => $value) {
             if ($key === 'constraints' || $key === 'translatable') {

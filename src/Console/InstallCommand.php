@@ -89,6 +89,8 @@ class InstallCommand extends Command
         try {
             (new LanguageSeeder)->run();
             (new PageSeeder)->run();
+            // A re-run on an existing site re-derives the references index from the pages' fields.
+            $this->callSilently('cms:page-refs:rebuild');
         } catch (Throwable $e) {
             $this->error("Seeding failed: {$e->getMessage()}");
 
