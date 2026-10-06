@@ -107,6 +107,9 @@ it('falls back to an empty render with the lang-file heading when the 4xx page r
         ->assertJsonPath('component', 'Cms/Page')
         ->assertJsonPath('props.render', [])
         ->assertJsonPath('props.page.heading', __('tbtop-cms::errors.4xx.heading'))
+        ->assertJsonPath('props.page.name', null)
+        ->assertJsonPath('props.page.title', null)
+        ->assertJsonPath('props.page.summary', null)
         ->assertJsonPath('props.page.subtype', null)
         // The page prop shape is a normal page's: fields is a JSON object even when empty.
         ->assertSee('"fields":{}', false);
