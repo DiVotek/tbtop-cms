@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Page;
 
 use InvalidArgumentException;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
+use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Types\ArticleType;
 use Tbtop\Cms\Page\Types\CategoryType;
 use Tbtop\Cms\Page\Types\PageType;
@@ -78,6 +79,37 @@ class PageTypeRegistry
     public function isSourceBacked(string $type): bool
     {
         return $this->has($type) && $this->get($type)->isSourceBacked();
+    }
+
+    /**
+     * The registered types whose base() is $base, other than $base itself.
+     *
+     * @return list<PageTypeInterface>
+     */
+    public function subtypesOf(string $base): array
+    {
+        $this->boot();
+
+        return array_values(array_filter(
+            $this->types,
+            static fn (PageTypeInterface $type): bool => $type->base() === $base && $type->key() !== $base,
+        ));
+    }
+
+    /**
+     * The types a page is made of: its base type, then its subtype — each
+     * only when registered, since both columns outlive a registration.
+     *
+     * @return list<PageTypeInterface>
+     */
+    public function forPage(Page $page): array
+    {
+        $this->boot();
+
+        return array_values(array_filter([
+            $this->types[$page->type] ?? null,
+            is_string($page->subtype) && $page->subtype !== '' ? $this->types[$page->subtype] ?? null : null,
+        ]));
     }
 
     /** @return list<string> */

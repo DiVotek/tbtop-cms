@@ -82,11 +82,6 @@ final class BlockContent
                 $entry['sort'] = (int) $row['sort'];
             }
 
-            // A type-owned row (see TypeBlocks) keeps its owner on the envelope.
-            if (is_string($row['owner'] ?? null) && $row['owner'] !== '') {
-                $entry['owner'] = $row['owner'];
-            }
-
             // A reference to a shared block carries no data of its own; the
             // pointer stays on the envelope, never inside `data`.
             $shared = SharedBlocks::refOf($row);
@@ -98,7 +93,7 @@ final class BlockContent
 
             $out[] = [
                 ...$entry,
-                'data' => Arr::except($row, ['id', 'kind', 'active', 'sort', 'shared', 'owner']),
+                'data' => Arr::except($row, ['id', 'kind', 'active', 'sort', 'shared']),
             ];
         }
 
@@ -132,9 +127,6 @@ final class BlockContent
             $shared = SharedBlocks::refOf($block);
             if ($shared !== null) {
                 $row['shared'] = $shared;
-            }
-            if (is_string($block['owner'] ?? null) && $block['owner'] !== '') {
-                $row['owner'] = $block['owner'];
             }
             $rows[] = $row;
         }

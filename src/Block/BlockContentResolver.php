@@ -6,10 +6,12 @@ namespace Tbtop\Cms\Block;
 
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
+use Tbtop\Cms\Block\Support\TranslatablePaths;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\TypeBlocks;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Throwable;
 
@@ -20,7 +22,7 @@ class BlockContentResolver
         private readonly Languages $languages,
         private readonly MediaUrlResolver $mediaUrlResolver,
         private readonly SharedBlocks $sharedBlocks,
-        private readonly TypeBlocks $typeBlocks,
+        private readonly PageTypeRegistry $pageTypes,
     ) {}
 
     /**
@@ -40,9 +42,8 @@ class BlockContentResolver
     }
 
     /**
-     * Rows owned by a type other than the page's are dormant and skipped
-     * (see TypeBlocks). The page type's general blocks resolve first, into
-     * `fields`, and never enter the block list.
+     * The page's type fields resolve first, into `fields`, so every block
+     * can read them through ResolveContext::field().
      *
      * @param  array<int, mixed>  $content
      * @return array{blocks: list<ResolvedBlock>, fields: array<string, mixed>}
@@ -55,31 +56,13 @@ class BlockContentResolver
         $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver, source: $source);
         $strict = (bool) config('tbtop-cms.blocks.strict', false);
 
-        if ($page !== null) {
-            $content = TypeBlocks::visible($content, $page->type);
-        }
-
-        $fields = [];
-        $flow = [];
-        foreach (self::sorted($content) as $raw) {
-            if (is_array($raw) && $this->typeBlocks->isGeneral($raw)) {
-                $general = $this->resolveOne($raw, $ctx, $locales, $strict);
-                if ($general instanceof ResolvedBlock && $general->error === null) {
-                    // Two general blocks may share a key; a later empty one must not wipe what an earlier one filled.
-                    $fields = [...$fields, ...array_filter($general->props, static fn (mixed $value, string | int $key): bool => $value !== null || ! array_key_exists($key, $fields), ARRAY_FILTER_USE_BOTH)];
-                }
-
-                continue;
-            }
-            $flow[] = $raw;
-        }
-
+        $fields = $page !== null ? $this->resolveFields($page, $ctx, $locales, $strict) : [];
         if ($fields !== []) {
             $ctx = new ResolveContext($locale, $fallback, $page, $this->mediaUrlResolver, source: $source, fields: $fields);
         }
 
         $resolved = [];
-        foreach ($flow as $raw) {
+        foreach (self::sorted($content) as $raw) {
             $block = $this->resolveOne($raw, $ctx, $locales, $strict);
             if ($block instanceof ResolvedBlock) {
                 $resolved[] = $block;
@@ -87,6 +70,36 @@ class BlockContentResolver
         }
 
         return ['blocks' => $resolved, 'fields' => $fields];
+    }
+
+    /**
+     * Base type first, then the subtype: a key both declare takes the
+     * subtype's value. Every type reads the whole stored `fields` and keeps
+     * only what its own form declares, so a key left behind by an earlier
+     * subtype is not resolved. A type whose resolveFields() throws adds
+     * nothing — the page still renders, as with a failing block.
+     *
+     * @param  list<string>  $locales
+     * @return array<string, mixed>
+     */
+    private function resolveFields(Page $page, ResolveContext $ctx, array $locales, bool $strict): array
+    {
+        $stored = is_array($page->fields) ? $page->fields : [];
+        $fields = [];
+
+        foreach ($this->pageTypes->forPage($page) as $type) {
+            try {
+                $input = LocaleFlattener::flattenData($stored, $ctx->locale, $ctx->fallbackLocale, $locales, TranslatablePaths::of($type->fields(new S)));
+                $fields = [...$fields, ...$type->resolveFields($input, $ctx)];
+            } catch (Throwable $e) {
+                if ($strict) {
+                    throw $e;
+                }
+                Log::warning('page.fields_resolve_failed', ['type' => $type->key(), 'page' => $page->getKey(), 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $fields;
     }
 
     /**

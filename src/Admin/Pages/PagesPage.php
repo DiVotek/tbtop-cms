@@ -17,6 +17,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
+use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
@@ -30,6 +31,7 @@ use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PageRestored;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageDuplicator;
 
 class PagesPage extends AdminPage
@@ -82,6 +84,7 @@ class PagesPage extends AdminPage
     public function view(S $s): Node
     {
         $pages = (new Page)->getTable();
+        $subtypes = $this->subtypeOptions();
 
         $table = $s->table('pages')
             ->query($this->query(...))
@@ -90,6 +93,12 @@ class PagesPage extends AdminPage
                 Column::make('type')->label(__('tbtop-cms::pages.columns.type'))
                     ->formatUsing($this->typeLabel(...))
                     ->muted()->uppercase(),
+                // Only once a host registers a subtype: before that every row would be blank.
+                ...($subtypes === [] ? [] : [
+                    Column::make('subtype')->label(__('tbtop-cms::pages.columns.subtype'))
+                        ->formatUsing($this->subtypeLabel(...))
+                        ->muted()->uppercase(),
+                ]),
                 Column::make('parent_name')->label(__('tbtop-cms::pages.columns.parent'))->translatable()->muted(),
                 // Bound to the display_state computed column (see query()),
                 // not the raw status column — mirrors PageEditStatusBar's
@@ -141,6 +150,11 @@ class PagesPage extends AdminPage
                 Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))->count()
                     ->description(__('tbtop-cms::pages.tabs_deleted_description'))
                     ->query($this->onlyTrashedScope(...)),
+            ])
+            ->filters($subtypes === [] ? [] : [
+                // Qualified: PageSortKey self-joins the pages table, so a bare `subtype` is ambiguous.
+                $s->select('subtype')->label(__('tbtop-cms::pages.columns.subtype'))->options($subtypes)
+                    ->filterUsing(static fn (Builder $q, mixed $value): Builder => $q->where("{$pages}.subtype", $value)),
             ])
             ->searchable(["{$pages}.name"])
             ->defaultSort('sort_key', 'asc')
@@ -438,6 +452,33 @@ class PagesPage extends AdminPage
     private function typeLabel(mixed $value): string
     {
         return EnumLabel::make('tbtop-cms::pages.types', $value);
+    }
+
+    private function subtypeLabel(mixed $value): string
+    {
+        if (! is_string($value) || $value === '') {
+            return '';
+        }
+        $types = app(PageTypeRegistry::class);
+
+        return PageFormOptions::typeLabelFor($value, $types->has($value) ? $types->get($value)->label() : $value);
+    }
+
+    /**
+     * Every registered subtype, whatever its base.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function subtypeOptions(): array
+    {
+        $options = [];
+        foreach (app(PageTypeRegistry::class)->all() as $type) {
+            if ($type->base() !== $type->key()) {
+                $options[] = ['value' => $type->key(), 'label' => PageFormOptions::typeLabelFor($type->key(), $type->label())];
+            }
+        }
+
+        return $options;
     }
 
     private function statusLabel(mixed $value): string

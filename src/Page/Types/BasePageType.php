@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Types;
 
+use Tbtop\Admin\Dsl\Fields\Field;
+use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Block\Support\FormResolver;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\TypeBlock;
 
 abstract class BasePageType implements PageTypeInterface
 {
@@ -59,9 +62,18 @@ abstract class BasePageType implements PageTypeInterface
         return $this->key();
     }
 
-    /** @return list<TypeBlock> */
-    public function blocks(): array
+    /** @return list<Field> */
+    public function fields(S $s): array
     {
         return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function resolveFields(array $input, ResolveContext $ctx): array
+    {
+        return (new FormResolver)->resolve($this->fields(new S), $input, $ctx);
     }
 }

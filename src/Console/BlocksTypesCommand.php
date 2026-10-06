@@ -16,7 +16,6 @@ use Tbtop\Cms\BlockTypes\RegistryEmitter;
 use Tbtop\Cms\BlockTypes\TypeAliasCollector;
 use Tbtop\Cms\BlockTypes\TypeScriptEmitter;
 use Tbtop\Cms\BlockTypes\UnsupportedShapeException;
-use Tbtop\Cms\Page\TypeBlocks;
 
 class BlocksTypesCommand extends Command
 {
@@ -118,15 +117,9 @@ class BlocksTypesCommand extends Command
             return null;
         }
 
-        // A component is needed where the block is drawn: wherever an editor may place it, and on the pages of a type
-        // that carries it as content. A block placeable nowhere and at most General-tab fields is never rendered.
-        $typeContent = app(TypeBlocks::class)->contentKinds();
-
+        // A block placeable nowhere is never drawn, so it needs no component.
         return (new RegistryEmitter)->emit(
-            array_values(array_filter(
-                $registry->all(),
-                static fn (Block $block): bool => $block->placements() !== [] || in_array($block->kind(), $typeContent, true),
-            )),
+            array_values(array_filter($registry->all(), static fn (Block $block): bool => $block->placements() !== [])),
             self::relativeModule(dirname($registryPath), $typesPath),
             $componentsImport,
             $componentsDir,

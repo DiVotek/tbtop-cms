@@ -21,7 +21,9 @@ assign the whole array through `fill()`/mass assignment. `body` is admin-only
 richtext and never reaches the frontend `page` prop; what the frontend renders
 is `content`, the block list.
 
-Plain (not translatable): `type`, `source_id`, `parent_id`, `status`,
+Plain (not translatable): `type` (always a top-level type), `subtype`
+(nullable — see Subtypes and type fields), `fields` (array cast, the type
+fields' stored values), `source_id`, `parent_id`, `status`,
 `published_at`, `unpublish_at`, `content` (array cast, block envelope — see
 blocks.md), `starter_blocks` (array cast, per-child-type starter structure
 — see Starter blocks below), `image` (a media id, not a URL — resolve with
@@ -57,7 +59,8 @@ re-implements a frontend read path — `PageResolver` already applies it.
 ## Page types
 
 `PageTypeInterface` (`src/Page/Contracts/PageTypeInterface.php`): `key()`,
-`label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, plus the
+`label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, `base()`,
+`fields()`, `resolveFields()` (see Subtypes and type fields), plus the
 source-backed trio below. `BasePageType` (`src/Page/Types/BasePageType.php`)
 gives every method a content-only, leaf-type default (`allowedChildren()`
 `[]`, `requiresParent()` `false`, `maxDepth()` `1`, not source-backed) — a
@@ -371,80 +374,57 @@ has one; `source($page)` must handle a null `source_id` itself.
 `template()` is called on every render with no caching between the call
 and block resolution — an expensive template build costs a full request.
 
-## Page subtypes
+## Subtypes and type fields
 
-The editor picks a type in two steps: "Type" lists the top-level types,
-"Subtype" the types whose `base()` is `page` (plus "— none —" = a plain
-page) and is hidden unless "Type" is page. `PageTypeInterface::base()`
-returns the type's own key by default; a host type that is a kind of page
-returns `'page'`:
-
-```php
-public function base(): string { return 'page'; }
-```
-
-The page stores one key either way (`src/Page/PageSubtype.php` folds the
-two selects into `type` on save and splits it on load), so `allowedChildren`,
-type blocks and anything keyed on `type` see the subtype's key. Subtypes of
-category and article are not offered yet.
-
-## Type blocks
-
-A page type can carry blocks of its own: `PageTypeInterface::blocks()`
-returns a list of `TypeBlock` (empty from `BasePageType`), each either
-`TypeBlock::content('Kind')` — a block in the content flow, with its own
-tab, `active` and `sort` like any other — or `TypeBlock::general('Kind')`,
-whose form sits on the General tab (under the page's own fields) and whose
-resolved props ship as the `page.fields` prop and as `ResolveContext::field()`
-for every other block on the page. Both kinds are ordinary registered
-`Block` classes, and "general" is a role the block has **on that type
-only**: on a page of another type the same kind is a normal block, offered
-in "+ Add block" and drawn by its component. A block that is General-tab
-fields and nothing else says so itself by returning `[]` from
-`placements()` — then no picker offers it anywhere and `cms:blocks:types`
-asks for no component (it would only if some type carried the kind as a
-content block):
+A subtype is a key and a set of fields, not a type of its own.
+`PageTypeInterface::base()` returns the type's own key by default (a
+top-level type); a host type that is a kind of another returns that type's
+key:
 
 ```php
-/** @return list<string> */
-public function placements(): array
+final class ConcertType extends BasePageType
 {
-    return [];
+    public function key(): string { return 'concert'; }
+    public function base(): string { return 'event'; }   // a host top-level type works too
+
+    public function fields(S $s): array
+    {
+        return [$s->text('artist')->label('Artist')];
+    }
 }
 ```
 
-When two general blocks of one type resolve the same key, the later one
-wins — unless its value is `null`, which never replaces a filled one.
-
-```php
-public function blocks(): array
-{
-    return [TypeBlock::general('ContactsGeneral'), TypeBlock::content('ContactDetails')];
-}
-```
-
-How it is stored and what the rules are (`src/Page/TypeBlocks.php`):
-
-- The rows live in the page's `content` envelope with `owner` set to the
-  type key. `PageObserver::saving` adds any declared row the page lacks, so
-  every path that saves a page (form, seeder, API, revision restore) gets
-  them — a seeder may create a page of the type with `content => []` and
-  fill the rows afterwards. A content row added to a page that **already
-  exists** (the page took the type, or the type gained a block) starts
-  inactive, so an empty block does not go live on the next save; on a new
-  page it starts active. A general row is always active.
-- An owned row has no "Remove block" or "Make shared" in the editor, "+ Add block" does not offer its kind again, and no
-  `pageBlockRemove_{id}` action is registered for it. It can be switched
-  off and reordered. Editor-added and shared blocks interleave freely by
-  `sort`.
-- A type switch keeps the old type's rows **dormant**: still in `content`,
-  not shown in the editor, not resolved on the site, carried through every
-  save unchanged. Switching back wakes them with their data. The General tab
-  shows a "Hidden data of another page type" section with a
-  `pageTypeBlocksPurge` action that drops them; revisions keep every version.
+- **Storage.** `type` holds the base, `subtype` the subtype key (or null).
+  Tree rules (`allowedChildren`, `requiresParent`, `maxDepth`, starter
+  blocks) always come from `type`, i.e. the base — a subtype's own
+  overrides of them are never read.
+- **Editor.** "Type" lists the types whose `base() === key()`. The sidebar
+  "Subtype" select lists only the subtypes of the page's current type
+  ("— none —" first), is hidden when that type has none, and writes the
+  `subtype` column; `type` is untouched. Changing "Type" drops a subtype
+  that does not belong to the new one. The create modal offers the subtypes
+  of `page`. The pages list gets a Subtype column and filter once any
+  subtype is registered.
+- **Type fields.** `fields(S $s): array` (empty from `BasePageType`) is a
+  list of ordinary form fields. The General tab shows, under the page's own
+  fields, a section for the base type's fields and then one for the
+  subtype's; their names carry a `field_` prefix in the form and are saved
+  without it into the page's `fields` column. A save merges into `fields` —
+  keys the form does not show (a former subtype's) are kept, so switching
+  the subtype and back never loses data.
+- **Site.** `page.fields` ships the base's and then the subtype's fields
+  (a subtype key wins on a clash), translatable values flattened to the
+  request locale; every block reads them through `ResolveContext::field()`.
+  `page.subtype` ships next to `page.type`. To compute or reshape values,
+  override `resolveFields(array $input, ResolveContext $ctx): array` — the
+  default runs `FormResolver` over `fields()`, and the input is the flattened
+  `fields` column. A throw is logged (`page.fields_resolve_failed`) and that
+  type's fields drop out; in a strict render it propagates.
+- **Blocks.** `placements()` may name a subtype key: the block is then
+  offered in "+ Add block" on pages of that subtype only (a page is offered
+  the blocks placed on its `type` and on its `subtype`).
 - `BlockContentResolver::resolveWithFields()` is the render entry:
-  `{blocks, fields}`; `resolve()` returns the blocks only. Both skip dormant
-  rows when given a page.
+  `{blocks, fields}`; `resolve()` returns the blocks only.
 
 ## Revisions
 
@@ -459,9 +439,9 @@ hierarchy/slug guards).
 
 `PageRevisionWriter::snapshot()` fires on every `Page::save()` that changes
 an "editorial" field (`name`, `title`, `heading`, `summary`, `body`,
-`image`, `content`, `seo`, `is_indexable`) — a sort-order-only drag reorder
+`image`, `content`, `fields`, `seo`, `is_indexable`) — a sort-order-only drag reorder
 or a bare status toggle does not create a revision. Deliberately excluded:
-`status`, `type`, `parent_id`, `sort_order` — workflow/structural state
+`status`, `type`, `subtype`, `parent_id`, `sort_order` — workflow/structural state
 `restore()` never touches, so restoring old content can never resurrect an
 old status or move the page in the tree. Every save keeps only the newest
 `keep` rows per page.

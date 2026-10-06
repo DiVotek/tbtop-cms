@@ -23,10 +23,10 @@ use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\PageSubtype;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\StarterBlocks;
 use Tbtop\Cms\Page\Types\PageType;
@@ -59,7 +59,7 @@ class PageForm
                 $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
                     ->required()->options(PageFormOptions::types(includeSourceBacked: false))
                     ->default(app(PageType::class)->key()),
-                self::subtypeField($s),
+                ...self::subtypeField($s, app(PageType::class)->key()),
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))
                     ->query(static fn (): Builder => self::parentQuery())
                     ->labelKey('name')->searchable()
@@ -68,12 +68,25 @@ class PageForm
         ];
     }
 
-    /** The "Subtype" select: only visible while "Type" is the page base. */
-    public static function subtypeField(S $s): Field
+    /**
+     * The "Subtype" select for pages of $base: absent when $base has no
+     * subtypes, hidden once "Type" is changed to another base — its options
+     * would not belong to it, and save() drops the stale value.
+     *
+     * @return list<Field>
+     */
+    public static function subtypeField(S $s, string $base): array
     {
-        return $s->select('subtype')->label(__('tbtop-cms::pages.fields.subtype'))
-            ->options(PageFormOptions::subtypes())->default('')
-            ->hiddenIf(Cond::neq('type', PageSubtype::BASE));
+        $options = PageFormOptions::subtypes($base);
+        if ($options === []) {
+            return [];
+        }
+
+        return [
+            $s->select('subtype')->label(__('tbtop-cms::pages.fields.subtype'))
+                ->options($options)->default('')
+                ->hiddenIf(Cond::neq('type', $base)),
+        ];
     }
 
     /**
@@ -377,7 +390,6 @@ class PageForm
      */
     public static function save(array $form, ?int $id = null): Page
     {
-        $form = PageSubtype::resolve($form);
         $page = $id !== null ? Page::query()->findOrFail($id) : new Page;
         $isCreate = ! $page->exists;
         $statusBefore = $page->exists ? $page->status : null;
@@ -401,8 +413,15 @@ class PageForm
         // (see fillContent()'s docblock) is carried over from THIS, the
         // pre-save envelope, by matching block id.
         $contentBefore = $isCreate ? [] : BlockEnvelope::blocksOf($page->content);
+        // Folded against the types the form was rendered for, before fill() may change them.
+        $fields = $isCreate ? [] : PageEditTypeFields::fold($form, $page);
 
         $page->fill(self::fillAttributes($page, $isCreate ? self::withTitleFallback($form) : $form, $parentId, $isCreate));
+
+        // Null stays null when nothing was entered, so a plain save is not an editorial change.
+        if ($fields !== ($page->fields ?? [])) {
+            $page->fields = $fields;
+        }
 
         // A source-backed page's content is owned by its type's template
         // (PageTypeInterface::template()), never by this form — the editor
@@ -569,13 +588,16 @@ class PageForm
             return $attributes;
         }
 
+        $type = (string) ($form['type'] ?? (self::isSourceBacked($page) ? $page->type : ''));
+
         return [
             ...$attributes,
             // Omitted entirely for a source-backed page (PageEditSidebar
             // hides the type select — its type is owned by the sync, not
-            // editorially chosen): keep the page's existing type rather than
-            // reading a missing key as ''.
-            'type' => (string) ($form['type'] ?? (self::isSourceBacked($page) ? $page->type : '')),
+            // editorially chosen): $type keeps the page's existing type
+            // rather than reading a missing key as ''.
+            'type' => $type,
+            'subtype' => self::subtypeAttribute($page, $form, $type),
             'parent_id' => $parentId,
             'status' => (string) ($form['status'] ?? PageStatus::Draft->value),
             // Create form never sends these (PageEditSidebar is edit-only),
@@ -584,6 +606,38 @@ class PageForm
             'published_at' => self::nullableDateTime($form['published_at'] ?? null),
             'unpublish_at' => self::nullableDateTime($form['unpublish_at'] ?? null),
         ];
+    }
+
+    /**
+     * A subtype must be one of $type's. A missing `subtype` key keeps the
+     * stored one. A value that does not fit is dropped when the type changed
+     * (the select was hidden, its value stale) and rejected otherwise —
+     * except the page's own stored subtype, which outlives its registration
+     * the way `type` does.
+     *
+     * @param  array<string, mixed>  $form
+     */
+    private static function subtypeAttribute(Page $page, array $form, string $type): ?string
+    {
+        $stored = $page->getAttribute('subtype');
+        $value = array_key_exists('subtype', $form) ? $form['subtype'] : $stored;
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $subtypes = array_map(static fn (PageTypeInterface $subtype): string => $subtype->key(), app(PageTypeRegistry::class)->subtypesOf($type));
+        $isTypeKept = $page->exists && $page->type === $type;
+
+        if (in_array($value, $subtypes, true) || ($isTypeKept && $value === $stored)) {
+            return $value;
+        }
+        if (! $isTypeKept) {
+            return null;
+        }
+
+        throw ValidationException::withMessages([
+            'subtype' => __('tbtop-cms::pages.validation.subtype_invalid', ['subtype' => $value, 'type' => $type]),
+        ]);
     }
 
     /**
@@ -666,8 +720,8 @@ class PageForm
             'heading' => $page->getTranslations('heading'),
             'summary' => $page->getTranslations('summary'),
             'body' => $page->getTranslations('body'),
-            'type' => PageSubtype::baseOf($page->type),
-            'subtype' => PageSubtype::subtypeOf($page->type),
+            'type' => $page->type,
+            'subtype' => $page->subtype ?? '',
             // Raw id string (or null) — the relation picker resolves its
             // label via the relation-search endpoint's resolve mode, which
             // looks the value up by primary key; the old NO_PARENT sentinel

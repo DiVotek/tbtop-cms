@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Support\FormResolver;
+use Tbtop\Cms\Block\Support\TranslatablePaths;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 
 abstract class Block
@@ -77,7 +78,7 @@ abstract class Block
     /** @return list<string> */
     public function translatableFields(): array
     {
-        return self::collectTranslatablePaths($this->form(new S), '');
+        return TranslatablePaths::of($this->form(new S));
     }
 
     /**
@@ -100,28 +101,5 @@ abstract class Block
     public function toSchema(array $props, SchemaContext $ctx): ?array
     {
         return null;
-    }
-
-    /**
-     * @param  list<Field>  $fields
-     * @return list<string>
-     */
-    private static function collectTranslatablePaths(array $fields, string $prefix): array
-    {
-        $paths = [];
-
-        foreach ($fields as $field) {
-            $path = $prefix === '' ? $field->name : "{$prefix}.{$field->name}";
-
-            if ($field->isTranslatableField()) {
-                $paths[] = $path;
-            }
-
-            /** @var list<Field> $children */
-            $children = $field->childFields();
-            $paths = [...$paths, ...self::collectTranslatablePaths($children, $path)];
-        }
-
-        return $paths;
     }
 }

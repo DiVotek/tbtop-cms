@@ -4,93 +4,91 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
-use Tbtop\Admin\Actions\ActionCtx;
-use Tbtop\Admin\Actions\Effects;
-use Tbtop\Admin\Dsl\ActionBuilder;
+use Tbtop\Admin\Dsl\Fields\Field;
+use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
-use Tbtop\Cms\Block\BlockRegistry;
-use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
-use Tbtop\Cms\Page\TypeBlocks;
 
 /**
- * The General tab's share of a page type's blocks (see TypeBlocks): the
- * forms of its general blocks, under the same `block_{id}_` prefix the
- * block tabs use so PageEditBlocks reads them back unchanged, and the
- * notice about rows another type left behind, with the action to drop them.
+ * The General tab's type fields (PageTypeInterface::fields()): a section for
+ * the base type, then one for the subtype, each field renamed `field_{name}`
+ * — the same folding the block tabs do with `block_{id}_` — and read back
+ * into the page's `fields` column by fold().
+ *
+ * Only the names the page's current types declare are shown, read or
+ * written. Anything else in `fields` (left by an earlier subtype) is carried
+ * through untouched, so switching the subtype back finds its values.
  */
 final class PageEditTypeFields
 {
-    /** @return list<mixed> */
+    private const string PREFIX = 'field_';
+
+    /** @return list<Node> */
     public static function build(S $s, Page $page): array
     {
-        $registry = app(BlockRegistry::class);
-        $typeBlocks = app(TypeBlocks::class);
-        $nodes = [];
+        $sections = [];
 
-        foreach (PageEditBlocks::blocks($page) as $block) {
-            if (! $typeBlocks->isGeneral($block) || ! $registry->has((string) $block['kind'])) {
+        foreach (app(PageTypeRegistry::class)->forPage($page) as $type) {
+            $fields = $type->fields($s);
+            if ($fields === []) {
                 continue;
             }
-            $id = (string) $block['id'];
-            $kind = (string) $block['kind'];
-            $nodes[] = $s->section(['title' => BlockPicker::label($registry, $kind)], array_map(
-                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}"),
-                $registry->get($kind)->form($s),
-            ));
+
+            $sections[] = $s->section(
+                ['title' => PageFormOptions::typeLabelFor($type->key(), $type->label())],
+                array_map(static fn (Field $field): Field => PrefixedField::rename($field, self::PREFIX . $field->name), $fields),
+            );
         }
 
-        $dormant = TypeBlocks::dormant($page->content, $page->type);
-        if ($dormant !== []) {
-            $nodes[] = self::dormantNotice($s, $page, $dormant);
-        }
-
-        return $nodes;
+        return $sections;
     }
 
-    /** @param  array<string, int>  $dormant */
-    private static function dormantNotice(S $s, Page $page, array $dormant): mixed
+    /** @return array<string, mixed> */
+    public static function recordValues(Page $page): array
     {
-        $types = app(PageTypeRegistry::class);
-        $lines = [];
-        foreach ($dormant as $type => $count) {
-            $label = $types->has($type) ? $types->get($type)->label() : $type;
-            $lines[] = '- ' . trans_choice('tbtop-cms::pages.type_blocks.dormant_line', $count, ['type' => $label, 'count' => $count]);
+        $stored = is_array($page->fields) ? $page->fields : [];
+        $values = [];
+
+        foreach (self::declaredNames($page) as $name) {
+            if (array_key_exists($name, $stored)) {
+                $values[self::PREFIX . $name] = $stored[$name];
+            }
         }
 
-        return $s->section([
-            'title' => __('tbtop-cms::pages.type_blocks.dormant_title'),
-            'description' => __('tbtop-cms::pages.type_blocks.dormant_hint'),
-        ], [
-            $s->markdown(implode("\n", $lines)),
-            $s->flex([self::purgeAction($s, $page), $s->spacer()]),
-        ]);
+        return $values;
     }
 
-    private static function purgeAction(S $s, Page $page): ActionBuilder
+    /**
+     * The stored `fields` with the submitted `field_*` values laid over them.
+     * Read against the page as stored — the types the form was rendered for.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    public static function fold(array $form, Page $page): array
     {
-        return $s->action('pageTypeBlocksPurge')
-            ->label(__('tbtop-cms::pages.type_blocks.purge'))->color('danger')->outlined()
-            ->confirm(__('tbtop-cms::pages.type_blocks.purge_title'), __('tbtop-cms::pages.type_blocks.purge_confirm'))
-            ->withoutValidation(PageEditBlockTabs::skipsGate($page))
-            ->handle(fn (ActionCtx $ctx): Effects => self::handlePurge($ctx, $page), needs: ['form']);
-    }
+        $fields = is_array($page->fields) ? $page->fields : [];
 
-    private static function handlePurge(ActionCtx $ctx, Page $page): Effects
-    {
-        $rows = array_values(array_filter(
-            PageEditBlocks::toRows($ctx->form, $page),
-            static fn (array $row): bool => (TypeBlocks::ownerOf($row) ?? $page->type) === $page->type,
-        ));
-
-        try {
-            PageForm::save(PageEditBlockTabs::structuralForm($ctx->form, $page, $rows), $page->getKey());
-        } catch (PageConflictException) {
-            return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
+        foreach (self::declaredNames($page) as $name) {
+            if (array_key_exists(self::PREFIX . $name, $form)) {
+                $fields[$name] = $form[self::PREFIX . $name];
+            }
         }
 
-        return Effects::make()->notify(__('tbtop-cms::pages.type_blocks.purged'))
-            ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
+        return $fields;
+    }
+
+    /** @return list<string> */
+    private static function declaredNames(Page $page): array
+    {
+        $names = [];
+        foreach (app(PageTypeRegistry::class)->forPage($page) as $type) {
+            foreach ($type->fields(new S) as $field) {
+                $names[] = $field->name;
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 }

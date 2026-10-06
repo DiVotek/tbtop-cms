@@ -26,7 +26,7 @@ class PageRevisionWriter
 {
     /**
      * Fields a revision snapshot cares about. Deliberately excludes status,
-     * type, parent_id, sort_order, and slugs — those are structural/workflow
+     * type, subtype, parent_id, sort_order, and slugs — those are structural/workflow
      * state, not editorial content, and restore() must not touch them (see
      * its docblock). Kept private-const rather than public: the observer only
      * needs wasChanged(EDITORIAL_FIELDS) via wasChangedEditorial() below, and
@@ -34,7 +34,7 @@ class PageRevisionWriter
      */
     private const EDITORIAL_FIELDS = [
         'name', 'title', 'heading', 'summary', 'body',
-        'image', 'content', 'seo', 'is_indexable',
+        'image', 'content', 'fields', 'seo', 'is_indexable',
     ];
 
     /** @var list<string> */
@@ -100,6 +100,9 @@ class PageRevisionWriter
         if (array_key_exists('content', $payload)) {
             $page->content = $payload['content'];
         }
+        if (array_key_exists('fields', $payload)) {
+            $page->fields = $payload['fields'];
+        }
         if (array_key_exists('seo', $payload)) {
             $page->seo = $payload['seo'];
         }
@@ -133,6 +136,7 @@ class PageRevisionWriter
 
         $payload['image'] = $page->image;
         $payload['content'] = $page->content;
+        $payload['fields'] = $page->fields;
         $payload['seo'] = $page->seo;
         $payload['is_indexable'] = (bool) $page->is_indexable;
         // Captured display-only (see class docblock on restore()): the
