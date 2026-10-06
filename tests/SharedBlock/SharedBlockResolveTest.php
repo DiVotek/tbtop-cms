@@ -27,17 +27,15 @@ it('resolves a reference with the shared block content, flattened to the locale 
     ]);
 
     expect($out)->toHaveCount(1)
-        ->and($out[0]->props['title'])->toBe('Pryvit')
-        ->and($out[0]->error)->toBeNull();
+        ->and($out[0]->props['title'])->toBe('Pryvit');
 });
 
-it('marks a reference to a deleted shared block instead of dropping it', function (): void {
+it('drops a reference to a deleted shared block', function (): void {
     $out = app(BlockContentResolver::class)->resolve([
         ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'shared' => 999],
     ]);
 
-    expect($out[0]->props)->toBe([])
-        ->and($out[0]->error)->toBe('Block [Hero] points at shared block #999, which does not exist.');
+    expect($out)->toBe([]);
 });
 
 it('treats a shared block of another kind as missing: the page row decides the component', function (): void {
@@ -47,7 +45,7 @@ it('treats a shared block of another kind as missing: the page row decides the c
         ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'shared' => $shared->getKey()],
     ]);
 
-    expect($out[0]->error)->toContain('does not exist');
+    expect($out)->toBe([]);
 });
 
 it('throws for a missing shared block in strict mode', function (): void {

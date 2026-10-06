@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\Tests\Fixtures\BrokenBlock;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 
@@ -56,10 +58,7 @@ it('orders rendered blocks by sort, not by their position in content', function 
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'Second');
 });
 
-it('keeps a block that throws while resolving in its place as an error element, listed under errors', function (): void {
-    // The generic message is the non-debug one; debug would ship the exception text.
-    config(['app.debug' => false]);
-
+it('drops a block that throws while resolving and keeps its siblings', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
@@ -71,13 +70,11 @@ it('keeps a block that throws while resolving in its place as an error element, 
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.render.elements.$root.children', ['hero-1', 'broken-1'])
-        ->assertJsonPath('props.render.elements.broken-1.type', 'CmsBlockError')
-        ->assertJsonPath('props.render.elements.broken-1.props', ['kind' => 'Broken', 'message' => 'Block [Broken] failed to resolve.'])
-        ->assertJsonPath('props.render.errors.broken-1', 'Block [Broken] failed to resolve.');
+        ->assertJsonPath('props.render.elements.$root.children', ['hero-1'])
+        ->assertJsonMissingPath('props.render.elements.broken-1');
 });
 
-it('ships render.errors and page.fields as JSON objects when they are empty', function (): void {
+it('ships page.fields as a JSON object when it is empty', function (): void {
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
@@ -86,34 +83,31 @@ it('ships render.errors and page.fields as JSON objects when they are empty', fu
 
     $props = json_decode($this->get('/about', ['X-Inertia' => 'true'])->assertOk()->getContent(), false)->props;
 
-    expect($props->render->errors)->toEqual(new stdClass)
-        ->and($props->page->fields)->toEqual(new stdClass);
+    expect($props->page->fields)->toEqual(new stdClass);
 });
 
-it('ships render.errors as an object when a block id is numeric', function (): void {
+it('skips an unregistered kind and a dangling shared reference without a trace on the page or in the log', function (): void {
+    $gone = SharedBlock::query()->create(['name' => 'Promo', 'kind' => 'Hero', 'data' => []]);
+    $goneId = $gone->getKey();
+    $gone->delete();
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
-        'content' => [['id' => '0', 'kind' => 'Broken', 'data' => []]],
+        'content' => [
+            ['id' => 'ghost-1', 'kind' => 'Ghost', 'data' => ['legacy' => 'kept']],
+            ['id' => 'hero-1', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'Welcome']]],
+            ['id' => 'dangling-1', 'kind' => 'Hero', 'shared' => $goneId, 'data' => []],
+        ],
     ]);
+    Log::spy();
 
-    $props = json_decode($this->get('/about', ['X-Inertia' => 'true'])->assertOk()->getContent(), false)->props;
+    $render = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.render');
 
-    expect($props->render->errors)->toBeInstanceOf(stdClass::class);
-});
-
-it('still renders a page whose stored content names a kind that is not registered', function (): void {
-    Page::factory()->create([
-        'status' => PageStatus::Published,
-        'name' => ['en' => 'About'],
-        'content' => [['id' => 'ghost-1', 'kind' => 'Ghost', 'data' => []]],
-    ]);
-
-    $this->get('/about', ['X-Inertia' => 'true'])
-        ->assertOk()
-        ->assertJsonPath('props.render.elements.ghost-1.type', 'CmsBlockError')
-        ->assertJsonPath('props.render.elements.ghost-1.props', ['kind' => 'Ghost', 'message' => 'Block [Ghost] is not registered.'])
-        ->assertJsonPath('props.render.errors.ghost-1', 'Block [Ghost] is not registered.');
+    expect($render)->toHaveKeys(['root', 'elements'])->not->toHaveKey('errors')
+        ->and(array_keys($render['elements']))->toEqualCanonicalizing(['hero-1', '$root'])
+        ->and($render['elements']['$root']['children'])->toBe(['hero-1']);
+    Log::shouldNotHaveReceived('warning');
+    Log::shouldNotHaveReceived('error');
 });
 
 it('renders a valid empty spec for a page with no blocks', function (): void {

@@ -1,19 +1,7 @@
 import type { Spec } from "@json-render/react";
 
-/** The kind CmsRenderer draws in place of a block that cannot render. Not a block a host registers. */
-export const BLOCK_ERROR_KIND = "CmsBlockError";
-
-export interface BlockErrorProps {
-    kind: string;
-    message: string;
-}
-
-/**
- * The server's `render` prop: a spec plus the blocks whose resolve() failed, by element id. The server already
- * ships each of those as a `CmsBlockError` element with `{ kind, message }` props; `errors` is kept for a host
- * that builds its own spec (a layout slot from `cms.layout`) with the original kind.
- */
-export type RenderSpec = Spec & { errors?: Record<string, string> };
+/** The server's `render` prop: `{root, elements}`. A row that cannot render never reaches it — the server skips it. */
+export type RenderSpec = Spec;
 
 interface PropsSchema {
     safeParse(value: unknown): { success: boolean; error?: { issues: ReadonlyArray<{ path: PropertyKey[]; message: string }> } };
@@ -24,41 +12,43 @@ export interface CatalogLike {
     data: { components?: Record<string, { props?: PropsSchema }> };
 }
 
-/**
- * Rewrites every element that cannot render into a `CmsBlockError` element carrying the reason, so the
- * page keeps the block's place and the placeholder — not an empty gap plus a console line — says what broke.
- * Three causes, checked in this order: the server failed to resolve the block, the kind has no component in
- * the registry, the props do not match the catalog's schema. An element the server already sent as
- * `CmsBlockError` is kept as it is.
- */
-export function markBrokenBlocks(spec: RenderSpec, catalog: CatalogLike, registry: Record<string, unknown>): Spec {
-    const elements: Spec["elements"] = {};
-    let changed = false;
-
-    for (const [id, element] of Object.entries(spec.elements)) {
-        const message = id === spec.root || element.type === BLOCK_ERROR_KIND ? null : brokenReason(id, element.type, element.props, spec.errors, catalog, registry);
-        if (message === null) {
-            elements[id] = element;
-            continue;
-        }
-        changed = true;
-        elements[id] = { type: BLOCK_ERROR_KIND, props: { kind: element.type, message } satisfies BlockErrorProps };
-    }
-
-    return changed ? { ...spec, elements } : spec;
+export interface DroppedBlock {
+    id: string;
+    kind: string;
+    message: string;
 }
 
-function brokenReason(
-    id: string,
-    kind: string,
-    props: unknown,
-    errors: Record<string, string> | undefined,
-    catalog: CatalogLike,
-    registry: Record<string, unknown>,
-): string | null {
-    if (errors?.[id]) {
-        return errors[id];
+/**
+ * Removes every element the client cannot draw — its kind has no component in the registry, or its props fail
+ * the catalog's schema — together with its id in any `children` list. Both are developer bugs (a component
+ * not registered, a `resolve()` out of step with its zod schema), so the page renders without the block and
+ * the caller decides whether to say so. The spec comes back as the same object when nothing was dropped.
+ */
+export function dropBrokenBlocks(spec: RenderSpec, catalog: CatalogLike, registry: Record<string, unknown>): { spec: Spec; dropped: DroppedBlock[] } {
+    const dropped: DroppedBlock[] = [];
+    for (const [id, element] of Object.entries(spec.elements)) {
+        const message = id === spec.root ? null : brokenReason(element.type, element.props, catalog, registry);
+        if (message !== null) {
+            dropped.push({ id, kind: element.type, message });
+        }
     }
+    if (dropped.length === 0) {
+        return { spec, dropped };
+    }
+
+    const gone = new Set(dropped.map((block) => block.id));
+    const elements: Spec["elements"] = {};
+    for (const [id, element] of Object.entries(spec.elements)) {
+        if (gone.has(id)) {
+            continue;
+        }
+        elements[id] = element.children ? { ...element, children: element.children.filter((child) => !gone.has(child)) } : element;
+    }
+
+    return { spec: { ...spec, elements }, dropped };
+}
+
+function brokenReason(kind: string, props: unknown, catalog: CatalogLike, registry: Record<string, unknown>): string | null {
     // Own keys only: `constructor` or `toString` stored as a kind must not pass as a component.
     if (!Object.hasOwn(registry, kind)) {
         return `Block [${kind}] has no component in the registry.`;

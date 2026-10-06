@@ -1,6 +1,6 @@
 import { Renderer } from "@json-render/react";
-import { Component, type CSSProperties, type FC, type ReactNode } from "react";
-import { BLOCK_ERROR_KIND, type BlockErrorProps, type CatalogLike, markBrokenBlocks, type RenderSpec } from "./blockErrors";
+import { Component, type FC, type ReactNode } from "react";
+import { type CatalogLike, dropBrokenBlocks, type RenderSpec } from "./blockErrors";
 
 type RegistryComponent = (props: { element: { type: string; props: unknown }; children?: ReactNode }) => ReactNode;
 type Registry = Record<string, RegistryComponent>;
@@ -10,31 +10,28 @@ interface CmsRendererProps {
     catalog: CatalogLike;
     /** The `registry` from `defineRegistry()`; typed loosely so a host's exact registry type fits. */
     registry: Record<string, unknown>;
-    /** Draw a placeholder naming the broken block; off, a broken block renders nothing. Never on for visitors. */
+    /**
+     * Gates the developer console line for a block the client could not draw (no component, props failing the
+     * schema, a throwing component). The page looks the same either way: such a block renders nothing.
+     */
     showErrors: boolean;
 }
 
-const placeholderStyle: CSSProperties = {
-    margin: "8px 0",
-    padding: "12px 16px",
-    border: "2px dashed #dc2626",
-    background: "#fef2f2",
-    color: "#991b1b",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: "13px",
-    whiteSpace: "pre-wrap",
-};
+const reported = new Set<string>();
 
-export function BlockErrorPlaceholder({ kind, message, visible }: BlockErrorProps & { visible: boolean }) {
-    if (!visible) {
-        return null;
+/** In the browser once per page load per message — a re-render must not repeat it. The server pass logs each time. */
+function report(message: string, error?: unknown) {
+    if (typeof window !== "undefined") {
+        if (reported.has(message)) {
+            return;
+        }
+        reported.add(message);
     }
-
-    return (
-        <div role="alert" data-testid="cms-block-error" data-kind={kind} style={placeholderStyle}>
-            {message}
-        </div>
-    );
+    if (error === undefined) {
+        console.error(`[tbtop-cms] ${message}`);
+    } else {
+        console.error(`[tbtop-cms] ${message}`, error);
+    }
 }
 
 interface BoundaryProps {
@@ -44,34 +41,26 @@ interface BoundaryProps {
 }
 
 /**
- * Catches a block component that throws while rendering on the client. json-render's own boundary logs
- * and renders nothing; this one draws the same placeholder the other failure causes get. React's server
- * renderer does not run boundaries, so the SSR path is guardServerRender() instead.
+ * Catches a block component that throws while rendering on the client and renders nothing in its place, so
+ * one broken block does not take the page down. React's server renderer does not run boundaries, so the SSR
+ * path is guardServerRender() instead.
  */
-class BlockBoundary extends Component<BoundaryProps, { error: Error | null }> {
-    state = { error: null as Error | null };
+class BlockBoundary extends Component<BoundaryProps, { failed: boolean }> {
+    state = { failed: false };
 
-    static getDerivedStateFromError(error: Error) {
-        return { error };
+    static getDerivedStateFromError() {
+        return { failed: true };
     }
 
     componentDidCatch(error: Error) {
-        console.error(`[tbtop-cms] Block [${this.props.kind}] threw while rendering:`, error);
+        if (this.props.showErrors) {
+            report(`Block [${this.props.kind}] threw while rendering.`, error);
+        }
     }
 
     render() {
-        if (this.state.error) {
-            return throwPlaceholder(this.props.kind, this.state.error, this.props.showErrors);
-        }
-
-        return this.props.children;
+        return this.state.failed ? null : this.props.children;
     }
-}
-
-function throwPlaceholder(kind: string, error: unknown, showErrors: boolean) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    return <BlockErrorPlaceholder kind={kind} message={`Block [${kind}] threw while rendering: ${message}`} visible={showErrors} />;
 }
 
 /**
@@ -87,36 +76,18 @@ function guardServerRender(kind: string, component: RegistryComponent, showError
         try {
             return component(props);
         } catch (error) {
-            console.error(`[tbtop-cms] Block [${kind}] threw while rendering:`, error);
+            if (showErrors) {
+                report(`Block [${kind}] threw while rendering.`, error);
+            }
 
-            return throwPlaceholder(kind, error, showErrors);
+            return null;
         }
     };
 }
 
-const reported = new Set<string>();
-
-/**
- * A block hidden from visitors must still leave a trace: the SSR process log on the server, the console in
- * the browser. A thrown component already logs in its own path; this covers the three causes found before
- * rendering. The server logs every request, the browser once per page load — a re-render must not repeat it.
- */
-function reportHidden(kind: string, message: string) {
-    if (typeof window !== "undefined") {
-        if (reported.has(message)) {
-            return;
-        }
-        reported.add(message);
-    }
-    console.error(`[tbtop-cms] Block [${kind}] is hidden from the page: ${message}`);
-}
-
 const wrapped = new WeakMap<object, Map<boolean, Registry>>();
 
-/**
- * The registry with every block guarded and the placeholder kind added, memoised per registry. The
- * server/client choice is made here, per registry, so one bundle serves both passes.
- */
+/** The registry with every block guarded, memoised per registry. The server/client choice is made here, so one bundle serves both passes. */
 function guardedRegistry(registry: Record<string, unknown>, showErrors: boolean): Registry {
     const perRegistry = wrapped.get(registry) ?? new Map<boolean, Registry>();
     wrapped.set(registry, perRegistry);
@@ -139,26 +110,25 @@ function guardedRegistry(registry: Record<string, unknown>, showErrors: boolean)
             </BlockBoundary>
         );
     }
-    guarded[BLOCK_ERROR_KIND] = ({ element }) => {
-        const { kind, message } = element.props as BlockErrorProps;
-        if (!showErrors) {
-            reportHidden(kind, message);
-        }
-
-        return <BlockErrorPlaceholder kind={kind} message={message} visible={showErrors} />;
-    };
     perRegistry.set(showErrors, guarded);
 
     return guarded;
 }
 
 /**
- * `<Renderer>` for CMS pages and layout slots. A block that cannot render — the server failed to resolve it,
- * no component is registered for its kind, its props fail the catalog schema, or its component throws —
- * becomes a placeholder instead of vanishing: visible with `showErrors` (preview, app.debug), empty otherwise.
+ * `<Renderer>` for CMS pages and layout slots. A row the editor has to fix (unregistered kind, missing shared
+ * block) never reaches the client — the server skips it and the admin lists it. What this guards against are
+ * developer bugs: a kind with no component, props failing the catalog schema, a component that throws. Each
+ * renders nothing; with `showErrors` (preview, `app.debug`) it also leaves a console line.
  */
 export function CmsRenderer({ spec, catalog, registry, showErrors }: CmsRendererProps) {
     const guarded = guardedRegistry(registry, showErrors);
+    const { spec: drawable, dropped } = dropBrokenBlocks(spec, catalog, registry);
+    if (showErrors) {
+        for (const block of dropped) {
+            report(block.message);
+        }
+    }
 
-    return <Renderer spec={markBrokenBlocks(spec, catalog, registry)} registry={guarded} />;
+    return <Renderer spec={drawable} registry={guarded} />;
 }
