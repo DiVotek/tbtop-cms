@@ -64,7 +64,7 @@ final class BlockShapeExtractor
             throw $e->withBlockKind($kind);
         }
 
-        return new BlockShape($kind, $fragment, isTyped: true, usedAliases: $converter->usedAliases(), leadingComment: $leadingComment);
+        return new BlockShape($kind, $fragment, isTyped: true, usedAliases: $converter->usedAliases(), leadingComment: $leadingComment, warnings: $this->unknownFieldWarnings($block));
     }
 
     /** @return array{0: string, 1: ?string} the props fragment, and a leading comment to print above its `export const` */
@@ -137,6 +137,19 @@ final class BlockShapeExtractor
         $type = (new FormResolver)->phpType($block->form(new S));
 
         return $this->parser->parse(new TokenIterator($this->lexer->tokenize("/** @return {$type} */")))->getReturnTagValues()[0]->type ?? null;
+    }
+
+    /** @return list<string> */
+    private function unknownFieldWarnings(Block $block): array
+    {
+        if ((new ReflectionMethod($block, 'resolve'))->getDeclaringClass()->getName() !== Block::class) {
+            return [];
+        }
+
+        return array_map(
+            static fn (array $field): string => "Block [{$block->kind()}]: field [{$field['name']}] is a {$field['shape']} — its props are typed as unknown.",
+            (new FormResolver)->unknownFields($block->form(new S)),
+        );
     }
 
     private function returnTypeOf(Block $block): ?TypeNode

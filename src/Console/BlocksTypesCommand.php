@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use RuntimeException;
 use Tbtop\Cms\Block\Block;
+use Tbtop\Cms\Block\BlockDiscovery;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\BlockTypes\BlockShape;
 use Tbtop\Cms\BlockTypes\BlockShapeExtractor;
@@ -195,7 +196,7 @@ class BlocksTypesCommand extends Command
     {
         $extractor = new BlockShapeExtractor;
         $shapes = [];
-        $warnings = [];
+        $warnings = self::discoveryWarnings();
 
         /** @var array<string, TypeNode> $aliases */
         $aliases = [];
@@ -203,6 +204,8 @@ class BlocksTypesCommand extends Command
         foreach ($registry->all() as $block) {
             $shape = $this->extractOne($extractor, $block);
             $shapes[] = $shape;
+
+            $warnings = [...$warnings, ...$shape->warnings];
 
             if (! $shape->isTyped) {
                 $warnings[] = "Block [{$shape->kind}] has no typed @return array{...} on resolve() — emitting a permissive fallback.";
@@ -214,6 +217,17 @@ class BlocksTypesCommand extends Command
         $contents = (new TypeScriptEmitter)->emit($shapes, $aliases);
 
         return new GeneratedOutput($contents, $warnings);
+    }
+
+    /** @return list<string> */
+    private static function discoveryWarnings(): array
+    {
+        ['empty' => $empty, 'malformed' => $malformed] = BlockDiscovery::problems(config('tbtop-cms.blocks.discover', []));
+
+        return [
+            ...array_map(static fn (string $entry): string => "Discover entry [{$entry}] registers no block class — check the namespace and that the directory exists.", $empty),
+            ...array_map(static fn (string $entry): string => "Discover entry [{$entry}] is malformed — expected a 'Namespace' => '/directory' pair.", $malformed),
+        ];
     }
 
     private function extractOne(BlockShapeExtractor $extractor, Block $block): BlockShape

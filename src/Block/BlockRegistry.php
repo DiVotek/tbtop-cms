@@ -109,12 +109,12 @@ class BlockRegistry
             $this->register($class);
         }
 
-        /** @var array<string, string> $discover */
-        $discover = (array) config('tbtop-cms.blocks.discover', []);
-
-        foreach ($discover as $namespace => $directory) {
+        foreach (BlockDiscovery::entries(config('tbtop-cms.blocks.discover', [])) as $namespace => $directory) {
             foreach (BlockDiscovery::classes($namespace, $directory) as $class) {
-                $this->register($class);
+                // A class listed in 'types' and also found here is the same block twice, not a conflict.
+                if (! $this->hasClass($class)) {
+                    $this->register($class);
+                }
             }
         }
 
@@ -125,6 +125,17 @@ class BlockRegistry
         }
 
         $this->booted = true;
+    }
+
+    private function hasClass(string $class): bool
+    {
+        foreach ($this->blocks as $block) {
+            if ($block::class === $class) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param class-string $class */
@@ -143,7 +154,9 @@ class BlockRegistry
         }
 
         if (isset($this->blocks[$kind])) {
-            throw new InvalidArgumentException("Block [{$kind}] is already registered.");
+            $existing = $this->blocks[$kind]::class;
+
+            throw new InvalidArgumentException("Block [{$kind}] is already registered by [{$existing}]; [{$class}] declares the same kind.");
         }
 
         $this->blocks[$kind] = $block;

@@ -140,6 +140,7 @@ class PageController
         if ($isPreview) {
             $seo['noindex'] = true;
         }
+        $fallback = $this->languages->defaultLocale();
 
         return [
             'page' => [
@@ -147,13 +148,14 @@ class PageController
                 'type' => $page->type,
                 'subtype' => $page->subtype,
                 'status' => $page->status->value,
-                'name' => $page->getTranslation('name', $locale),
-                'title' => $page->getTranslation('title', $locale),
-                'heading' => $page->getTranslation('heading', $locale),
-                'summary' => $page->getTranslation('summary', $locale),
+                'name' => PageTranslation::text($page, 'name', $locale, $fallback),
+                'title' => PageTranslation::text($page, 'title', $locale, $fallback),
+                'heading' => PageTranslation::text($page, 'heading', $locale, $fallback),
+                'summary' => PageTranslation::text($page, 'summary', $locale, $fallback),
                 'body' => $this->bodyHtml($page, $locale),
                 'image' => $this->resolveImage($page->image),
-                'fields' => $fields,
+                // An object even when empty or keyed 0..n: the client reads it as a map.
+                'fields' => (object) $fields,
             ],
             'render' => $this->assembler->assemble($resolved),
             'seo' => $seo,

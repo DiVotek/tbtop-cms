@@ -44,6 +44,18 @@ is registered, in relative-path order after `blocks.types`; traits, abstract
 classes and helpers in subfolders are skipped by the same test. A folder that
 does not exist contributes nothing.
 
+A class both listed in `blocks.types` and found by discovery is registered
+once — the discovered copy is skipped. Two *different* classes declaring the
+same `kind()` still throw `InvalidArgumentException` naming both classes; the
+registry boots lazily, so that surfaces on the first page render.
+
+A misconfigured entry registers nothing without failing: a namespace that
+does not match the folder's classes, a folder that does not exist, or a
+malformed entry (a list `[app_path('Cms/Blocks')]` instead of a map, a
+non-string path). `cms:doctor` reports them under **Block discovery**
+(warning) and `cms:blocks:types` prints one warning line per entry; neither
+fails the run.
+
 ### Generating the zod schema: `cms:blocks:types`
 
 `php artisan cms:blocks:types` reads every registered block's `resolve()`
@@ -203,15 +215,17 @@ Overridable, all with sane defaults:
 
   | field | prop |
   |---|---|
-  | text, textarea, select, radio, togglebuttons, slug, date, time, … | trimmed `string\|null` (blank → null) |
+  | text, textarea, select, radio, togglebuttons, slug, date, time, upload, … | trimmed `string\|null` (blank → null) |
   | richtext | rendered HTML `string\|null` |
   | media | URL `string\|null`; `->multiple()` → `list<string>` of existing media |
   | link | `{href, type, label}\|null` via `$ctx->link()` |
   | number, slider | `float\|null` (numeric strings parsed) |
   | boolean, checkbox | `bool` |
-  | tags, checkboxlist, select `->multiple()` | `list<string>` |
+  | tags, checkboxlist, select / togglebuttons / upload `->multiple()` | `list<string>` |
+  | daterange | `{from: string\|null, to: string\|null}` |
   | keyvalue | `array<string, string>` |
   | repeater | `list<row>` with the same rules per row; rows with no filled field dropped |
+  | any other field with sub-fields (`->set('fields', …)`) | the stored value as-is, typed `unknown`; `cms:blocks:types` prints a warning naming block, field and shape |
 
   Input not matching the kind yields the empty value (null, `[]`, `false`);
   input with no field in the form is dropped. Override `resolve()` when the
@@ -325,9 +339,14 @@ order:
    list with empty props and `ResolvedBlock::$error` set** (the exception
    message with `app.debug`, a generic "Block [Kind] failed to resolve."
    without) — unless `blocks.strict` is true, which rethrows as
-   `BlockResolutionException::resolveFailed()`. `PageSpecAssembler` lists
-   those ids under `render.errors`, and `CmsRenderer` draws a placeholder in
-   the block's place. One broken block never takes down the rest of the
+   `BlockResolutionException::resolveFailed()`. `PageSpecAssembler` ships
+   such a block as `{type: 'CmsBlockError', props: {kind, message}}` in its
+   own place (the same goes for an unregistered kind and a missing shared
+   block), repeats the message under `render.errors[id]`, and `CmsRenderer`
+   draws a placeholder there. A host on the bare json-render `Renderer`
+   never gets the original component called with `{}` props: it either
+   registers a `CmsBlockError` component or the element is skipped. The
+   block publishes no JSON-LD node. One broken block never takes down the rest of the
    page, and never vanishes without a trace either.
 
 **`blocks.strict`** (`config/tbtop-cms.php`, default `false`): non-strict is
@@ -517,7 +536,9 @@ are the client's half of the three-layer contract:
   showErrors={isPreview || cms.debug} />` — never `@json-render/react`'s
   bare `<Renderer>` (`cms:doctor` warns when a host file imports it). It
   turns every block that cannot render into a placeholder in its place,
-  for four causes: the server failed to resolve it (`render.errors[id]`),
+  for four causes: the server failed to resolve it (the server already sends
+  a `CmsBlockError` element; `render.errors[id]` is still honoured for a
+  spec a host builds itself),
   its kind has no component in the registry, its props fail the catalog
   schema, or its component throws while rendering (an error boundary on the
   client; on the server, where React runs no boundaries, a try/catch around
