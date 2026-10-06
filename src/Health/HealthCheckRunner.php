@@ -19,6 +19,7 @@ use Tbtop\Cms\Health\Checks\RobotsTxtCheck;
 use Tbtop\Cms\Health\Checks\RoutesRegisteredCheck;
 use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
 use Tbtop\Cms\Health\Checks\SessionDriverCheck;
+use Tbtop\Cms\Health\Checks\UnregisteredBlockRowsCheck;
 use Tbtop\Cms\Health\Checks\UntypedBlocksCheck;
 use Throwable;
 
@@ -51,6 +52,7 @@ final class HealthCheckRunner
             UntypedBlocksCheck::class,
             BlockDiscoveryCheck::class,
             BrokenSharedReferencesCheck::class,
+            UnregisteredBlockRowsCheck::class,
         ];
     }
 

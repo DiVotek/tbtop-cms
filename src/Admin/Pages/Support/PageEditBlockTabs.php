@@ -39,7 +39,10 @@ final class PageEditBlockTabs
         $tabs = [];
 
         foreach (PageEditBlocks::blocks($page) as $block) {
-            $tabs[] = self::blockTab($s, $page, $registry, $block);
+            // A row the site skips has no tab: it is listed in the Problem blocks modal instead.
+            if (! ProblemBlocks::isProblem($block)) {
+                $tabs[] = self::blockTab($s, $page, $registry, $block);
+            }
         }
 
         $tabs[] = self::addBlockTab($s, $page, $registry);
@@ -59,15 +62,14 @@ final class PageEditBlockTabs
         $values = [];
 
         foreach (PageEditBlocks::blocks($page) as $block) {
+            if (ProblemBlocks::isProblem($block)) {
+                continue;
+            }
             $id = (string) $block['id'];
             $kind = (string) $block['kind'];
             $data = is_array($block['data'] ?? null) ? $block['data'] : [];
             $values["block_{$id}_active"] = (bool) ($block['active'] ?? true);
             $values["block_{$id}_sort"] = (int) $block['sort'];
-
-            if (! $registry->has($kind)) {
-                continue;
-            }
 
             foreach ($registry->get($kind)->form(new S) as $field) {
                 if (array_key_exists($field->name, $data)) {
@@ -89,20 +91,20 @@ final class PageEditBlockTabs
         $kind = (string) $block['kind'];
         $active = (bool) ($block['active'] ?? true);
         $shared = SharedBlocks::refOf($block);
+        // Problem rows never get here (see build()), so a reference always has its target.
+        $source = $shared !== null ? app(SharedBlocks::class)->find($shared) : null;
 
-        if ($shared !== null) {
-            return self::sharedTab($s, $page, $registry, $block, $shared);
+        if ($source instanceof SharedBlock) {
+            return self::sharedTab($s, $page, $registry, $block, $source);
         }
 
-        $fields = $registry->has($kind)
-            ? array_map(
-                static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"),
-                $registry->get($kind)->form($s),
-            )
-            : [];
+        $fields = array_map(
+            static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"),
+            $registry->get($kind)->form($s),
+        );
         // Registered even when hidden, so a hand-made post reaches the
         // handler's 403 instead of a "no handler" 404.
-        $share = $registry->has($kind) ? self::shareAction($s, $page, $registry, $id, $kind) : null;
+        $share = self::shareAction($s, $page, $registry, $id, $kind);
 
         $body = $s->stack([
             ...$fields,
@@ -113,7 +115,7 @@ final class PageEditBlockTabs
             $s->flex([
                 self::removeAction($s, $page, $id),
                 $s->spacer(),
-                ...($share !== null && self::canShare() ? [$share] : []),
+                ...(self::canShare() ? [$share] : []),
             ]),
         ]);
 
@@ -133,32 +135,18 @@ final class PageEditBlockTabs
      * @param  array<string, mixed>  $block
      * @return array{label: string, body: mixed, badge?: string}
      */
-    private static function sharedTab(S $s, Page $page, BlockRegistry $registry, array $block, int $shared): array
+    private static function sharedTab(S $s, Page $page, BlockRegistry $registry, array $block, SharedBlock $source): array
     {
         $id = (string) $block['id'];
-        $kind = (string) $block['kind'];
-        // The row's kind decides the component (as in the resolver): a target
-        // of another kind is as unusable as a deleted one, and must not be
-        // detached into this row.
-        $source = SharedBlock::query()->find($shared);
-        if ($source instanceof SharedBlock && $source->kind !== $kind) {
-            $source = null;
-        }
-        $label = BlockPicker::label($registry, $kind);
-
-        $info = $source instanceof SharedBlock
-            ? [
-                $s->displayText(__('tbtop-cms::shared-blocks.reference.info', ['name' => $source->name]))->variant('muted'),
-                $s->flex([
-                    $s->action("pageBlockEditShared_{$id}")->label(__('tbtop-cms::shared-blocks.reference.edit_source'))
-                        ->url(route('tbtop.cms.shared-block-edit-page', ['sharedBlock' => $source->getKey()])),
-                    self::detachAction($s, $page, $id, $source),
-                ], gap: 2),
-            ]
-            : [$s->displayText(__('tbtop-cms::shared-blocks.reference.missing', ['id' => $shared]))->variant('muted')];
+        $label = BlockPicker::label($registry, (string) $block['kind']);
 
         $body = $s->stack([
-            ...$info,
+            $s->displayText(__('tbtop-cms::shared-blocks.reference.info', ['name' => $source->name]))->variant('muted'),
+            $s->flex([
+                $s->action("pageBlockEditShared_{$id}")->label(__('tbtop-cms::shared-blocks.reference.edit_source'))
+                    ->url(route('tbtop.cms.shared-block-edit-page', ['sharedBlock' => $source->getKey()])),
+                self::detachAction($s, $page, $id, $source),
+            ], gap: 2),
             $s->flex([
                 $s->boolean("block_{$id}_active")->label(__('tbtop-cms::pages.blocks.active')),
                 $s->number("block_{$id}_sort")->label(__('tbtop-cms::pages.blocks.sort')),
@@ -166,7 +154,7 @@ final class PageEditBlockTabs
             $s->flex([self::removeAction($s, $page, $id), $s->spacer()]),
         ]);
 
-        $tab = ['label' => $label . ' · ' . ($source instanceof SharedBlock ? $source->name : "#{$shared}"), 'body' => $body];
+        $tab = ['label' => $label . ' · ' . $source->name, 'body' => $body];
         if (! (bool) ($block['active'] ?? true)) {
             $tab['badge'] = '·';
         }
@@ -304,7 +292,7 @@ final class PageEditBlockTabs
      * filtered to the form's schema). Inactive blocks never trip the gate:
      * PrefixedField::rename() conditions their `required` on the active flag.
      */
-    private static function skipsGate(Page $page): bool
+    public static function skipsGate(Page $page): bool
     {
         return $page->status !== PageStatus::Published;
     }
@@ -325,24 +313,37 @@ final class PageEditBlockTabs
 
     private static function handleRemove(ActionCtx $ctx, Page $page, string $id): Effects
     {
-        $rows = array_values(array_filter(
-            PageEditBlocks::toRows($ctx->form, $page),
-            static fn (array $row): bool => (string) $row['id'] !== $id,
-        ));
-
-        // Same stale-form guard as PageEditPage::save() — this action saves
-        // outside the normal form submit cycle, but it carries the same
-        // $ctx->form (including lock_version) and reaches the same
-        // PageForm::save(), so it needs the same non-destructive handling of
-        // a conflict: error notify, no redirect, block NOT removed.
-        try {
-            PageForm::save(self::structuralForm($ctx->form, $page, $rows), $page->getKey());
-        } catch (PageConflictException) {
+        if (! self::removeRow($ctx->form, $page, $id)) {
             return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
         }
 
         return Effects::make()->notify(__('tbtop-cms::pages.blocks.removed'))
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
+    }
+
+    /**
+     * Saves the editor's form without the row `$id`; false on a stale
+     * lock_version. Same stale-form guard as PageEditPage::save() — this
+     * saves outside the normal form submit cycle, but carries the same form
+     * (lock_version included) into the same PageForm::save(), so a conflict
+     * is non-destructive: nothing is written, the row stays.
+     *
+     * @param  array<string, mixed>  $form
+     */
+    public static function removeRow(array $form, Page $page, string $id): bool
+    {
+        $rows = array_values(array_filter(
+            PageEditBlocks::toRows($form, $page),
+            static fn (array $row): bool => (string) $row['id'] !== $id,
+        ));
+
+        try {
+            PageForm::save(self::structuralForm($form, $page, $rows), $page->getKey());
+        } catch (PageConflictException) {
+            return false;
+        }
+
+        return true;
     }
 
     /** @return array{label: string, body: mixed} */

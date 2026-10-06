@@ -259,14 +259,13 @@ it('rechecks usage when deleting, so a placement made after the card rendered is
         ->and(SharedBlock::count())->toBe(1);
 });
 
-it('shows a reference whose target has another kind as missing, with no edit or detach', function (): void {
+it('gives a reference whose target has another kind no tab, so it cannot be edited or detached into the row', function (): void {
     $other = SharedBlock::query()->create(['name' => 'Other', 'kind' => 'Hero', 'data' => []]);
     $page = sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $other->id, 'data' => []]]);
 
     $tabs = PageEditHelpers::formTabs($page->id);
-    $json = json_encode($tabs[2]);
-    expect($tabs[2]['label'])->toBe("Simple · #{$other->id}")
-        ->and($json)->not->toContain('pageBlockDetach_ref1')->not->toContain('pageBlockEditShared_ref1');
+    expect(array_column($tabs, 'label'))->toBe(['General', 'SEO', '+ Add block'])
+        ->and(json_encode($tabs))->not->toContain('pageBlockDetach_ref1')->not->toContain('pageBlockEditShared_ref1');
 });
 
 it('refuses to delete a shared block only a trashed page places, and marks that page in the usage table', function (): void {

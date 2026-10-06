@@ -67,7 +67,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | Command | Signature/options | Purpose | Scheduled? |
 |---|---|---|---|
 | `cms:install` | `{--force : Overwrite published config files} {--skip-migrations : Do not run database migrations}` | Publish config, run migrations, seed default languages and home page | No |
-| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — and `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind, trashed pages included). Exit 1 only on an error-level check | No |
+| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks). Exit 1 only on an error-level check | No |
 | `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
@@ -147,7 +147,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `locale` | `string` | current app locale |
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
-| `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, so broken-block placeholders show in preview and on a debug install, never to visitors |
+| `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, which only gates a developer `console.error` line for a block the client could not draw — the page looks the same either way |
 | `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::remember`; `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
@@ -167,8 +167,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none |
-| `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>, errors:object}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
-| `render.errors` | `object` (`Record<string,string>`) | message per block id for every block that could not be resolved (resolve() threw, kind not registered, shared block missing); always a JSON object, `{}` when none. The message carries the exception text only with `app.debug` |
+| `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; `[]` when fewer than two crumbs (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
@@ -176,15 +175,15 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 
 Each `render.elements[id].props` (and root's `props`) serializes as `{}` not `[]` when empty — the block/root has no props.
 
-A block listed in `render.errors` keeps its place in `children`, but its element is `{type: 'CmsBlockError', props: {kind, message}}` (`PageSpecAssembler::BLOCK_ERROR_KIND`, the same string as `BLOCK_ERROR_KIND` in `blockErrors.ts`) — never its own kind with empty props. `CmsRenderer` draws it as the placeholder; a host on the bare `Renderer` registers a `CmsBlockError` component or gets json-render's "no renderer" skip. Such a block contributes no JSON-LD node.
+A content row that cannot render — unregistered kind, missing shared block, shared block of another kind (`BlockRowProblem`), or a `resolve()` that throws — is not in `render` at all: no element, no place in `children`, no JSON-LD node. Only the throw is logged (`block.resolve_failed`); the other three are listed in the admin editor's Problem blocks (blocks.md#problem-blocks). `cms.layout` slots follow the same rule; their `ResolvedBlock` items are `{id, kind, props}`.
 
 **Frontend exports** (`resources/js/cms`, imported via the `@cms` alias):
 
 | Import | Export | Purpose |
 |---|---|---|
 | `@cms/CmsPage` | default `CmsPage` | The stock `Cms/Page` component: `CmsHead` + preview banner + `CmsRenderer` |
-| `@cms/CmsRenderer` | `CmsRenderer({ spec, catalog, registry, showErrors })`, `BlockErrorPlaceholder` | The renderer for pages and layout slots: a block that fails to resolve, has no component, fails its schema or throws becomes a placeholder (visible with `showErrors`) instead of vanishing — see blocks.md#client-side |
-| `@cms/blockErrors` | `markBrokenBlocks(spec, catalog, registry)`, `BLOCK_ERROR_KIND`, types `RenderSpec`, `BlockErrorProps`, `CatalogLike` | The pure spec rewrite behind `CmsRenderer`, for a host with its own render path |
+| `@cms/CmsRenderer` | `CmsRenderer({ spec, catalog, registry, showErrors })` | The renderer for pages and layout slots: a block with no component, props failing its schema, or a component that throws renders nothing; `showErrors` only adds a developer `console.error` line — see blocks.md#client-side |
+| `@cms/blockErrors` | `dropBrokenBlocks(spec, catalog, registry) → {spec, dropped}`, types `RenderSpec` (= json-render `Spec`), `DroppedBlock`, `CatalogLike` | The pure spec filter behind `CmsRenderer`, for a host with its own render path |
 | `@cms/CmsHead` | `CmsHead({ seo })`, types `Seo`, `SeoAlternate` | The SEO `<Head>` block, key-matched with `head.blade.php` — render it from a host-owned `CmsPage.tsx` instead of copying the tags |
 
 ## 5. Extension contracts and base classes
@@ -312,7 +311,7 @@ Source: `src/Admin/Support/CmsAbilities.php`. Gates are host-answered only when 
 | `tbtop-cms.users` | `src/Admin/Pages/UsersPage.php` |
 | `tbtop-cms.audit` | `src/Admin/Pages/AuditLogPage.php`, `src/Admin/Pages/AuditActivityPage.php` |
 
-`DashboardPage` checks `Gate::allows('tbtop-cms.submissions')` to conditionally show a widget but declares no page-level ability itself. `PageEditPage` (under `tbtop-cms.pages`) shows and accepts a block's "Make shared" action (`pageBlockShare_{id}`) only when `tbtop-cms.design` also allows — it creates a shared block; a hand-made post without it is a 403. `ProfilePage` and `LoginPage` declare none.
+`DashboardPage` checks `Gate::allows('tbtop-cms.submissions')` to conditionally show a widget but declares no page-level ability itself. `PageEditPage` (under `tbtop-cms.pages`) shows and accepts a block's "Make shared" action (`pageBlockShare_{id}`) only when `tbtop-cms.design` also allows — it creates a shared block; a hand-made post without it is a 403. `PageEditPage` and `LayoutEditPage` show **Problem blocks (N)** (`pageProblemBlocks` / `layoutProblemBlocks`, a modal with one `…ProblemDelete_{rowId}` action per row) when the container has rows the site skips, under the page's own ability; lang keys `tbtop-cms::pages.problem_blocks.{action,title,description,reasons.{unregistered,shared_missing,shared_kind_mismatch},delete,delete_title,delete_confirm,deleted}` — see blocks.md#problem-blocks. `ProfilePage` and `LoginPage` declare none.
 
 ## 9. Database tables
 

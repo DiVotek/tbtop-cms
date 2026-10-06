@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockResolutionException;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
@@ -109,40 +110,25 @@ it('skips an inactive block', function (): void {
     expect($out)->toBeEmpty();
 });
 
-it('keeps an unknown kind in place, marked, without throwing', function (): void {
+it('drops an unknown kind without throwing', function (): void {
     $out = app(BlockContentResolver::class)->resolve([
         ['id' => 'a', 'kind' => 'Ghost', 'active' => true, 'data' => []],
+        ['id' => 'b', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Hello']]],
     ]);
 
-    expect($out)->toHaveCount(1)
-        ->and($out[0]->props)->toBe([])
-        ->and($out[0]->error)->toBe('Block [Ghost] is not registered.');
+    expect(array_map(fn (object $b): string => $b->id, $out))->toBe(['b']);
 });
 
-it('keeps a failing block in place, marked with its error, and still resolves its siblings', function (): void {
-    config()->set('app.debug', true);
+it('drops a block whose resolve() throws, logs it, and still resolves its siblings', function (): void {
+    Log::spy();
 
     $out = app(BlockContentResolver::class)->resolve([
         ['id' => 'x', 'kind' => 'Broken', 'active' => true, 'data' => []],
         ['id' => 'y', 'kind' => 'Hero', 'active' => true, 'data' => ['title' => ['en' => 'Hello']]],
     ]);
 
-    expect($out)->toHaveCount(2)
-        ->and($out[0]->id)->toBe('x')
-        ->and($out[0]->props)->toBe([])
-        ->and($out[0]->error)->toStartWith('Block [Broken] failed to resolve: ')
-        ->and($out[1]->id)->toBe('y')
-        ->and($out[1]->error)->toBeNull();
-});
-
-it('keeps the failure reason out of the page props outside debug', function (): void {
-    config()->set('app.debug', false);
-
-    $out = app(BlockContentResolver::class)->resolve([
-        ['id' => 'x', 'kind' => 'Broken', 'active' => true, 'data' => []],
-    ]);
-
-    expect($out[0]->error)->toBe('Block [Broken] failed to resolve.');
+    expect(array_map(fn (object $b): string => $b->id, $out))->toBe(['y']);
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context): bool => $message === 'block.resolve_failed' && $context['id'] === 'x');
 });
 
 it('preserves block order', function (): void {

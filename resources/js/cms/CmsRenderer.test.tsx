@@ -1,19 +1,18 @@
 import { render } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
-import { JSONUIProvider, type Spec } from "@json-render/react";
+import { JSONUIProvider } from "@json-render/react";
 import { expect, it, mock } from "bun:test";
-import { BLOCK_ERROR_KIND, markBrokenBlocks, type RenderSpec } from "./blockErrors";
+import { dropBrokenBlocks, type RenderSpec } from "./blockErrors";
 import { catalog } from "./catalog";
 import { CmsRenderer } from "./CmsRenderer";
 import { registry } from "./registry";
 
 const hero = { title: "Welcome", subtitle: null, image: null, cta: null };
 
-function spec(elements: Record<string, { type: string; props: unknown }>, errors?: Record<string, string>): RenderSpec {
+function spec(elements: Record<string, { type: string; props: unknown }>): RenderSpec {
     return {
         root: "$root",
         elements: { ...elements, $root: { type: "Fragment", props: {}, children: Object.keys(elements) } },
-        ...(errors ? { errors } : {}),
     } as RenderSpec;
 }
 
@@ -25,142 +24,104 @@ function renderSpec(s: RenderSpec, showErrors: boolean, reg: Record<string, unkn
     );
 }
 
-it("replaces a block the server failed to resolve with the error element and leaves the rest untouched", () => {
-    const out = markBrokenBlocks(
-        spec({ a: { type: "Hero", props: hero }, b: { type: "Hero", props: {} } }, { b: "Block [Hero] failed to resolve." }),
-        catalog,
-        registry,
-    );
-
-    expect(out.elements.a).toEqual({ type: "Hero", props: hero });
-    expect(out.elements.b).toEqual({ type: BLOCK_ERROR_KIND, props: { kind: "Hero", message: "Block [Hero] failed to resolve." } });
-    expect(out.elements.$root.children).toEqual(["a", "b"]);
-});
-
-it("keeps an error element the server already sent, with its original kind and message", () => {
-    const sent = { type: BLOCK_ERROR_KIND, props: { kind: "Hero", message: "Block [Hero] failed to resolve." } };
-    const s = spec({ a: { type: "Hero", props: hero }, b: sent }, { b: "Block [Hero] failed to resolve." });
-
-    const out = markBrokenBlocks(s, catalog, registry);
-
-    expect(out).toBe(s as Spec);
-    expect(out.elements.b).toEqual(sent);
-});
-
-it("draws the server's error element as the placeholder with showErrors, and hides and logs it without", () => {
-    const s = spec({ a: { type: "Hero", props: hero }, b: { type: BLOCK_ERROR_KIND, props: { kind: "Broken", message: "Block [Broken] failed to resolve." } } }, { b: "Block [Broken] failed to resolve." });
-
-    const shown = renderSpec(s, true);
-    expect(shown.getByText("Welcome")).toBeDefined();
-    expect(shown.getByTestId("cms-block-error").getAttribute("data-kind")).toBe("Broken");
-    expect(shown.getByTestId("cms-block-error").textContent).toBe("Block [Broken] failed to resolve.");
-    shown.unmount();
-
+/** Runs `fn` with console.error captured; returns the first argument of every call. */
+function consoleLines(fn: () => void): string[] {
     const original = console.error;
     const logged = mock((..._args: unknown[]) => undefined);
     console.error = logged;
     try {
-        const hidden = renderSpec(s, false);
-        expect(hidden.getByText("Welcome")).toBeDefined();
-        expect(hidden.queryByTestId("cms-block-error")).toBeNull();
-        expect(logged.mock.calls.map((call) => String(call[0]))).toEqual([
-            "[tbtop-cms] Block [Broken] is hidden from the page: Block [Broken] failed to resolve.",
-        ]);
+        fn();
     } finally {
         console.error = original;
     }
-});
 
-it("names a kind with no registered component", () => {
-    const out = markBrokenBlocks(spec({ a: { type: "Ghost", props: {} } }), catalog, registry);
+    return logged.mock.calls.map((call) => String(call[0]));
+}
 
-    expect(out.elements.a.props).toEqual({ kind: "Ghost", message: "Block [Ghost] has no component in the registry." });
+function throwingRegistry(message: string) {
+    // A fresh registry object each time: the guarded registry is memoised per registry.
+    return {
+        ...registry,
+        Hero: () => {
+            throw new Error(message);
+        },
+    };
+}
+
+it("drops a kind with no registered component and its place in children", () => {
+    const { spec: out, dropped } = dropBrokenBlocks(spec({ a: { type: "Hero", props: hero }, b: { type: "Ghost", props: {} } }), catalog, registry);
+
+    expect(Object.keys(out.elements).sort()).toEqual(["$root", "a"]);
+    expect(out.elements.$root.children).toEqual(["a"]);
+    expect(dropped).toEqual([{ id: "b", kind: "Ghost", message: "Block [Ghost] has no component in the registry." }]);
 });
 
 it("treats a prototype property name stored as a kind as unregistered", () => {
-    const out = markBrokenBlocks(spec({ a: { type: "constructor", props: {} } }), catalog, registry);
+    const { dropped } = dropBrokenBlocks(spec({ a: { type: "constructor", props: {} } }), catalog, registry);
 
-    expect(out.elements.a.props).toEqual({ kind: "constructor", message: "Block [constructor] has no component in the registry." });
-});
-
-it("names the props that fail the catalog schema", () => {
-    const out = markBrokenBlocks(spec({ a: { type: "Hero", props: { title: 42 } } }), catalog, registry);
-
-    expect(out.elements.a.type).toBe(BLOCK_ERROR_KIND);
-    expect((out.elements.a.props as { message: string }).message).toStartWith("Block [Hero] props do not match its schema — title:");
+    expect(dropped.map((block) => block.kind)).toEqual(["constructor"]);
 });
 
 it("returns the same spec object when every block is healthy", () => {
     const s = spec({ a: { type: "Hero", props: hero } });
 
-    expect(markBrokenBlocks(s, catalog, registry)).toBe(s as Spec);
+    expect(dropBrokenBlocks(s, catalog, registry)).toEqual({ spec: s, dropped: [] });
 });
 
-it("draws the placeholder with showErrors and nothing without, while healthy siblings render either way", () => {
-    const s = spec({ a: { type: "Hero", props: hero }, b: { type: "Ghost", props: {} } });
+it("renders nothing for props that fail the schema, and says so on the console only with showErrors", () => {
+    const s = spec({ a: { type: "Hero", props: hero }, b: { type: "Hero", props: { title: 42 } } });
 
-    const shown = renderSpec(s, true);
-    expect(shown.getByText("Welcome")).toBeDefined();
-    expect(shown.getByTestId("cms-block-error").textContent).toBe("Block [Ghost] has no component in the registry.");
-    shown.unmount();
+    const silent = consoleLines(() => {
+        const view = renderSpec(s, false);
+        expect(view.getAllByTestId("hero")).toHaveLength(1);
+        expect(view.getByText("Welcome")).toBeDefined();
+        view.unmount();
+    });
+    expect(silent).toEqual([]);
 
-    const original = console.error;
-    const logged = mock((..._args: unknown[]) => undefined);
-    console.error = logged;
-    try {
-        const hidden = renderSpec(s, false);
-        expect(hidden.getByText("Welcome")).toBeDefined();
-        expect(hidden.queryByTestId("cms-block-error")).toBeNull();
-        // Hidden from the visitor, not from whoever reads the log.
-        expect(logged.mock.calls.map((call) => String(call[0]))).toEqual([
-            "[tbtop-cms] Block [Ghost] is hidden from the page: Block [Ghost] has no component in the registry.",
-        ]);
-    } finally {
-        console.error = original;
-    }
+    const loud = consoleLines(() => {
+        const view = renderSpec(s, true);
+        expect(view.getAllByTestId("hero")).toHaveLength(1);
+        view.unmount();
+    });
+    expect(loud).toHaveLength(1);
+    expect(loud[0]).toStartWith("[tbtop-cms] Block [Hero] props do not match its schema — title:");
 });
 
-it("catches a component that throws while rendering and shows the placeholder in its place", () => {
-    const original = console.error;
-    console.error = mock(() => undefined);
-    try {
-        const throwing = {
-            ...registry,
-            Hero: () => {
-                throw new Error("boom");
-            },
-        };
-        const { getByTestId } = renderSpec(spec({ a: { type: "Hero", props: hero } }), true, throwing);
+it("renders nothing for a component that throws, and says so on the console only with showErrors", () => {
+    const silent = consoleLines(() => {
+        const view = renderSpec(spec({ a: { type: "Hero", props: hero } }), false, throwingRegistry("quiet boom"));
+        expect(view.container.textContent).toBe("");
+        view.unmount();
+    });
+    expect(silent.filter((line) => line.startsWith("[tbtop-cms]"))).toEqual([]);
 
-        expect(getByTestId("cms-block-error").textContent).toBe("Block [Hero] threw while rendering: boom");
-    } finally {
-        console.error = original;
-    }
+    const loud = consoleLines(() => {
+        const view = renderSpec(spec({ a: { type: "Hero", props: hero } }), true, throwingRegistry("loud boom"));
+        expect(view.container.textContent).toBe("");
+        view.unmount();
+    });
+    expect(loud.filter((line) => line.startsWith("[tbtop-cms]"))).toEqual(["[tbtop-cms] Block [Hero] threw while rendering."]);
 });
 
-it("renders the placeholder in place of a throwing component on the server, where no boundary runs", () => {
-    const originalError = console.error;
-    console.error = mock(() => undefined);
+it("renders nothing in place of a throwing component on the server, where no boundary runs", () => {
     const win = globalThis.window;
-    // A fresh registry object: the guarded registry is memoised per registry, and the client/server choice is made there.
-    const throwing = {
-        ...registry,
-        Hero: () => {
-            throw new Error("boom");
-        },
-    };
-    try {
-        // happy-dom defines window for every test; the server pass is the one without it.
-        Object.defineProperty(globalThis, "window", { value: undefined, configurable: true, writable: true });
-        const html = renderToString(
-            <JSONUIProvider registry={registry}>
-                <CmsRenderer spec={spec({ a: { type: "Hero", props: hero } })} catalog={catalog} registry={throwing} showErrors={true} />
-            </JSONUIProvider>,
-        );
+    let html = "";
+    const lines = consoleLines(() => {
+        try {
+            // happy-dom defines window for every test; the server pass is the one without it.
+            Object.defineProperty(globalThis, "window", { value: undefined, configurable: true, writable: true });
+            html = renderToString(
+                <JSONUIProvider registry={registry}>
+                    <CmsRenderer spec={spec({ a: { type: "Hero", props: hero } })} catalog={catalog} registry={throwingRegistry("server boom")} showErrors={false} />
+                </JSONUIProvider>,
+            );
+        } finally {
+            Object.defineProperty(globalThis, "window", { value: win, configurable: true, writable: true });
+        }
+    });
 
-        expect(html).toContain("Block [Hero] threw while rendering: boom");
-    } finally {
-        Object.defineProperty(globalThis, "window", { value: win, configurable: true, writable: true });
-        console.error = originalError;
-    }
+    expect(html).not.toContain("server boom");
+    expect(html).not.toContain("Welcome");
+    expect(lines).toEqual([]);
 });

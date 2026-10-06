@@ -13,6 +13,8 @@ use Tbtop\Admin\Pages\Page;
 use Tbtop\Cms\Admin\Pages\Support\LayoutEditBlocks;
 use Tbtop\Cms\Admin\Pages\Support\LayoutEditBlockTabs;
 use Tbtop\Cms\Admin\Pages\Support\LayoutForm;
+use Tbtop\Cms\Admin\Pages\Support\ProblemBlocks;
+use Tbtop\Cms\Admin\Pages\Support\ProblemBlocksAction;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EditFooter;
 use Tbtop\Cms\Layout\Models\Layout;
@@ -54,7 +56,16 @@ class LayoutEditPage extends Page
         $layout = $this->layoutRow($slot);
         $footer = EditFooter::build($s, $this->listUrl(), $this->saveAction($s));
 
+        $problemBlocks = ProblemBlocksAction::build(
+            $s,
+            'layout',
+            ProblemBlocks::of(LayoutEditBlocks::blocks($layout)),
+            false,
+            fn (ActionCtx $ctx, string $id): Effects => $this->deleteProblemRow($ctx, $slot, $id),
+        );
+
         $form = $s->form('layoutEditor', [
+            ...($problemBlocks !== null ? [$s->flex([$s->spacer(), $problemBlocks])] : []),
             $s->tabs(LayoutEditBlockTabs::build($s, $slot, $layout)),
             $footer,
         ])
@@ -78,6 +89,14 @@ class LayoutEditPage extends Page
         LayoutForm::save([...$ctx->form, 'content' => $rows], $slot);
 
         return Effects::make()->notify(__('tbtop-cms::layout.actions.saved'));
+    }
+
+    private function deleteProblemRow(ActionCtx $ctx, string $slot, string $id): Effects
+    {
+        LayoutEditBlockTabs::removeRow($ctx->form, $slot, $id);
+
+        return Effects::make()->closeModal()->notify(__('tbtop-cms::pages.problem_blocks.deleted'))
+            ->redirect(route('tbtop.cms.layout-edit-page', ['slot' => $slot]));
     }
 
     private function slot(): string

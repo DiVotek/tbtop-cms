@@ -303,17 +303,13 @@ it('round-trips an unregistered kind\'s data untouched through a save', function
         ->assertOk()
         ->json('props.structure');
 
-    // An unregistered kind's tab keeps its active/sort/remove controls (so
-    // it still round-trips through save) but carries no block-data field —
-    // there is no registered form() to render one from.
-    $ghostBody = findLayoutTabBody($structure, 'Ghost');
-    expect($ghostBody)->not->toBeNull()
-        ->and(collectLayoutFieldNames($ghostBody))->toBe(['block_ghost1_active', 'block_ghost1_sort']);
+    // An unregistered kind has no tab (the editor lists it under Problem
+    // blocks), so the form never sends its fields; the save keeps it as stored.
+    expect(findLayoutTabBody($structure, 'Ghost'))->toBeNull();
 
     test()->actingAs($admin, 'web')->postJson(
         '/admin/layout/' . Slots::HEADER . '/edit/forms/layoutEditor',
         [
-            'block_ghost1_active' => true, 'block_ghost1_sort' => 0,
             'block_a_active' => true, 'block_a_heading' => 'H2', 'block_a_body' => 'B2', 'block_a_sort' => 1,
         ],
     )->assertRedirect();
@@ -324,7 +320,7 @@ it('round-trips an unregistered kind\'s data untouched through a save', function
         ->and($layout->content[0]['data'])->toBe(['legacy' => 'kept']);
 });
 
-it('uses the registered block\'s label on its tab, falling back to the raw kind when unregistered', function (): void {
+it('uses the registered block\'s label on its tab, and gives an unregistered kind none', function (): void {
     config(['tbtop-cms.blocks.types' => [RequiredFieldBlock::class]]);
 
     Layout::query()->create([
@@ -345,5 +341,5 @@ it('uses the registered block\'s label on its tab, falling back to the raw kind 
     // proves the tab label comes from the registered block, not a fallback.
     expect(findLayoutTabBody($structure, 'Needs a value'))->not->toBeNull()
         ->and(findLayoutTabBody($structure, 'RequiredField'))->toBeNull()
-        ->and(findLayoutTabBody($structure, 'Ghost'))->not->toBeNull();
+        ->and(findLayoutTabBody($structure, 'Ghost'))->toBeNull();
 });

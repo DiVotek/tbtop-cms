@@ -166,6 +166,20 @@ return [
         'remove_confirm' => 'This cannot be undone.',
         'removed' => 'Block removed',
     ],
+    'problem_blocks' => [
+        'action' => 'Problem blocks (:count)',
+        'title' => 'Problem blocks',
+        'description' => 'These blocks are not shown on the site. Their saved data is kept as it is until you delete the row.',
+        'reasons' => [
+            'unregistered' => 'The block [:kind] no longer exists in the code.',
+            'shared_missing' => 'Shared block #:id no longer exists.',
+            'shared_kind_mismatch' => 'Shared block #:id is a different kind.',
+        ],
+        'delete' => 'Delete row',
+        'delete_title' => 'Delete this row?',
+        'delete_confirm' => 'The row and its saved data are removed from the page. This cannot be undone.',
+        'deleted' => 'Row deleted',
+    ],
     'starter_blocks' => [
         'section_title' => 'Starter blocks',
         'section_hint' => 'The block structure new pages under this category start with — which block kinds, in which order. Only the structure: each block still starts empty and is filled in on the page itself. New articles and new subcategories each get their own starter — a subcategory\'s own starter overrides this one for everything under it.',

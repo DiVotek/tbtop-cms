@@ -72,7 +72,7 @@ return [
                 'admin_page_import_missing' => "The admin page component at :path does not import from '@tbtop/inertia-admin' — Inertia will fail to resolve the admin/page component.",
                 'css_not_found' => 'No CSS entry file found (looked for: :candidates).',
                 'source_missing' => 'The stylesheet at :path has no @source line for vendor/tbtop/cms — admin DSL classes may compile to nothing and render unstyled.',
-                'raw_renderer' => "Blocks are rendered with the raw '@json-render/react' Renderer at :paths — import CmsRenderer from '@cms/CmsRenderer' instead, so a block that fails to resolve or render shows a placeholder in preview and debug rather than vanishing silently.",
+                'raw_renderer' => "Blocks are rendered with the raw '@json-render/react' Renderer at :paths — import CmsRenderer from '@cms/CmsRenderer' instead, so a block component that throws renders nothing instead of aborting the whole server render, and preview and debug name the broken block on the console.",
             ],
         ],
         'package_versions_match' => [
@@ -189,7 +189,15 @@ return [
             'ok' => 'Every page and layout row placed by reference points at a shared block of its kind.',
             'warning' => 'Rows that point at a missing shared block, or one of another kind, per container: :containers.',
             'hints' => [
-                'warning' => 'Each such row renders as a placeholder in preview and is hidden from visitors. Open the page or layout slot and remove the row, or place a shared block of the right kind.',
+                'warning' => 'The site skips each such row. Open the page or layout slot: its editor lists the row under Problem blocks, where you can delete it.',
+            ],
+        ],
+        'unregistered_block_rows' => [
+            'label' => 'Blocks missing from the code',
+            'ok' => 'Every page and layout row has a registered block kind.',
+            'warning' => 'Rows whose block kind is no longer registered, per container: :containers.',
+            'hints' => [
+                'warning' => 'The site skips each such row and keeps its data. Register the block class again, or open the page or layout slot and delete the row under Problem blocks.',
             ],
         ],
     ],

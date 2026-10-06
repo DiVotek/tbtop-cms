@@ -20,8 +20,8 @@ use Tbtop\Cms\Page\Models\Page;
 
 /**
  * The status-bar card at the top of PageEditPage: status badge, updated/
- * created timestamps, view-on-site, and a top-of-form save button mirroring
- * the footer save.
+ * created timestamps, Problem blocks (when any), view-on-site, and a
+ * top-of-form save button mirroring the footer save.
  *
  * The badge shows the computed PageDisplayState (draft/scheduled/published/
  * expired), not the raw PageStatus (draft/published) — see
@@ -45,7 +45,7 @@ final class PageEditStatusBar
         'expired' => 'gray',
     ];
 
-    public static function build(S $s, Page $page, ?ActionBuilder $revisions, ActionBuilder $viewOnSite, ActionBuilder $saveTop): Node
+    public static function build(S $s, Page $page, ?ActionBuilder $revisions, ActionBuilder $viewOnSite, ActionBuilder $saveTop, ?ActionBuilder $problemBlocks = null): Node
     {
         return $s->flex([
             self::statusBadge($s, $page),
@@ -53,6 +53,7 @@ final class PageEditStatusBar
             $s->unsavedIndicator(),
             $s->spacer(),
             ...self::timestamps($s, $page),
+            ...($problemBlocks !== null ? [$problemBlocks] : []),
             ...($revisions !== null ? [$revisions] : []),
             $viewOnSite,
             ...self::previewLinkAction($s, $page),

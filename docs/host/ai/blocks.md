@@ -26,8 +26,8 @@ fails `cms:blocks:types` (and `--check` in CI). The runtime enforcement is
 `CmsRenderer` (`@cms/CmsRenderer`, the wrapper every host renders pages
 and layout slots with — see "Client side"): it checks each element's `props`
 against the catalog schema for its `type` before the component sees them, so
-a `resolve()` shape that drifts from the zod schema shows up as a broken-block
-placeholder in preview and debug, not as a crash inside the component.
+a `resolve()` shape that drifts from the zod schema renders nothing (with a
+console line in preview and debug), not a crash inside the component.
 `@json-render/react`'s bare `Renderer` does no such check — it hands props
 through as they are.
 
@@ -327,32 +327,27 @@ order:
    existed — falls back to array index; PHP's stable `usort()` keeps
    original order among ties).
 2. Skip if `active === false`, or if `kind`/`id` aren't strings.
-3. Look up `kind` in `BlockRegistry`. Unknown kind: kept with empty props
-   and `error` "Block [Kind] is not registered." (plus a `block.unknown`
-   warning log) so the placeholder shows where it stood, *unless*
-   `tbtop-cms.blocks.strict` is true, in which case it throws
-   `BlockResolutionException::unknownKind()`.
+3. Skip a **problem row** (`BlockRowProblem::of()`): its `kind` is not in
+   `BlockRegistry` (`unregistered`), or its `shared` pointer leads to no
+   shared block (`shared_missing`) or to one of another kind
+   (`shared_kind_mismatch`). Skipped silently — nothing on the page, in
+   preview, in `render`, or in the log; the row's data stays in `content`
+   untouched and the admin editor lists it (see "Problem blocks" below).
+   With `tbtop-cms.blocks.strict` it throws instead:
+   `BlockResolutionException::unknownKind()` for an unregistered kind,
+   `resolveFailed()` for a broken pointer.
 4. Flatten `data` for the current locale via `LocaleFlattener`, using the
    block's `translatableFields()`.
-5. Call `$block->resolve($flat, $ctx)`. An uncaught exception here is
-   caught, logged as `block.resolve_failed`, and the block **stays in the
-   list with empty props and `ResolvedBlock::$error` set** (the exception
-   message with `app.debug`, a generic "Block [Kind] failed to resolve."
-   without) — unless `blocks.strict` is true, which rethrows as
-   `BlockResolutionException::resolveFailed()`. `PageSpecAssembler` ships
-   such a block as `{type: 'CmsBlockError', props: {kind, message}}` in its
-   own place (the same goes for an unregistered kind and a missing shared
-   block), repeats the message under `render.errors[id]`, and `CmsRenderer`
-   draws a placeholder there. A host on the bare json-render `Renderer`
-   never gets the original component called with `{}` props: it either
-   registers a `CmsBlockError` component or the element is skipped. The
-   block publishes no JSON-LD node. One broken block never takes down the rest of the
-   page, and never vanishes without a trace either.
+5. Call `$block->resolve($flat, $ctx)`. A throw here is a developer bug, not
+   an editor matter: it is caught, logged as `block.resolve_failed`, and the
+   block is dropped from the list — unless `blocks.strict` is true, which
+   rethrows as `BlockResolutionException::resolveFailed()`. One broken
+   block never takes down the rest of the page.
 
 **`blocks.strict`** (`config/tbtop-cms.php`, default `false`): non-strict is
-the resilient default for production frontend rendering (mark bad blocks,
-log, move on). Flip it on for tests or CI where a broken block should fail
-the run rather than render as a placeholder. See
+the resilient default for production frontend rendering (skip bad blocks,
+move on). Flip it on for tests or CI where a broken block should fail
+the run rather than be skipped. See
 `tests/Block/BlockContentResolverTest.php` ("throws on an unknown kind when
 strict mode is enabled", "throws with the original error as previous when
 strict mode is enabled").
@@ -534,23 +529,19 @@ are the client's half of the three-layer contract:
 - **`CmsRenderer.tsx`** (`@cms/CmsRenderer`) is what renders a spec —
   `<CmsRenderer spec={render} catalog={catalog} registry={registry}
   showErrors={isPreview || cms.debug} />` — never `@json-render/react`'s
-  bare `<Renderer>` (`cms:doctor` warns when a host file imports it). It
-  turns every block that cannot render into a placeholder in its place,
-  for four causes: the server failed to resolve it (the server already sends
-  a `CmsBlockError` element; `render.errors[id]` is still honoured for a
-  spec a host builds itself),
-  its kind has no component in the registry, its props fail the catalog
-  schema, or its component throws while rendering (an error boundary on the
-  client; on the server, where React runs no boundaries, a try/catch around
-  the block's own render body — a throw in a component the block nests still
-  escapes the SSR pass, and Inertia falls back to client render).
-  With `showErrors` the placeholder is a red box naming the block and the
-  reason (`data-testid="cms-block-error"`); without it the block renders
-  nothing, so a visitor never sees the diagnostics. A layout slot built
-  from `cms.layout.header`/`footer` passes each block's `error` through as
-  `spec.errors[id]` the same way. The pure spec rewrite is
-  `markBrokenBlocks()` in `blockErrors.ts`, for a host that builds its own
-  render path.
+  bare `<Renderer>` (`cms:doctor` warns when a host file imports it). Rows
+  an editor has to fix never reach it (the server skips them). It guards
+  against developer bugs: a kind with no component in the registry, props
+  that fail the catalog schema, and a component that throws while rendering
+  (an error boundary on the client; on the server, where React runs no
+  boundaries, a try/catch around the block's own render body — a throw in a
+  component the block nests still escapes the SSR pass, and Inertia falls
+  back to client render). Each such block renders **nothing**, for everyone.
+  `showErrors` only gates a `console.error` line naming the block and the
+  reason — a developer signal for preview and `app.debug`; without it the
+  console stays quiet too. The pure spec filter is `dropBrokenBlocks()` in
+  `blockErrors.ts` (`{spec, dropped}`), for a host that builds its own render
+  path.
 - **Extending vs. rewriting the catalog**: the package ships exactly two
   built-in blocks (`Hero`, `ContactForm`) with their own `catalog.ts`/
   `registry.tsx` as a working example, importable via the `@cms` alias. In
@@ -630,11 +621,10 @@ included) becomes a new shared block named "<block label> — <page name>"
 
 `BlockContentResolver` resolves a reference by taking `data` from the shared
 block instead of the row, then proceeds exactly as for an inline block
-(locale flattening, `resolve()`, `error` marking). The row's `kind` wins:
-a pointer whose target has another kind, or no longer exists, resolves to
-the same "missing shared block" error as any broken block (thrown in
-`blocks.strict`, a placeholder otherwise) — the data stays in the page, the
-editor says which block is missing. Deleting a shared block that pages still
+(locale flattening, `resolve()`). The row's `kind` wins: a pointer whose
+target has another kind, or no longer exists, is a problem row — skipped by
+the site (thrown in `blocks.strict`), its data left in the page, and listed
+in the editor's Problem blocks with the shared id. Deleting a shared block that pages still
 place has no delete button — its card shows the placement count instead —
 and the delete handler re-checks before deleting; `SharedBlockUsage` scans
 page content and layout slots for the pointers. The edit page lists those
@@ -645,6 +635,31 @@ container, the pointer dropped) without opening the page. Saving or deleting a s
 a page save does. Layout slots accept the same `shared` pointer in their
 content rows (the resolver is the same) and count as placements, but the
 layout editor has no UI for placing one.
+
+## Problem blocks
+
+A content row the site skips (step 3 of the data flow: unregistered kind,
+missing shared block, shared block of another kind) has no tab in the page
+or layout editor. The editor instead shows **Problem blocks (N)** — on the
+page editor in the status bar next to Revisions, on the layout editor above
+the tabs; absent when N is 0, and absent on a source-backed page. It opens
+a modal listing each row, inactive rows included: the block's label (or the
+raw kind when unregistered), the reason
+(`tbtop-cms::pages.problem_blocks.reasons.{unregistered|shared_missing|shared_kind_mismatch}`)
+and the row's saved `data` as pretty JSON. **Delete row** under each removes
+that row through the same write as a tab's Remove — the editor's whole form
+is saved (lock_version checked on a page; a stale form keeps the modal open
+with the conflict message and writes nothing). Nothing else changes a
+problem row: Save round-trips it as stored, so re-registering the block
+class (or restoring the shared block) brings it back as it was.
+
+Action names: `pageProblemBlocks` / `pageProblemDelete_{rowId}` and
+`layoutProblemBlocks` / `layoutProblemDelete_{rowId}`, behind the editor's
+own ability (`tbtop-cms.pages` / `tbtop-cms.design`). `cms:doctor` counts
+the same rows per container: `unregistered_block_rows` and
+`broken_shared_references`. The rule lives in one place,
+`Tbtop\Cms\Block\BlockRowProblem`, read by the resolver, the editor
+(`Admin\Pages\Support\ProblemBlocks`) and both checks.
 
 ## Where does my code go
 
