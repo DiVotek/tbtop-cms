@@ -1,0 +1,75 @@
+{
+    "Hero": {
+        "full": {
+            "title": "Welcome",
+            "subtitle": "A subtitle",
+            "image": "https://example.test/hero.jpg",
+            "cta": {
+                "label": "Go",
+                "href": "/contact"
+            }
+        },
+        "empty": {
+            "title": "",
+            "subtitle": null,
+            "image": null,
+            "cta": null
+        }
+    },
+    "ContactForm": {
+        "full": {
+            "heading": "Write to us",
+            "submitLabel": "Send it",
+            "successMessage": "Got it.",
+            "fields": [
+                {
+                    "name": "name",
+                    "label": "Name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "email",
+                    "label": "Email",
+                    "type": "email",
+                    "required": true
+                },
+                {
+                    "name": "message",
+                    "label": "Message",
+                    "type": "textarea",
+                    "required": true
+                }
+            ],
+            "action": "http://localhost/_cms/forms/en/1/ContactForm-full",
+            "honeypotField": "website"
+        },
+        "empty": {
+            "heading": "Contact us",
+            "submitLabel": "Send",
+            "successMessage": "Thanks, we will be in touch.",
+            "fields": [
+                {
+                    "name": "name",
+                    "label": "Name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "email",
+                    "label": "Email",
+                    "type": "email",
+                    "required": true
+                },
+                {
+                    "name": "message",
+                    "label": "Message",
+                    "type": "textarea",
+                    "required": true
+                }
+            ],
+            "action": "http://localhost/_cms/forms/en/1/ContactForm-empty",
+            "honeypotField": "website"
+        }
+    }
+}

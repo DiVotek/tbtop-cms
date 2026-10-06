@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'trashed' => 'In trash',
     'title' => 'Pages',
     'tab_description' => ':tab — categories group content, pages stand alone, articles live under a category.',
     'tabs' => [

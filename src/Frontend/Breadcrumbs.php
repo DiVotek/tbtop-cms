@@ -10,6 +10,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Page\Support\AncestorChain;
+use Tbtop\Cms\Page\Support\PageTranslation;
 
 class Breadcrumbs
 {
@@ -126,18 +127,6 @@ class Breadcrumbs
     // <title>), and Google may show BreadcrumbList in place of the URL.
     private function label(Page $page, string $locale): string
     {
-        $default = $this->languages->defaultLocale();
-
-        foreach ([$locale, $default] as $loc) {
-            foreach (['name', 'title'] as $key) {
-                $value = (string) $page->getTranslation($key, $loc, false);
-
-                if ($value !== '') {
-                    return $value;
-                }
-            }
-        }
-
-        return '';
+        return PageTranslation::firstText($page, ['name', 'title'], $locale, $this->languages->defaultLocale());
     }
 }

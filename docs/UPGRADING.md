@@ -289,3 +289,69 @@ read.
 ## "Make shared" needs the design ability
 
 With `tbtop-cms.roles` on, the page editor's "Make shared" action (`pageBlockShare_{id}`) is shown and accepted (otherwise 403) only when `tbtop-cms.design` allows; with roles off nothing changes.
+
+## Blocks without their own `resolve()` now get form-resolved props (#238)
+
+`Block::resolve()` used to return its input unchanged. The default now runs
+`Block\Support\FormResolver` over the block's `form()`, so a host block that
+does not override `resolve()` hands its React component different props:
+
+- a `media` field ships the media **URL**, not the stored id (`->multiple()`:
+  a list of URLs of media that still exist);
+- a `link` field ships `{href, type, label}` with `href` the resolved path or
+  URL, not the stored `{type, value, label}`;
+- a translatable field is a plain string in the current locale (it already
+  was, flattened before `resolve()`), but a blank one is now `null`, not `''`;
+- every text-like value is trimmed and blank becomes `null`; numbers are
+  floats, booleans `bool`, repeater rows with no filled field are dropped;
+- **a key in the stored data with no field in `form()` is dropped** — data a
+  block kept outside its form (seeded, imported) no longer reaches the client.
+
+`cms:blocks:types` types such a block from the same rules instead of the
+permissive `z.record()` fallback. To keep the old pass-through for a block,
+override `resolve()`:
+
+```php
+/** @return array<string, mixed> */
+public function resolve(array $input, ResolveContext $ctx): array
+{
+    return $input;
+}
+```
+
+Blocks with their own `resolve()` are unaffected.
+
+## A block that fails to resolve is sent as a `CmsBlockError` element
+
+A block whose `resolve()` threw, whose kind is not registered, or whose
+shared block is missing used to reach the client with its own `type` and
+`{}` props, listed under `render.errors`. It now reaches the client as
+
+```json
+{ "type": "CmsBlockError", "props": { "kind": "Hero", "message": "Block [Hero] failed to resolve." } }
+```
+
+in the same place in `children`; `render.errors[id]` still carries the
+message. `CmsRenderer` behaves as before (a placeholder with `showErrors`,
+nothing plus a console line without). A host that renders with the bare
+json-render `Renderer` no longer has its component called with empty props;
+register a `CmsBlockError` component there to show something, or let
+json-render skip it. A host that read `render.elements[id].type` to find the
+broken block's kind reads `props.kind` instead.
+
+## `render.errors` and `page.fields` are always JSON objects
+
+Both used to serialise as `[]` when empty (and `render.errors` as a list if
+the block ids were `"0"`, `"1"`, …). They are now always objects — `{}` when
+empty. Code that checked `Array.isArray(...)` or `.length` on either reads it
+as a map instead (`Object.keys(...).length`).
+
+## Page texts fall back to the default language when blank
+
+`page.name`, `page.title`, `page.heading` and `page.summary` (page props and
+error-page props), breadcrumb labels, the meta title/description and the
+JSON-LD names now follow the rule `page.body` already did: this locale, then
+the site's default language, then `null`. A translation saved as `''` or
+whitespace counts as missing. Before, a blank translation shipped `''`, and
+a missing one fell back to `app.fallback_locale` rather than the default
+language. The four page props are typed `string | null`.

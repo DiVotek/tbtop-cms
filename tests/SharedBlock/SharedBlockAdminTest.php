@@ -269,6 +269,23 @@ it('shows a reference whose target has another kind as missing, with no edit or 
         ->and($json)->not->toContain('pageBlockDetach_ref1')->not->toContain('pageBlockEditShared_ref1');
 });
 
+it('refuses to delete a shared block only a trashed page places, and marks that page in the usage table', function (): void {
+    $shared = sharedSimple();
+    $page = sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'shared' => $shared->id, 'data' => []]]);
+    $page->delete();
+
+    $rows = sharedActing()->getJson("/admin/shared-blocks/{$shared->id}/edit/tables/sharedBlockUsage")->assertOk()->json('data.data');
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['id'])->toBe("page:{$page->id}")
+        ->and($rows[0]['container'])->toBe('trashed_page');
+
+    $structure = json_encode($this->get('/admin/shared-blocks', ['X-Inertia' => 'true'])->assertOk()->json('props.structure'));
+    expect($structure)->not->toContain("sharedBlockDelete_{$shared->id}");
+    $this->postJson("/admin/shared-blocks/actions/sharedBlockDelete_{$shared->id}", ['payload' => []])->assertNotFound();
+
+    expect(SharedBlock::count())->toBe(1);
+});
+
 it('deletes a shared block nothing places', function (): void {
     $shared = sharedSimple();
 

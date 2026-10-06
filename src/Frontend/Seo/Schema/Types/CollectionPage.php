@@ -6,8 +6,10 @@ namespace Tbtop\Cms\Frontend\Seo\Schema\Types;
 
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaType;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageUrl;
+use Tbtop\Cms\Page\Support\PageTranslation;
 
 class CollectionPage extends SchemaType
 {
@@ -70,10 +72,11 @@ class CollectionPage extends SchemaType
             ->get();
 
         $parts = [];
+        // Read per call: the schema registry is a singleton, Languages is per request.
+        $fallback = app(Languages::class)->defaultLocale();
 
         foreach ($children as $child) {
-            $name = (string) $child->getTranslation('title', $locale, false)
-                ?: (string) $child->getTranslation('name', $locale, false);
+            $name = PageTranslation::firstText($child, ['title', 'name'], $locale, $fallback);
             $path = $child->pathFor($locale);
 
             if ($name === '' || $path === null) {

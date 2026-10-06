@@ -564,3 +564,34 @@ it('treats a literally-stored JSON null for seo.indexing_enabled as indexing ena
         ->assertOk()
         ->assertJsonPath('props.seo.noindex', false);
 });
+
+it('falls back to the default locale for every page text left blank in the requested one', function (): void {
+    // Page::getTranslation() falls back to app.fallback_locale, which a host need not align with the CMS default language.
+    config(['app.fallback_locale' => 'de']);
+    Language::factory()->create(['locale' => 'uk']);
+    $parent = Page::factory()->create([
+        'type' => 'category',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Company', 'uk' => '  '],
+    ]);
+    $page = Page::factory()->create([
+        'type' => 'article',
+        'status' => PageStatus::Published,
+        'parent_id' => $parent->id,
+        'name' => ['en' => 'About', 'uk' => ''],
+        'title' => ['en' => 'About Page', 'uk' => ''],
+        'heading' => ['en' => 'Hello', 'uk' => ''],
+        'summary' => ['en' => 'Who we are.', 'uk' => ' '],
+        'seo' => [],
+    ]);
+
+    $response = $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])->assertOk();
+
+    $response->assertJsonPath('props.page.name', 'About')
+        ->assertJsonPath('props.page.title', 'About Page')
+        ->assertJsonPath('props.page.heading', 'Hello')
+        ->assertJsonPath('props.page.summary', 'Who we are.')
+        ->assertJsonPath('props.seo.title', 'About Page — Acme')
+        ->assertJsonPath('props.seo.description', 'Who we are.');
+    expect(array_column($response->json('props.breadcrumbs'), 'label'))->toContain('Company');
+});

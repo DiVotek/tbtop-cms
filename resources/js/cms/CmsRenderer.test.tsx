@@ -37,6 +37,40 @@ it("replaces a block the server failed to resolve with the error element and lea
     expect(out.elements.$root.children).toEqual(["a", "b"]);
 });
 
+it("keeps an error element the server already sent, with its original kind and message", () => {
+    const sent = { type: BLOCK_ERROR_KIND, props: { kind: "Hero", message: "Block [Hero] failed to resolve." } };
+    const s = spec({ a: { type: "Hero", props: hero }, b: sent }, { b: "Block [Hero] failed to resolve." });
+
+    const out = markBrokenBlocks(s, catalog, registry);
+
+    expect(out).toBe(s as Spec);
+    expect(out.elements.b).toEqual(sent);
+});
+
+it("draws the server's error element as the placeholder with showErrors, and hides and logs it without", () => {
+    const s = spec({ a: { type: "Hero", props: hero }, b: { type: BLOCK_ERROR_KIND, props: { kind: "Broken", message: "Block [Broken] failed to resolve." } } }, { b: "Block [Broken] failed to resolve." });
+
+    const shown = renderSpec(s, true);
+    expect(shown.getByText("Welcome")).toBeDefined();
+    expect(shown.getByTestId("cms-block-error").getAttribute("data-kind")).toBe("Broken");
+    expect(shown.getByTestId("cms-block-error").textContent).toBe("Block [Broken] failed to resolve.");
+    shown.unmount();
+
+    const original = console.error;
+    const logged = mock((..._args: unknown[]) => undefined);
+    console.error = logged;
+    try {
+        const hidden = renderSpec(s, false);
+        expect(hidden.getByText("Welcome")).toBeDefined();
+        expect(hidden.queryByTestId("cms-block-error")).toBeNull();
+        expect(logged.mock.calls.map((call) => String(call[0]))).toEqual([
+            "[tbtop-cms] Block [Broken] is hidden from the page: Block [Broken] failed to resolve.",
+        ]);
+    } finally {
+        console.error = original;
+    }
+});
+
 it("names a kind with no registered component", () => {
     const out = markBrokenBlocks(spec({ a: { type: "Ghost", props: {} } }), catalog, registry);
 

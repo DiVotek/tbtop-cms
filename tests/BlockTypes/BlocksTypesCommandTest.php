@@ -29,6 +29,7 @@ use Tbtop\Cms\Tests\Fixtures\BlockTypes\UnsupportedShapeBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\UntypedFormBlock;
 use Tbtop\Cms\Tests\Fixtures\BlockTypes\ValueOfImportBlock;
+use Tbtop\Cms\Tests\Fixtures\FormResolver\ArrayShapesBlock;
 use Tbtop\Cms\Tests\Fixtures\FormResolver\EveryKindBlock;
 
 beforeEach(function (): void {
@@ -330,4 +331,19 @@ it('derives the schema from the form for a block that keeps the base resolve()',
         ->toContain('featured: z.boolean(),')
         ->toContain("items: z.array(z.object({\n        label: z.string().nullable(),\n        qty: z.number().nullable(),\n    })),")
         ->not->toContain('TODO: add @return');
+});
+
+it('types the array-valued field kinds and warns about a field whose value has no known shape', function (): void {
+    config()->set('tbtop-cms.blocks.types', []);
+    BlockRegistry::extend(fn (): array => [ArrayShapesBlock::class]);
+
+    $this->artisan('cms:blocks:types', ['--path' => $this->outputPath])
+        ->expectsOutputToContain('Block [ArrayShapes]: field [address] is a text with sub-fields — its props are typed as unknown.')
+        ->assertExitCode(0);
+
+    expect(file_get_contents($this->outputPath))
+        ->toContain('days: z.array(z.string()),')
+        ->toContain("period: z.object({\n        from: z.string().nullable(),\n        to: z.string().nullable(),\n    }),")
+        ->toContain('files: z.array(z.string()),')
+        ->toContain('address: z.unknown(),');
 });

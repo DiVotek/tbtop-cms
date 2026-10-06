@@ -107,6 +107,7 @@ class SharedBlockEditPage extends Page
                 Column::make('name')->label(__('tbtop-cms::shared-blocks.columns.name')),
                 Column::make('container')->label(__('tbtop-cms::shared-blocks.columns.container'))->badge([
                     'page' => ['label' => __('tbtop-cms::shared-blocks.containers.page'), 'color' => Color::Info],
+                    'trashed_page' => ['label' => __('tbtop-cms::pages.trashed'), 'color' => Color::Warning],
                     'layout' => ['label' => __('tbtop-cms::shared-blocks.containers.layout'), 'color' => Color::Gray],
                 ]),
             ])
@@ -129,7 +130,7 @@ class SharedBlockEditPage extends Page
         $union = null;
         foreach ($containers as $container) {
             $row = $container instanceof CmsPage
-                ? ['page:' . $container->getKey(), $this->pageName($container), 'page']
+                ? ['page:' . $container->getKey(), $this->pageName($container), $container->trashed() ? 'trashed_page' : 'page']
                 : ['layout:' . $container->slot, LayoutForm::label($container->slot), 'layout'];
             $select = DB::query()->selectRaw('? as id, ? as name, ? as container', $row);
             $union = $union instanceof QueryBuilder ? $union->unionAll($select) : $select;
@@ -194,7 +195,7 @@ class SharedBlockEditPage extends Page
         [$type, $key] = array_pad(explode(':', $rowId, 2), 2, '');
 
         return match ($type) {
-            'page' => ctype_digit($key) ? CmsPage::query()->find((int) $key) : null,
+            'page' => ctype_digit($key) ? CmsPage::withTrashed()->find((int) $key) : null,
             'layout' => Layout::query()->where('slot', $key)->first(),
             default => null,
         };
