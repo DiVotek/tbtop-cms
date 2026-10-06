@@ -9,7 +9,8 @@ use Tbtop\Cms\Settings\Settings;
 /**
  * Picks the title/description template a page renders through.
  *
- * Two rungs, most specific first: a template stored for the page's own type
+ * Three rungs, most specific first: a template stored for the page's
+ * subtype (`seo.type_templates.concert.title`), then for its type
  * (`seo.type_templates.article.title`), then the site-wide one
  * (`seo.title_template`).
  *
@@ -33,14 +34,14 @@ class SeoTemplates
 
     public function __construct(private readonly Settings $settings) {}
 
-    public function title(string $type, string $locale): string
+    public function title(string $type, string $locale, ?string $subtype = null): string
     {
-        return $this->resolve($type, 'title', 'seo.title_template', $locale);
+        return $this->resolve($type, $subtype, 'title', 'seo.title_template', $locale);
     }
 
-    public function description(string $type, string $locale): string
+    public function description(string $type, string $locale, ?string $subtype = null): string
     {
-        return $this->resolve($type, 'description', 'seo.description_template', $locale);
+        return $this->resolve($type, $subtype, 'description', 'seo.description_template', $locale);
     }
 
     public static function key(string $type, string $slot): string
@@ -48,10 +49,15 @@ class SeoTemplates
         return self::KEY_PREFIX . '.' . $type . '.' . $slot;
     }
 
-    private function resolve(string $type, string $slot, string $siteKey, string $locale): string
+    private function resolve(string $type, ?string $subtype, string $slot, string $siteKey, string $locale): string
     {
-        $perType = LocalizedSeo::value($this->settings->get(self::key($type, $slot)), $locale);
+        foreach (array_filter([$subtype, $type]) as $key) {
+            $perType = LocalizedSeo::value($this->settings->get(self::key($key, $slot)), $locale);
+            if ($perType !== '') {
+                return $perType;
+            }
+        }
 
-        return $perType !== '' ? $perType : LocalizedSeo::value($this->settings->get($siteKey), $locale);
+        return LocalizedSeo::value($this->settings->get($siteKey), $locale);
     }
 }

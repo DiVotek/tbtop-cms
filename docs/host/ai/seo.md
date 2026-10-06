@@ -33,7 +33,7 @@ unaffected.
 Field-by-field:
 
 - **title** — `SeoTemplates::title($page->type, $locale)` picks a template:
-  per-type (`seo.type_templates.{type}.title`) first, else site-wide
+  per-subtype, then per-type (`seo.type_templates.{type}.title`), else site-wide
   (`seo.title_template`). An empty template falls back to the legacy
   `{title} {seo.title_suffix}` behavior (`SeoResolver::titleWithSuffix()`) —
   existing sites with no template configured render byte-identical titles.
@@ -102,7 +102,7 @@ Field-by-field:
 | Article author / publisher | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab — same entity (same `@id`) as the site-wide identity node |
 | `is_indexable` | `page.is_indexable` column | Page edit sidebar → *Publication* card, not the SEO tab |
 | Site title/description templates, separator, suffix | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`, `seo.title_suffix`) | Admin → SEO settings → *Titles* tab |
-| Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type |
+| Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type and subtype; a page reads its subtype's pair first, then its type's |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
 | Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`, contacts fall back to `site.contacts.*`) | SEO settings → *Identity* tab exposes type, profile links (sameAs) and, for the organisation types, legal name, telephone, email, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win) |

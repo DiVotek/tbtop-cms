@@ -64,5 +64,5 @@ registry rule. Fixtures `EventPageType`, `ConcertPageType` and
 **Assumptions:**
 - A host registers its subtype classes before running the migration; a subtype registered later leaves its old pages with the subtype key in `type` until the host moves them.
 - The host moves the data of former general type blocks into `fields` itself; the package cannot tell which content rows were general.
-- A subtype's own tree-rule, SEO-template and `schemaTypes()` overrides are not read; everything keyed on the page type reads the base.
+- A subtype's own tree-rule and `schemaTypes()` overrides are not read; everything keyed on the page type reads the base. SEO title/description templates are the one exception: a page reads its subtype's template before its type's.
 - A stored subtype outlives its registration: the page keeps it on save while its type is unchanged.
