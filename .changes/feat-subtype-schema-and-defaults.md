@@ -3,7 +3,7 @@
 touches: schema selection, SEO tab schema select, page create form, page save, PageTypeInterface
 
 > ⚠️ **Contract** `PageTypeInterface::childSubtype(): ?string` is new (`BasePageType` returns `null`). A host type implementing the interface directly must add it.
-> ⚠️ **Contract** A page publishes its subtype's `schemaTypes()` when the subtype is registered, else its base type's (`PageTypeRegistry::schemaTypesFor()`). A subtype extending `BasePageType` with `base() = 'article'` now publishes `WebPage`-family schema instead of `Article`; extend `ArticleType` to keep `Article`.
+> ⚠️ **Contract** A page publishes its subtype's `schemaTypes()` when the subtype is registered, else its base type's (`PageTypeRegistry::schemaTypesFor()`). A subtype extending `BasePageType` publishes `BasePageType`'s `WebPage` family: under `base() = 'article'` that replaces `Article`, under `'category'` it replaces `CollectionPage`. Extend `ArticleType` / `CategoryType` to keep the base's list.
 > ⚠️ **Contract** The create form names its subtype selects `subtype_{base}` (one per base with subtypes, shown for that base); save reads the picked type's one. A bare `subtype` key is still accepted.
 
 A legal service under a "Services" category is a `Service`, not an
