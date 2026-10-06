@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
@@ -98,6 +100,9 @@ final class PageEditBlockTabs
                 $registry->get($kind)->form($s),
             )
             : [];
+        // Registered even when hidden, so a hand-made post reaches the
+        // handler's 403 instead of a "no handler" 404.
+        $share = $registry->has($kind) ? self::shareAction($s, $page, $registry, $id, $kind) : null;
 
         $body = $s->stack([
             ...$fields,
@@ -108,7 +113,7 @@ final class PageEditBlockTabs
             $s->flex([
                 self::removeAction($s, $page, $id),
                 $s->spacer(),
-                ...($registry->has($kind) ? [self::shareAction($s, $page, $registry, $id, $kind)] : []),
+                ...($share !== null && self::canShare() ? [$share] : []),
             ]),
         ]);
 
@@ -225,6 +230,10 @@ final class PageEditBlockTabs
 
     private static function handleShare(ActionCtx $ctx, Page $page, BlockRegistry $registry, string $id, string $kind): Effects
     {
+        if (! self::canShare()) {
+            abort(403);
+        }
+
         $rows = [];
         $shared = null;
         foreach (PageEditBlocks::toRows($ctx->form, $page) as $row) {
@@ -252,6 +261,14 @@ final class PageEditBlockTabs
 
         return Effects::make()->notify(__('tbtop-cms::shared-blocks.share.done', ['name' => $shared->name]))
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
+    }
+
+    /** Sharing creates a shared block, and shared blocks are design, not page content. */
+    private static function canShare(): bool
+    {
+        $gate = CmsAbilities::for('tbtop-cms.design');
+
+        return $gate === null || Gate::allows($gate);
     }
 
     /** "Label — Page", with " 2", " 3"… while taken, so two shares from the same page stay apart. */

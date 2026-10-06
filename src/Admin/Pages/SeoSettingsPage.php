@@ -12,7 +12,6 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
-use Tbtop\Cms\Frontend\Seo\ProfileUrl;
 use Tbtop\Cms\Frontend\Seo\RobotsTxt;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
 use Tbtop\Cms\Frontend\Seo\SiteIdentity;
@@ -93,10 +92,7 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_identity_type' => 'seo.identity.type',
             'seo_identity_name' => 'seo.identity.name',
             'seo_identity_logo' => 'seo.identity.logo',
-            'seo_identity_same_as' => 'seo.identity.same_as',
             'seo_identity_legal_name' => 'seo.identity.legal_name',
-            'seo_identity_telephone' => 'seo.identity.telephone',
-            'seo_identity_email' => 'seo.identity.email',
             'seo_identity_street' => 'seo.identity.address.street',
             'seo_identity_locality' => 'seo.identity.address.locality',
             'seo_identity_region' => 'seo.identity.address.region',
@@ -304,8 +300,7 @@ class SeoSettingsPage extends SettingsPageBase
                 ->options($types)
                 ->helperText(__('tbtop-cms::settings.seo.helpers.identity_type'))
                 ->rules('nullable|in:' . implode(',', SiteIdentity::TYPES)),
-            $s->tags('seo_identity_same_as')->label(__('tbtop-cms::settings.seo.fields.identity_same_as'))
-                ->rules('nullable|array')->helperText(__('tbtop-cms::settings.seo.helpers.identity_same_as')),
+            $s->displayText(__('tbtop-cms::settings.seo.helpers.identity_contacts'))->variant('muted'),
             $s->section([
                 'title' => __('tbtop-cms::settings.seo.sections.identity_organization'),
                 'hiddenIf' => Cond::notIn('seo_identity_type', SiteIdentity::ORGANISATION_TYPES),
@@ -333,11 +328,6 @@ class SeoSettingsPage extends SettingsPageBase
         return [
             $s->text('seo_identity_legal_name')->label(__('tbtop-cms::settings.seo.fields.identity_legal_name'))
                 ->rules(self::onlyFor($organisation, 'nullable|string|max:255')),
-            $s->text('seo_identity_telephone')->label(__('tbtop-cms::settings.seo.fields.identity_telephone'))
-                ->placeholder('+380 44 123 4567')
-                ->rules(self::onlyFor($organisation, 'nullable|string|max:50')),
-            $s->text('seo_identity_email')->label(__('tbtop-cms::settings.seo.fields.identity_email'))
-                ->rules(self::onlyFor($organisation, 'nullable|email|max:255')),
             $s->displayText(__('tbtop-cms::settings.seo.helpers.identity_address'))->variant('muted'),
             $s->text('seo_identity_street')->label(__('tbtop-cms::settings.seo.fields.identity_street'))
                 ->translatable()
@@ -551,13 +541,6 @@ class SeoSettingsPage extends SettingsPageBase
 
         if (isset($form['seo_identity_country']) && is_string($form['seo_identity_country'])) {
             $form['seo_identity_country'] = strtoupper($form['seo_identity_country']);
-        }
-
-        if (isset($form['seo_identity_same_as']) && is_array($form['seo_identity_same_as'])) {
-            $form['seo_identity_same_as'] = array_values(array_filter(
-                $form['seo_identity_same_as'],
-                static fn (mixed $url): bool => is_string($url) && ProfileUrl::valid($url),
-            ));
         }
 
         return $form;

@@ -42,7 +42,7 @@ function identityNodes(array $jsonLd): array
 
 it('publishes a local business as the single identity node with address, telephone and opening hours', function (): void {
     $settings = app(Settings::class);
-    $settings->set('seo.identity.telephone', '+380 44 123 4567');
+    $settings->set('site.contacts.phones', [['number' => '+380 44 123 4567']]);
     $settings->set('seo.identity.opening_hours', [
         ['days' => ['Monday', 'Friday'], 'opens' => '09:00', 'closes' => '18:00'],
     ]);
@@ -111,7 +111,7 @@ it('links the article author and publisher to the identity node', function (stri
     'person' => ['person', 'Person', false],
 ]);
 
-it('fills telephone, email and sameAs from Site settings contacts when the SEO identity leaves them blank', function (): void {
+it('takes telephone, email and sameAs from Site settings contacts', function (): void {
     $settings = app(Settings::class);
     $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001'], ['number' => '+380 44 555 0002']]);
     $settings->set('site.contacts.emails', [['address' => 'hello@example.com']]);
@@ -129,7 +129,19 @@ it('fills telephone, email and sameAs from Site settings contacts when the SEO i
         ->and($identity[0]['sameAs'])->toBe(['https://facebook.com/acme', 'https://t.me/acme']);
 });
 
-it('lets the explicit SEO identity fields override the Site settings contacts', function (): void {
+it('gives an Organization the telephone of Site settings contacts when nothing else is set', function (): void {
+    $settings = app(Settings::class);
+    $settings->set('seo.identity.type', 'organization');
+    $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001']]);
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    $identity = identityNodes(localBusinessJsonLd('/about'));
+
+    expect($identity[0]['@type'])->toBe('Organization')
+        ->and($identity[0]['telephone'])->toBe('+380 44 555 0001');
+});
+
+it('no longer reads the legacy SEO identity telephone, email and profile links', function (): void {
     $settings = app(Settings::class);
     $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001']]);
     $settings->set('site.contacts.emails', [['address' => 'hello@example.com']]);
@@ -141,7 +153,7 @@ it('lets the explicit SEO identity fields override the Site settings contacts', 
 
     $identity = identityNodes(localBusinessJsonLd('/about'));
 
-    expect($identity[0]['telephone'])->toBe('+380 44 123 4567')
-        ->and($identity[0]['email'])->toBe('press@example.com')
-        ->and($identity[0]['sameAs'])->toBe(['https://www.wikidata.org/wiki/Q1']);
+    expect($identity[0]['telephone'])->toBe('+380 44 555 0001')
+        ->and($identity[0]['email'])->toBe('hello@example.com')
+        ->and($identity[0]['sameAs'])->toBe(['https://facebook.com/acme']);
 });
