@@ -52,24 +52,29 @@ final class PageLeafType
     }
 
     /**
-     * The edit form's condition under which saving changes the leaf type —
-     * the mirror of resolve() for the page as loaded — with the confirm copy.
-     * Null for anything that is not a page or an article.
+     * The edit form's condition under which saving turns the loaded page into
+     * the other leaf type — implicitly by its category (resolve()) or by an
+     * explicit pick in the type select — with the confirm copy. Null for
+     * anything that is not a page or an article.
      *
      * @return array{when: Cond, title: string, description: string}|null
      */
     public static function flip(Page $page): ?array
     {
-        $pageWithParent = Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id'));
-
         return match ($page->type) {
             self::PAGE => [
-                'when' => $pageWithParent,
+                'when' => Cond::any(
+                    Cond::eq('type', self::ARTICLE),
+                    Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id')),
+                ),
                 'title' => __('tbtop-cms::pages.leaf_flip.to_article_title'),
                 'description' => __('tbtop-cms::pages.leaf_flip.to_article'),
             ],
             self::ARTICLE => [
-                'when' => Cond::any(Cond::all(Cond::eq('type', self::ARTICLE), Cond::empty('parent_id')), $pageWithParent),
+                'when' => Cond::any(
+                    Cond::eq('type', self::PAGE),
+                    Cond::all(Cond::eq('type', self::ARTICLE), Cond::empty('parent_id')),
+                ),
                 'title' => __('tbtop-cms::pages.leaf_flip.to_page_title'),
                 'description' => __('tbtop-cms::pages.leaf_flip.to_page'),
             ],
