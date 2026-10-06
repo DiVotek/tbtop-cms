@@ -30,12 +30,14 @@ final class FallbackProps
             'page' => [
                 'id' => null,
                 'type' => 'page',
+                'subtype' => null,
                 'status' => null,
                 'name' => '',
                 'title' => '',
                 'heading' => __("tbtop-cms::errors.{$key}.heading"),
                 'summary' => '',
                 'image' => null,
+                'fields' => (object) [],
             ],
             'render' => [],
             'seo' => [

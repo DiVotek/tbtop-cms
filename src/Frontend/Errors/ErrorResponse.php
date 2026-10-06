@@ -82,7 +82,8 @@ class ErrorResponse
         $this->currentPage->set($page);
 
         $locale = (string) app()->getLocale();
-        $resolved = $this->forms->bind($this->blocks->resolve($page->content ?? [], $page), $page);
+        ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($page->content ?? [], $page);
+        $resolved = $this->forms->bind($blocks, $page);
         $seo = $this->seo->resolve($page, $locale, []);
         // Error pages carry no slug (see PageSlugWriter), so canonical/ogUrl
         // as computed by SeoResolver would point at a made-up '/' path —
@@ -99,12 +100,14 @@ class ErrorResponse
             'page' => [
                 'id' => $page->getKey(),
                 'type' => $page->type,
+                'subtype' => $page->subtype,
                 'status' => $page->status->value,
                 'name' => PageTranslation::text($page, 'name', $locale, $fallback),
                 'title' => PageTranslation::text($page, 'title', $locale, $fallback),
                 'heading' => PageTranslation::text($page, 'heading', $locale, $fallback),
                 'summary' => PageTranslation::text($page, 'summary', $locale, $fallback),
                 'image' => null,
+                'fields' => (object) $fields,
             ],
             'render' => $this->assembler->assemble($resolved),
             'seo' => $seo,

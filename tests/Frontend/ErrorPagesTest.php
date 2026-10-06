@@ -72,6 +72,7 @@ it('renders the 404 page from the DB through the normal Cms/Page pipeline, noind
         ->assertNotFound()
         ->assertJsonPath('component', 'Cms/Page')
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'Not found here')
+        ->assertSee('"fields":{}', false)
         ->assertJsonPath('props.seo.noindex', true)
         ->assertJsonPath('props.seo.canonical', null);
 });
@@ -105,7 +106,10 @@ it('falls back to an empty render with the lang-file heading when the 4xx page r
         ->assertNotFound()
         ->assertJsonPath('component', 'Cms/Page')
         ->assertJsonPath('props.render', [])
-        ->assertJsonPath('props.page.heading', __('tbtop-cms::errors.4xx.heading'));
+        ->assertJsonPath('props.page.heading', __('tbtop-cms::errors.4xx.heading'))
+        ->assertJsonPath('props.page.subtype', null)
+        // The page prop shape is a normal page's: fields is a JSON object even when empty.
+        ->assertSee('"fields":{}', false);
 });
 
 it('gives the fallback 404 the same seo keys as a normal page', function (): void {
