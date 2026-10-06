@@ -95,6 +95,10 @@ final class PageRefIndex
 
         foreach ($this->pagesFieldNames($page) as $name) {
             foreach (PageIds::list($stored[$name] ?? null) as $position => $target) {
+                // A page never lists itself among its own back references, whatever path wrote the id.
+                if ($target === (int) $page->getKey()) {
+                    continue;
+                }
                 $rows[] = ['page_id' => (int) $page->getKey(), 'field' => $name, 'target_id' => $target, 'position' => $position];
             }
         }

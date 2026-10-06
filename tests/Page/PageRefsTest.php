@@ -168,3 +168,11 @@ it('rebuilds the reverse index from scratch', function (): void {
         ['page_id' => $reviewer->id, 'field' => 'services', 'target_id' => $divorce->id, 'position' => 0],
     ]);
 });
+
+it('leaves a page\'s reference to itself out of the reverse index', function (): void {
+    $service = refsArticle('legal_service', 'Divorce');
+    $specialist = refsArticle('specialist', 'Olena');
+    $specialist->update(['fields' => ['services' => [(string) $specialist->id, (string) $service->id]]]);
+
+    expect(DB::table('tbtop_page_refs')->where('page_id', $specialist->id)->pluck('target_id')->all())->toBe([$service->id]);
+});
