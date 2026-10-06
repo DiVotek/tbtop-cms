@@ -15,15 +15,17 @@ use Tbtop\Admin\Dsl\S;
  */
 final class EditFooter
 {
-    public static function build(S $s, string $cancelUrl, ActionBuilder $save, ?ActionBuilder $delete = null): Node
+    /** @param ActionBuilder|list<ActionBuilder> $save more than one when a form swaps its save button by a condition */
+    public static function build(S $s, string $cancelUrl, ActionBuilder | array $save, ?ActionBuilder $delete = null): Node
     {
+        $save = is_array($save) ? $save : [$save];
         $cancel = $s->action('cancel')
             ->label(__('tbtop-cms::common.actions.cancel'))
             ->url($cancelUrl);
 
         $children = $delete !== null
-            ? [$delete, $s->spacer(), $cancel, $save]
-            : [$s->spacer(), $cancel, $save];
+            ? [$delete, $s->spacer(), $cancel, ...$save]
+            : [$s->spacer(), $cancel, ...$save];
 
         return $s->flex($children, justify: 'end');
     }

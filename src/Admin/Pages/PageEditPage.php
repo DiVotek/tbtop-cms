@@ -8,6 +8,7 @@ use DomainException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
+use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Pages\Page as AdminPage;
@@ -19,6 +20,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditStarterBlocks;
 use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditTypeFields;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
+use Tbtop\Cms\Admin\Pages\Support\PageLeafType;
 use Tbtop\Cms\Admin\Pages\Support\ProblemBlocks;
 use Tbtop\Cms\Admin\Pages\Support\ProblemBlocksAction;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
@@ -98,8 +100,8 @@ class PageEditPage extends AdminPage
     public function view(S $s): Node
     {
         $page = $this->page();
-        $saveTop = $this->saveAction($s, 'saveTop');
-        $saveFooter = $this->saveAction($s, 'save');
+        $saveTop = $this->saveActions($s, $page, 'saveTop');
+        $saveFooter = $this->saveActions($s, $page, 'save');
 
         $footer = EditFooter::build(
             $s,
@@ -177,6 +179,29 @@ class PageEditPage extends AdminPage
     private function isSourceBacked(Page $page): bool
     {
         return app(PageTypeRegistry::class)->isSourceBacked($page->type);
+    }
+
+    /**
+     * A save that would turn a page into an article or back (PageLeafType)
+     * asks first. The admin's confirm text is fixed per action, so the button
+     * is swapped by a form condition: the plain one while the type stays, the
+     * confirming one while the type would change.
+     */
+    /** @return list<ActionBuilder> */
+    private function saveActions(S $s, Page $page, string $name): array
+    {
+        $action = $this->saveAction($s, $name);
+        $flip = $this->isSourceBacked($page) || $page->is_system ? null : PageLeafType::flip($page);
+        if ($flip === null) {
+            return [$action];
+        }
+
+        return [
+            $action->hiddenIf($flip['when']),
+            $s->action("{$name}LeafFlip")->label(__('tbtop-cms::pages.actions.save'))->color('primary')
+                ->confirm($flip['title'], $flip['description'])->submit('pageEditor')
+                ->hiddenIf(Cond::not($flip['when'])),
+        ];
     }
 
     private function saveAction(S $s, string $name): ActionBuilder
