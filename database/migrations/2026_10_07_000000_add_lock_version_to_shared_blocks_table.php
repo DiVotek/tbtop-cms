@@ -21,6 +21,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasColumn('tbtop_shared_blocks', 'lock_version')) {
+            return;
+        }
+
         Schema::table('tbtop_shared_blocks', function (Blueprint $table): void {
             $table->dropColumn('lock_version');
         });
