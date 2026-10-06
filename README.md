@@ -33,7 +33,7 @@ each step edits a file this package does not own:
    `Cms::frontendRoutes();` (it ends in a catch-all).
 3. Create `resources/js/pages/Cms/Page.tsx` (re-export `@cms/CmsPage`, or your
    own copy once you need site chrome — rendering through `@cms/CmsRenderer`,
-   so a broken block shows a placeholder instead of vanishing).
+   so a block component that throws renders nothing instead of breaking the page).
 4. Add the `@cms` alias to `vite.config.ts` and `tsconfig.json`.
 5. Import `@cms/admin/blocks` in `admin.tsx` and add the two `@source` lines to
    `resources/css/admin.css`.
