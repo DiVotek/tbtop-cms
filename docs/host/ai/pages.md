@@ -426,6 +426,60 @@ final class ConcertType extends BasePageType
 - `BlockContentResolver::resolveWithFields()` is the render entry:
   `{blocks, fields}`; `resolve()` returns the blocks only.
 
+## Page references
+
+A `pages` field picks several pages; a page type can list, in turn, the
+pages that pick it.
+
+```php
+// SpecialistType — base 'article'
+public function fields(S $s): array
+{
+    return [$s->pages('services')->label('Services')->of('article', 'legal_service')->max(10)];
+}
+
+// LegalServiceType — base 'article'
+public function backReferences(): array
+{
+    return ['specialists' => ['field' => 'services', 'from' => 'specialist']];
+}
+```
+
+- **Field.** `$s->pages('name')` (`src/Admin/Fields/Pages.php`) is a
+  searchable multiple select of pages; it stores their ids as strings, in
+  the order picked. `->of(type, ?subtype)` restricts it to a type (and
+  subtype) and may be called more than once; with no `of()` any page is
+  accepted. `->max(n)` caps the count. The search matches the name in the
+  admin's locale or the default content locale, shows at most 20, leaves
+  out trashed pages and the page being edited, and includes drafts. Save
+  rejects an id that does not exist or does not match `of()` (rule
+  `page_ref`). Not translatable — `->translatable()` throws.
+- **Site.** The field resolves to `list<{id: string, name: string, url:
+  string}>` of the **live** pages, in stored order, name and url in the
+  request locale (same rules as a page link: the name falls back to the
+  default/first filled locale; a page with no slug in that locale, or no
+  name in any locale, is left out). Unknown, trashed and unpublished ids drop out
+  silently. Works in a type's `fields()` and in a block's `form()` alike.
+- **Reverse lists.** `backReferences(): array<string, array{field: string,
+  from?: string}>` (empty from `BasePageType`) adds a key to `page.fields`
+  per entry: the live pages whose type field `field` holds this page, by
+  `sort_order` then name, as the same `{id, name, url}` list. `from`
+  narrows to sources whose `type` or `subtype` is that key. A subtype's
+  entries merge over its base's. A throw is logged
+  (`page.back_references_resolve_failed`) and the lists drop out.
+- **Index.** The lists read `tbtop_page_refs` (`page_id`, `field`,
+  `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
+  for a page on every save; a force delete cascades. Only a page type's
+  `fields()` are indexed. A page whose types change at deploy time (a
+  pages field added to an existing type, a type class rebound) is indexed
+  on its next save — run `php artisan cms:page-refs:rebuild` after such a
+  deploy, or after importing pages with a raw query. `cms:install` runs it
+  too.
+- **Gotchas.** A draft can be picked but never appears on the site until it
+  is live, on either side of the reference. A reverse list covers page-type
+  fields only: a `pages` field inside a block is resolved forward but is
+  invisible to `backReferences()`.
+
 ## Revisions
 
 Config-gated content-snapshot history per page, `config('tbtop-cms.revisions.keep', 25)`

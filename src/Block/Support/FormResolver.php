@@ -7,12 +7,14 @@ namespace Tbtop\Cms\Block\Support;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Fields\Repeater;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Page\Refs\PageRefList;
 
 /**
  * Resolves block input by the form's field kinds, so a block without its own
  * resolve() still hands React typed props: a media id becomes a URL, a link
- * value a {href, type, label}, richtext the rendered HTML, a repeater a list
+ * value a {href, type, label}, page ids their live {id, name, url}, richtext the rendered HTML, a repeater a list
  * of resolved rows with blank rows dropped. Every field's output shape is
  * declared next to its resolution in rule(), and phpType() prints the same
  * shape as a PHPStan array type so cms:blocks:types derives the zod schema
@@ -96,6 +98,11 @@ final class FormResolver
             $field->childFields() !== [] => [
                 'type' => 'mixed',
                 'resolve' => static fn (mixed $v): mixed => $v,
+            ],
+            // Before the multiple-select rule: on the wire a pages field is a select.
+            $field instanceof Pages => [
+                'type' => 'list<array{id: string, name: string, url: string}>',
+                'resolve' => static fn (mixed $v, ResolveContext $ctx): array => app(PageRefList::class)->resolve($v, $ctx->locale),
             ],
             $kind === 'richtext' => [
                 'type' => 'string|null',

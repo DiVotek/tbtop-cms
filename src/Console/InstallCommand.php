@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 use Tbtop\Cms\Database\Seeders\LanguageSeeder;
 use Tbtop\Cms\Database\Seeders\PageSeeder;
 use Throwable;
@@ -89,6 +90,11 @@ class InstallCommand extends Command
         try {
             (new LanguageSeeder)->run();
             (new PageSeeder)->run();
+            // A re-run on an existing site re-derives the references index from the pages' fields;
+            // with --skip-migrations the table may not exist yet.
+            if (Schema::hasTable('tbtop_page_refs')) {
+                $this->callSilently('cms:page-refs:rebuild');
+            }
         } catch (Throwable $e) {
             $this->error("Seeding failed: {$e->getMessage()}");
 

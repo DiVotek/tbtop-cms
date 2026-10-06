@@ -24,6 +24,7 @@ use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Admin\Fields\Link;
+use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
 use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
 use Tbtop\Cms\Admin\Listeners\SeedsLocaleFromProfile;
@@ -79,8 +80,11 @@ use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Events\PageUnpublished;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
+use Tbtop\Cms\Page\Observers\PageRefs;
 use Tbtop\Cms\Page\Observers\PageRevisions;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Refs\PageRefRule;
+use Tbtop\Cms\Page\Refs\RebuildPageRefsCommand;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
 use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
 use Tbtop\Cms\Redirect\RedirectResolver;
@@ -137,6 +141,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_10_06_000000_add_subtype_and_fields_to_pages_table')
             ->hasMigration('2026_10_07_000000_add_lock_version_to_shared_blocks_table')
             ->hasMigration('2026_10_07_000001_move_identity_contacts_to_site_contacts')
+            ->hasMigration('2026_10_07_000002_create_page_refs_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -146,6 +151,7 @@ class CmsServiceProvider extends PackageServiceProvider
                 SnapshotSeoAuditCommand::class,
                 DoctorCommand::class,
                 BlocksTypesCommand::class,
+                RebuildPageRefsCommand::class,
             ])
             ->runsMigrations();
     }
@@ -192,9 +198,11 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->wireAdminLogout();
         $this->wireLinkPageSearch();
         LinkShapeValidator::register();
+        PageRefRule::register();
         $this->wireLocaleSlugBackfill();
         $this->wireRedirectMaintenance();
         $this->wirePageRevisions();
+        $this->wirePageRefs();
         $this->wireContentCacheInvalidation();
         $this->wireLocaleSeeding();
         $this->wireNotificationRegistry();
@@ -227,6 +235,7 @@ class CmsServiceProvider extends PackageServiceProvider
     private function registerLinkField(): void
     {
         S::register('link', Link::class);
+        S::register('pages', Pages::class);
     }
 
     private function registerAdminPanel(): void
@@ -385,6 +394,12 @@ class CmsServiceProvider extends PackageServiceProvider
     private function wirePageRevisions(): void
     {
         Page::observe(PageRevisions::class);
+    }
+
+    /** A third Page observer, same reasoning: the references index is derived data. */
+    private function wirePageRefs(): void
+    {
+        Page::observe(PageRefs::class);
     }
 
     /**

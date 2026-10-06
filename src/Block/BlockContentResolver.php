@@ -12,6 +12,7 @@ use Tbtop\Cms\Block\Support\TranslatablePaths;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Refs\BackReferences;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Throwable;
 
@@ -23,6 +24,7 @@ class BlockContentResolver
         private readonly MediaUrlResolver $mediaUrlResolver,
         private readonly SharedBlocks $sharedBlocks,
         private readonly PageTypeRegistry $pageTypes,
+        private readonly BackReferences $backReferences,
     ) {}
 
     /**
@@ -77,7 +79,8 @@ class BlockContentResolver
      * subtype's value. Every type reads the whole stored `fields` and keeps
      * only what its own form declares, so a key left behind by an earlier
      * subtype is not resolved. A type whose resolveFields() throws adds
-     * nothing — the page still renders, as with a failing block.
+     * nothing — the page still renders, as with a failing block. The types'
+     * backReferences() lists come last.
      *
      * @param  list<string>  $locales
      * @return array<string, mixed>
@@ -97,6 +100,15 @@ class BlockContentResolver
                 }
                 Log::warning('page.fields_resolve_failed', ['type' => $type->key(), 'page' => $page->getKey(), 'error' => $e->getMessage()]);
             }
+        }
+
+        try {
+            $fields = [...$fields, ...$this->backReferences->resolve($page, $ctx->locale)];
+        } catch (Throwable $e) {
+            if ($strict) {
+                throw $e;
+            }
+            Log::warning('page.back_references_resolve_failed', ['page' => $page->getKey(), 'error' => $e->getMessage()]);
         }
 
         return $fields;

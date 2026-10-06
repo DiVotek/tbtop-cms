@@ -99,7 +99,7 @@ final class PageEditBlockTabs
         }
 
         $fields = array_map(
-            static fn ($field) => PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"),
+            static fn ($field) => PageEditTypeFields::exceptSelf(PrefixedField::rename($field, "block_{$id}_{$field->name}", "block_{$id}_active"), $page),
             $registry->get($kind)->form($s),
         );
         // Registered even when hidden, so a hand-made post reaches the

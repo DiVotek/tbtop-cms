@@ -31,6 +31,7 @@ class EveryKindBlock extends Block
             $s->tags('keywords'),
             $s->select('sizes')->multiple(),
             $s->keyvalue('meta'),
+            $s->pages('related'),
             $s->repeater('items')->fields([
                 $s->text('label')->translatable(),
                 $s->number('qty'),
