@@ -56,7 +56,10 @@ it('orders rendered blocks by sort, not by their position in content', function 
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'Second');
 });
 
-it('keeps a block that throws while resolving as an empty element listed under errors', function (): void {
+it('keeps a block that throws while resolving in its place as an error element, listed under errors', function (): void {
+    // The generic message is the non-debug one; debug would ship the exception text.
+    config(['app.debug' => false]);
+
     Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About'],
@@ -69,8 +72,34 @@ it('keeps a block that throws while resolving as an empty element listed under e
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.render.elements.$root.children', ['hero-1', 'broken-1'])
-        ->assertJsonPath('props.render.elements.broken-1.type', 'Broken')
+        ->assertJsonPath('props.render.elements.broken-1.type', 'CmsBlockError')
+        ->assertJsonPath('props.render.elements.broken-1.props', ['kind' => 'Broken', 'message' => 'Block [Broken] failed to resolve.'])
         ->assertJsonPath('props.render.errors.broken-1', 'Block [Broken] failed to resolve.');
+});
+
+it('ships render.errors and page.fields as JSON objects when they are empty', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [['id' => 'hero-1', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'Welcome']]]],
+    ]);
+
+    $props = json_decode($this->get('/about', ['X-Inertia' => 'true'])->assertOk()->getContent(), false)->props;
+
+    expect($props->render->errors)->toEqual(new stdClass)
+        ->and($props->page->fields)->toEqual(new stdClass);
+});
+
+it('ships render.errors as an object when a block id is numeric', function (): void {
+    Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'content' => [['id' => '0', 'kind' => 'Broken', 'data' => []]],
+    ]);
+
+    $props = json_decode($this->get('/about', ['X-Inertia' => 'true'])->assertOk()->getContent(), false)->props;
+
+    expect($props->render->errors)->toBeInstanceOf(stdClass::class);
 });
 
 it('still renders a page whose stored content names a kind that is not registered', function (): void {
@@ -82,7 +111,8 @@ it('still renders a page whose stored content names a kind that is not registere
 
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
-        ->assertJsonPath('props.render.elements.ghost-1.type', 'Ghost')
+        ->assertJsonPath('props.render.elements.ghost-1.type', 'CmsBlockError')
+        ->assertJsonPath('props.render.elements.ghost-1.props', ['kind' => 'Ghost', 'message' => 'Block [Ghost] is not registered.'])
         ->assertJsonPath('props.render.errors.ghost-1', 'Block [Ghost] is not registered.');
 });
 

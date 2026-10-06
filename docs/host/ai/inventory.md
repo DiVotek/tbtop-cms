@@ -67,7 +67,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | Command | Signature/options | Purpose | Scheduled? |
 |---|---|---|---|
 | `cms:install` | `{--force : Overwrite published config files} {--skip-migrations : Do not run database migrations}` | Publish config, run migrations, seed default languages and home page | No |
-| `cms:doctor` | (none) | Run CMS health checks and report issues | No |
+| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — and `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind, trashed pages included). Exit 1 only on an error-level check | No |
 | `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
@@ -147,6 +147,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `locale` | `string` | current app locale |
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
+| `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, so broken-block placeholders show in preview and on a debug install, never to visitors |
 | `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::remember`; `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
@@ -158,19 +159,24 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.id` | `string\|int` | page key |
 | `page.type` | `string` | page type key |
 | `page.status` | `string` | `PageStatus` enum value |
-| `page.name` | `string` | translated name |
-| `page.title` | `string` | translated title |
-| `page.heading` | `string` | translated heading |
-| `page.summary` | `string` | translated summary |
+| `page.subtype` | `string\|null` | subtype key, null for a page of a base type |
+| `page.name` | `string\|null` | translated name — this locale, else the default locale, else `null`; a blank (`''`, whitespace) translation counts as missing (`PageTranslation::text()`) |
+| `page.title` | `string\|null` | translated title, same fallback |
+| `page.heading` | `string\|null` | translated heading, same fallback |
+| `page.summary` | `string\|null` | translated summary, same fallback |
 | `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
-| `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
+| `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none |
+| `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>, errors:object}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
+| `render.errors` | `object` (`Record<string,string>`) | message per block id for every block that could not be resolved (resolve() threw, kind not registered, shared block missing); always a JSON object, `{}` when none. The message carries the exception text only with `app.debug` |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; `[]` when fewer than two crumbs (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
 
 Each `render.elements[id].props` (and root's `props`) serializes as `{}` not `[]` when empty — the block/root has no props.
+
+A block listed in `render.errors` keeps its place in `children`, but its element is `{type: 'CmsBlockError', props: {kind, message}}` (`PageSpecAssembler::BLOCK_ERROR_KIND`, the same string as `BLOCK_ERROR_KIND` in `blockErrors.ts`) — never its own kind with empty props. `CmsRenderer` draws it as the placeholder; a host on the bare `Renderer` registers a `CmsBlockError` component or gets json-render's "no renderer" skip. Such a block contributes no JSON-LD node.
 
 **Frontend exports** (`resources/js/cms`, imported via the `@cms` alias):
 

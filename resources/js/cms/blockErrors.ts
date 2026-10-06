@@ -8,7 +8,11 @@ export interface BlockErrorProps {
     message: string;
 }
 
-/** The server's `render` prop: a spec plus the blocks whose resolve() failed, by element id. */
+/**
+ * The server's `render` prop: a spec plus the blocks whose resolve() failed, by element id. The server already
+ * ships each of those as a `CmsBlockError` element with `{ kind, message }` props; `errors` is kept for a host
+ * that builds its own spec (a layout slot from `cms.layout`) with the original kind.
+ */
 export type RenderSpec = Spec & { errors?: Record<string, string> };
 
 interface PropsSchema {
@@ -24,14 +28,15 @@ export interface CatalogLike {
  * Rewrites every element that cannot render into a `CmsBlockError` element carrying the reason, so the
  * page keeps the block's place and the placeholder — not an empty gap plus a console line — says what broke.
  * Three causes, checked in this order: the server failed to resolve the block, the kind has no component in
- * the registry, the props do not match the catalog's schema.
+ * the registry, the props do not match the catalog's schema. An element the server already sent as
+ * `CmsBlockError` is kept as it is.
  */
 export function markBrokenBlocks(spec: RenderSpec, catalog: CatalogLike, registry: Record<string, unknown>): Spec {
     const elements: Spec["elements"] = {};
     let changed = false;
 
     for (const [id, element] of Object.entries(spec.elements)) {
-        const message = id === spec.root ? null : brokenReason(id, element.type, element.props, spec.errors, catalog, registry);
+        const message = id === spec.root || element.type === BLOCK_ERROR_KIND ? null : brokenReason(id, element.type, element.props, spec.errors, catalog, registry);
         if (message === null) {
             elements[id] = element;
             continue;

@@ -7,6 +7,8 @@ namespace Tbtop\Cms\Health;
 use Tbtop\Cms\Health\Checks\ActivityLogTableCheck;
 use Tbtop\Cms\Health\Checks\AgentDocsPointerCheck;
 use Tbtop\Cms\Health\Checks\AppUrlCheck;
+use Tbtop\Cms\Health\Checks\BlockDiscoveryCheck;
+use Tbtop\Cms\Health\Checks\BrokenSharedReferencesCheck;
 use Tbtop\Cms\Health\Checks\DefaultOwnerAndLanguageCheck;
 use Tbtop\Cms\Health\Checks\InertiaRootViewCheck;
 use Tbtop\Cms\Health\Checks\JsWiringCheck;
@@ -47,6 +49,8 @@ final class HealthCheckRunner
             SessionDriverCheck::class,
             AgentDocsPointerCheck::class,
             UntypedBlocksCheck::class,
+            BlockDiscoveryCheck::class,
+            BrokenSharedReferencesCheck::class,
         ];
     }
 

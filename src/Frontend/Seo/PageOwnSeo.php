@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo;
 
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Support\PageTranslation;
 
 /**
  * What a page says about itself, per locale, from the row already in hand —
@@ -28,8 +30,8 @@ final class PageOwnSeo
     public static function title(Page $page, array $seo, string $locale): string
     {
         return LocalizedSeo::value($seo['title'] ?? null, $locale)
-            ?: (string) $page->getTranslation('title', $locale)
-            ?: (string) $page->getTranslation('name', $locale);
+            ?: (string) PageTranslation::text($page, 'title', $locale, self::fallbackLocale())
+            ?: (string) PageTranslation::text($page, 'name', $locale, self::fallbackLocale());
     }
 
     /**
@@ -42,7 +44,7 @@ final class PageOwnSeo
     public static function description(Page $page, array $seo, string $locale): string
     {
         return LocalizedSeo::value($seo['description'] ?? null, $locale)
-            ?: (string) $page->getTranslation('summary', $locale);
+            ?: (string) PageTranslation::text($page, 'summary', $locale, self::fallbackLocale());
     }
 
     /**
@@ -58,6 +60,12 @@ final class PageOwnSeo
 
         return (is_string($override) && $override !== '')
             || ($page->image !== null && $page->image !== '');
+    }
+
+    /** The site's default language: Page::getTranslation()'s own fallback is app.fallback_locale, and it keeps a blank ''. */
+    private static function fallbackLocale(): string
+    {
+        return app(Languages::class)->defaultLocale();
     }
 
     /** @return array<string, mixed> */

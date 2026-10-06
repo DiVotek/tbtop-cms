@@ -54,6 +54,32 @@ final class FormResolver
         return 'array{' . implode(', ', $items) . '}';
     }
 
+    /**
+     * Fields whose value no rule describes, so their props pass through as
+     * stored and phpType() prints them as `mixed`: `name` is the key path
+     * (`items.*.address` inside a repeater), `shape` what the form declares.
+     *
+     * @param  list<mixed>  $fields  the block's form()
+     * @return list<array{name: string, shape: string}>
+     */
+    public function unknownFields(array $fields, string $prefix = ''): array
+    {
+        $unknown = [];
+        foreach (S::normalizeChildren($fields) as $field) {
+            if (! $field instanceof Field) {
+                continue;
+            }
+            $name = $prefix . $field->name;
+            if ($field instanceof Repeater) {
+                $unknown = [...$unknown, ...$this->unknownFields($field->childFields(), "{$name}.*.")];
+            } elseif ($field->childFields() !== []) {
+                $unknown[] = ['name' => $name, 'shape' => "{$field->toNode()->kind} with sub-fields"];
+            }
+        }
+
+        return $unknown;
+    }
+
     /** @return array{type: string, resolve: callable(mixed, ResolveContext): mixed} */
     private function rule(Field $field): array
     {
@@ -65,6 +91,11 @@ final class FormResolver
             $field instanceof Repeater => [
                 'type' => 'list<' . $this->phpType($field->childFields()) . '>',
                 'resolve' => fn (mixed $v, ResolveContext $ctx): array => $this->rows($field->childFields(), $v, $ctx),
+            ],
+            // A container other than a repeater: its stored value has no rule here, so it is passed on as-is.
+            $field->childFields() !== [] => [
+                'type' => 'mixed',
+                'resolve' => static fn (mixed $v): mixed => $v,
             ],
             $kind === 'richtext' => [
                 'type' => 'string|null',
@@ -94,7 +125,15 @@ final class FormResolver
                 'type' => 'bool',
                 'resolve' => static fn (mixed $v): bool => filter_var($v, FILTER_VALIDATE_BOOLEAN),
             ],
-            $kind === 'checkboxlist' || $kind === 'tags' || ($kind === 'select' && $isMultiple) => [
+            $kind === 'daterange' => [
+                'type' => 'array{from: string|null, to: string|null}',
+                'resolve' => static fn (mixed $v): array => [
+                    'from' => is_array($v) && is_string($v['from'] ?? null) ? self::blankToNull(trim($v['from'])) : null,
+                    'to' => is_array($v) && is_string($v['to'] ?? null) ? self::blankToNull(trim($v['to'])) : null,
+                ],
+            ],
+            // A multiple upload stores a list of paths, each the string a single upload stores.
+            $kind === 'checkboxlist' || $kind === 'tags' || ($isMultiple && in_array($kind, ['select', 'togglebuttons', 'upload'], true)) => [
                 'type' => 'list<string>',
                 'resolve' => static fn (mixed $v): array => array_values(array_filter(
                     array_map(static fn (mixed $item): ?string => is_scalar($item) ? self::blankToNull(trim((string) $item)) : null, is_array($v) ? $v : []),

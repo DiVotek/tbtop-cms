@@ -13,6 +13,9 @@ use Tbtop\Cms\Page\Models\Page;
  * inside the JSON content, and a page or layout save is the only thing
  * that changes it. Layouts count because the resolver honours a pointer
  * there too — a shared block a slot places must not look deletable.
+ * Trashed pages count: a restore brings their pointers back. Old
+ * revisions do not — restoring one onto a deleted block shows the
+ * placeholder.
  */
 final class SharedBlockUsage
 {
@@ -21,7 +24,7 @@ final class SharedBlockUsage
     {
         $index = [];
 
-        foreach (Page::query()->orderBy('sort_order')->orderBy('id')->get() as $page) {
+        foreach (Page::withTrashed()->orderBy('sort_order')->orderBy('id')->get() as $page) {
             foreach (self::refsIn($page->content) as $ref) {
                 $index[$ref][] = $page;
             }
@@ -45,7 +48,7 @@ final class SharedBlockUsage
     public static function counts(): array
     {
         $counts = [];
-        foreach ([Page::query(), Layout::query()] as $query) {
+        foreach ([Page::withTrashed(), Layout::query()] as $query) {
             foreach ($query->pluck('content') as $content) {
                 foreach (self::refsIn($content) as $ref) {
                     $counts[$ref] = ($counts[$ref] ?? 0) + 1;
