@@ -18,6 +18,7 @@ use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
+use Tbtop\Cms\Admin\Pages\Support\PageLeafType;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
@@ -144,9 +145,9 @@ class PagesPage extends AdminPage
                 $this->tab('categories')
                     ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", 'category')),
                 $this->tab('pages')
-                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", '!=', 'category')->whereNull("{$pages}.parent_id")),
+                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", PageLeafType::PAGE)),
                 $this->tab('articles')
-                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", '!=', 'category')->whereNotNull("{$pages}.parent_id")),
+                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", PageLeafType::ARTICLE)),
                 Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))->count()
                     ->description(__('tbtop-cms::pages.tabs_deleted_description'))
                     ->query($this->onlyTrashedScope(...)),
