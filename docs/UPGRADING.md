@@ -263,6 +263,33 @@ has a template for) and, for owner admins only (`is_owner` on
 reset-to-built-in action. A non-owner admin sees the channel checkboxes but
 no template fields.
 
+## Site contacts are the only source of the identity's telephone, email and profile links
+
+The SEO settings → *Identity* tab no longer has telephone, email or profile
+link (sameAs) fields, and the `seo.identity.telephone`,
+`seo.identity.email` and `seo.identity.same_as` settings keys are gone. The
+identity JSON-LD takes the first phone, the first email and every social
+link from Site settings → *Contacts* (`site.contacts.phones`,
+`site.contacts.emails`, `site.contacts.socials`, read via
+`Tbtop\Cms\Settings\SiteContacts`).
+
+Run `php artisan migrate`. The `2026_10_07_000001_move_identity_contacts_to_site_contacts`
+migration copies each legacy identity value into the matching contacts list
+when that list has no entry yet, then deletes the identity key. Where both
+were set, the contacts value is kept and the identity value is dropped. A
+moved profile link gets a label and name derived from its host
+(`https://www.facebook.com/acme` → label `facebook`, name `facebook.com`);
+rename them on the Contacts tab. Non-URL profile entries are not moved. The
+migration has no `down()` restore.
+
+A host that writes these keys from code (a seeder, a migration) writes the
+`site.contacts.*` lists instead; a value written to the old keys is no longer
+read.
+
+## "Make shared" needs the design ability
+
+With `tbtop-cms.roles` on, the page editor's "Make shared" action (`pageBlockShare_{id}`) is shown and accepted (otherwise 403) only when `tbtop-cms.design` allows; with roles off nothing changes.
+
 ## Blocks without their own `resolve()` now get form-resolved props (#238)
 
 `Block::resolve()` used to return its input unchanged. The default now runs

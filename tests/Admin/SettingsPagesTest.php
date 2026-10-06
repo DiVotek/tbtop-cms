@@ -123,7 +123,6 @@ it('keeps every settings field reachable after the regrouping', function (): voi
         'seo_default_og_image',
         'seo_twitter_card',
         'seo_identity_type',
-        'seo_identity_same_as',
         'seo_gtm_container_id',
         'seo_verification_google',
         'seo_verification_bing',
@@ -169,7 +168,6 @@ it('labels SEO identity/GTM fields from translations', function (): void {
         ->and($labels['seo_verification_google'])->toBe(__('tbtop-cms::settings.seo.fields.verification_google'))
         ->and($labels['seo_verification_bing'])->toBe(__('tbtop-cms::settings.seo.fields.verification_bing'))
         ->and($labels['seo_identity_type'])->toBe(__('tbtop-cms::settings.seo.fields.identity_type'))
-        ->and($labels['seo_identity_same_as'])->toBe(__('tbtop-cms::settings.seo.fields.identity_same_as'))
         ->and($labels['seo_twitter_card'])->toBe(__('tbtop-cms::settings.seo.fields.twitter_card'));
 
     $verificationGoogle = settingsFindFieldByName($structure, 'seo_verification_google');
@@ -293,12 +291,23 @@ it('rejects a verification value that does not normalize to a valid token', func
     expect(app(Settings::class)->get('seo.verification.bing'))->toBeNull();
 });
 
-it('drops non-URL profile links from seo.identity.same_as on save', function (): void {
+it('leaves telephone, email and profile links to Site settings contacts, pointing there from the Identity tab', function (): void {
+    $structure = test()->get('/admin/seo-settings', ['X-Inertia' => 'true'])->assertOk()->json('props.structure');
+
+    expect(settingsFindFieldByName($structure, 'seo_identity_telephone'))->toBeNull()
+        ->and(settingsFindFieldByName($structure, 'seo_identity_email'))->toBeNull()
+        ->and(settingsFindFieldByName($structure, 'seo_identity_same_as'))->toBeNull()
+        ->and(json_encode($structure, JSON_UNESCAPED_UNICODE))->toContain(__('tbtop-cms::settings.seo.helpers.identity_contacts'));
+
     test()->post('/admin/seo-settings/forms/seo-settings', [
-        'seo_identity_same_as' => ['https://github.com/acme', 'not a url', 'javascript:alert(1)', 'ftp://x.example'],
+        'seo_identity_telephone' => '+380 44 123 4567',
+        'seo_identity_email' => 'press@example.com',
+        'seo_identity_same_as' => ['https://github.com/acme'],
     ])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect(app(Settings::class)->get('seo.identity.same_as'))->toBe(['https://github.com/acme']);
+    expect(app(Settings::class)->get('seo.identity.telephone'))->toBeNull()
+        ->and(app(Settings::class)->get('seo.identity.email'))->toBeNull()
+        ->and(app(Settings::class)->get('seo.identity.same_as'))->toBeNull();
 });
 
 it('does not return mail.password on the notification settings record', function (): void {

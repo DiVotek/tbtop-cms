@@ -250,9 +250,9 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.name` | `SiteSettingsPage` | no | yes |
 | `site.logo` | `SiteSettingsPage` | no | yes (media URL) |
 | `site.favicon` | `SiteSettingsPage` | no | yes (media URL) |
-| `site.contacts.phones` (`[{number}]`) | `SiteSettingsPage` | no | yes — public contact data; read via `Tbtop\Cms\Settings\SiteContacts`, first entry is the identity JSON-LD `telephone` unless `seo.identity.telephone` is set |
-| `site.contacts.emails` (`[{address}]`) | `SiteSettingsPage` | no | yes — same, feeds the identity `email` unless `seo.identity.email` is set |
-| `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s feed the identity `sameAs` unless `seo.identity.same_as` is set |
+| `site.contacts.phones` (`[{number}]`) | `SiteSettingsPage` | no | yes — public contact data; read via `Tbtop\Cms\Settings\SiteContacts`, first entry is the identity JSON-LD `telephone` (the only source) |
+| `site.contacts.emails` (`[{address}]`) | `SiteSettingsPage` | no | yes — same, the first entry is the identity `email` (the only source) |
+| `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s are the identity `sameAs` (the only source) |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
 | `seo.description_template` | `SeoSettingsPage` | no | yes |
@@ -267,10 +267,7 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.identity.type` | `SeoSettingsPage` | no | yes |
 | `seo.identity.name` | `SeoSettingsPage` | no | yes |
 | `seo.identity.logo` | `SeoSettingsPage` | no | yes (media URL) |
-| `seo.identity.same_as` | `SeoSettingsPage` | no | yes |
 | `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
-| `seo.identity.telephone` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
-| `seo.identity.email` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.region` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
@@ -315,7 +312,7 @@ Source: `src/Admin/Support/CmsAbilities.php`. Gates are host-answered only when 
 | `tbtop-cms.users` | `src/Admin/Pages/UsersPage.php` |
 | `tbtop-cms.audit` | `src/Admin/Pages/AuditLogPage.php`, `src/Admin/Pages/AuditActivityPage.php` |
 
-`DashboardPage` checks `Gate::allows('tbtop-cms.submissions')` to conditionally show a widget but declares no page-level ability itself. `ProfilePage` and `LoginPage` declare none.
+`DashboardPage` checks `Gate::allows('tbtop-cms.submissions')` to conditionally show a widget but declares no page-level ability itself. `PageEditPage` (under `tbtop-cms.pages`) shows and accepts a block's "Make shared" action (`pageBlockShare_{id}`) only when `tbtop-cms.design` also allows — it creates a shared block; a hand-made post without it is a 403. `ProfilePage` and `LoginPage` declare none.
 
 ## 9. Database tables
 
@@ -331,7 +328,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_settings` | `src/Settings/Models/Setting.php` | Yes | |
 | `tbtop_form_submissions` | `src/Form/Models/FormSubmission.php` | Yes | gained `lead_status` in a later migration |
 | `tbtop_layouts` | `src/Layout/Models/Layout.php` | Yes | |
-| `tbtop_shared_blocks` | `src/SharedBlock/Models/SharedBlock.php` | Yes | `name`, `kind`, json `data` (same shape as a page content row's `data`); page content rows point at it via a top-level `shared` key |
+| `tbtop_shared_blocks` | `src/SharedBlock/Models/SharedBlock.php` | Yes | `name`, `kind`, json `data` (same shape as a page content row's `data`), `lock_version` (bumped on every update; a stale edit form is rejected); page content rows point at it via a top-level `shared` key |
 | `tbtop_page_revisions` | `src/Page/Models/PageRevision.php` | Yes | `user_id` via `UserKeyColumn::define` (nullable) |
 | `tbtop_form_submission_comments` | `src/Form/Models/FormSubmissionComment.php` | Yes | `user_id` via `UserKeyColumn::define` |
 | `notifications` | Laravel's built-in notifications table, used by `src/Notifications/*` | No | UUID primary key, standard Laravel shape |

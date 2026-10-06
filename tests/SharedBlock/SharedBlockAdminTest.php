@@ -79,6 +79,24 @@ it('renders the edit page with the block form under the data prefix and saves it
         ->and($block->data)->toBe(['heading' => 'New heading', 'body' => 'New body']);
 });
 
+it('rejects a save from a form loaded before another editor saved, keeping the first save', function (): void {
+    $block = sharedSimple();
+    sharedActing();
+    $url = "/admin/shared-blocks/{$block->id}/edit";
+    $formA = $this->get($url, ['X-Inertia' => 'true'])->assertOk()->json('props.data.sharedBlockEditor');
+    $formB = $this->get($url, ['X-Inertia' => 'true'])->assertOk()->json('props.data.sharedBlockEditor');
+
+    $this->post("{$url}/forms/sharedBlockEditor", [...$formA, 'name' => 'A wins', 'data_heading' => 'A heading', 'data_body' => 'A body'])->assertRedirect();
+    $this->post("{$url}/forms/sharedBlockEditor", [...$formB, 'name' => 'B overwrites', 'data_heading' => 'B heading', 'data_body' => 'B body'])->assertRedirect();
+
+    $block->refresh();
+    expect($block->name)->toBe('A wins')
+        ->and($block->data)->toBe(['heading' => 'A heading', 'body' => 'A body']);
+    $notify = collect(session('inertia.flash_data')['tbtop.effects'] ?? [])->firstWhere('kind', 'notify');
+    expect($notify['level'] ?? null)->toBe('error')
+        ->and($notify['message'] ?? null)->toBe(__('tbtop-cms::shared-blocks.conflict.message'));
+});
+
 it('offers the shared blocks of a kind behind its Add button and adds a reference, not a copy', function (): void {
     $shared = sharedSimple();
     $page = sharedPage();
@@ -291,6 +309,23 @@ it('turns an inline block into a shared one from the page editor, keeping unsave
     $content = $page->refresh()->content;
     expect($content[0])->toMatchArray(['id' => 'blk1', 'shared' => $shared->id, 'data' => []]);
 });
+
+it('offers and accepts "Make shared" only to an editor with the design ability', function (bool $design): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.pages', static fn (): bool => true);
+    Gate::define('tbtop-cms.design', static fn (): bool => $design);
+    $page = sharedPage([['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'Old']]]);
+
+    expect(str_contains((string) json_encode(PageEditHelpers::formTabs($page->id)), 'pageBlockShare_blk1'))->toBe($design);
+
+    $response = $this->postJson("/admin/pages/{$page->id}/edit/actions/pageBlockShare_blk1", [
+        'payload' => ['form' => [...PageEditHelpers::baseEditPayload(), 'block_blk1_heading' => 'Old', 'block_blk1_active' => true, 'block_blk1_sort' => 0]],
+    ]);
+
+    $response->assertStatus($design ? 200 : 403);
+    expect(SharedBlock::count())->toBe($design ? 1 : 0)
+        ->and(array_key_exists('shared', $page->refresh()->content[0]))->toBe($design);
+})->with(['with design' => true, 'without design' => false]);
 
 it('numbers a derived shared-block name that is already taken', function (): void {
     SharedBlock::query()->create(['name' => 'Simple — About', 'kind' => 'Simple', 'data' => []]);

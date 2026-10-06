@@ -51,6 +51,10 @@ return [
         'delete_in_use' => '{1} Still placed in :count place — remove it there first.|[2,*] Still placed in :count places — remove it there first.',
         'deleted' => 'Shared block deleted',
     ],
+    'conflict' => [
+        // Pages' wording without the pointer to Revisions: shared blocks keep none.
+        'message' => 'This shared block was changed by someone else while you were editing, so your unsaved edits were not applied — the form now shows the latest version.',
+    ],
     'share' => [
         'action' => 'Make shared',
         'title' => 'Make this block shared?',
