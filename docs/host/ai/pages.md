@@ -124,10 +124,11 @@ container) rather than an attempt to reconfigure `CategoryType` — its
 `allowedChildren()` is not configurable, only overridable by subclassing
 `BasePageType` directly. `PageHierarchy::assert()`
 (`src/Page/Support/PageHierarchy.php`) enforces `allowedChildren()`,
-`requiresParent()`, and `maxDepth()` on every create/parent-or-type change,
-walking the full ancestor chain and descendant tree — a violation throws
-`DomainException` from the `creating`/`updating` observer hooks, not just a
-form-level warning.
+`requiresParent()`, and `maxDepth()` on every create, parent-or-type change
+and restore from the trash, walking the full ancestor chain and descendant
+tree — a violation throws `DomainException` from the
+`creating`/`updating`/`restoring` observer hooks, not just a form-level
+warning (the admin's restore action shows it as an error notice).
 
 ### Starter blocks
 
