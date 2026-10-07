@@ -477,8 +477,11 @@ public function backReferences(): array
   accepted. `->max(n)` caps the count. The search matches the name in the
   admin's locale or the default content locale, shows at most 20, leaves
   out trashed pages and the page being edited, and includes drafts. Save
-  rejects an id that does not exist or does not match `of()` (rule
-  `page_ref`). Not translatable — `->translatable()` throws.
+  rejects an id that does not exist (force-deleted included) or does not
+  match `of()` (rule `page_ref`); a trashed page that matches is accepted,
+  so trashing a target does not block saving the pages that reference it,
+  and the reference works again once it is restored. Not translatable —
+  `->translatable()` throws.
 - **Site.** The field resolves to `list<{id: string, name: string, url:
   string}>` of the **live** pages, in stored order, name and url in the
   request locale (same rules as a page link: the name falls back to the
