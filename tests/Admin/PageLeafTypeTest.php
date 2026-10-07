@@ -7,8 +7,10 @@ use Illuminate\Testing\TestResponse;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
+use Tbtop\Cms\Tests\Fixtures\SectionType;
 
 uses(RefreshDatabase::class);
 
@@ -47,6 +49,16 @@ it('turns a page given a category into an article under it', function (): void {
 
     expect($page->refresh()->only(['type', 'parent_id']))->toBe(['type' => 'article', 'parent_id' => $blog->id])
         ->and($page->pathFor('en'))->toBe('blog/news');
+});
+
+it('keeps a page under a host container a page', function (): void {
+    PageTypeRegistry::extend(fn (): array => [SectionType::class]);
+    $section = Page::create(['type' => 'section', 'status' => PageStatus::Published, 'name' => ['en' => 'Work'], 'slug' => ['en' => 'work']]);
+    $page = Page::create(['type' => 'page', 'parent_id' => $section->id, 'status' => PageStatus::Published, 'name' => ['en' => 'Team'], 'slug' => ['en' => 'team']]);
+
+    saveLeaf($page, ['type' => 'page', 'parent_id' => $section->id, 'slug' => ['en' => 'team']])->assertSessionHasNoErrors();
+
+    expect($page->refresh()->only(['type', 'parent_id']))->toBe(['type' => 'page', 'parent_id' => $section->id]);
 });
 
 it('turns an article whose category is removed into a page at the root', function (): void {

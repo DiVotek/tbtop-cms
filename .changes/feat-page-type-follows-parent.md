@@ -2,7 +2,7 @@
 
 touches: page create form, page edit form (save buttons, type/parent), pages list tabs, subtype on type change
 
-> ⚠️ **Contract** Saving a page with a category makes it an `article`; saving an article without one makes it a `page`. Picking `page` drops any parent; picking `article` requires one (`parent_id` error `pages.validation.article_needs_category`).
+> ⚠️ **Contract** Saving a page with a category makes it an `article` (only a `category` parent does this — a page under a host container that allows pages stays a page); saving an article without one makes it a `page`. Picking `page` drops any parent; picking `article` requires one (`parent_id` error `pages.validation.article_needs_category`).
 > ⚠️ **Contract** A type change that would leave the page's stored subtype behind is rejected on `type` (`pages.validation.type_change_subtype`); it used to drop the subtype silently.
 > ⚠️ **Contract** The pages list tabs "Pages" and "Articles" filter by `type` (`page` / `article`); they used to mean "no parent" / "has a parent".
 
@@ -17,7 +17,8 @@ address with a redirect).
 The create form shows the category picker for an article (required) and a
 category (optional), labelled "Category" — a parent is always one.
 
-Tests: `PageLeafTypeTest` (6 of 7 red before), `PageSubtypeTest` updated for
+Tests: `PageLeafTypeTest` (6 of 7 red before; plus a page under a host
+`section` that stays a page), `PageSubtypeTest` updated for
 the refusal, `PageEditPageTest` footer lists the confirming twin.
 
 Read by eye: the confirm dialog on both save buttons when a page gets a
