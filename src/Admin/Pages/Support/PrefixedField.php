@@ -32,10 +32,14 @@ use Tbtop\Admin\Dsl\S;
  * With $activeField given, every `required` (field-level and per-locale)
  * is rewritten to `required_unless:{activeField},false,0`: an inactive block
  * never renders, so its empty fields must not veto Save or the structural
- * add/remove actions. The label keeps its required marker — the field is
- * still required for the block to go live. Only the server enforces the
- * conditional rule; ConstraintMap does not project `required_unless` to the
- * client, which is what keeps the client pre-flight from blocking on it.
+ * add/remove actions. $requiredRule rewrites it to any other rule instead
+ * (a subtype's section: `required_if:subtype,{key}`). The label keeps its
+ * required marker. Only the server enforces the conditional rule;
+ * ConstraintMap projects neither to the client, which keeps its pre-flight
+ * from blocking on it.
+ *
+ * $excludeRule (`exclude_if:...`) goes first in the field-level and every
+ * per-locale rule list: Laravel only skips the rules after it.
  *
  * Known limitation: does not recurse into `childFields()` (repeater
  * sub-fields nested under the field itself, not a page-level repeater). No
@@ -44,8 +48,9 @@ use Tbtop\Admin\Dsl\S;
  */
 final class PrefixedField
 {
-    public static function rename(Field $field, string $newName, ?string $activeField = null): Field
+    public static function rename(Field $field, string $newName, ?string $activeField = null, ?string $requiredRule = null, ?string $excludeRule = null): Field
     {
+        $requiredRule ??= $activeField === null ? null : "required_unless:{$activeField},false,0";
         $node = $field->toNode();
         // The field's own class, not S::makeField($node->kind): a field that
         // serializes as a built-in kind (Pages is a `select`) must come back as itself.
@@ -62,7 +67,7 @@ final class PrefixedField
             $clone->meta($key, $value);
         }
 
-        $rules = self::gateRequired($field->ruleEntries(), $activeField);
+        $rules = self::gateRules($field->ruleEntries(), $requiredRule, $excludeRule);
         if ($rules !== []) {
             $clone->rules($rules);
         }
@@ -73,7 +78,7 @@ final class PrefixedField
 
         foreach ($field->localeRuleEntries() as $locale => $localeRules) {
             if ($localeRules !== []) {
-                $clone->rulesForLocale($locale, self::gateRequired($localeRules, $activeField));
+                $clone->rulesForLocale($locale, self::gateRules($localeRules, $requiredRule, $excludeRule));
             }
         }
 
@@ -87,15 +92,15 @@ final class PrefixedField
      * @param  list<string>  $rules
      * @return list<string>
      */
-    private static function gateRequired(array $rules, ?string $activeField): array
+    private static function gateRules(array $rules, ?string $requiredRule, ?string $excludeRule): array
     {
-        if ($activeField === null) {
-            return $rules;
+        if ($requiredRule !== null) {
+            $rules = array_map(
+                static fn (string $rule): string => $rule === 'required' ? $requiredRule : $rule,
+                $rules,
+            );
         }
 
-        return array_map(
-            static fn (string $rule): string => $rule === 'required' ? "required_unless:{$activeField},false,0" : $rule,
-            $rules,
-        );
+        return $excludeRule === null ? $rules : [$excludeRule, ...$rules];
     }
 }
