@@ -216,5 +216,13 @@ return [
                 'warning' => 'No page can hold such a subtype. Make base() return the key of a registered type whose own base() is its key, or register that type.',
             ],
         ],
+        'unknown_schema_types' => [
+            'label' => 'Page type schema keys',
+            'ok' => 'Every page type\'s schemaTypes() names registered schema types only.',
+            'warning' => 'These page types list schema keys no schema type registers (type: keys): :types.',
+            'hints' => [
+                'warning' => 'Such a key is skipped: the page publishes the next listed key, or WebPage when none is left. Fix the key or register its class in tbtop-cms.seo.schema_types.',
+            ],
+        ],
     ],
 ];

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaSelector;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\ConsultingPageType;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 use Tbtop\Cms\Tests\Fixtures\ServicePageType;
 use Tbtop\Cms\Tests\Fixtures\ServicesCategoryType;
@@ -75,4 +77,21 @@ it('gives the default subtype to a page that becomes an article in the category,
 
     expect($page->refresh()->only(['type', 'subtype']))->toBe(['type' => 'article', 'subtype' => 'service'])
         ->and($article->refresh()->subtype)->toBeNull();
+});
+
+it('skips a schema key no schema type registers, in the editor and on the site, and names it in cms:doctor', function (): void {
+    PageTypeRegistry::extend(fn (): array => [ConsultingPageType::class]);
+    app(Cms::class)->frontendRoutes();
+    $parent = category(null, 'blog');
+    $page = Page::create(['type' => 'article', 'subtype' => 'consulting', 'parent_id' => $parent->id, 'status' => PageStatus::Published, 'name' => ['en' => 'Audit'], 'slug' => ['en' => 'audit']]);
+
+    $structure = test()->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure');
+    $site = test()->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])->assertOk();
+    $selects = [];
+    collectNodesByKind($structure, 'select', $selects);
+
+    expect(array_column(collect($selects)->firstWhere('name', 'schema_type')['options']['options'], 'value'))->toBe(['NewsArticle', 'Article'])
+        ->and(collect($site->json('props.seo.jsonLd'))->pluck('@type')->all())->toContain('NewsArticle');
+
+    test()->artisan('cms:doctor')->expectsOutputToContain('consulting: Service.');
 });

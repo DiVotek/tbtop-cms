@@ -252,7 +252,7 @@ class PageForm
             return [];
         }
 
-        $keys = app(PageTypeRegistry::class)->schemaTypesFor($page);
+        $keys = app(SchemaSelector::class)->availableKeys($page);
 
         if (count($keys) < 2) {
             return [];
