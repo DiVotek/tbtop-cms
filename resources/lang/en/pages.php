@@ -215,6 +215,7 @@ return [
         'helper' => 'Link is valid for :hours hours.',
         'copy' => 'Copy',
         'close' => 'Close',
+        'no_slug' => 'Save a URL slug to get a preview link.',
     ],
     'revisions' => [
         'title' => 'Revisions',
