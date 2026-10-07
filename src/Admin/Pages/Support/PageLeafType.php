@@ -76,10 +76,11 @@ final class PageLeafType
         return match ($page->type) {
             self::PAGE => [
                 // A page already under a host container keeps that parent
-                // unchanged; only a new parent (a category) flips it.
+                // unchanged; only a new parent (a category) flips it. A legacy
+                // page already under a category flips on any save (resolve()).
                 'when' => Cond::any(
                     Cond::eq('type', self::ARTICLE),
-                    $page->parent_id === null
+                    $page->parent_id === null || self::isCategory($page->parent_id)
                         ? Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id'))
                         : Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id'), Cond::neq('parent_id', (string) $page->parent_id)),
                 ),

@@ -133,3 +133,45 @@ function collectFieldNames(array $node, array &$names): void
         }
     }
 }
+
+/**
+ * Evaluates a serialized `hiddenIf` condition against form data the way the
+ * admin client does (conditionCompiler.ts): eq compares scalars as strings,
+ * empty means null, '' or an empty list.
+ *
+ * @param  array<string, mixed>  $cond
+ * @param  array<string, mixed>  $data
+ */
+function evalCond(array $cond, array $data): bool
+{
+    $value = isset($cond['field']) ? ($data[$cond['field']] ?? null) : null;
+    $equals = static fn (mixed $a, mixed $b): bool => $a === $b || (is_scalar($a) && is_scalar($b) && (string) $a === (string) $b);
+    $isEmpty = $value === null || $value === '' || $value === [];
+
+    return match ($cond['op']) {
+        'eq' => $equals($value, $cond['value']),
+        'neq' => ! $equals($value, $cond['value']),
+        'in' => array_any($cond['value'], static fn (mixed $item): bool => $equals($value, $item)),
+        'notIn' => ! array_any($cond['value'], static fn (mixed $item): bool => $equals($value, $item)),
+        'empty' => $isEmpty,
+        'notEmpty' => ! $isEmpty,
+        'all' => array_all($cond['conds'], static fn (array $c): bool => evalCond($c, $data)),
+        'any' => array_any($cond['conds'], static fn (array $c): bool => evalCond($c, $data)),
+        'not' => ! evalCond($cond['cond'], $data),
+    };
+}
+
+/**
+ * Whether the client renders $node for the given form data: neither a static
+ * `hidden` meta nor a `hiddenIf` that holds.
+ *
+ * @param  array<string, mixed>  $node
+ * @param  array<string, mixed>  $data
+ */
+function isShownFor(array $node, array $data): bool
+{
+    $meta = $node['meta'] ?? [];
+
+    return ($meta['hidden'] ?? false) !== true
+        && ! (isset($meta['hiddenIf']) && evalCond($meta['hiddenIf'], $data));
+}

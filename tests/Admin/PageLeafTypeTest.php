@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -35,6 +36,23 @@ function createLeaf(array $form): TestResponse
         'title' => ['en' => ''],
         ...$form,
     ]]]);
+}
+
+/**
+ * The footer save button the client shows for $page's edit form once the
+ * editor has put $state into it: `save` (plain) or `saveLeafFlip` (confirms).
+ *
+ * @param  array<string, mixed>  $state
+ * @return list<string>
+ */
+function shownSave(Page $page, array $state = []): array
+{
+    $actions = [];
+    collectNodesByKind(test()->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'), 'action', $actions);
+    $data = [...PageForm::loadRow($page->id), ...$state];
+
+    return collect($actions)->whereIn('name', ['save', 'saveLeafFlip'])
+        ->filter(static fn (array $action): bool => isShownFor($action, $data))->pluck('name')->values()->all();
 }
 
 function blog(): Page
@@ -150,4 +168,17 @@ it('confirms a save that changes a page into an article and back, and never for 
     expect($flip($page)['options']['confirm']['title'] ?? null)->toBe('Turn this page into an article?')
         ->and($flip($article)['options']['confirm']['title'] ?? null)->toBe('Turn this article into a page?')
         ->and($flip($blog))->toBeNull();
+});
+
+it('confirms saving an untouched legacy page under a category, which the save turns into an article', function (): void {
+    PageTypeRegistry::extend(fn (): array => [SectionType::class]);
+    $blog = blog();
+    $legacy = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Old']]);
+    // Written past PageHierarchy, which refuses a page under a category today.
+    Page::query()->whereKey($legacy->id)->toBase()->update(['parent_id' => $blog->id]);
+    $section = Page::create(['type' => 'section', 'status' => PageStatus::Draft, 'name' => ['en' => 'Work']]);
+    $team = Page::create(['type' => 'page', 'parent_id' => $section->id, 'status' => PageStatus::Draft, 'name' => ['en' => 'Team']]);
+
+    expect(shownSave($legacy->refresh()))->toBe(['saveLeafFlip'])
+        ->and(shownSave($team))->toBe(['save']);
 });
