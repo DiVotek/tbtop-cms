@@ -17,8 +17,8 @@ shared editor, active/order, Detach (copies the content into the page and
 drops the pointer) and Remove; an inline block's tab has Make shared, the
 reverse move, which names the new shared block after the block and page. A shared block pages still place offers no
 delete; its card shows the page count. A pointer to a deleted shared block, or one of
-another kind, becomes the usual broken-block placeholder, never a dropped
-block. Saving or deleting a shared block bumps the content cache.
+another kind, is skipped on the site and listed under Problem blocks in the
+editor; its row stays in the content. Saving or deleting a shared block bumps the content cache.
 
 **Read by eye:**
 - `database/migrations/2026_10_03_000002_create_shared_blocks_table.php`

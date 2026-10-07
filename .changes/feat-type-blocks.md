@@ -2,7 +2,7 @@
 
 touches: page type contract, page model and migration, page editor (General tab, sidebar, create modal, block picker), pages list, block resolution, page render, revisions, blocks:types registry emitter, translations
 
-> ⚠️ **Contract** `PageTypeInterface` gains `base(): string`, `fields(S $s): list<Field>` and `resolveFields(array $input, ResolveContext $ctx): array`; `BasePageType` returns the own key, `[]` and a `FormResolver` pass over `fields()`. A host implementing the interface directly breaks at load.
+> ⚠️ **Contract** `PageTypeInterface` gains `base(): string`, `fields(S $s): list<Field>` and `resolveFields(array $input, ResolveContext $ctx): array` (later `backReferences()` and `childSubtype()`, #251/#252); `BasePageType` returns the own key, `[]` and a `FormResolver` pass over `fields()`. A host implementing the interface directly breaks at load.
 > ⚠️ **Contract** `tbtop_pages` gains `subtype` (nullable, indexed) and `fields` (JSON). `type` always holds a top-level type; a subtype key lives in `subtype`. The migration moves existing `type = <subtype>` pages for every subtype registered when it runs.
 > ⚠️ **Contract** page props gain `page.fields` and `page.subtype`. `ResolveContext` gains a public `fields` array and `field(string)`. `BlockContentResolver::resolveWithFields()` returns `{blocks, fields}`; `resolve()` is unchanged.
 > ⚠️ **Contract** `Block::placements()` may name a subtype key; `BlockRegistry::forPlacements(array)` is new. `cms:blocks:types` skips a block whose `placements()` is `[]` and requires a component of every other one.
@@ -12,8 +12,11 @@ A subtype is a key plus fields. A type whose `base()` names another type is
 a subtype of it: pages store the base in `type` and the subtype key in
 `subtype`, so every tree rule, guard and lookup keyed on `type` reads the
 base and needs no look-through. The sidebar "Subtype" select lists only the
-subtypes of the page's type and is hidden when there are none; the create
-modal offers the subtypes of `page`; the pages list gets a Subtype column and
+subtypes of the page's type and is hidden when there are none; changing
+"Type" while a subtype is stored is rejected on `type`
+(`pages.validation.type_change_subtype`) until the editor clears it; the
+create modal has one subtype select per base type that has subtypes
+(`subtype_{base}`); the pages list gets a Subtype column and
 filter once any subtype is registered.
 
 `fields()` declares a type's own values. The General tab shows the base
@@ -64,5 +67,5 @@ registry rule. Fixtures `EventPageType`, `ConcertPageType` and
 **Assumptions:**
 - A host registers its subtype classes before running the migration; a subtype registered later leaves its old pages with the subtype key in `type` until the host moves them.
 - The host moves the data of former general type blocks into `fields` itself; the package cannot tell which content rows were general.
-- A subtype's own tree-rule and `schemaTypes()` overrides are not read; everything keyed on the page type reads the base. SEO title/description templates are the one exception: a page reads its subtype's template before its type's.
+- A subtype's own tree-rule overrides are not read; everything keyed on the page type reads the base. Two exceptions: SEO title/description templates (a page reads its subtype's template before its type's) and `schemaTypes()`, which `PageTypeRegistry::schemaTypesFor()` takes from the subtype when it is registered (#251).
 - A stored subtype outlives its registration: the page keeps it on save while its type is unchanged.

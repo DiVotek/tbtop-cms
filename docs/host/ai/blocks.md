@@ -469,10 +469,18 @@ to extending `Block`:
   itself needs to do with a validated submission. It is unrelated to and
   runs independently of the cms's own admin-notification fan-out (mail/bell/
   Telegram) — see [./notifications.md](./notifications.md#submission-lifecycle)
-  for that pipeline. A thrown exception here fails the request and marks the
-  stored `FormSubmission` `Failed` (see `FormSubmitController::__invoke()`);
-  it does not stop the notification fan-out, which is dispatched separately
-  via the `SubmissionReceived` event before `handleSubmit()` runs.
+  for that pipeline. `handleSubmit()` runs after `SubmissionReceived` has
+  fired. A thrown exception here is logged (`form.submit.failed`), the
+  visitor is sent back with a `form` error, and a stored `FormSubmission`
+  is set to `Failed` with the exception message (`handled_at` stays null);
+  see `FormSubmitController::__invoke()`. The throw also **skips** the
+  bell/mail/telegram fan-out: the row is no longer `Pending` by the time the
+  deferred `SubmissionNotifier::notify()` runs after the response, so its
+  claim fails and nothing is sent. Nobody is notified until an admin
+  retries the row. With `forms.store` off there is no row: the visitor gets
+  the error, nothing is stored or notified. **Known issue:** a retry that
+  re-runs the fan-out successfully while `handleSubmit()` throws again
+  leaves the row `Handled` (see notifications.md); not intended.
 
 `SubmitContext` (`src/Block/SubmitContext.php`) is the trimmed version of
 `ResolveContext` available at submit time: `locale`, `fallbackLocale`,
@@ -516,8 +524,10 @@ class docblock: notifying the team is the cms's own concern
 (`SubmissionReceived` → `SubmissionNotifier`), not this block's. A host that
 wants delivery beyond that fan-out (CRM push, lead storage) swaps
 `handleSubmit()`, either by extending `ContactForm` or writing its own
-`HandlesFormSubmission` block; the notification fan-out keeps running either
-way since it doesn't depend on `handleSubmit()`.
+`HandlesFormSubmission` block; the notification fan-out does not depend on
+what `handleSubmit()` does, but it is skipped when `handleSubmit()` throws
+(see above), so a custom handler should not throw for a failure the team
+must still hear about.
 
 ## Client side
 

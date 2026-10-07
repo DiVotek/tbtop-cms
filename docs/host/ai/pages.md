@@ -17,9 +17,10 @@ Translatable (spatie/laravel-translatable, `$translatable`), stored as
 `['uk' => 'Головна', 'en' => 'Home', ...]` per locale: `name`, `title`,
 `heading`, `summary`, `body`. Read/write a locale with
 `getTranslation('name', $locale)` / `setTranslations('name', [...])`, or
-assign the whole array through `fill()`/mass assignment. `body` is admin-only
-richtext and never reaches the frontend `page` prop; what the frontend renders
-is `content`, the block list.
+assign the whole array through `fill()`/mass assignment. `body` is richtext;
+`PageController` ships it in the frontend `page` prop as rendered HTML
+(`page.body`, this locale then the default language, `''` when empty). What
+the frontend renders as blocks is `content`, the block list.
 
 Plain (not translatable): `type` (always a top-level type), `subtype`
 (nullable — see Subtypes and type fields), `fields` (array cast, the type
@@ -60,8 +61,9 @@ re-implements a frontend read path — `PageResolver` already applies it.
 
 `PageTypeInterface` (`src/Page/Contracts/PageTypeInterface.php`): `key()`,
 `label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, `base()`,
-`fields()`, `resolveFields()` (see Subtypes and type fields), plus the
-source-backed trio below. `BasePageType` (`src/Page/Types/BasePageType.php`)
+`fields()`, `resolveFields()`, `backReferences()`, `childSubtype()` (see
+Subtypes and type fields and Page references), plus the source-backed trio
+below. `BasePageType` (`src/Page/Types/BasePageType.php`)
 gives every method a content-only, leaf-type default (`allowedChildren()`
 `[]`, `requiresParent()` `false`, `maxDepth()` `1`, not source-backed) — a
 host type extends it and overrides only what differs.
@@ -108,6 +110,13 @@ type.
 `divotek_com_ua/app/Cms/PageTypes/SectionType.php` does the same for its
 services/portfolio/blog tree (children `['page', 'article', 'section']`,
 `maxDepth() = 3`, sections can nest).
+
+The stock admin gives such a container no way to be picked as a parent:
+`PageForm::parentQuery()` (the parent select in the create form and the
+edit sidebar) lists pages of type `category` only. So a page under a host
+`section` is not placed from the stock forms; the host sets `parent_id`
+itself (its own admin page or action, a seeder, an import) and
+`PageHierarchy` still validates it.
 
 The rule: a section needing children that are not built-in
 `category`/`article` gets a host `SectionType` (or similarly named
@@ -178,7 +187,7 @@ languages before creating pages — this bites most often in tests.
   outright — their URL is not author-editable, matching their
   status/type/parent locks (see `PageObserver::guardSystemStatus()`).
 - **An error page gets no `PageSlug` row at all**, not even an empty one —
-  see "Error pages" below. `PageSlugWriter::sync()`/`writeDown()` skip a page
+  see "Error pages" below. `PageSlugWriter::sync()`/`writeLevels()` skip a page
   where `Page::isErrorPage()` is true before deriving any base.
 
 ### The home page
@@ -401,10 +410,26 @@ final class ConcertType extends BasePageType
 - **Editor.** "Type" lists the types whose `base() === key()`. The sidebar
   "Subtype" select lists only the subtypes of the page's current type
   ("— none —" first), is hidden when that type has none, and writes the
-  `subtype` column; `type` is untouched. Changing "Type" drops a subtype
-  that does not belong to the new one. The create modal offers the subtypes
-  of `page`. The pages list gets a Subtype column and filter once any
+  `subtype` column; `type` is untouched. Changing "Type" while a subtype is
+  stored is rejected on `type` (`pages.validation.type_change_subtype`);
+  clear the subtype first. The create modal has one subtype select per base
+  type that has subtypes, named `subtype_{base}`; the one for the picked
+  type is saved. The pages list gets a Subtype column and filter once any
   subtype is registered.
+- **Leaf type follows the category.** A page given a category (a `category`
+  parent) becomes an `article`; an article whose category is removed becomes
+  a `page`. Picking `page` by hand drops a stale parent; picking `article`
+  requires a category (`pages.validation.article_needs_category`). Under any
+  other container whose `allowedChildren()` includes `page` (a host
+  `section`), a page stays a page. The edit form asks to confirm while the
+  save would change the type. The list tabs "Pages" and "Articles" filter by
+  `type`.
+- **`childSubtype()`.** A category type (or subtype) may return the key of a
+  subtype of `article`; an article that arrives under that category without
+  a subtype of its own — created there, or a page that just became an
+  article — gets it. The parent's subtype is asked first, then its base; a
+  key that is not a registered subtype of `article` is ignored. An article
+  that already has a subtype keeps it. `BasePageType` returns `null`.
 - **Type fields.** `fields(S $s): array` (empty from `BasePageType`) is a
   list of ordinary form fields. The General tab shows, under the page's own
   fields, a section for the base type's fields and then one for the
@@ -569,9 +594,14 @@ shared content-cache version — `InvalidatesContentCache`
 `CmsServiceProvider::wireContentCacheInvalidation()` against `PageSaved`,
 `PagePublished`, `PageUnpublished`, `PageDeleted`, `PageRestored`,
 `LayoutSaved`, `SettingsSaved`, `LanguagesChanged`. A host that writes
-`Page`/`Layout` rows through the normal Eloquent model — `save()`, mass
-update through the model, seeders included — gets this for free; the
-observers dispatching these events fire regardless of caller.
+`Page`/`Layout` rows through the normal Eloquent model — `save()`, seeders
+included — gets `PageSaved`/`PagePublished`/`PageUnpublished` for free; the
+observer dispatches them regardless of caller. A query-builder write
+(`Page::query()->where(...)->update([...])`) fires no model events at all,
+so it bumps nothing. `PageDeleted` and `PageRestored` are not raised by the
+observer: only the admin (page edit, pages list) dispatches them. A host
+that deletes or restores pages itself dispatches the event or bumps the
+cache.
 
 A host only needs to bump the cache itself
 (`app(\Tbtop\Cms\Cache\CmsCache::class)->bump()`) if it writes to
@@ -590,8 +620,8 @@ unattended schedule boundary.
 
 ## Events
 
-`src/Page/Events/*`, raised from `PageObserver`'s `created()`/`updated()`
-hooks inside `DB::afterCommit()` — a batched write inside a transaction
+`src/Page/Events/*`. `PageSaved`/`PagePublished`/`PageUnpublished` are raised
+from `PageObserver`'s `created()`/`updated()` hooks inside `DB::afterCommit()` — a batched write inside a transaction
 (e.g. `StarterBlockSync::apply()`) fires once per page, only after commit:
 
 - `PageSaved(Page $page, bool $wasCreated)` — every finished save, create or
@@ -600,8 +630,10 @@ hooks inside `DB::afterCommit()` — a batched write inside a transaction
   create or update.
 - `PageUnpublished(Page $page)` — status transitions out of `Published` on
   update.
-- `PageDeleted(Page $page, bool $forced)` — soft or forced delete.
-- `PageRestored(Page $page)` — a soft-deleted page restored.
+- `PageDeleted(Page $page, bool $forced)` — soft or forced delete **done in
+  the admin**; the observer never dispatches it.
+- `PageRestored(Page $page)` — a soft-deleted page restored in the admin;
+  likewise not dispatched by the observer.
 
 `PagePublished`/`PageUnpublished` fire on the **status column transition**,
 not on live-visibility change — see the Cache section above for what that
