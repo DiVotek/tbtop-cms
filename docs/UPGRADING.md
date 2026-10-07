@@ -422,6 +422,16 @@ hand, in order.
    export or any code that reads a page's or layout's `content` directly
    sees no data for such a row; resolve it with
    `app(Tbtop\Cms\SharedBlock\SharedBlocks::class)->dataOf($row, $kind)`.
+9. **`type` is a base and `subtype` one of its subtypes, for every writer.**
+   A `Page` save that changes either column now throws a `DomainException`
+   when `type` is a subtype key or `subtype` is not a registered subtype of
+   `type` — seeders and host code included, not only the admin form. Fix
+   seeders that write `type = '<subtype>'` (store the base in `type`, the
+   subtype in `subtype`). Run `php artisan cms:doctor` after migrating:
+   `page_type_pairs` lists stored pages that break the rule (they still
+   render, but any later type/subtype change is refused until fixed), and
+   `page_subtype_bases` lists subtypes whose `base()` is not a registered
+   top-level type.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts) have their own
