@@ -19,10 +19,10 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
 });
 
-function makeUsersPageActor(string $email): AdminUser
+function makeUsersPageActor(string $email, bool $owner = false): AdminUser
 {
     $user = AdminUser::create(['name' => 'Actor', 'email' => $email, 'password' => 'secret']);
-    CmsUserProfile::query()->create(['user_id' => $user->id]);
+    CmsUserProfile::query()->forceCreate(['user_id' => $user->id, 'is_owner' => $owner]);
     test()->actingAs($user, 'web');
 
     return $user;
@@ -100,7 +100,7 @@ it('rejects granting access to a user who already has it', function (): void {
 });
 
 it('revokes access, deleting the profile row', function (): void {
-    makeUsersPageActor('actor@example.com');
+    makeUsersPageActor('actor@example.com', owner: true);
     $target = makeTargetUser('target@example.com', withAccess: true);
 
     $response = test()->postJson('/admin/users/actions/userRevoke', [
@@ -262,7 +262,7 @@ it('rejects creating a user with a short password and creates no user', function
 
 it('edits a user, renaming and changing email, leaving the password unchanged when blank', function (): void {
     makeUsersPageActor('actor@example.com');
-    $target = makeTargetUser('target@example.com', withAccess: true);
+    $target = makeTargetUser('target@example.com');
     $originalPassword = $target->password;
 
     $response = test()->postJson('/admin/users/actions/userEditSave', [
@@ -283,7 +283,7 @@ it('edits a user, renaming and changing email, leaving the password unchanged wh
 
 it('changes the password on edit when a new one is submitted', function (): void {
     makeUsersPageActor('actor@example.com');
-    $target = makeTargetUser('target@example.com', withAccess: true);
+    $target = makeTargetUser('target@example.com');
 
     $response = test()->postJson('/admin/users/actions/userEditSave', [
         'payload' => [
@@ -301,7 +301,7 @@ it('changes the password on edit when a new one is submitted', function (): void
 it('rejects editing a user into a duplicate email of another user', function (): void {
     makeUsersPageActor('actor@example.com');
     makeTargetUser('taken@example.com');
-    $target = makeTargetUser('target@example.com', withAccess: true);
+    $target = makeTargetUser('target@example.com');
 
     $response = test()->postJson('/admin/users/actions/userEditSave', [
         'payload' => [
