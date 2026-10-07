@@ -22,7 +22,9 @@ use Tbtop\Cms\Page\PageTypeRegistry;
  * - type picked by hand: a page drops any parent (a stale picker value from
  *   before the type changed), an article must name its category.
  *
- * Categories and host types are left to PageHierarchy as before.
+ * Only a category parent flips a page; a page under a host container that
+ * allows pages stays a page. Categories and host types are left to
+ * PageHierarchy as before.
  */
 final class PageLeafType
 {
@@ -36,7 +38,11 @@ final class PageLeafType
         $isTypeKept = $page->exists && $page->type === $type;
 
         if ($isTypeKept && $type === self::PAGE && $parentId !== null) {
-            return ['type' => self::ARTICLE, 'parentId' => $parentId];
+            // Only a category turns its page into an article; a host container
+            // that allows pages keeps them (PageHierarchy judges the rest).
+            return self::isCategory($parentId)
+                ? ['type' => self::ARTICLE, 'parentId' => $parentId]
+                : ['type' => self::PAGE, 'parentId' => $parentId];
         }
         if ($isTypeKept && $type === self::ARTICLE && $parentId === null) {
             return ['type' => self::PAGE, 'parentId' => null];
@@ -65,9 +71,13 @@ final class PageLeafType
     {
         return match ($page->type) {
             self::PAGE => [
+                // A page already under a host container keeps that parent
+                // unchanged; only a new parent (a category) flips it.
                 'when' => Cond::any(
                     Cond::eq('type', self::ARTICLE),
-                    Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id')),
+                    $page->parent_id === null
+                        ? Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id'))
+                        : Cond::all(Cond::eq('type', self::PAGE), Cond::notEmpty('parent_id'), Cond::neq('parent_id', (string) $page->parent_id)),
                 ),
                 'title' => __('tbtop-cms::pages.leaf_flip.to_article_title'),
                 'description' => __('tbtop-cms::pages.leaf_flip.to_article'),
@@ -82,6 +92,11 @@ final class PageLeafType
             ],
             default => null,
         };
+    }
+
+    private static function isCategory(int $parentId): bool
+    {
+        return Page::query()->whereKey($parentId)->value('type') === 'category';
     }
 
     /**
