@@ -251,6 +251,7 @@ return [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
         'subtype_invalid' => ':subtype is not a subtype of :type.',
+        'type_is_subtype' => ':type is a subtype of :base: store :base in the type and :type in the subtype.',
         'type_source_backed' => 'Pages of type :type are created by their source, not by hand.',
         'status_invalid' => 'Status [:status] is not a valid page status.',
         'delete_has_children' => 'This page has child pages — move or delete them first.',

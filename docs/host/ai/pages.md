@@ -407,6 +407,19 @@ final class ConcertType extends BasePageType
   Tree rules (`allowedChildren`, `requiresParent`, `maxDepth`, starter
   blocks) always come from `type`, i.e. the base — a subtype's own
   overrides of them are never read.
+- **Invariant on every write.** `PageObserver` (on `saving`, when `type` or
+  `subtype` is dirty) throws a `DomainException` for any writer — admin,
+  seeder, host code — when `type` is a registered subtype (its `base()` is
+  not its key; `pages.validation.type_is_subtype`), or when `subtype` is set
+  but is not a registered type whose `base()` is `type`
+  (`pages.validation.subtype_invalid`). A save that leaves both untouched is
+  not checked, so a page whose stored subtype lost its registration stays
+  editable; an unregistered `type` is rejected by the tree rules as before.
+  Writes past Eloquent (query builder, raw SQL) are not checked:
+  `cms:doctor` lists stored violations under `page_type_pairs`, and a
+  subtype whose `base()` names no registered top-level type under
+  `page_subtype_bases` (not thrown at registry boot, which would take the
+  site down for one misdeclared class).
 - **Editor.** "Type" lists the types whose `base() === key()`. The sidebar
   "Subtype" select lists only the subtypes of the page's current type
   ("— none —" first), is hidden when that type has none, and writes the

@@ -15,6 +15,8 @@ use Tbtop\Cms\Health\Checks\JsWiringCheck;
 use Tbtop\Cms\Health\Checks\MediaDiskWritableCheck;
 use Tbtop\Cms\Health\Checks\NotificationsConfiguredCheck;
 use Tbtop\Cms\Health\Checks\PackageVersionsMatchCheck;
+use Tbtop\Cms\Health\Checks\PageSubtypeBasesCheck;
+use Tbtop\Cms\Health\Checks\PageTypePairsCheck;
 use Tbtop\Cms\Health\Checks\RobotsTxtCheck;
 use Tbtop\Cms\Health\Checks\RoutesRegisteredCheck;
 use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
@@ -53,6 +55,8 @@ final class HealthCheckRunner
             BlockDiscoveryCheck::class,
             BrokenSharedReferencesCheck::class,
             UnregisteredBlockRowsCheck::class,
+            PageTypePairsCheck::class,
+            PageSubtypeBasesCheck::class,
         ];
     }
 
