@@ -153,21 +153,28 @@ it('lists pages and articles by their type', function (): void {
         ->and($names('articles'))->toBe(['Post']);
 });
 
-it('confirms a save that changes a page into an article and back, and never for a category', function (): void {
+it('shows the plain save while the type stays and the confirming one while it would flip', function (): void {
     $blog = blog();
     $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'About']]);
     $article = Page::create(['type' => 'article', 'parent_id' => $blog->id, 'status' => PageStatus::Draft, 'name' => ['en' => 'Post']]);
+    $category = (string) $blog->id;
 
-    $flip = function (Page $p): ?array {
-        $actions = [];
-        collectNodesByKind(test()->get("/admin/pages/{$p->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'), 'action', $actions);
+    expect(shownSave($page))->toBe(['save'])
+        ->and(shownSave($page, ['parent_id' => $category]))->toBe(['saveLeafFlip'])
+        ->and(shownSave($page, ['type' => 'article', 'parent_id' => $category]))->toBe(['saveLeafFlip'])
+        ->and(shownSave($article, ['sort_order' => 3]))->toBe(['save'])
+        ->and(shownSave($article, ['parent_id' => null]))->toBe(['saveLeafFlip'])
+        ->and(shownSave($article, ['type' => 'page']))->toBe(['saveLeafFlip'])
+        ->and(shownSave($blog, ['parent_id' => null]))->toBe(['save']);
+});
 
-        return collect($actions)->firstWhere('name', 'saveLeafFlip');
-    };
+it('keeps the plain save for a root article when the host article type needs no category', function (): void {
+    app()->bind(ArticleType::class, RootArticleType::class);
+    app()->forgetInstance(PageTypeRegistry::class);
+    $article = Page::create(['type' => 'article', 'parent_id' => blog()->id, 'status' => PageStatus::Draft, 'name' => ['en' => 'Post']]);
 
-    expect($flip($page)['options']['confirm']['title'] ?? null)->toBe('Turn this page into an article?')
-        ->and($flip($article)['options']['confirm']['title'] ?? null)->toBe('Turn this article into a page?')
-        ->and($flip($blog))->toBeNull();
+    expect(shownSave($article, ['parent_id' => null]))->toBe(['save'])
+        ->and(shownSave($article, ['type' => 'page']))->toBe(['saveLeafFlip']);
 });
 
 it('confirms saving an untouched legacy page under a category, which the save turns into an article', function (): void {
