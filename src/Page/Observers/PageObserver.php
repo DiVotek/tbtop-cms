@@ -14,6 +14,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageHierarchy;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
+use Tbtop\Cms\Page\Support\PageTypePairProblem;
 
 class PageObserver
 {
@@ -149,6 +150,10 @@ class PageObserver
      */
     public function saving(Page $page): void
     {
+        if ($page->isDirty(['type', 'subtype'])) {
+            $this->guardTypeAndSubtype($page);
+        }
+
         if (! $page->exists) {
             return;
         }
@@ -218,6 +223,28 @@ class PageObserver
     public function restored(Page $page): void
     {
         $this->slugs->sync($page);
+    }
+
+    /**
+     * `type` holds a base and `subtype` one of that base's subtypes, for every
+     * writer (seeders and host code included), not only the admin form. Run
+     * only when the pair changes: a stored subtype outlives its registration
+     * like `type` does, and an unregistered `type` is PageHierarchy's to reject.
+     */
+    private function guardTypeAndSubtype(Page $page): void
+    {
+        $type = (string) $page->getAttribute('type');
+        $subtype = $page->subtype;
+
+        match (PageTypePairProblem::of($type, $subtype, $this->registry)) {
+            null => null,
+            PageTypePairProblem::TypeIsSubtype => throw new DomainException(__('tbtop-cms::pages.validation.type_is_subtype', [
+                'type' => $type, 'base' => $this->registry->get($type)->base(),
+            ])),
+            PageTypePairProblem::SubtypeInvalid => throw new DomainException(__('tbtop-cms::pages.validation.subtype_invalid', [
+                'subtype' => $subtype, 'type' => $type,
+            ])),
+        };
     }
 
     private function guardSystemStatus(Page $page): void
