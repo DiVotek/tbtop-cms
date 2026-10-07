@@ -233,6 +233,25 @@ it('blocks the restore row action with a notify effect when the parent is still 
     expect($notify['level'] ?? null)->toBe('error');
 });
 
+it('blocks the restore row action with a notify effect when the parent no longer allows the page\'s type', function (): void {
+    $category = Page::factory()->category()->create(['status' => 'published', 'name' => ['en' => 'Blog']]);
+    $article = Page::factory()->article()->create([
+        'status' => 'published',
+        'parent_id' => $category->id,
+        'name' => ['en' => 'Post'],
+    ]);
+    $article->delete();
+    $category->update(['type' => 'page']);
+
+    $response = $this->postJson('/admin/pages/actions/pageRestore', ['payload' => ['row' => ['id' => $article->id]]]);
+
+    $response->assertOk();
+    expect($article->fresh()->trashed())->toBeTrue();
+
+    $notify = collect($response->json('effects'))->firstWhere('kind', 'notify');
+    expect($notify['level'] ?? null)->toBe('error');
+});
+
 it('duplicates a page via the row action, creating a draft copy next to the original', function (): void {
     $category = Page::factory()->category()->create(['name' => ['en' => 'Blog']]);
     $page = Page::factory()->article()->create([

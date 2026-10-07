@@ -97,6 +97,32 @@ it('rejects on save an id outside the field\'s of() filter, and accepts a draft 
     expect($specialist->refresh()->fields['services'])->toBe([(string) $draftService->id]);
 });
 
+it('accepts on save a reference to a trashed page that matches of(), and still rejects a gone id or a trashed mismatch', function (): void {
+    $service = refsArticle('legal_service', 'Divorce');
+    $specialist = refsArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id]]]);
+    $plain = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $service->delete();
+    $plain->delete();
+
+    test()->actingAs(PageEditHelpers::admin(), 'web');
+    $save = fn (array $ids) => test()->post("/admin/pages/{$specialist->id}/edit/forms/pageEditor", [
+        ...PageEditHelpers::baseEditPayload(),
+        'name' => ['en' => 'Anna'],
+        'slug' => ['en' => 'anna'],
+        'type' => 'article',
+        'subtype' => 'specialist',
+        'parent_id' => (string) $specialist->parent_id,
+        'field_services' => $ids,
+    ]);
+
+    $save([(string) $service->id, '999999', (string) $plain->id])
+        ->assertSessionHasErrors(['field_services.1', 'field_services.2'])
+        ->assertSessionDoesntHaveErrors('field_services.0');
+
+    $save([(string) $service->id])->assertSessionHasNoErrors();
+    expect($specialist->refresh()->fields['services'])->toBe([(string) $service->id]);
+});
+
 it('offers matching pages in the admin search, drafts included, the edited page left out', function (): void {
     $specialist = refsArticle('specialist', 'Anna');
     $live = refsArticle('legal_service', 'Divorce');

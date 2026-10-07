@@ -186,18 +186,24 @@ class PageObserver
      * the global (non-trashed) scope, so a parent can be deleted while its
      * children are already in the trash; withTrashed() is required here to
      * even see that parent.
+     *
+     * The tree may also have changed around the trashed page (its parent's
+     * type, an ancestor moved deeper): assertChildrenAllowed() and the depth
+     * walk only see live pages, so the full assert runs again here. None of
+     * its queries reads this page's own row, so deleted_at not being cleared
+     * yet does not matter.
      */
     public function restoring(Page $page): void
     {
-        if ($page->parent_id === null) {
-            return;
+        if ($page->parent_id !== null) {
+            $parent = Page::withTrashed()->find($page->parent_id);
+
+            if ($parent !== null && $parent->trashed()) {
+                throw new DomainException(__('tbtop-cms::pages.validation.restore_parent_trashed'));
+            }
         }
 
-        $parent = Page::withTrashed()->find($page->parent_id);
-
-        if ($parent !== null && $parent->trashed()) {
-            throw new DomainException(__('tbtop-cms::pages.validation.restore_parent_trashed'));
-        }
+        PageHierarchy::assert($page, $this->registry);
     }
 
     /**

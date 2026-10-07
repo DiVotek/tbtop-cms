@@ -9,8 +9,10 @@ use Tbtop\Cms\Page\Models\Page;
 
 /**
  * Named rule `page_ref:<type or type/subtype>,…` on each id a pages field
- * posts: the page exists (not trashed) and matches the field's of() filter.
- * Drafts pass — an editor may reference a page before publishing it. An
+ * posts: the page exists and matches the field's of() filter. Drafts pass —
+ * an editor may reference a page before publishing it. Trashed pages pass
+ * too: trashing a target must not lock every page that references it out of
+ * saving, and the site already drops non-live pages from the list. An
  * `except=<id>` parameter rejects the edited page itself, matching the search.
  */
 final class PageRefRule
@@ -55,6 +57,6 @@ final class PageRefRule
     {
         $id = PageIds::one($value);
 
-        return $id !== null && $id !== $exceptPageId && $filter->apply(Page::query()->whereKey($id))->exists();
+        return $id !== null && $id !== $exceptPageId && $filter->apply(Page::withTrashed()->whereKey($id))->exists();
     }
 }
