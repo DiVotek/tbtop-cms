@@ -85,6 +85,20 @@ it('refuses a type change that would leave the subtype behind, and rejects a sub
         ->and($kept->refresh()->subtype)->toBeNull();
 });
 
+it('keeps the subtype select in reach after a type change until the subtype is cleared, then saves both', function (): void {
+    $page = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+    subtypeAdmin();
+    $subtype = findFieldByName(editStructure($page), 'subtype');
+
+    expect(isShownFor($subtype, ['type' => 'page', 'subtype' => 'concert']))->toBeTrue()
+        ->and(isShownFor($subtype, ['type' => 'page', 'subtype' => '']))->toBeFalse()
+        ->and(isShownFor($subtype, ['type' => 'event', 'subtype' => '']))->toBeTrue();
+
+    savePage($page, ['type' => 'page', 'subtype' => null])->assertSessionHasNoErrors();
+
+    expect($page->refresh()->only(['type', 'subtype']))->toBe(['type' => 'page', 'subtype' => null]);
+});
+
 it('reads tree rules from the base type: a subtype that requires a parent does not make its page need one', function (): void {
     $page = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
 
@@ -99,4 +113,37 @@ it('shows the subtype in the pages list and filters by it', function (): void {
 
     expect(array_column($rows, 'name'))->toBe(['Gig'])
         ->and(array_column($rows, 'subtype'))->toBe(['Concert']);
+});
+
+it('refuses to store a subtype key in `type`, whoever writes the page', function (): void {
+    expect(fn () => Page::create(['type' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]))
+        ->toThrow(DomainException::class, 'concert is a subtype of event');
+
+    $page = Page::create(['type' => 'event', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+
+    expect(fn () => $page->update(['type' => 'concert']))->toThrow(DomainException::class)
+        ->and($page->refresh()->type)->toBe('event');
+});
+
+it('refuses a subtype that is not a registered subtype of the page\'s type, whoever writes the page', function (): void {
+    expect(fn () => Page::create(['type' => 'page', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]))
+        ->toThrow(DomainException::class, 'concert is not a subtype of page')
+        ->and(fn () => Page::create(['type' => 'event', 'subtype' => 'ghost', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]))
+        ->toThrow(DomainException::class, 'ghost is not a subtype of event');
+
+    $concert = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+
+    expect(fn () => $concert->update(['type' => 'page']))->toThrow(DomainException::class)
+        ->and($concert->refresh()->only(['type', 'subtype']))->toBe(['type' => 'event', 'subtype' => 'concert']);
+});
+
+it('keeps a page whose stored subtype lost its registration savable while type and subtype are untouched', function (): void {
+    $page = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+    Page::query()->whereKey($page->id)->update(['subtype' => 'retired']);
+    $page->refresh();
+
+    $page->update(['name' => ['en' => 'Renamed']]);
+
+    expect($page->refresh()->subtype)->toBe('retired')
+        ->and($page->name)->toBe('Renamed');
 });

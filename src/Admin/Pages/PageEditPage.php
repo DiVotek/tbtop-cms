@@ -185,12 +185,15 @@ class PageEditPage extends AdminPage
      * A save that would turn a page into an article or back (PageLeafType)
      * asks first. The admin's confirm text is fixed per action, so the button
      * is swapped by a form condition: the plain one while the type stays, the
-     * confirming one while the type would change.
+     * confirming one while the type would change. Both footer twins carry
+     * mod+s: the client binds a shortcut only while its action is mounted.
+     *
+     * @return list<ActionBuilder>
      */
-    /** @return list<ActionBuilder> */
     private function saveActions(S $s, Page $page, string $name): array
     {
-        $action = $this->saveAction($s, $name);
+        $isShortcut = $name === 'save';
+        $action = $this->saveAction($s, $name, $isShortcut);
         $flip = $this->isSourceBacked($page) || $page->is_system ? null : PageLeafType::flip($page);
         if ($flip === null) {
             return [$action];
@@ -198,17 +201,17 @@ class PageEditPage extends AdminPage
 
         return [
             $action->hiddenIf($flip['when']),
-            $s->action("{$name}LeafFlip")->label(__('tbtop-cms::pages.actions.save'))->color('primary')
-                ->confirm($flip['title'], $flip['description'])->submit('pageEditor')
+            $this->saveAction($s, "{$name}LeafFlip", $isShortcut)
+                ->confirm($flip['title'], $flip['description'])
                 ->hiddenIf(Cond::not($flip['when'])),
         ];
     }
 
-    private function saveAction(S $s, string $name): ActionBuilder
+    private function saveAction(S $s, string $name, bool $isShortcut): ActionBuilder
     {
         $action = $s->action($name)->label(__('tbtop-cms::pages.actions.save'))->color('primary')->submit('pageEditor');
 
-        return $name === 'save' ? $action->keybinding('mod+s') : $action;
+        return $isShortcut ? $action->keybinding('mod+s') : $action;
     }
 
     /**

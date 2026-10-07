@@ -191,11 +191,15 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    - `SchemaSelector` (`Frontend/Seo/Schema/SchemaSelector.php`) reads
      `page.seo.schema.type` (the only key left under `seo.schema` — the
      rest of the old structured-data form fields are gone, see below): a
-     page whose type isn't registered in `PageTypeRegistry` gets `WebPage`;
-     a stored key outside that list (or none stored at
-     all) falls back to the first element; the resulting key is looked up
-     via `SchemaTypeRegistry::get()`, which throws on an unknown key
-     (host misconfiguration surfaces, no silent fallback).
+     page whose type isn't registered in `PageTypeRegistry` gets `WebPage`.
+     The list is first narrowed to the keys `SchemaTypeRegistry` knows
+     (`SchemaSelector::availableKeys()`, which also feeds the SEO tab's
+     *Schema* select): a key no schema type registers — a typo, or a host
+     schema class missing from `seo.schema_types` — is skipped rather than
+     failing the render or the editor. A stored key outside the narrowed
+     list (or none stored at all) falls back to its first element, and to
+     `WebPage` when nothing is left. `cms:doctor` names every type and
+     unknown key under `unknown_schema_types`.
 
    `SchemaContext` (`Frontend/Seo/Schema/SchemaContext.php`, built once per render by
    `SchemaContextFactory::make()` and reused by `openGraph()`, `build()` and

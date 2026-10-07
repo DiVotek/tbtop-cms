@@ -124,10 +124,11 @@ container) rather than an attempt to reconfigure `CategoryType` — its
 `allowedChildren()` is not configurable, only overridable by subclassing
 `BasePageType` directly. `PageHierarchy::assert()`
 (`src/Page/Support/PageHierarchy.php`) enforces `allowedChildren()`,
-`requiresParent()`, and `maxDepth()` on every create/parent-or-type change,
-walking the full ancestor chain and descendant tree — a violation throws
-`DomainException` from the `creating`/`updating` observer hooks, not just a
-form-level warning.
+`requiresParent()`, and `maxDepth()` on every create, parent-or-type change
+and restore from the trash, walking the full ancestor chain and descendant
+tree — a violation throws `DomainException` from the
+`creating`/`updating`/`restoring` observer hooks, not just a form-level
+warning (the admin's restore action shows it as an error notice).
 
 ### Starter blocks
 
@@ -407,23 +408,46 @@ final class ConcertType extends BasePageType
   Tree rules (`allowedChildren`, `requiresParent`, `maxDepth`, starter
   blocks) always come from `type`, i.e. the base — a subtype's own
   overrides of them are never read.
+- **Invariant on every write.** `PageObserver` (on `saving`, when `type` or
+  `subtype` is dirty) throws a `DomainException` for any writer — admin,
+  seeder, host code — when `type` is a registered subtype (its `base()` is
+  not its key; `pages.validation.type_is_subtype`), or when `subtype` is set
+  but is not a registered type whose `base()` is `type`
+  (`pages.validation.subtype_invalid`). A save that leaves both untouched is
+  not checked, so a page whose stored subtype lost its registration stays
+  editable; an unregistered `type` is rejected by the tree rules as before.
+  Writes past Eloquent (query builder, raw SQL) are not checked:
+  `cms:doctor` lists stored violations under `page_type_pairs`, and a
+  subtype whose `base()` names no registered top-level type under
+  `page_subtype_bases` (not thrown at registry boot, which would take the
+  site down for one misdeclared class).
 - **Editor.** "Type" lists the types whose `base() === key()`. The sidebar
   "Subtype" select lists only the subtypes of the page's current type
   ("— none —" first), is hidden when that type has none, and writes the
   `subtype` column; `type` is untouched. Changing "Type" while a subtype is
   stored is rejected on `type` (`pages.validation.type_change_subtype`);
-  clear the subtype first. The create modal has one subtype select per base
+  clear the subtype first — the select stays visible after a "Type" change
+  until it is cleared, so both go in one save. The create modal has one subtype select per base
   type that has subtypes, named `subtype_{base}`; the one for the picked
   type is saved. The pages list gets a Subtype column and filter once any
   subtype is registered.
 - **Leaf type follows the category.** A page given a category (a `category`
   parent) becomes an `article`; an article whose category is removed becomes
   a `page`. Picking `page` by hand drops a stale parent; picking `article`
-  requires a category (`pages.validation.article_needs_category`). Under any
+  requires a category (`pages.validation.article_needs_category`). Both
+  article rules apply only while the `article` type's `requiresParent()` is
+  `true`: a host `ArticleType` override returning `false` keeps root
+  articles as articles and lets the create modal make one. Under any
   other container whose `allowedChildren()` includes `page` (a host
   `section`), a page stays a page. The edit form asks to confirm while the
-  save would change the type. The list tabs "Pages" and "Articles" filter by
-  `type`.
+  save would change the type.
+- **Pages list tabs.** "All", then one tab per `type` that a non-trashed
+  page has — registered types in registration order, then any type that
+  outlived its registration — then "Deleted". A tab is named by the type key
+  (`?tab=section`) and labelled by `pages.types.{key}` when that translation
+  exists, else the type's `label()`, else the raw key. A host base type
+  (`section`, `event`) gets its own tab; subtypes share their base's tab and
+  use the Subtype filter.
 - **`childSubtype()`.** A category type (or subtype) may return the key of a
   subtype of `article`; an article that arrives under that category without
   a subtype of its own — created there, or a page that just became an
@@ -432,11 +456,23 @@ final class ConcertType extends BasePageType
   that already has a subtype keeps it. `BasePageType` returns `null`.
 - **Type fields.** `fields(S $s): array` (empty from `BasePageType`) is a
   list of ordinary form fields. The General tab shows, under the page's own
-  fields, a section for the base type's fields and then one for the
-  subtype's; their names carry a `field_` prefix in the form and are saved
-  without it into the page's `fields` column. A save merges into `fields` —
-  keys the form does not show (a former subtype's) are kept, so switching
-  the subtype and back never loses data.
+  fields, a section for the base type's fields and then one per subtype of
+  the base, each shown only while the "Subtype" select picks it — picking
+  another subtype shows its fields before a save. In the form a base field
+  is named `field_{name}`, a subtype's `field_{subtype}__{name}`; both are
+  saved under the bare name into the page's `fields` column. A subtype
+  field's `required` applies only while its subtype is picked. A save
+  writes the base's and the picked subtype's fields and merges into
+  `fields` — keys the form does not save (a former subtype's) are kept, so
+  switching the subtype and back never loses data.
+- **Field names.** A page's type fields are the base's `fields()` merged
+  with its subtype's, one per name: **same name → the subtype's
+  declaration wins**. Its rules validate the save and its kind resolves
+  the value; the base's field of that name is hidden, unvalidated and not
+  saved while that subtype is picked, and the base's `resolveFields()` does
+  not receive the value. The reverse-reference index follows the same
+  declaration. Two subtypes of one base may declare the same name too: a
+  page has only one of them, and both read and write the same `fields` key.
 - **Site.** `page.fields` ships the base's and then the subtype's fields
   (a subtype key wins on a clash), translatable values flattened to the
   request locale; every block reads them through `ResolveContext::field()`.
@@ -477,8 +513,11 @@ public function backReferences(): array
   accepted. `->max(n)` caps the count. The search matches the name in the
   admin's locale or the default content locale, shows at most 20, leaves
   out trashed pages and the page being edited, and includes drafts. Save
-  rejects an id that does not exist or does not match `of()` (rule
-  `page_ref`). Not translatable — `->translatable()` throws.
+  rejects an id that does not exist (force-deleted included) or does not
+  match `of()` (rule `page_ref`); a trashed page that matches is accepted,
+  so trashing a target does not block saving the pages that reference it,
+  and the reference works again once it is restored. Not translatable —
+  `->translatable()` throws.
 - **Site.** The field resolves to `list<{id: string, name: string, url:
   string}>` of the **live** pages, in stored order, name and url in the
   request locale (same rules as a page link: the name falls back to the
@@ -491,7 +530,12 @@ public function backReferences(): array
   `sort_order` then name, as the same `{id, name, url}` list. `from`
   narrows to sources whose `type` or `subtype` is that key. A subtype's
   entries merge over its base's. A throw is logged
-  (`page.back_references_resolve_failed`) and the lists drop out.
+  (`page.back_references_resolve_failed`) and the lists drop out. The lists
+  are added after the type fields, so a key named like a field (the base's
+  or the subtype's) replaces that field's value in `page.fields`;
+  `cms:doctor` warns about each such name under `page_field_collisions`
+  (declared `fields()` names only, not keys a `resolveFields()` override
+  computes).
 - **Index.** The lists read `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
   for a page on every save; a force delete cascades. Only a page type's

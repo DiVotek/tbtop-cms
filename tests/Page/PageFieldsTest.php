@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -11,9 +12,11 @@ use Tbtop\Cms\Page\Models\PageRevision;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\PageRevisionWriter;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\BoxOfficePageType;
 use Tbtop\Cms\Tests\Fixtures\ConcertPageType;
 use Tbtop\Cms\Tests\Fixtures\ConcertTicketBlock;
 use Tbtop\Cms\Tests\Fixtures\EventPageType;
+use Tbtop\Cms\Tests\Fixtures\FestivalPageType;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 
@@ -23,7 +26,7 @@ beforeEach(function (): void {
     config(['tbtop-cms.admin.model' => AdminUser::class]);
     config(['auth.providers.users.model' => AdminUser::class]);
     config(['tbtop-cms.blocks.types' => [HeroBlock::class, ConcertTicketBlock::class]]);
-    PageTypeRegistry::extend(fn (): array => [EventPageType::class, ConcertPageType::class]);
+    PageTypeRegistry::extend(fn (): array => [EventPageType::class, ConcertPageType::class, FestivalPageType::class, BoxOfficePageType::class]);
     Language::factory()->default()->create(['locale' => 'en']);
     Language::factory()->create(['locale' => 'uk']);
     app(Cms::class)->frontendRoutes();
@@ -60,14 +63,90 @@ function addBlockOffer(Page $page): array
     return array_column($actions, 'name');
 }
 
-it('shows the base type\'s fields and then the subtype\'s on the General tab, prefixed', function (): void {
+it('shows the base type\'s fields, then each subtype\'s section shown only while that subtype is picked', function (): void {
     $general = PageEditHelpers::formTabs(eventPage()->id)[0]['body'];
 
     $names = [];
     collectFieldNames($general, $names);
-    $typeFields = array_values(array_filter($names, static fn (string $name): bool => str_starts_with($name, 'field_')));
+    $sections = [];
+    collectNodesByKind($general, 'section', $sections);
+    $hiddenIf = [];
+    foreach ($sections as $section) {
+        $hiddenIf[$section['options']['title']] = $section['meta']['hiddenIf'] ?? null;
+    }
 
-    expect($typeFields)->toBe(['field_venue', 'field_capacity', 'field_artist']);
+    expect(array_values(array_filter($names, static fn (string $name): bool => str_starts_with($name, 'field_'))))
+        ->toBe(['field_venue', 'field_capacity', 'field_concert__artist', 'field_festival__headliner', 'field_box_office__capacity'])
+        ->and($hiddenIf)->toMatchArray([
+            'Event' => null,
+            'Concert' => ['op' => 'neq', 'field' => 'subtype', 'value' => 'concert'],
+            'Festival' => ['op' => 'neq', 'field' => 'subtype', 'value' => 'festival'],
+        ]);
+});
+
+/** @param  array<string, mixed>  $form */
+function saveEventPage(Page $page, array $form): TestResponse
+{
+    if (! auth('web')->check()) {
+        test()->actingAs(PageEditHelpers::admin(), 'web');
+    }
+
+    return test()->post("/admin/pages/{$page->id}/edit/forms/pageEditor", [
+        ...PageEditHelpers::baseEditPayload(),
+        'type' => 'event',
+        'field_venue' => ['en' => 'Arena'],
+        ...$form,
+    ]);
+}
+
+it('does not let a required field of a subtype that is not picked block the save', function (): void {
+    $page = eventPage(fields: ['artist' => 'Okean Elzy']);
+
+    saveEventPage($page, ['subtype' => 'concert', 'field_concert__artist' => 'Muse', 'field_festival__headliner' => ''])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($page->refresh()->fields['artist'])->toBe('Muse');
+});
+
+it('requires a required field of the subtype being picked', function (): void {
+    $page = eventPage(fields: ['artist' => 'Okean Elzy']);
+
+    saveEventPage($page, ['subtype' => 'festival', 'field_festival__headliner' => ''])
+        ->assertSessionHasErrors('field_festival__headliner');
+
+    expect($page->refresh()->subtype)->toBe('concert');
+});
+
+it('switches the subtype and saves its fields in one save, ignoring the sections of the subtypes not picked', function (): void {
+    $page = eventPage(fields: ['artist' => 'Okean Elzy']);
+
+    saveEventPage($page, ['subtype' => 'festival', 'field_concert__artist' => 'Stale', 'field_festival__headliner' => 'Muse'])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($page->refresh()->subtype)->toBe('festival')
+        ->and($page->fields)->toMatchArray(['headliner' => 'Muse', 'artist' => 'Okean Elzy']);
+});
+
+it('lets a subtype that re-declares a base field own it: the base input yields, the subtype\'s rule decides, one value ships', function (): void {
+    $page = eventPage('box_office', ['capacity' => 'Sold out']);
+    $general = PageEditHelpers::formTabs($page->id)[0]['body'];
+
+    expect(findFieldByName($general, 'field_capacity')['meta']['hiddenIf'] ?? null)
+        ->toBe(['op' => 'in', 'field' => 'subtype', 'value' => ['box_office']]);
+
+    // The base input still carries the stored text, which its own `integer` rule would reject.
+    saveEventPage($page, ['subtype' => 'box_office', 'field_capacity' => 'Sold out', 'field_box_office__capacity' => ''])
+        ->assertSessionHasErrors('field_box_office__capacity')
+        ->assertSessionDoesntHaveErrors('field_capacity');
+
+    saveEventPage($page, ['subtype' => 'box_office', 'field_capacity' => 'Sold out', 'field_box_office__capacity' => 'Few left'])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($page->refresh()->fields)->toBe(['capacity' => 'Few left', 'venue' => ['en' => 'Arena']])
+        ->and(siteProps($page)['page']['fields'])->toBe(['venue' => 'Arena', 'capacity' => 'Few left']);
+
+    saveEventPage($page, ['subtype' => 'concert', 'field_capacity' => 'Sold out'])
+        ->assertSessionHasErrors('field_capacity');
 });
 
 it('saves the General tab\'s type fields into `fields`, keeping keys the form does not show', function (): void {
@@ -79,7 +158,7 @@ it('saves the General tab\'s type fields into `fields`, keeping keys the form do
         'subtype' => 'concert',
         'field_venue' => ['en' => 'Arena', 'uk' => 'Арена'],
         'field_capacity' => 500,
-        'field_artist' => 'Okean Elzy',
+        'field_concert__artist' => 'Okean Elzy',
     ])->assertRedirect()->assertSessionHasNoErrors();
 
     expect($page->refresh()->fields)->toEqual([
@@ -115,7 +194,7 @@ it('keeps `fields` when the subtype changes, and stops resolving what the page n
         'type' => 'event',
         'subtype' => '',
         'field_venue' => ['en' => 'Arena'],
-        'field_artist' => 'Okean Elzy',
+        'field_concert__artist' => 'Okean Elzy',
     ])->assertRedirect()->assertSessionHasNoErrors();
 
     expect($page->refresh()->subtype)->toBeNull()

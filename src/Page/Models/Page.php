@@ -219,9 +219,9 @@ class Page extends Model
     protected function auditFields(): array
     {
         return [
-            'type', 'parent_id', 'status', 'published_at', 'unpublish_at',
+            'type', 'subtype', 'parent_id', 'status', 'published_at', 'unpublish_at',
             'name', 'title', 'heading', 'summary', 'body', 'image', 'content',
-            'seo', 'is_indexable', 'is_system', 'error_class', 'sort_order',
+            'fields', 'seo', 'is_indexable', 'is_system', 'error_class', 'sort_order',
         ];
     }
 
@@ -233,6 +233,6 @@ class Page extends Model
     /** @return list<string> */
     protected function auditMarkerFields(): array
     {
-        return ['body', 'content', 'seo'];
+        return ['body', 'content', 'fields', 'seo'];
     }
 }

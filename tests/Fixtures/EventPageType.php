@@ -22,7 +22,7 @@ class EventPageType extends BasePageType
     {
         return [
             $s->text('venue')->label('Venue')->translatable(),
-            $s->number('capacity')->label('Capacity'),
+            $s->number('capacity')->label('Capacity')->rules('integer'),
         ];
     }
 }

@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Page\Refs;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Page\Models\Page;
@@ -106,18 +107,23 @@ final class PageRefIndex
         return $rows;
     }
 
-    /** @return list<string> */
+    /**
+     * A name the subtype shares with its base is indexed by the subtype's
+     * declaration of it — the later one wins, as in page.fields.
+     *
+     * @return list<string>
+     */
     private function pagesFieldNames(Page $page): array
     {
-        $names = [];
+        $declared = [];
         foreach ($this->types->forPage($page) as $type) {
             foreach (S::normalizeChildren($type->fields(new S)) as $field) {
-                if ($field instanceof Pages && ! in_array($field->name, $names, true)) {
-                    $names[] = $field->name;
+                if ($field instanceof Field) {
+                    $declared[$field->name] = $field;
                 }
             }
         }
 
-        return $names;
+        return array_keys(array_filter($declared, static fn (Field $field): bool => $field instanceof Pages));
     }
 }

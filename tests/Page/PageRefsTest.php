@@ -87,14 +87,40 @@ it('rejects on save an id outside the field\'s of() filter, and accepts a draft 
         'type' => 'article',
         'subtype' => 'specialist',
         'parent_id' => (string) $specialist->parent_id,
-        'field_services' => $ids,
+        'field_specialist__services' => $ids,
     ]);
 
-    $save([(string) $draftService->id, (string) $plain->id])->assertSessionHasErrors('field_services.1');
+    $save([(string) $draftService->id, (string) $plain->id])->assertSessionHasErrors('field_specialist__services.1');
     expect($specialist->refresh()->fields['services'] ?? null)->toBeNull();
 
     $save([(string) $draftService->id])->assertSessionHasNoErrors();
     expect($specialist->refresh()->fields['services'])->toBe([(string) $draftService->id]);
+});
+
+it('accepts on save a reference to a trashed page that matches of(), and still rejects a gone id or a trashed mismatch', function (): void {
+    $service = refsArticle('legal_service', 'Divorce');
+    $specialist = refsArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id]]]);
+    $plain = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $service->delete();
+    $plain->delete();
+
+    test()->actingAs(PageEditHelpers::admin(), 'web');
+    $save = fn (array $ids) => test()->post("/admin/pages/{$specialist->id}/edit/forms/pageEditor", [
+        ...PageEditHelpers::baseEditPayload(),
+        'name' => ['en' => 'Anna'],
+        'slug' => ['en' => 'anna'],
+        'type' => 'article',
+        'subtype' => 'specialist',
+        'parent_id' => (string) $specialist->parent_id,
+        'field_specialist__services' => $ids,
+    ]);
+
+    $save([(string) $service->id, '999999', (string) $plain->id])
+        ->assertSessionHasErrors(['field_specialist__services.1', 'field_specialist__services.2'])
+        ->assertSessionDoesntHaveErrors('field_specialist__services.0');
+
+    $save([(string) $service->id])->assertSessionHasNoErrors();
+    expect($specialist->refresh()->fields['services'])->toBe([(string) $service->id]);
 });
 
 it('offers matching pages in the admin search, drafts included, the edited page left out', function (): void {
@@ -106,7 +132,7 @@ it('offers matching pages in the admin search, drafts included, the edited page 
 
     test()->actingAs(PageEditHelpers::admin(), 'web');
     $search = fn (Page $page): array => test()
-        ->postJson("/admin/pages/{$page->id}/edit/select-options/field_services", ['search' => 'Div'])
+        ->postJson("/admin/pages/{$page->id}/edit/select-options/field_{$page->subtype}__services", ['search' => 'Div'])
         ->assertOk()
         ->json('options');
 
@@ -188,8 +214,8 @@ it('rejects on save a reference to the page being edited', function (): void {
         'type' => 'article',
         'subtype' => 'reviewer',
         'parent_id' => (string) $reviewer->parent_id,
-        'field_services' => [(string) $service->id, (string) $reviewer->id],
-    ])->assertSessionHasErrors('field_services.1');
+        'field_reviewer__services' => [(string) $service->id, (string) $reviewer->id],
+    ])->assertSessionHasErrors('field_reviewer__services.1');
 
     expect($reviewer->refresh()->fields['services'] ?? null)->toBeNull();
 });
