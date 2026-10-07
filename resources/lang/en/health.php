@@ -200,5 +200,37 @@ return [
                 'warning' => 'The site skips each such row and keeps its data. Register the block class again, or open the page or layout slot and delete the row under Problem blocks.',
             ],
         ],
+        'page_type_pairs' => [
+            'label' => 'Page types and subtypes',
+            'ok' => 'Every page stores a base type in `type` and, if any, one of its registered subtypes in `subtype`.',
+            'warning' => 'Pages whose type is a subtype key, or whose subtype is not a registered subtype of their type: :pairs.',
+            'hints' => [
+                'warning' => 'Such a page still renders, but any write that changes its type or subtype is refused until the pair is valid. Store the base in `type` and the subtype key in `subtype`, or register the missing subtype again.',
+            ],
+        ],
+        'page_subtype_bases' => [
+            'label' => 'Subtype bases',
+            'ok' => 'Every page subtype\'s base() names a registered top-level type.',
+            'warning' => 'These subtypes name a base that is not registered or is itself a subtype (subtype → base): :subtypes.',
+            'hints' => [
+                'warning' => 'No page can hold such a subtype. Make base() return the key of a registered type whose own base() is its key, or register that type.',
+            ],
+        ],
+        'unknown_schema_types' => [
+            'label' => 'Page type schema keys',
+            'ok' => 'Every page type\'s schemaTypes() names registered schema types only.',
+            'warning' => 'These page types list schema keys no schema type registers (type: keys): :types.',
+            'hints' => [
+                'warning' => 'Such a key is skipped: the page publishes the next listed key, or WebPage when none is left. Fix the key or register its class in tbtop-cms.seo.schema_types.',
+            ],
+        ],
+        'page_field_collisions' => [
+            'label' => 'Page field names',
+            'ok' => 'No page type has a back-reference named like one of its fields.',
+            'warning' => 'These page types have back-references named like one of their (base and subtype) fields (type: names): :types.',
+            'hints' => [
+                'warning' => 'On the site, page.fields carries the back-reference list under that name and the field\'s value is lost. Rename the backReferences() key or the field.',
+            ],
+        ],
     ],
 ];

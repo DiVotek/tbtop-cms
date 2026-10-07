@@ -40,7 +40,7 @@ final class PageEditSidebar
                 ...($isSourceBacked ? [] : [
                     $s->select('type')->label(__('tbtop-cms::pages.fields.type'))
                         ->required()->options(PageFormOptions::types(includeSourceBacked: false)),
-                    ...PageForm::subtypeField($s, $page->type),
+                    ...PageForm::subtypeField($s, $page->type, isStored: true),
                 ]),
                 // Excludes the page itself and its descendants — placing it
                 // under its own subtree is a cycle PageForm::guardParent()

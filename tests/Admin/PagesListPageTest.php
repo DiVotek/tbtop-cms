@@ -8,7 +8,9 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\SectionType;
 
 uses(RefreshDatabase::class);
 
@@ -48,18 +50,19 @@ function pagesTableNode(): array
 }
 
 it('renders the divotek-style pages list wire shape', function (): void {
+    Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
     $node = pagesTableNode();
     $opts = $node['options'];
 
-    // Tabs: All / Categories / Pages / Articles / Deleted, each with a subtitle.
+    // Tabs: All, one per type a live page has (registry order), Deleted — each with a subtitle.
     $tabs = array_column($opts['tabs'], 'label', 'name');
     expect($tabs)->toBe([
         'all' => 'All',
-        'categories' => 'Categories',
-        'pages' => 'Pages',
-        'articles' => 'Articles',
+        'page' => 'Page',
+        'category' => 'Category',
         'deleted' => 'Deleted',
-    ])->and(array_column($opts['tabs'], 'description'))->toHaveCount(5);
+    ])->and(array_column($opts['tabs'], 'description'))->toHaveCount(4);
 
     // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge (computed display_state) / SEO badge (computed seo_state) / Updated date / Updated by (hidden) / deleted_at (hidden helper).
     $cols = array_column($opts['columns'], null, 'name');
@@ -116,14 +119,13 @@ it('links each row to its dedicated edit page', function (): void {
 });
 
 it('opts every tab into a count badge, including Deleted', function (): void {
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
     $node = pagesTableNode();
 
     $counts = array_column($node['options']['tabs'], 'count', 'name');
     expect($counts)->toBe([
         'all' => true,
-        'categories' => true,
-        'pages' => true,
-        'articles' => true,
+        'page' => true,
         'deleted' => true,
     ]);
 });
@@ -134,15 +136,14 @@ it('returns per-tab counts scoped by each tab\'s own query, ignoring the active 
     $trashed = Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'Old']]);
     $trashed->delete();
 
-    $counts = $this->getJson('/admin/pages/tables/pages?tab=categories')
+    $counts = $this->getJson('/admin/pages/tables/pages?tab=category')
         ->assertOk()
         ->json('data.tabCounts');
 
     expect($counts)->toBe([
         'all' => 2,
-        'categories' => 1,
-        'pages' => 1,
-        'articles' => 0,
+        'page' => 1,
+        'category' => 1,
         'deleted' => 1,
     ]);
 });
@@ -157,9 +158,9 @@ it('scopes the tab queries by page type and parent', function (): void {
         ->json('data.data');
 
     expect(array_column($rows('all'), 'id'))->toHaveCount(3)
-        ->and(array_column($rows('categories'), 'type'))->toBe(['Category'])
-        ->and(array_column($rows('pages'), 'type'))->toBe(['Page'])
-        ->and(array_column($rows('articles'), 'type'))->toBe(['Article']);
+        ->and(array_column($rows('category'), 'type'))->toBe(['Category'])
+        ->and(array_column($rows('page'), 'type'))->toBe(['Page'])
+        ->and(array_column($rows('article'), 'type'))->toBe(['Article']);
 });
 
 it('lists only trashed pages in the Deleted tab and excludes them from the other four', function (): void {
@@ -173,7 +174,7 @@ it('lists only trashed pages in the Deleted tab and excludes them from the other
 
     expect(array_column($rows('deleted'), 'id'))->toBe([$trashed->id])
         ->and(array_column($rows('all'), 'id'))->toBe([$active->id])
-        ->and(array_column($rows('pages'), 'id'))->toBe([$active->id]);
+        ->and(array_column($rows('page'), 'id'))->toBe([$active->id]);
 });
 
 it('does not link a trashed row to an edit page (recordUrl resolves to null)', function (): void {
@@ -223,6 +224,25 @@ it('blocks the restore row action with a notify effect when the parent is still 
     ]);
     $article->delete();
     $category->delete();
+
+    $response = $this->postJson('/admin/pages/actions/pageRestore', ['payload' => ['row' => ['id' => $article->id]]]);
+
+    $response->assertOk();
+    expect($article->fresh()->trashed())->toBeTrue();
+
+    $notify = collect($response->json('effects'))->firstWhere('kind', 'notify');
+    expect($notify['level'] ?? null)->toBe('error');
+});
+
+it('blocks the restore row action with a notify effect when the parent no longer allows the page\'s type', function (): void {
+    $category = Page::factory()->category()->create(['status' => 'published', 'name' => ['en' => 'Blog']]);
+    $article = Page::factory()->article()->create([
+        'status' => 'published',
+        'parent_id' => $category->id,
+        'name' => ['en' => 'Post'],
+    ]);
+    $article->delete();
+    $category->update(['type' => 'page']);
 
     $response = $this->postJson('/admin/pages/actions/pageRestore', ['payload' => ['row' => ['id' => $article->id]]]);
 
@@ -326,7 +346,7 @@ it('projects parent name, formatted status, and slug path into list rows', funct
     $category = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
     Page::create(['type' => 'article', 'parent_id' => $category->id, 'status' => 'draft', 'name' => ['en' => 'Post']]);
 
-    $rows = $this->getJson('/admin/pages/tables/pages?tab=articles')->assertOk()->json('data.data');
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=article')->assertOk()->json('data.data');
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0]['parent_name'])->toBe('Blog')
@@ -575,4 +595,20 @@ it('runs the seo_state query without error on the test driver', function (): voi
     Page::factory()->count(3)->create();
 
     $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk();
+});
+
+it('gives a host type and an unregistered type their own tab', function (): void {
+    PageTypeRegistry::extend(fn (): array => [SectionType::class]);
+    Page::create(['type' => 'section', 'status' => 'published', 'name' => ['en' => 'Work']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+    DB::table((new Page)->getTable())->insert(['type' => 'legacy_promo', 'status' => 'draft', 'name' => json_encode(['en' => 'Promo']), 'created_at' => now(), 'updated_at' => now()]);
+    $trashed = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Gone']]);
+    $trashed->delete();
+
+    $tabs = array_column(pagesTableNode()['options']['tabs'], 'label', 'name');
+    $names = fn (string $tab): array => array_column($this->getJson("/admin/pages/tables/pages?tab={$tab}")->assertOk()->json('data.data'), 'name');
+
+    expect($tabs)->toBe(['all' => 'All', 'page' => 'Page', 'section' => 'Section', 'legacy_promo' => 'legacy_promo', 'deleted' => 'Deleted'])
+        ->and($names('section'))->toBe(['Work'])
+        ->and($names('legacy_promo'))->toBe(['Promo']);
 });

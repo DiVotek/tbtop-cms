@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
 use Tbtop\Cms\Block\Support\TranslatablePaths;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Refs\BackReferences;
@@ -75,10 +76,11 @@ class BlockContentResolver
     }
 
     /**
-     * Base type first, then the subtype: a key both declare takes the
-     * subtype's value. Every type reads the whole stored `fields` and keeps
-     * only what its own form declares, so a key left behind by an earlier
-     * subtype is not resolved. A type whose resolveFields() throws adds
+     * Base type first, then the subtype: a field both declare is resolved by
+     * the subtype's declaration alone (the base does not see its value), and
+     * any other key both return takes the subtype's. Every type reads the
+     * stored `fields` and keeps only what its own form declares, so a key
+     * left behind by an earlier subtype is not resolved. A type whose resolveFields() throws adds
      * nothing — the page still renders, as with a failing block. The types'
      * backReferences() lists come last.
      *
@@ -90,9 +92,11 @@ class BlockContentResolver
         $stored = is_array($page->fields) ? $page->fields : [];
         $fields = [];
 
-        foreach ($this->pageTypes->forPage($page) as $type) {
+        $types = $this->pageTypes->forPage($page);
+        foreach ($types as $i => $type) {
             try {
-                $input = LocaleFlattener::flattenData($stored, $ctx->locale, $ctx->fallbackLocale, $locales, TranslatablePaths::of($type->fields(new S)));
+                $ownStored = array_diff_key($stored, array_flip(self::fieldNames(array_slice($types, $i + 1))));
+                $input = LocaleFlattener::flattenData($ownStored, $ctx->locale, $ctx->fallbackLocale, $locales, TranslatablePaths::of($type->fields(new S)));
                 $fields = [...$fields, ...$type->resolveFields($input, $ctx)];
             } catch (Throwable $e) {
                 if ($strict) {
@@ -112,6 +116,22 @@ class BlockContentResolver
         }
 
         return $fields;
+    }
+
+    /**
+     * @param  list<PageTypeInterface>  $types
+     * @return list<string>
+     */
+    private static function fieldNames(array $types): array
+    {
+        $names = [];
+        foreach ($types as $type) {
+            foreach ($type->fields(new S) as $field) {
+                $names[] = $field->name;
+            }
+        }
+
+        return $names;
     }
 
     /**

@@ -10,11 +10,12 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 /**
  * Resolves which SchemaTypeInterface key a page publishes: the stored
  * seo.schema.type if it is one of the page's schemaTypes (its subtype's, else
- * its type's — PageTypeRegistry::schemaTypesFor()),
- * otherwise the type's first (default) key. Falls back to
+ * its type's — PageTypeRegistry::schemaTypesFor()) that SchemaTypeRegistry
+ * knows, otherwise the first known (default) key. Falls back to
  * SchemaTypeRegistry::FALLBACK_KEY when the page's type is no longer
- * registered in PageTypeRegistry, or (a host contract violation —
- * schemaTypes() is typed non-empty) when it returns no keys at all.
+ * registered in PageTypeRegistry, or when none of its keys is known (an
+ * empty list breaks the non-empty schemaTypes() contract; an unknown key is
+ * a host typo or a missing schema class).
  */
 final class SchemaSelector
 {
@@ -29,7 +30,23 @@ final class SchemaSelector
             return $this->schemaTypes->get(SchemaTypeRegistry::FALLBACK_KEY);
         }
 
-        return $this->schemaTypes->get($this->selectedKey($page, $this->pageTypes->schemaTypesFor($page)));
+        return $this->schemaTypes->get($this->selectedKey($page, $this->availableKeys($page)));
+    }
+
+    /**
+     * The page's schemaTypes() keys that SchemaTypeRegistry knows. A host
+     * type may list a key no schema type registers (a typo, a schema class
+     * not yet added); it is skipped here — and named by the
+     * unknown_schema_types doctor check — rather than failing every render.
+     *
+     * @return list<string>
+     */
+    public function availableKeys(Page $page): array
+    {
+        return array_values(array_filter(
+            $this->pageTypes->schemaTypesFor($page),
+            fn (string $key): bool => $this->schemaTypes->has($key),
+        ));
     }
 
     /** @param  list<string>  $available */

@@ -7,7 +7,12 @@ use Spatie\Activitylog\Models\Activity;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
+use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
+use Tbtop\Cms\Tests\Fixtures\ConcertPageType;
+use Tbtop\Cms\Tests\Fixtures\EventPageType;
 
 uses(RefreshDatabase::class);
 
@@ -118,4 +123,20 @@ it('does not flag an order change when only a block\'s data changed', function (
     ]]);
 
     expect(data_get(Activity::query()->sole()->properties, 'context.content_order_changed'))->toBeFalse();
+});
+
+it('records a page subtype change with its values and a type-fields change by name only', function (): void {
+    PageTypeRegistry::extend(fn (): array => [EventPageType::class, ConcertPageType::class]);
+    test()->actingAs(auditAdmin(), 'web');
+    $page = Page::create(['type' => 'event', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+    Activity::query()->delete();
+
+    $page->update(['subtype' => 'concert', 'fields' => ['artist' => 'Not stored in the audit log']]);
+
+    $activity = Activity::query()->sole();
+
+    expect(data_get($activity->properties, 'changed_fields'))->toContain('subtype', 'fields')
+        ->and(data_get($activity->attribute_changes, 'attributes.subtype'))->toBe('concert')
+        ->and(data_get($activity->attribute_changes, 'old.subtype'))->toBeNull()
+        ->and($activity->attribute_changes->toJson())->not->toContain('Not stored in the audit log');
 });

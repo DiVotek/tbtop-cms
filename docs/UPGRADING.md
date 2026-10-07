@@ -69,6 +69,14 @@ the base. Its `fields()` show on the General tab and ship as `page.fields`
 (and `ResolveContext::field()`); `page.subtype` ships next to `page.type`.
 `placements()` may name a subtype key.
 
+The editor form names a base field `field_{name}` and a subtype field
+`field_{subtype}__{name}` (it used to be `field_{name}` for both); the
+stored `fields` keys are the bare names either way. A host test or script
+that posts the page editor form, or reads its validation errors, by a
+subtype field's name must switch to the new one. A field name the subtype
+shares with its base is the subtype's: its declaration validates, saves
+and resolves the one value.
+
 The migration `2026_10_06_000000_add_subtype_and_fields_to_pages_table`
 adds the columns and, for every type registered when it runs with
 `base() !== key()`, moves pages from `type = <subtype>` to
@@ -362,7 +370,11 @@ language. The four page props are typed `string | null`.
 The sections above cover each change in depth; this is what a host does by
 hand, in order.
 
-1. **Run `php artisan migrate`.** New migrations, in order:
+1. **Page types that implement `PageTypeInterface` directly** add the five
+   methods listed under "Page subtypes and type fields" — before migrating:
+   the subtype migration reads the page-type registry, which fails on a
+   class missing them. Types extending `BasePageType` need nothing.
+2. **Run `php artisan migrate`.** New migrations, in order:
    `2026_10_03_000002_create_shared_blocks_table`,
    `2026_10_06_000000_add_subtype_and_fields_to_pages_table`,
    `2026_10_07_000000_add_lock_version_to_shared_blocks_table`,
@@ -378,12 +390,9 @@ hand, in order.
    - Dropping `tbtop_shared_blocks` (`create_shared_blocks` `down()`)
      empties every block that points at one: those rows hold only
      `shared: <id>` and become Problem blocks.
-2. **Run `php artisan cms:page-refs:rebuild` once** if any page type has a
+3. **Run `php artisan cms:page-refs:rebuild` once** if any page type has a
    `pages`-kind field, or its reverse lists stay empty until each source
    page is saved again.
-3. **Page types that implement `PageTypeInterface` directly** add the five
-   methods listed under "Page subtypes and type fields". Types extending
-   `BasePageType` need nothing.
 4. **A published `config/tbtop-cms.php` needs two new keys.** Add
    `admin.pages.shared_blocks` (`Tbtop\Cms\Admin\Pages\SharedBlocksPage::class`)
    and `admin.pages.shared_block_edit`
@@ -421,6 +430,16 @@ hand, in order.
    export or any code that reads a page's or layout's `content` directly
    sees no data for such a row; resolve it with
    `app(Tbtop\Cms\SharedBlock\SharedBlocks::class)->dataOf($row, $kind)`.
+9. **`type` is a base and `subtype` one of its subtypes, for every writer.**
+   A `Page` save that changes either column now throws a `DomainException`
+   when `type` is a subtype key or `subtype` is not a registered subtype of
+   `type` — seeders and host code included, not only the admin form. Fix
+   seeders that write `type = '<subtype>'` (store the base in `type`, the
+   subtype in `subtype`). Run `php artisan cms:doctor` after migrating:
+   `page_type_pairs` lists stored pages that break the rule (they still
+   render, but any later type/subtype change is refused until fixed), and
+   `page_subtype_bases` lists subtypes whose `base()` is not a registered
+   top-level type.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts) have their own

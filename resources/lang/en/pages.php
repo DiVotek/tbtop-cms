@@ -8,9 +8,6 @@ return [
     'tab_description' => ':tab — categories group content, pages stand alone, articles live under a category.',
     'tabs' => [
         'all' => 'All',
-        'categories' => 'Categories',
-        'pages' => 'Pages',
-        'articles' => 'Articles',
         'deleted' => 'Deleted',
     ],
     'tabs_deleted_description' => 'Pages moved to the trash — restore them or delete permanently.',
@@ -241,9 +238,9 @@ return [
     ],
     'leaf_flip' => [
         'to_article_title' => 'Turn this page into an article?',
-        'to_article' => 'It now has a category, so it becomes an article: the schema.org type and the type\'s fields switch to the article\'s, and the page moves to the Articles tab. Content and SEO texts stay; the address gains the category segment (a redirect is created).',
+        'to_article' => 'It now has a category, so it becomes an article: the schema.org type and the type\'s fields switch to the article\'s, and the page moves to the Article tab. Content and SEO texts stay; the address gains the category segment (a redirect is created).',
         'to_page_title' => 'Turn this article into a page?',
-        'to_page' => 'Without a category it becomes a standalone page: its category is removed, the schema.org type and the type\'s fields switch to the page\'s, and it moves to the Pages tab. Content and SEO texts stay; the address loses the category segment (a redirect is created).',
+        'to_page' => 'Without a category it becomes a standalone page: its category is removed, the schema.org type and the type\'s fields switch to the page\'s, and it moves to the Page tab. Content and SEO texts stay; the address loses the category segment (a redirect is created).',
     ],
     'validation' => [
         'article_needs_category' => 'An article lives in a category — choose one.',
@@ -251,6 +248,7 @@ return [
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
         'subtype_invalid' => ':subtype is not a subtype of :type.',
+        'type_is_subtype' => ':type is a subtype of :base: store :base in the type and :type in the subtype.',
         'type_source_backed' => 'Pages of type :type are created by their source, not by hand.',
         'status_invalid' => 'Status [:status] is not a valid page status.',
         'delete_has_children' => 'This page has child pages — move or delete them first.',
