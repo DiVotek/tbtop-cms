@@ -46,7 +46,10 @@ class SetLanguage
     private function canonical(array $segments, Request $request): RedirectResponse
     {
         array_shift($segments);
-        $url = '/' . implode('/', $segments);
+        // Empty segments ("/en//evil.example") would glue into "//evil.example",
+        // which redirect()->to() passes through as a protocol-relative URL to
+        // another host.
+        $url = '/' . implode('/', array_filter($segments, static fn (string $s): bool => $s !== ''));
         $query = $request->getQueryString();
 
         return redirect()->to($query !== null && $query !== '' ? $url . '?' . $query : $url, 301);
