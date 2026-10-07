@@ -41,8 +41,11 @@ return new class extends Migration
         $this->dropOwners();
     }
 
+    /** `fields` has no column to return to: its values are dropped. */
     public function down(): void
     {
+        DB::table('tbtop_pages')->whereNotNull('subtype')->update(['type' => DB::raw('subtype')]);
+
         Schema::table('tbtop_pages', function (Blueprint $table): void {
             $table->dropIndex(['subtype']);
             $table->dropColumn(['subtype', 'fields']);

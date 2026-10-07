@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
@@ -50,4 +51,19 @@ it('moves a subtype key out of `type` into `subtype` and strips `owner` from con
         ->and(Page::withTrashed()->findOrFail($trashed->id)->content)->toBe([
             ['id' => 'c', 'kind' => 'Hero', 'active' => true, 'sort' => 0, 'data' => []],
         ]);
+});
+
+it('moves a subtype back into `type` on down(), trashed pages included', function (): void {
+    $concert = Page::createQuietly(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+    $plain = Page::createQuietly(['type' => 'event', 'status' => PageStatus::Draft, 'name' => ['en' => 'Fair']]);
+    $trashed = Page::createQuietly(['type' => 'page', 'subtype' => 'contacts', 'status' => PageStatus::Draft, 'name' => ['en' => 'Old']]);
+    $trashed->delete();
+
+    subtypesMigration()->down();
+
+    expect(DB::table('tbtop_pages')->orderBy('id')->pluck('type', 'id')->all())->toBe([
+        $concert->id => 'concert',
+        $plain->id => 'event',
+        $trashed->id => 'contacts',
+    ]);
 });
