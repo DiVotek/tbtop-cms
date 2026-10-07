@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Testing\TestResponse;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
@@ -47,12 +48,32 @@ function createLeaf(array $form): TestResponse
  */
 function shownSave(Page $page, array $state = []): array
 {
+    return shownActions($page, $state)->whereIn('name', ['save', 'saveLeafFlip'])->pluck('name')->values()->all();
+}
+
+/**
+ * The shown action mod+s fires: the client binds the shortcut only for
+ * mounted actions, and a hiddenIf that holds unmounts the action.
+ *
+ * @param  array<string, mixed>  $state
+ * @return list<string>
+ */
+function shortcutSave(Page $page, array $state = []): array
+{
+    return shownActions($page, $state)->where('options.keybinding', 'mod+s')->pluck('name')->values()->all();
+}
+
+/**
+ * @param  array<string, mixed>  $state
+ * @return Collection<int, array<string, mixed>>
+ */
+function shownActions(Page $page, array $state): Collection
+{
     $actions = [];
     collectNodesByKind(test()->get("/admin/pages/{$page->id}/edit", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'), 'action', $actions);
     $data = [...PageForm::loadRow($page->id), ...$state];
 
-    return collect($actions)->whereIn('name', ['save', 'saveLeafFlip'])
-        ->filter(static fn (array $action): bool => isShownFor($action, $data))->pluck('name')->values()->all();
+    return collect($actions)->filter(static fn (array $action): bool => isShownFor($action, $data));
 }
 
 function blog(): Page
@@ -188,4 +209,11 @@ it('confirms saving an untouched legacy page under a category, which the save tu
 
     expect(shownSave($legacy->refresh()))->toBe(['saveLeafFlip'])
         ->and(shownSave($team))->toBe(['save']);
+});
+
+it('binds mod+s to the save button that is shown, the confirming one included', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'About']]);
+
+    expect(shortcutSave($page))->toBe(['save'])
+        ->and(shortcutSave($page, ['parent_id' => (string) blog()->id]))->toBe(['saveLeafFlip']);
 });
