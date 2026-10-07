@@ -16,7 +16,7 @@ class Breadcrumbs
 {
     private bool $homeLoaded = false;
 
-    private ?Page $home = null;
+    private ?int $homeId = null;
 
     public function __construct(
         private readonly PageUrl $url,
@@ -30,12 +30,17 @@ class Breadcrumbs
      * then the page itself. Fewer than two crumbs is no trail — the home
      * page gets [] rather than a lone "Home".
      *
+     * Only live ancestors and a live site root make the trail: a draft or
+     * expired one has no page a visitor could follow the crumb to. The page
+     * itself always stays (a preview shows what a visitor will see once it
+     * goes live), and the fewer-than-two rule applies after the filter.
+     *
      * @return list<array{label: string, path: string, url: string}>
      */
     public function forPage(Page $page, string $locale): array
     {
-        $chain = AncestorChain::forPage($page);
-        $home = $this->home();
+        $chain = $this->liveAncestors($page);
+        $home = $this->liveHome();
 
         if ($home !== null && $home->getKey() !== $page->getKey()
             && ! $this->contains($chain, $home)) {
@@ -48,16 +53,31 @@ class Breadcrumbs
     }
 
     /**
-     * Real ancestry only — no site root, no self. The `{parent}` SEO
-     * template variable reads its last element (SeoResolver::parentLabel());
-     * feeding it forPage() would turn `{parent}` into "Home" on top-level
-     * pages and into the page's own label everywhere else.
+     * Real live ancestry only — no site root, no self. The `{parent}` SEO
+     * template variable reads its last element (SeoResolver::parentLabel()),
+     * so it names the nearest live ancestor; feeding it forPage() would turn
+     * `{parent}` into "Home" on top-level pages and into the page's own
+     * label everywhere else.
      *
      * @return list<array{label: string, path: string, url: string}>
      */
     public function ancestors(Page $page, string $locale): array
     {
-        return $this->crumbs(AncestorChain::forPage($page), $locale);
+        return $this->crumbs($this->liveAncestors($page), $locale);
+    }
+
+    /**
+     * Filtered here, not in AncestorChain: hierarchy checks and starter
+     * blocks need the full chain, draft ancestors included.
+     *
+     * @return list<Page>
+     */
+    private function liveAncestors(Page $page): array
+    {
+        return array_values(array_filter(
+            AncestorChain::forPage($page),
+            static fn (Page $ancestor): bool => $ancestor->isLive(),
+        ));
     }
 
     /**
@@ -85,15 +105,20 @@ class Breadcrumbs
         return $crumbs;
     }
 
-    /** Memoized including the miss: a SeoAudit sweep asks once per page. */
-    private function home(): ?Page
+    /**
+     * Only the root's id is memoized (including the miss: a SeoAudit sweep
+     * asks once per page); its liveness and labels are read fresh, because
+     * this instance outlives a request — the route caches the controller
+     * that holds it.
+     */
+    private function liveHome(): ?Page
     {
         if (! $this->homeLoaded) {
             $this->homeLoaded = true;
-            $this->home = HomePage::find();
+            $this->homeId = HomePage::find()?->getKey();
         }
 
-        return $this->home;
+        return $this->homeId === null ? null : Page::query()->live()->find($this->homeId);
     }
 
     /** @param list<Page> $ancestors */
