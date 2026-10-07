@@ -86,11 +86,14 @@ class PageForm
     /**
      * The "Subtype" select for pages of $base: absent when $base has no
      * subtypes, hidden once "Type" is changed to another base — its options
-     * would not belong to it, and save() drops the stale value.
+     * would not belong to it, and save() drops the stale value. The edit
+     * form's select ($isStored) stays until it is cleared: save() refuses a
+     * type change that would leave a stored subtype behind, and the editor
+     * needs the select to clear it.
      *
      * @return list<Field>
      */
-    public static function subtypeField(S $s, string $base, string $name = 'subtype'): array
+    public static function subtypeField(S $s, string $base, string $name = 'subtype', bool $isStored = false): array
     {
         $options = PageFormOptions::subtypes($base);
         if ($options === []) {
@@ -100,7 +103,7 @@ class PageForm
         return [
             $s->select($name)->label(__('tbtop-cms::pages.fields.subtype'))
                 ->options($options)->default('')
-                ->hiddenIf(Cond::neq('type', $base)),
+                ->hiddenIf($isStored ? Cond::all(Cond::neq('type', $base), Cond::empty($name)) : Cond::neq('type', $base)),
         ];
     }
 

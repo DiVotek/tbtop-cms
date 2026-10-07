@@ -85,6 +85,20 @@ it('refuses a type change that would leave the subtype behind, and rejects a sub
         ->and($kept->refresh()->subtype)->toBeNull();
 });
 
+it('keeps the subtype select in reach after a type change until the subtype is cleared, then saves both', function (): void {
+    $page = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
+    subtypeAdmin();
+    $subtype = findFieldByName(editStructure($page), 'subtype');
+
+    expect(isShownFor($subtype, ['type' => 'page', 'subtype' => 'concert']))->toBeTrue()
+        ->and(isShownFor($subtype, ['type' => 'page', 'subtype' => '']))->toBeFalse()
+        ->and(isShownFor($subtype, ['type' => 'event', 'subtype' => '']))->toBeTrue();
+
+    savePage($page, ['type' => 'page', 'subtype' => null])->assertSessionHasNoErrors();
+
+    expect($page->refresh()->only(['type', 'subtype']))->toBe(['type' => 'page', 'subtype' => null]);
+});
+
 it('reads tree rules from the base type: a subtype that requires a parent does not make its page need one', function (): void {
     $page = Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
 

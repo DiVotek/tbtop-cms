@@ -412,7 +412,8 @@ final class ConcertType extends BasePageType
   ("— none —" first), is hidden when that type has none, and writes the
   `subtype` column; `type` is untouched. Changing "Type" while a subtype is
   stored is rejected on `type` (`pages.validation.type_change_subtype`);
-  clear the subtype first. The create modal has one subtype select per base
+  clear the subtype first — the select stays visible after a "Type" change
+  until it is cleared, so both go in one save. The create modal has one subtype select per base
   type that has subtypes, named `subtype_{base}`; the one for the picked
   type is saved. The pages list gets a Subtype column and filter once any
   subtype is registered.
