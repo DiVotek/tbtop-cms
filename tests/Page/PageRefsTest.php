@@ -112,12 +112,12 @@ it('accepts on save a reference to a trashed page that matches of(), and still r
         'type' => 'article',
         'subtype' => 'specialist',
         'parent_id' => (string) $specialist->parent_id,
-        'field_services' => $ids,
+        'field_specialist__services' => $ids,
     ]);
 
     $save([(string) $service->id, '999999', (string) $plain->id])
-        ->assertSessionHasErrors(['field_services.1', 'field_services.2'])
-        ->assertSessionDoesntHaveErrors('field_services.0');
+        ->assertSessionHasErrors(['field_specialist__services.1', 'field_specialist__services.2'])
+        ->assertSessionDoesntHaveErrors('field_specialist__services.0');
 
     $save([(string) $service->id])->assertSessionHasNoErrors();
     expect($specialist->refresh()->fields['services'])->toBe([(string) $service->id]);
