@@ -9,9 +9,11 @@ use Tbtop\Cms\SharedBlock\SharedBlocks;
 /**
  * Why a stored content row cannot render. The one rule the resolver (which
  * skips such a row) and the admin's problem-blocks list (which shows it to
- * the editor) both read, so a row is never dropped from the site without
- * being listed in the editor. The two shared cases are exactly the rows
- * SharedBlocks::dataOf() returns null for.
+ * the editor) both read, so a row the site skips for its stored state is
+ * always listed in the editor. A block whose resolve() throws is out of
+ * scope: that is a developer bug, logged as `block.resolve_failed` and
+ * skipped without an editor listing. The two shared cases are exactly the
+ * rows SharedBlocks::dataOf() returns null for.
  */
 enum BlockRowProblem: string
 {

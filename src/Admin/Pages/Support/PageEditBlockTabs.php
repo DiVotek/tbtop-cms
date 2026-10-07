@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Tbtop\Admin\Actions\ActionCtx;
@@ -222,29 +223,34 @@ final class PageEditBlockTabs
             abort(403);
         }
 
-        $rows = [];
-        $shared = null;
-        foreach (PageEditBlocks::toRows($ctx->form, $page) as $row) {
-            if ((string) $row['id'] === $id) {
-                $shared = SharedBlockForm::createFromRow(
-                    self::sharedName(BlockPicker::label($registry, $kind), $page),
-                    $kind,
-                    Arr::except($row, ['id', 'kind', 'active', 'sort', 'shared']),
-                );
-                $row = [...Arr::only($row, ['id', 'kind', 'active', 'sort']), 'shared' => (int) $shared->getKey()];
-            }
-            $rows[] = $row;
+        // One transaction: any failed page save (conflict, validation, …)
+        // must not leave the new shared block behind as an orphan.
+        try {
+            $shared = DB::transaction(static function () use ($ctx, $page, $registry, $id, $kind): ?SharedBlock {
+                $rows = [];
+                $shared = null;
+                foreach (PageEditBlocks::toRows($ctx->form, $page) as $row) {
+                    if ((string) $row['id'] === $id) {
+                        $shared = SharedBlockForm::createFromRow(
+                            self::sharedName(BlockPicker::label($registry, $kind), $page),
+                            $kind,
+                            Arr::except($row, ['id', 'kind', 'active', 'sort', 'shared']),
+                        );
+                        $row = [...Arr::only($row, ['id', 'kind', 'active', 'sort']), 'shared' => (int) $shared->getKey()];
+                    }
+                    $rows[] = $row;
+                }
+                if ($shared instanceof SharedBlock) {
+                    PageForm::save(self::structuralForm($ctx->form, $page, $rows), $page->getKey());
+                }
+
+                return $shared;
+            });
+        } catch (PageConflictException) {
+            return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
         }
         if (! $shared instanceof SharedBlock) {
             return Effects::make()->notify(__('tbtop-cms::shared-blocks.share.missing'), 'error');
-        }
-
-        try {
-            PageForm::save(self::structuralForm($ctx->form, $page, $rows), $page->getKey());
-        } catch (PageConflictException) {
-            $shared->delete();
-
-            return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
         }
 
         return Effects::make()->notify(__('tbtop-cms::shared-blocks.share.done', ['name' => $shared->name]))
