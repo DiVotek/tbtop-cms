@@ -486,10 +486,52 @@ php artisan cms:admin:revoke admin@example.com   # revoke
 ```
 
 **The first admin becomes the owner** (`is_owner` on the profile row). The
-owner cannot be revoked or edited by other admins — a protection against
-losing all access, not an extra section right. `DefaultOwnerAndLanguageCheck`
+owner cannot be revoked, or edited by anyone but themselves, and grants no
+extra section right. The owner has two privileges: editing notification
+template overrides, and managing other admins. `DefaultOwnerAndLanguageCheck`
 treats zero owners as an unrecoverable error state (DB surgery is the only
 fix left) — same severity as zero active default languages.
+
+**Admin manager.** On the Users page (`UsersPage`) only the admin manager
+edits (name, email, password) or revokes another admin. The admin manager is
+the owner, in every mode including `CmsAdmin`, plus, only when
+`tbtop-cms.roles` is `true`, every user the host gives the gate
+`tbtop-cms.admins` (`CmsAbilities::ADMINS`). With roles on this works only on
+top of `tbtop-cms.users`: without it the Users page is closed to everyone,
+the owner included. With roles off the gate is never read.
+
+| Actor | Own row | Row without CMS access | Another admin or admin manager | The owner |
+|---|---|---|---|---|
+| Admin manager | edit | edit, grant access | edit, revoke access | no |
+| Other admin | edit | edit, grant access | no | no |
+
+Nobody grants or revokes their own access. Whether a target is an admin is
+decided as for signing in (`CurrentAdmin::allows()`: `canAccessCmsAdmin()`
+for a `CmsAdmin` model, a profile row otherwise). The server checks every
+action (`userEditSave`, `userRevoke`, `userGrant`, and the edit form's
+loader); hidden buttons are only a convenience. A refused save answers
+`haltModal(tbtop-cms::users.errors.not_allowed)`, a refused revoke
+`notify(tbtop-cms::users.errors.revoke_not_allowed, 'error')`, a refused
+edit-form load a 403 with the `not_allowed` text. In `CmsAdmin` mode the
+list cannot tell admins apart (every row shows "Managed by application"), so
+Edit shows on every row but the owner's, and the server refuses another
+admin's row unless the actor is the admin manager.
+
+> **Warning:** granting `tbtop-cms.admins` gives control of other admin
+> accounts: its holder can set the password of any admin but the owner and sign in as them.
+> Keep it out of any "full editor" bundle; it is deliberately not in
+> `CmsAbilities::ALL`.
+
+> **Warning:** with the default `model` (`App\Models\User`) the Users page
+> lists every user of the site, and any admin may edit any of them that has
+> no CMS access (name, email, password). Point `tbtop-cms.admin.model` at a
+> separate admin model when the site has its own customers.
+
+Recovery when no owner exists (the owner row was deleted from the host table
+with roles off): nobody can then edit or revoke another admin. Either mark
+one profile row `is_owner = 1` in `tbtop_user_profiles`, or turn on
+`tbtop-cms.roles` and give a trusted admin `tbtop-cms.users` and
+`tbtop-cms.admins`.
 
 **What an admin may do is the host's decision**, gated by
 `tbtop-cms.roles`:
@@ -502,12 +544,28 @@ fix left) — same severity as zero active default languages.
   — nine values: `tbtop-cms.pages`, `.media`, `.submissions`, `.redirects`,
   `.settings`, `.design`, `.languages`, `.users`, `.audit`. Dashboard and
   profile pages declare no ability and stay open under either setting.
-  **Known issue:** the media HTTP API (`api/media/*`: list, upload,
-  import-url, update, replace, delete, folders) is registered by
-  `tbtop/admin`, not by this package, and the ability is declared only on
-  `MediaLibraryPage`. With `roles` on, an admin denied `tbtop-cms.media`
-  loses the page but the endpoints are not gated by it; they fall under the
-  panel's own middleware stack.
+  `tbtop-cms.admins` (`CmsAbilities::ADMINS`, the admin-manager gate above)
+  is a separate, optional gate, not a section, and not in `ALL`.
+
+**Media API.** The media HTTP API (`api/media/*`, routes
+`tbtop.{panel}.media.*`) is registered by `tbtop/admin` and checks no gate
+itself. With `roles` on, this package's `AuthorizeMediaApi` middleware (in
+`CmsPanel`'s middleware) gates it by route name; with `roles` off it stays
+open to every admin.
+
+| Action (route name) | Needs any of |
+|---|---|
+| list, show, download, folder list, upload, import by URL, create folder (`index`, `show`, `download`, `folders.index`, `upload`, `import-url`, `folders.store`) | `tbtop-cms.media`, `.pages`, `.settings`, `.design` |
+| edit (name, alt, description, tags, move to folder), replace, delete a file; rename or delete a folder (`update`, `replace`, `destroy`, `folders.update`, `folders.destroy`) | `tbtop-cms.media` |
+| any other `tbtop.{panel}.media.*` route | `tbtop-cms.media` (closed by default) |
+
+A refused request is a 403 (JSON `{"message": "This action is unauthorized."}`).
+The tbtop/admin picker shows an error toast for a refused metadata save and an
+inline error in the detail panel for a refused replace or delete. It keeps
+its delete, replace and edit-metadata buttons, so without `tbtop-cms.media` a
+page editor cannot save alt text or tags from the picker. With roles on only `media`, `pages`, `settings` and `design` open
+the media API: users of a host page that has a media field must hold one of
+them, or the picker on that page fails with 403.
 
 `tbtop-cms.admin` config also controls: `prefix` (default `admin`), `guard`
 (default `web`), `model` (host user model class, default `App\Models\User`),

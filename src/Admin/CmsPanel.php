@@ -10,6 +10,7 @@ use Tbtop\Admin\Navigation\NavItem;
 use Tbtop\Admin\Pages\Page;
 use Tbtop\Admin\Panels\Panel;
 use Tbtop\Admin\Panels\PanelConfig;
+use Tbtop\Cms\Admin\Http\Middleware\AuthorizeMediaApi;
 use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
 use Tbtop\Cms\Admin\Http\Middleware\ShareAdminAuth;
 use Tbtop\Cms\Admin\Http\Middleware\SyncContentLocales;
@@ -33,7 +34,7 @@ class CmsPanel extends Panel
             // into the `errors` prop after a redirect-back. tbtop/admin leaves
             // it to the host's `web` group; a host without HandleInertiaRequests
             // there would get a silent form resync on every rejected save.
-            ->middleware(['web', InertiaMiddleware::class, EnsureCmsAdmin::class, ShareAdminAuth::class, SyncContentLocales::class])
+            ->middleware(['web', InertiaMiddleware::class, EnsureCmsAdmin::class, AuthorizeMediaApi::class, ShareAdminAuth::class, SyncContentLocales::class])
             ->chrome(CmsChrome::class)
             // Product brand (the CMS itself, not the host site) shown in the topbar
             // and on the login card. A logo will replace/accompany it later.
