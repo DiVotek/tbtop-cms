@@ -413,18 +413,28 @@ final class ConcertType extends BasePageType
   ("— none —" first), is hidden when that type has none, and writes the
   `subtype` column; `type` is untouched. Changing "Type" while a subtype is
   stored is rejected on `type` (`pages.validation.type_change_subtype`);
-  clear the subtype first. The create modal has one subtype select per base
+  clear the subtype first — the select stays visible after a "Type" change
+  until it is cleared, so both go in one save. The create modal has one subtype select per base
   type that has subtypes, named `subtype_{base}`; the one for the picked
   type is saved. The pages list gets a Subtype column and filter once any
   subtype is registered.
 - **Leaf type follows the category.** A page given a category (a `category`
   parent) becomes an `article`; an article whose category is removed becomes
   a `page`. Picking `page` by hand drops a stale parent; picking `article`
-  requires a category (`pages.validation.article_needs_category`). Under any
+  requires a category (`pages.validation.article_needs_category`). Both
+  article rules apply only while the `article` type's `requiresParent()` is
+  `true`: a host `ArticleType` override returning `false` keeps root
+  articles as articles and lets the create modal make one. Under any
   other container whose `allowedChildren()` includes `page` (a host
   `section`), a page stays a page. The edit form asks to confirm while the
-  save would change the type. The list tabs "Pages" and "Articles" filter by
-  `type`.
+  save would change the type.
+- **Pages list tabs.** "All", then one tab per `type` that a non-trashed
+  page has — registered types in registration order, then any type that
+  outlived its registration — then "Deleted". A tab is named by the type key
+  (`?tab=section`) and labelled by `pages.types.{key}` when that translation
+  exists, else the type's `label()`, else the raw key. A host base type
+  (`section`, `event`) gets its own tab; subtypes share their base's tab and
+  use the Subtype filter.
 - **`childSubtype()`.** A category type (or subtype) may return the key of a
   subtype of `article`; an article that arrives under that category without
   a subtype of its own — created there, or a page that just became an
