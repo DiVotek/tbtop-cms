@@ -69,6 +69,14 @@ the base. Its `fields()` show on the General tab and ship as `page.fields`
 (and `ResolveContext::field()`); `page.subtype` ships next to `page.type`.
 `placements()` may name a subtype key.
 
+The editor form names a base field `field_{name}` and a subtype field
+`field_{subtype}__{name}` (it used to be `field_{name}` for both); the
+stored `fields` keys are the bare names either way. A host test or script
+that posts the page editor form, or reads its validation errors, by a
+subtype field's name must switch to the new one. A field name the subtype
+shares with its base is the subtype's: its declaration validates, saves
+and resolves the one value.
+
 The migration `2026_10_06_000000_add_subtype_and_fields_to_pages_table`
 adds the columns and, for every type registered when it runs with
 `base() !== key()`, moves pages from `type = <subtype>` to

@@ -432,11 +432,23 @@ final class ConcertType extends BasePageType
   that already has a subtype keeps it. `BasePageType` returns `null`.
 - **Type fields.** `fields(S $s): array` (empty from `BasePageType`) is a
   list of ordinary form fields. The General tab shows, under the page's own
-  fields, a section for the base type's fields and then one for the
-  subtype's; their names carry a `field_` prefix in the form and are saved
-  without it into the page's `fields` column. A save merges into `fields` —
-  keys the form does not show (a former subtype's) are kept, so switching
-  the subtype and back never loses data.
+  fields, a section for the base type's fields and then one per subtype of
+  the base, each shown only while the "Subtype" select picks it — picking
+  another subtype shows its fields before a save. In the form a base field
+  is named `field_{name}`, a subtype's `field_{subtype}__{name}`; both are
+  saved under the bare name into the page's `fields` column. A subtype
+  field's `required` applies only while its subtype is picked. A save
+  writes the base's and the picked subtype's fields and merges into
+  `fields` — keys the form does not save (a former subtype's) are kept, so
+  switching the subtype and back never loses data.
+- **Field names.** A page's type fields are the base's `fields()` merged
+  with its subtype's, one per name: **same name → the subtype's
+  declaration wins**. Its rules validate the save and its kind resolves
+  the value; the base's field of that name is hidden, unvalidated and not
+  saved while that subtype is picked, and the base's `resolveFields()` does
+  not receive the value. The reverse-reference index follows the same
+  declaration. Two subtypes of one base may declare the same name too: a
+  page has only one of them, and both read and write the same `fields` key.
 - **Site.** `page.fields` ships the base's and then the subtype's fields
   (a subtype key wins on a clash), translatable values flattened to the
   request locale; every block reads them through `ResolveContext::field()`.
@@ -490,7 +502,9 @@ public function backReferences(): array
   per entry: the live pages whose type field `field` holds this page, by
   `sort_order` then name, as the same `{id, name, url}` list. `from`
   narrows to sources whose `type` or `subtype` is that key. A subtype's
-  entries merge over its base's. A throw is logged
+  entries merge over its base's. The lists are merged into `page.fields`
+  last, so a backReference key wins over a type field of the same name.
+  A throw is logged
   (`page.back_references_resolve_failed`) and the lists drop out.
 - **Index.** The lists read `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
