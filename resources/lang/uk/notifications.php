@@ -20,9 +20,15 @@ return [
         'message_title' => 'Нова заявка з форми',
         'test_message' => 'Це тестове повідомлення від Telegram-сповіщень вашої CMS.',
     ],
+    'channels' => [
+        'mail' => 'Email',
+        'telegram' => 'Telegram',
+        'bell' => 'Дзвіночок',
+    ],
     'errors' => [
         'bell' => 'Не вдалося надіслати сповіщення дзвіночком: :error',
         'mail' => 'Не вдалося надіслати лист: :error',
+        'render' => 'Не вдалося сформувати сповіщення :channel: :error',
         'mail_no_recipients' => 'Поштові сповіщення увімкнено, але отримувачів не налаштовано.',
         'telegram' => 'Не вдалося надіслати повідомлення в Telegram: :error',
         'telegram_not_configured' => 'Telegram-сповіщення увімкнено, але токен бота або ID чатів не налаштовано.',

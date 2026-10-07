@@ -32,6 +32,10 @@ use Throwable;
  * SubmissionNotifier already defers its own call via app()->terminating())
  * when the caller doesn't need the outcome back.
  *
+ * A template that fails to render is that pair's failure too (a Failed
+ * Delivery with stage Render, its log row and NotificationFailed), never an
+ * exception out of send().
+ *
  * That outcome is the return value: exactly the deliveries this call made.
  * Callers must not reconstruct it by re-reading notification_log — the log
  * is shared by every concurrent request and carries no correlation to the
@@ -91,11 +95,29 @@ final class Notifications
                         continue;
                     }
 
-                    $override = $templateStore->override($typeKey, $channel->format(), $recipient->locale);
+                    $format = $channel->format();
+                    $override = $templateStore->override($typeKey, $format, $recipient->locale);
 
-                    $rendered = $override !== null
-                        ? self::renderWithFallback($renderer, $override, $type, $channel->format(), $payload, $recipient, $typeKey)
-                        : self::renderBuiltIn($renderer, $type, $channel->format(), $payload, $recipient);
+                    // One pair's template failing is that pair's failure, not
+                    // the whole send's: it is logged and recorded like a
+                    // channel that threw, and the remaining pairs still run.
+                    try {
+                        $rendered = $override !== null
+                            ? self::renderWithFallback($renderer, $override, $type, $format, $payload, $recipient, $typeKey)
+                            : self::renderBuiltIn($renderer, $type, $format, $payload, $recipient);
+                    } catch (Throwable $e) {
+                        Log::error('notifications.template_render_failed', [
+                            'type' => $typeKey,
+                            'channel' => $channelKey,
+                            'format' => $format->value,
+                            'locale' => $recipient->locale,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        app(NotificationChannelDriver::class)->recordFailure($typeKey, $channelKey, $recipient, $e->getMessage(), DeliveryStage::Render);
+
+                        continue;
+                    }
 
                     if ($rendered === null) {
                         continue;
@@ -130,6 +152,8 @@ final class Notifications
     /**
      * Renders the merchant's stored override; a failure falls back to the
      * built-in view (logged as a warning) rather than dropping the channel.
+     * A built-in view that throws as well propagates to send(), which records
+     * the pair as a render failure.
      */
     private static function renderWithFallback(
         TemplateRenderer $renderer,

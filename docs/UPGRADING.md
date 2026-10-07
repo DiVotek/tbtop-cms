@@ -403,6 +403,58 @@ used to send the fan-out and end `Handled`). `SubmissionNotifier::notifyClaimed(
 is replaced by `deliver()`, which returns the channel errors and leaves the
 claim to its caller.
 
+## A notification template that fails to render is a failed delivery, not an exception
+
+`Notifications::send()` no longer throws when a template throws while
+rendering. That (recipient, channel) pair is recorded like a channel that
+threw: a `Failed` row in `tbtop_notification_log`, a `Failed` `Delivery` in
+the return value and a `NotificationFailed` event, plus an error-level
+`notifications.template_render_failed` log entry. The other pairs still run.
+Templates are picked by format, so one broken view fails every channel of that
+format.
+
+- **`NotificationFailed` has a new source.** A listener now hears render
+  failures too. `NotificationFailed` and `Delivery` gain a trailing optional
+  `DeliveryStage $stage` (`Tbtop\Cms\Notifications\DeliveryStage`: `Render`
+  or `Send`, default `Send`). Positional construction stays compatible.
+- **Queued senders stop retrying render errors.** A queued listener that
+  calls `send()` (for example storefront's `SendsOrderNotification`) used to
+  fail on a render error and be retried by the queue. Its job now completes
+  with `Failed` log rows instead. A template error is deterministic; the
+  retry never fixed it.
+- `NotificationChannelDriver::recordFailure()` is new and public; it is how
+  `send()` writes a render failure.
+- A form submission's `error` names a render failure with the new key
+  `tbtop-cms::notifications.errors.render` (`Couldn't render the :channel
+  notification: :error`), using the short channel names in
+  `tbtop-cms::notifications.channels.{mail,telegram,bell}`. Identical errors
+  are written once.
+- Any other exception after a submission is claimed (in `notify()` or
+  anywhere in `retry()`) now ends the row `Failed` with the exception's
+  message instead of leaving it `Processing`. It is reported through
+  `report()` unchanged, with `submission_id` in Laravel's `Context` while
+  it is reported, and not rethrown, so the admin retry shows an error toast
+  instead of a 500.
+
+## Breadcrumbs leave out ancestors that are not live
+
+`Breadcrumbs::forPage()` and `ancestors()` — and with them
+`Cms::breadcrumbs()`, the `breadcrumbs` Inertia prop, the JSON-LD
+`BreadcrumbList`, `{parent}` in SEO templates, the admin SERP/OG previews,
+`SeoChecklist` and `SeoAudit` — no longer include a draft, scheduled or
+expired ancestor, or a non-live site root. The page itself is never left out;
+fewer than two crumbs after the filter still gives `[]`. The page stays
+reachable and in the sitemap as before; `AncestorChain` is unchanged.
+
+## The preview link covers every locale with a slug
+
+The editor's **Preview link** modal shows one field per frontend-active
+locale with a saved slug (`previewUrl_{locale}`, labelled with the language
+name) instead of a single default-locale `previewUrl`; **Copy** copies the
+first. With no slug it shows `tbtop-cms::pages.preview.no_slug` and nothing to
+copy, instead of a link to the home page. Error pages no longer get the
+action.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
@@ -486,4 +538,5 @@ hand, in order.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts, the admin
-manager, the media API gate, failed retries) have their own sections above.
+manager, the media API gate, failed retries, notification render failures,
+breadcrumb filtering, per-locale preview links) have their own sections above.

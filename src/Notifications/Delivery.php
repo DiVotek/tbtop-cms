@@ -13,6 +13,7 @@ final readonly class Delivery
         public Recipient $recipient,
         public NotificationLogStatus $status,
         public ?string $error = null,
+        public DeliveryStage $stage = DeliveryStage::Send,
     ) {}
 
     public function failed(): bool

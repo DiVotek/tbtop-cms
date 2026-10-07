@@ -8,6 +8,7 @@ use Tbtop\Cms\Admin\Pages\Support\OgPreview;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
@@ -930,6 +931,98 @@ it('returns a copyToClipboard effect with the signed preview URL from the Copy a
         ->and($effects[0]['kind'])->toBe('copyToClipboard')
         ->and($effects[0]['text'])->toContain('/draft-page')
         ->and($effects[0]['text'])->toContain('signature=');
+});
+
+/**
+ * The modal's signed links, as the client fetches them when it opens.
+ *
+ * @return array<string, string>
+ */
+function previewLinkData(int $pageId): array
+{
+    return test()->actingAs(previewLinkAdmin(), 'web')
+        ->postJson("/admin/pages/{$pageId}/edit/actions/pagePreviewLink/data", ['payload' => []])
+        ->assertOk()
+        ->json('data');
+}
+
+// PageEditHelpers::structure() already created the admin when the test read the modal first.
+function previewLinkAdmin(): AdminUser
+{
+    return AdminUser::query()->where('email', 'admin@example.com')->first() ?? PageEditHelpers::admin();
+}
+
+/**
+ * @param  list<array<string, mixed>>  $children  the modal form's children
+ * @return list<array<string, mixed>>
+ */
+function previewLinkFields(array $children): array
+{
+    return array_values(array_filter($children, fn (array $child): bool => ($child['kind'] ?? null) === 'text'));
+}
+
+it('signs one preview link per site locale with a saved slug, each on its own locale path', function (): void {
+    app(Cms::class)->frontendRoutes();
+    Language::factory()->create(['locale' => 'uk', 'name' => 'Українська', 'sort_order' => 1]);
+    Language::query()->where('locale', 'en')->sole()->update(['name' => 'English']);
+    $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page', 'uk' => 'Чернетка']]);
+    $ukPath = $draft->refresh()->pathFor('uk');
+
+    $fields = previewLinkFields(previewLinkNode($draft->id)['options']['spec']['body']['options']['children']);
+    $data = previewLinkData($draft->id);
+
+    expect(array_column($fields, 'name'))->toBe(['previewUrl_en', 'previewUrl_uk'])
+        ->and(array_column(array_column($fields, 'options'), 'label'))->toBe(['English', 'Українська'])
+        ->and(array_keys($data))->toBe(['previewUrl_en', 'previewUrl_uk'])
+        ->and(parse_url($data['previewUrl_en'], PHP_URL_PATH))->toBe('/draft-page')
+        ->and(parse_url($data['previewUrl_uk'], PHP_URL_PATH))->toBe('/uk/' . $ukPath)
+        ->and($data['previewUrl_uk'])->toContain('signature=');
+});
+
+// Every save writes a slug for each site locale, so a missing one is data
+// drift — deleting the row is the fixture for it.
+it('signs only the locale that has a slug, never the home page for the one that lacks it', function (): void {
+    app(Cms::class)->frontendRoutes();
+    Language::factory()->create(['locale' => 'uk', 'name' => 'Українська', 'sort_order' => 1]);
+    $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
+    PageSlug::query()->where('page_id', $draft->id)->where('locale', 'en')->delete();
+
+    $fields = previewLinkFields(previewLinkNode($draft->id)['options']['spec']['body']['options']['children']);
+    $data = previewLinkData($draft->id);
+
+    expect(array_column($fields, 'name'))->toBe(['previewUrl_uk'])
+        ->and(array_keys($data))->toBe(['previewUrl_uk'])
+        ->and(parse_url($data['previewUrl_uk'], PHP_URL_PATH))->toBe('/uk/draft-page');
+
+    $copy = test()->actingAs(previewLinkAdmin(), 'web')
+        ->postJson("/admin/pages/{$draft->id}/edit/actions/pagePreviewLinkCopy", ['payload' => []])
+        ->assertOk()
+        ->json('effects.0.text');
+
+    expect(parse_url($copy, PHP_URL_PATH))->toBe('/uk/draft-page');
+});
+
+it('offers no preview link, only a save-a-slug hint, when the page has no slug in any locale', function (): void {
+    app(Cms::class)->frontendRoutes();
+    $draft = Page::create(['type' => 'page', 'status' => PageStatus::Draft, 'name' => ['en' => 'Draft page']]);
+    $draft->slugs()->delete();
+
+    $children = previewLinkNode($draft->id)['options']['spec']['body']['options']['children'];
+    $footer = $children[array_key_last($children)];
+
+    expect(previewLinkFields($children))->toBe([])
+        ->and(json_encode($children))->toContain(json_encode('Save a URL slug to get a preview link.'))
+        ->and(array_column($footer['options']['children'], 'name'))->toBe(['pagePreviewLinkClose'])
+        ->and(previewLinkData($draft->id))->toBe([]);
+});
+
+it('omits the preview-link action for an error page, which has no URL of its own', function (): void {
+    $errorPage = Page::factory()->create(['is_system' => true, 'error_class' => ErrorClass::ClientError, 'status' => PageStatus::Draft]);
+
+    $form = findNodeByKind(PageEditHelpers::structure($errorPage->id)['props']['structure'], 'form');
+    $names = array_column($form['options']['children'][1]['options']['children'], 'name');
+
+    expect($names)->not->toContain('pagePreviewLink');
 });
 
 it('omits the preview-link action from the status bar for a live published page', function (): void {

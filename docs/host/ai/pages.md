@@ -252,7 +252,7 @@ Use the `Cms` facade (`src/Facades/Cms.php` / `src/Cms.php`) rather than
 ```php
 Cms::resolve(string $path, ?string $locale = null): ?Page   // path → live Page, current locale by default
 Cms::url(Page $page, ?string $locale = null): string        // Page → locale-prefixed path
-Cms::breadcrumbs(Page $page, ?string $locale = null): array // list<{label, path, url}>, home › ancestors › page
+Cms::breadcrumbs(Page $page, ?string $locale = null): array // list<{label, path, url}>, home › live ancestors › page
 ```
 
 `Cms::resolve()` only ever returns a *live* page (no `$withDrafts` param
@@ -261,14 +261,21 @@ exposed) — it delegates to `PageResolver::resolve($path, $locale, false)`.
 `AncestorChain::forPage()` (root-first), prepends the seeded site root
 (`is_system`, no parent, not an error page — it is a *sibling* of top-level
 pages, not their parent) unless it is already in the chain, and appends the
-page itself. Each crumb is labelled with its `name` falling back to `title`
+page itself. Only a live ancestor or site root (`Page::isLive()`) makes a
+crumb: a published article under a draft category stays reachable and in the
+sitemap, but its trail skips the category (`[Home, Post]`). The page itself is
+never filtered, so a preview shows the trail a visitor will see. The filter is
+in `Breadcrumbs`, not `AncestorChain` — hierarchy checks and starter blocks
+still see draft ancestors — and the root's liveness is read fresh on each call
+(only its id is memoized). Each crumb is labelled with its `name` falling back to `title`
 (`title` feeds `<title>` and tends to be SEO-length), current locale falling
 back to the default locale. `{parent}` gets the same label. Fewer than two crumbs
-yields `[]`, so the home page has no trail: `/services` → `[Home, Services]`,
+after the filter yields `[]`, so the home page has no trail: `/services` → `[Home, Services]`,
 `/blog/post` → `[Home, Blog, Post]`. The JSON-LD `BreadcrumbList` is built
 from the same trail (see seo.md). `{parent}` does **not** read it — that
-variable uses `Breadcrumbs::ancestors()`, the real ancestry without root or
-self.
+variable uses `Breadcrumbs::ancestors()`, the real live ancestry without root
+or self, so it names the nearest live ancestor and is empty when there is
+none.
 
 ### Redirects
 
@@ -322,7 +329,18 @@ lookup — an unpublished path 404s (or falls back to a redirect) for them.
 builds that signed URL against the same `tbtop-cms.page` named route the
 frontend uses, applying `PageUrl`'s locale-prefix rule so a
 non-default-locale draft doesn't 404 against the default-locale path. TTL:
-`config('tbtop-cms.preview.link_ttl_hours', 72)`.
+`config('tbtop-cms.preview.link_ttl_hours', 72)`. It expects a locale the
+page has a saved slug in: for one without, it signs the site root.
+
+The editor's **Preview link** action (`PageEditStatusBar`, only on a page that
+is not live and not an error page) shows one read-only field per
+frontend-active locale (`Languages::frontendActive()` order) whose saved slug
+gives the page a path (`pathFor($locale) !== null`): field
+`previewUrl_{locale}`, labelled with the language name, filled with that
+locale's signed link when the modal opens. **Copy** copies the first one.
+Every save writes a slug for each frontend-active locale, so a missing one is
+data drift; with no slug anywhere the modal shows
+`tbtop-cms::pages.preview.no_slug` and no fields or Copy.
 
 The `isPreview` prop is `! $page->isLive()` — true for draft, not-yet-
 scheduled, and past-`unpublish_at` alike, since reaching the page at all

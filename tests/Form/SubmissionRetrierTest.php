@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
@@ -14,12 +16,14 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Models\Layout;
 use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Notifications\Channels\RenderedMail;
+use Tbtop\Cms\Notifications\Events\NotificationSent;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
+use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
 
 uses(RefreshDatabase::class);
 
@@ -382,4 +386,58 @@ it('marks a retry handled with no error when the handler and the fan-out both su
         ->and($submission->handled_at)->not->toBeNull()
         ->and($admin->notifications()->count())->toBe(1);
     Http::assertSentCount(1);
+});
+
+it('shows the error toast, not a 500, and keeps the retry failed when the fan-out throws', function (): void {
+    Exceptions::fake();
+    config(['tbtop-cms.admin.model' => AdminUser::class]);
+    config(['auth.providers.users.model' => AdminUser::class]);
+    $admin = AdminUser::create(['name' => 'Operator', 'email' => 'operator@example.test', 'password' => 'secret']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $admin->id]);
+    Event::listen(NotificationSent::class, fn () => throw new RuntimeException('listener boom'));
+    $submission = FormSubmission::query()->create([
+        'page_id' => contactPageForRetry()->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'previous error',
+    ]);
+
+    $response = $this->actingAs($admin, 'web')->postJson('/admin/form-submissions/actions/retry', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk();
+
+    $submission->refresh();
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toBe('listener boom')
+        ->and(collect($response->json('effects'))->firstWhere('kind', 'notify'))
+        ->toMatchArray(['message' => 'listener boom', 'level' => 'error']);
+    Exceptions::assertReported(fn (RuntimeException $e): bool => $e->getMessage() === 'listener boom');
+});
+
+it('keeps a retry failed with the render prefix, not the send prefix, when the template still throws', function (): void {
+    Mail::fake();
+    ThrowingNotificationView::html();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    $submission = FormSubmission::query()->create([
+        'page_id' => contactPageForRetry()->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'previous error',
+    ]);
+
+    app(SubmissionRetrier::class)->retry($submission);
+    $submission->refresh();
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toStartWith("Couldn't render the Email notification: ")
+        ->and($submission->error)->toContain('html boom')
+        ->and($submission->error)->not->toContain('Mail delivery failed');
 });
