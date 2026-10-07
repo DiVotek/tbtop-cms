@@ -7,11 +7,11 @@ namespace Tbtop\Cms\Tests\Fixtures;
 use Tbtop\Cms\Page\Types\BasePageType;
 
 /** A subtype of EventPageType whose `venue` back-reference shares a name with the base's `venue` field. */
-class FestivalPageType extends BasePageType
+class ShadowingSubtypePageType extends BasePageType
 {
     public function key(): string
     {
-        return 'festival';
+        return 'shadowing';
     }
 
     #[\Override]
@@ -24,6 +24,6 @@ class FestivalPageType extends BasePageType
     #[\Override]
     public function backReferences(): array
     {
-        return ['venue' => ['field' => 'festivals'], 'lineup' => ['field' => 'festivals']];
+        return ['venue' => ['field' => 'shadowing_refs'], 'lineup' => ['field' => 'shadowing_refs']];
     }
 }

@@ -9,8 +9,8 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Tests\Fixtures\ConcertPageType;
 use Tbtop\Cms\Tests\Fixtures\EventPageType;
-use Tbtop\Cms\Tests\Fixtures\FestivalPageType;
 use Tbtop\Cms\Tests\Fixtures\OrphanSubtypePageType;
+use Tbtop\Cms\Tests\Fixtures\ShadowingSubtypePageType;
 use Tbtop\Cms\Tests\Fixtures\TourConcertPageType;
 
 uses(RefreshDatabase::class);
@@ -59,9 +59,9 @@ it('passes when every subtype names a registered top-level base', function (): v
 });
 
 it('names through cms:doctor a subtype back-reference that shares its name with a base type field', function (): void {
-    PageTypeRegistry::extend(fn (): array => [FestivalPageType::class]);
+    PageTypeRegistry::extend(fn (): array => [ShadowingSubtypePageType::class]);
 
-    $this->artisan('cms:doctor')->expectsOutputToContain('(type: names): festival: venue.');
+    $this->artisan('cms:doctor')->expectsOutputToContain('(type: names): shadowing: venue.');
 });
 
 it('passes when no back-reference is named like a field', function (): void {
