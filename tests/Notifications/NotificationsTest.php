@@ -22,6 +22,7 @@ use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\RecordingChannel;
 use Tbtop\Cms\Tests\Fixtures\RecordingShortChannel;
 use Tbtop\Cms\Tests\Fixtures\TestNotificationPayload;
+use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
 
 uses(RefreshDatabase::class);
 
@@ -269,7 +270,7 @@ it('falls back to the built-in view and logs a warning when a stored override fa
 it('records a built-in view render failure per pair while the other format still delivers to every recipient', function (): void {
     Event::fake([NotificationFailed::class]);
     Log::spy();
-    File::put(resource_path('views/test-notification-text.blade.php'), '@php throw new RuntimeException(\'boom\') @endphp');
+    ThrowingNotificationView::shadow('test-notification-text');
 
     $ana = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
     $bob = new Recipient(Audience::Customer, 'uk', email: 'bob@example.test');
@@ -311,7 +312,7 @@ it('records a built-in view render failure per pair while the other format still
 
 it('records a render failure when a broken override falls back to a built-in view that throws too', function (): void {
     Log::spy();
-    File::put(resource_path('views/test-notification-text.blade.php'), '@php throw new RuntimeException(\'boom\') @endphp');
+    ThrowingNotificationView::shadow('test-notification-text');
     NotificationTemplate::query()->create([
         'type' => 'test.recorded',
         'format' => Format::Text,

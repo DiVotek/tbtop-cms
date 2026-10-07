@@ -22,4 +22,19 @@ final class ThrowingNotificationView
 
         test()->beforeApplicationDestroyed(fn () => File::deleteDirectory($dir));
     }
+
+    /**
+     * Shadows a plain view with one that throws. A separate path, not an
+     * overwrite of the original file: rewriting a view within the second it
+     * was compiled can serve the stale compiled copy.
+     */
+    public static function shadow(string $view, string $message = 'boom'): void
+    {
+        $dir = sys_get_temp_dir() . '/tbtop-cms-shadow-views-' . getmypid();
+        File::ensureDirectoryExists($dir);
+        File::put("{$dir}/{$view}.blade.php", "@php throw new RuntimeException('{$message}') @endphp");
+        app('view')->getFinder()->prependLocation($dir);
+
+        test()->beforeApplicationDestroyed(fn () => File::deleteDirectory($dir));
+    }
 }
