@@ -8,6 +8,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Types\ArticleType;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 use Tbtop\Cms\Tests\Fixtures\SectionType;
@@ -96,6 +97,30 @@ it('creates an article only with a category, and a page at the root even with a 
 
     expect(Page::query()->where('type', 'article')->pluck('parent_id')->all())->toBe([$blog->id])
         ->and(Page::query()->where('type', 'page')->pluck('parent_id')->all())->toBe([null]);
+});
+
+/** A host's article type that may stand at the root (the documented ArticleType override). */
+class RootArticleType extends ArticleType
+{
+    #[Override]
+    public function requiresParent(): bool
+    {
+        return false;
+    }
+}
+
+it('keeps a root article an article when the host article type does not require a category', function (): void {
+    app()->bind(ArticleType::class, RootArticleType::class);
+    app()->forgetInstance(PageTypeRegistry::class);
+    $article = Page::create(['type' => 'article', 'status' => PageStatus::Published, 'name' => ['en' => 'Note'], 'slug' => ['en' => 'note']]);
+
+    saveLeaf($article, ['type' => 'article', 'parent_id' => '', 'slug' => ['en' => 'note']])->assertSessionHasNoErrors();
+    createLeaf(['name' => ['en' => 'Memo'], 'slug' => ['en' => 'memo'], 'type' => 'article', 'parent_id' => ''])->assertOk();
+
+    expect(Page::query()->orderBy('id')->get(['type', 'parent_id'])->toArray())->toBe([
+        ['type' => 'article', 'parent_id' => null],
+        ['type' => 'article', 'parent_id' => null],
+    ]);
 });
 
 it('lists pages and articles by their type', function (): void {

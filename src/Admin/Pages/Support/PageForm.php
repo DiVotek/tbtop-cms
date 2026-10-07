@@ -47,6 +47,16 @@ class PageForm
      */
     public static function fields(S $s): array
     {
+        // A parent is always a category: an article's (required unless the host's
+        // article type drops requiresParent()), a subcategory's optional one.
+        $parent = $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.category'))
+            ->query(static fn (): Builder => self::parentQuery())
+            ->labelKey('name')->searchable()
+            ->hiddenIf(Cond::notIn('type', ['category', PageLeafType::ARTICLE]));
+        if (PageLeafType::articleRequiresParent()) {
+            $parent->requiredIf(Cond::eq('type', PageLeafType::ARTICLE));
+        }
+
         return [
             $s->section(['title' => __('tbtop-cms::pages.sections.content')], [
                 $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
@@ -68,12 +78,7 @@ class PageForm
                     static fn (array $type): array => self::subtypeField($s, $type['value'], self::CREATE_SUBTYPE_PREFIX . $type['value']),
                     PageFormOptions::types(includeSourceBacked: false),
                 )),
-                // A parent is always a category: an article's required one, a subcategory's optional one.
-                $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.category'))
-                    ->query(static fn (): Builder => self::parentQuery())
-                    ->labelKey('name')->searchable()
-                    ->hiddenIf(Cond::notIn('type', ['category', PageLeafType::ARTICLE]))
-                    ->requiredIf(Cond::eq('type', PageLeafType::ARTICLE)),
+                $parent,
             ]),
         ];
     }

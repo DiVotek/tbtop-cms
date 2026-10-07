@@ -419,7 +419,10 @@ final class ConcertType extends BasePageType
 - **Leaf type follows the category.** A page given a category (a `category`
   parent) becomes an `article`; an article whose category is removed becomes
   a `page`. Picking `page` by hand drops a stale parent; picking `article`
-  requires a category (`pages.validation.article_needs_category`). Under any
+  requires a category (`pages.validation.article_needs_category`). Both
+  article rules apply only while the `article` type's `requiresParent()` is
+  `true`: a host `ArticleType` override returning `false` keeps root
+  articles as articles and lets the create modal make one. Under any
   other container whose `allowedChildren()` includes `page` (a host
   `section`), a page stays a page. The edit form asks to confirm while the
   save would change the type. The list tabs "Pages" and "Articles" filter by
