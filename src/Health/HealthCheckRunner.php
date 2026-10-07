@@ -15,6 +15,7 @@ use Tbtop\Cms\Health\Checks\JsWiringCheck;
 use Tbtop\Cms\Health\Checks\MediaDiskWritableCheck;
 use Tbtop\Cms\Health\Checks\NotificationsConfiguredCheck;
 use Tbtop\Cms\Health\Checks\PackageVersionsMatchCheck;
+use Tbtop\Cms\Health\Checks\PageFieldCollisionsCheck;
 use Tbtop\Cms\Health\Checks\PageSubtypeBasesCheck;
 use Tbtop\Cms\Health\Checks\PageTypePairsCheck;
 use Tbtop\Cms\Health\Checks\RobotsTxtCheck;
@@ -59,6 +60,7 @@ final class HealthCheckRunner
             PageTypePairsCheck::class,
             PageSubtypeBasesCheck::class,
             UnknownSchemaTypesCheck::class,
+            PageFieldCollisionsCheck::class,
         ];
     }
 

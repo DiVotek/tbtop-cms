@@ -504,7 +504,12 @@ public function backReferences(): array
   `sort_order` then name, as the same `{id, name, url}` list. `from`
   narrows to sources whose `type` or `subtype` is that key. A subtype's
   entries merge over its base's. A throw is logged
-  (`page.back_references_resolve_failed`) and the lists drop out.
+  (`page.back_references_resolve_failed`) and the lists drop out. The lists
+  are added after the type fields, so a key named like a field (the base's
+  or the subtype's) replaces that field's value in `page.fields`;
+  `cms:doctor` warns about each such name under `page_field_collisions`
+  (declared `fields()` names only, not keys a `resolveFields()` override
+  computes).
 - **Index.** The lists read `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
   for a page on every save; a force delete cascades. Only a page type's
