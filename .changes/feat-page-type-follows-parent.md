@@ -2,7 +2,7 @@
 
 touches: page create form, page edit form (save buttons, type/parent), pages list tabs, subtype on type change
 
-> ⚠️ **Contract** Saving a page with a category makes it an `article` (only a `category` parent does this — a page under a host container that allows pages stays a page); saving an article without one makes it a `page`. Picking `page` drops any parent; picking `article` requires one (`parent_id` error `pages.validation.article_needs_category`).
+> ⚠️ **Contract** Saving a page with a category makes it an `article` (only a `category` parent does this — a page under a host container that allows pages stays a page); saving an article without one makes it a `page`. Picking `page` drops any parent; picking `article` requires one (`parent_id` error `pages.validation.article_needs_category`). The article rules hold only while the registered `article` type `requiresParent()`.
 > ⚠️ **Contract** A type change that would leave the page's stored subtype behind is rejected on `type` (`pages.validation.type_change_subtype`); it used to drop the subtype silently.
 > ⚠️ **Contract** The pages list has one tab per `type` a live page has (named by the key, `?tab=page` / `?tab=article` / `?tab=section`, labelled by the type), between "All" and "Deleted"; the fixed "Categories" / "Pages" / "Articles" tabs (`?tab=categories|pages|articles`, which used to mean "no parent" / "has a parent") and their `pages.tabs.*` lang keys are gone.
 
@@ -24,5 +24,8 @@ the refusal, `PageEditPageTest` footer lists the confirming twin.
 Read by eye: the confirm dialog on both save buttons when a page gets a
 category in the sidebar, and when an article's category is cleared.
 
-Assumptions: `mod+s` stays on the plain save button; while it is hidden the
-shortcut saves without the confirm.
+`mod+s` opens the confirm while the type would change (it sits on both
+footer save twins). Both article rules apply only while the `article` type
+`requiresParent()`; a host override returning `false` keeps root articles.
+A legacy page already under a category gets the confirm on any save. After
+a Type change the Subtype select stays until the stored subtype is cleared.
