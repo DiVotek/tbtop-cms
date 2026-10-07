@@ -426,8 +426,14 @@ final class ConcertType extends BasePageType
   articles as articles and lets the create modal make one. Under any
   other container whose `allowedChildren()` includes `page` (a host
   `section`), a page stays a page. The edit form asks to confirm while the
-  save would change the type. The list tabs "Pages" and "Articles" filter by
-  `type`.
+  save would change the type.
+- **Pages list tabs.** "All", then one tab per `type` that a non-trashed
+  page has — registered types in registration order, then any type that
+  outlived its registration — then "Deleted". A tab is named by the type key
+  (`?tab=section`) and labelled by `pages.types.{key}` when that translation
+  exists, else the type's `label()`, else the raw key. A host base type
+  (`section`, `event`) gets its own tab; subtypes share their base's tab and
+  use the Subtype filter.
 - **`childSubtype()`.** A category type (or subtype) may return the key of a
   subtype of `article`; an article that arrives under that category without
   a subtype of its own — created there, or a page that just became an

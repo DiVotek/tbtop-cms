@@ -4,7 +4,7 @@ touches: page create form, page edit form (save buttons, type/parent), pages lis
 
 > ⚠️ **Contract** Saving a page with a category makes it an `article` (only a `category` parent does this — a page under a host container that allows pages stays a page); saving an article without one makes it a `page`. Picking `page` drops any parent; picking `article` requires one (`parent_id` error `pages.validation.article_needs_category`).
 > ⚠️ **Contract** A type change that would leave the page's stored subtype behind is rejected on `type` (`pages.validation.type_change_subtype`); it used to drop the subtype silently.
-> ⚠️ **Contract** The pages list tabs "Pages" and "Articles" filter by `type` (`page` / `article`); they used to mean "no parent" / "has a parent".
+> ⚠️ **Contract** The pages list has one tab per `type` a live page has (named by the key, `?tab=page` / `?tab=article` / `?tab=section`, labelled by the type), between "All" and "Deleted"; the fixed "Categories" / "Pages" / "Articles" tabs (`?tab=categories|pages|articles`, which used to mean "no parent" / "has a parent") and their `pages.tabs.*` lang keys are gone.
 
 The stock tree already forbids a page under a category and an article
 without one, so a save that broke the rule bounced off PageHierarchy with a

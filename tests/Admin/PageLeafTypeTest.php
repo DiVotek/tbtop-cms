@@ -170,8 +170,8 @@ it('lists pages and articles by their type', function (): void {
 
     $names = fn (string $tab): array => array_column(test()->getJson("/admin/pages/tables/pages?tab={$tab}")->assertOk()->json('data.data'), 'name');
 
-    expect($names('pages'))->toBe(['About'])
-        ->and($names('articles'))->toBe(['Post']);
+    expect($names('page'))->toBe(['About'])
+        ->and($names('article'))->toBe(['Post']);
 });
 
 it('shows the plain save while the type stays and the confirming one while it would flip', function (): void {

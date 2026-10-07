@@ -18,7 +18,6 @@ use Tbtop\Admin\Dsl\Tab;
 use Tbtop\Admin\Pages\Page as AdminPage;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
-use Tbtop\Cms\Admin\Pages\Support\PageLeafType;
 use Tbtop\Cms\Admin\Pages\Support\PageSortKey;
 use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
@@ -141,13 +140,8 @@ class PagesPage extends AdminPage
                     ->date(__('tbtop-cms::pages.date_format'))->toggleable(true, hiddenByDefault: true),
             ])
             ->tabs([
-                $this->tab('all'),
-                $this->tab('categories')
-                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", 'category')),
-                $this->tab('pages')
-                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", PageLeafType::PAGE)),
-                $this->tab('articles')
-                    ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", PageLeafType::ARTICLE)),
+                $this->tab('all', __('tbtop-cms::pages.tabs.all')),
+                ...$this->typeTabs($pages),
                 Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))->count()
                     ->description(__('tbtop-cms::pages.tabs_deleted_description'))
                     ->query($this->onlyTrashedScope(...)),
@@ -442,12 +436,30 @@ class PagesPage extends AdminPage
         return Effects::make()->notify(__('tbtop-cms::pages.actions.force_deleted'))->refreshTable();
     }
 
-    private function tab(string $name): Tab
+    private function tab(string $name, string $label): Tab
     {
-        $label = __('tbtop-cms::pages.tabs.' . $name);
-
         return Tab::make($name)->label($label)->count()
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
+    }
+
+    /**
+     * One tab per type a live page has, registered types in registry order
+     * and then any type that outlived its registration, labelled by its key.
+     *
+     * @return list<Tab>
+     */
+    private function typeTabs(string $pages): array
+    {
+        $registry = app(PageTypeRegistry::class);
+        $present = Page::query()->distinct()->pluck('type')->all();
+        $unregistered = array_diff($present, $registry->keys());
+        sort($unregistered);
+
+        return array_map(
+            fn (string $type): Tab => $this->tab($type, PageFormOptions::typeLabelFor($type, $registry->has($type) ? $registry->get($type)->label() : $type))
+                ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", $type)),
+            [...array_intersect($registry->keys(), $present), ...$unregistered],
+        );
     }
 
     private function typeLabel(mixed $value): string
