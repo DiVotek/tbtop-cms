@@ -101,6 +101,12 @@ it('redirects the bare default-locale prefix to the site root', function (): voi
     $this->get('/en')->assertRedirect('/');
 });
 
+it('keeps the locale-prefix redirect on this host when the path has empty segments', function (string $path): void {
+    app(Cms::class)->frontendRoutes();
+
+    $this->get($path)->assertStatus(301)->assertRedirect(url('/evil.example'));
+})->with(['/en//evil.example', '/en///evil.example', '/en/%2F%2Fevil.example']);
+
 it('preserves the query string when canonicalizing the locale prefix', function (): void {
     app(Cms::class)->frontendRoutes();
 
