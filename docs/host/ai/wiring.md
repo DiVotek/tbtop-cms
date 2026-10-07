@@ -502,6 +502,12 @@ fix left) — same severity as zero active default languages.
   — nine values: `tbtop-cms.pages`, `.media`, `.submissions`, `.redirects`,
   `.settings`, `.design`, `.languages`, `.users`, `.audit`. Dashboard and
   profile pages declare no ability and stay open under either setting.
+  **Known issue:** the media HTTP API (`api/media/*`: list, upload,
+  import-url, update, replace, delete, folders) is registered by
+  `tbtop/admin`, not by this package, and the ability is declared only on
+  `MediaLibraryPage`. With `roles` on, an admin denied `tbtop-cms.media`
+  loses the page but the endpoints are not gated by it; they fall under the
+  panel's own middleware stack.
 
 `tbtop-cms.admin` config also controls: `prefix` (default `admin`), `guard`
 (default `web`), `model` (host user model class, default `App\Models\User`),

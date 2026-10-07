@@ -55,11 +55,12 @@ update any reference to the old class name.
 
 ## Page subtypes and type fields
 
-`PageTypeInterface` gains `base(): string`, `fields(S $s): list<Field>` and
-`resolveFields(array $input, ResolveContext $ctx): array`; `BasePageType`
-returns the type's own key, `[]` and a `FormResolver` pass over `fields()`,
-so a type extending it is unaffected. A host implementing the interface
-directly must add the three methods.
+`PageTypeInterface` gains `base(): string`, `fields(S $s): list<Field>`,
+`resolveFields(array $input, ResolveContext $ctx): array`,
+`backReferences(): array` and `childSubtype(): ?string`; `BasePageType`
+returns the type's own key, `[]`, a `FormResolver` pass over `fields()`,
+`[]` and `null`, so a type extending it is unaffected. A host implementing
+the interface directly must add the five methods.
 
 `tbtop_pages` gains `subtype` (nullable string) and `fields` (JSON). A type
 whose `base()` is another type's key is a **subtype**: pages of it store
@@ -355,3 +356,72 @@ the site's default language, then `null`. A translation saved as `''` or
 whitespace counts as missing. Before, a blank translation shipped `''`, and
 a missing one fell back to `app.fallback_locale` rather than the default
 language. The four page props are typed `string | null`.
+
+## Upgrading from `main` to this release (checklist)
+
+The sections above cover each change in depth; this is what a host does by
+hand, in order.
+
+1. **Run `php artisan migrate`.** New migrations, in order:
+   `2026_10_03_000002_create_shared_blocks_table`,
+   `2026_10_06_000000_add_subtype_and_fields_to_pages_table`,
+   `2026_10_07_000000_add_lock_version_to_shared_blocks_table`,
+   `2026_10_07_000001_move_identity_contacts_to_site_contacts`,
+   `2026_10_07_000002_create_page_refs_table`. Register host page-type
+   classes (`PageTypeRegistry::extend()` or config) before migrating: the
+   subtype migration reads the registry. Rolling back is lossy:
+   - `move_identity_contacts_to_site_contacts` has an empty `down()`; the
+     old `seo.identity.*` keys are not restored.
+   - `add_subtype_and_fields` `down()` drops the `subtype` and `fields`
+     columns, so every stored `fields` value is lost (and pages already
+     moved to `type = <base>` do not move back).
+   - Dropping `tbtop_shared_blocks` (`create_shared_blocks` `down()`)
+     empties every block that points at one: those rows hold only
+     `shared: <id>` and become Problem blocks.
+2. **Run `php artisan cms:page-refs:rebuild` once** if any page type has a
+   `pages`-kind field, or its reverse lists stay empty until each source
+   page is saved again.
+3. **Page types that implement `PageTypeInterface` directly** add the five
+   methods listed under "Page subtypes and type fields". Types extending
+   `BasePageType` need nothing.
+4. **A published `config/tbtop-cms.php` needs two new keys.** Add
+   `admin.pages.shared_blocks` (`Tbtop\Cms\Admin\Pages\SharedBlocksPage::class`)
+   and `admin.pages.shared_block_edit`
+   (`Tbtop\Cms\Admin\Pages\SharedBlockEditPage::class`) next to
+   `layout_edit`. The service provider merges config with
+   `mergeConfigFrom`, which is shallow: a published config replaces the
+   whole `admin` array and never receives new nested keys. Without the two
+   keys the shared-block routes do not exist and "Make shared" in the page
+   editor fails with a 500. The new `blocks.discover`, `blocks.registry_path`
+   and `blocks.components_dir` keys are optional: the code falls back to
+   their defaults when they are missing.
+5. **Regenerate the block files.** `php artisan cms:blocks:types` now also
+   writes `registry.generated.ts` (next to the types file; catalog plus a
+   component map) when the components folder (`blocks.components_dir`,
+   default `./blocks`, relative to the registry file) exists. It then fails
+   if a registered block that is placeable somewhere has no
+   `<StudlyKind>.tsx` exporting `<StudlyKind>` there, or if two kinds map to
+   one component name. `--check` verifies both files. A host that keeps the
+   folder but its own catalog and registry sets `blocks.registry_path` to
+   `false`; a host without the folder gets only the types file, as before.
+   Block classes can be found by scanning folders with
+   `blocks.discover` (`namespace => directory`, subfolders map to
+   sub-namespaces) instead of listing each one in `blocks.types`.
+6. **A leaf's type follows its category.** A page given a category becomes
+   an article; an article whose category is removed becomes a page. Under
+   other containers that allow `page` children (a host `section`, say) a
+   page stays a page. The pages list tabs "Pages" and "Articles" now filter
+   by `type` (`page` / `article`), not by "no parent" / "has a parent". A
+   type change that would orphan the page's stored subtype is rejected on
+   `type`; it used to drop the subtype silently.
+7. **`BlockContentResolver` has new constructor dependencies**
+   (`SharedBlocks`, `PageTypeRegistry`, `BackReferences`). This only matters
+   to a host that builds it with `new`; container resolution is unaffected.
+8. **Content rows may carry `shared: <id>` with an empty `data`.** A seeder,
+   export or any code that reads a page's or layout's `content` directly
+   sees no data for such a row; resolve it with
+   `Tbtop\Cms\SharedBlock\SharedBlocks::dataOf($row, $kind)`.
+
+The remaining behaviour changes (form-resolved block props, Problem blocks,
+`page.fields` as an object, page-text fallback, site contacts) have their own
+sections above.

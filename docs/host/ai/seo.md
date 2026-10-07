@@ -180,7 +180,11 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    Which key a page gets is a two-step lookup, not a hardcoded `match` on
    `page->type` any more:
    - `PageTypeInterface::schemaTypes(): non-empty-list<string>` lists the
-     keys a page type may publish, first element the default
+     keys a page type may publish, first element the default. A page is
+     judged by `PageTypeRegistry::schemaTypesFor()`: its subtype's list when
+     the subtype is registered, else its base type's (a subtype is the more
+     specific declaration; one extending its base's class inherits the
+     base's list)
      (`BasePageType` → `['WebPage','AboutPage','ContactPage','ItemPage']`,
      `ArticleType` → `['Article','NewsArticle','BlogPosting']`,
      `CategoryType` → `['CollectionPage']`).
@@ -188,7 +192,7 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
      `page.seo.schema.type` (the only key left under `seo.schema` — the
      rest of the old structured-data form fields are gone, see below): a
      page whose type isn't registered in `PageTypeRegistry` gets `WebPage`;
-     a stored key outside the type's `schemaTypes()` (or none stored at
+     a stored key outside that list (or none stored at
      all) falls back to the first element; the resulting key is looked up
      via `SchemaTypeRegistry::get()`, which throws on an unknown key
      (host misconfiguration surfaces, no silent fallback).
