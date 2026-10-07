@@ -11,15 +11,20 @@ use Tbtop\Cms\Page\Models\Page;
 use Throwable;
 
 /**
- * Retry has two independent deliveries to re-run, both of which the original
- * submit attempted: the block's own handleSubmit() (a custom block may
- * forward to a CRM, queue a job, etc — HandlesFormSubmission's contract,
- * unrelated to cms-owned notifications) and SubmissionNotifier's bell/mail/
- * telegram fan-out. The submission is Handled only if both succeed, Failed
- * with both errors joined if either doesn't — a retry that silently drops
- * one of the two original delivery paths would be a regression for any
- * block that relies on handleSubmit() for its own delivery, not just the
- * notification rework.
+ * Retry re-runs both delivery paths the original submit attempted, in the
+ * same order and with the same rule: the block's own handleSubmit() (a
+ * custom block may forward to a CRM, queue a job, etc — HandlesFormSubmission's
+ * contract, unrelated to cms-owned notifications), then SubmissionNotifier's
+ * bell/mail/telegram fan-out.
+ *
+ * - The handler throws: the row stays Failed with the handler's error, no
+ *   notification goes out (admins are never told about a submission the
+ *   block did not handle) and handled_at stays null.
+ * - The handler succeeds (or already had): the fan-out runs to every enabled
+ *   channel; Handled with no error if it succeeds, Failed with the channel
+ *   error otherwise.
+ *
+ * The claim is released once, with that outcome.
  *
  * handleSubmit() is not idempotent, so it runs only while handled_at is
  * null: that column records the handler's own success (FormSubmitController
@@ -56,23 +61,19 @@ class SubmissionRetrier
             return;
         }
 
-        $errors = [];
-
         if ($submission->handled_at === null) {
             try {
                 $located->block->handleSubmit($submission->payload, $located->data, $located->context);
-                $submission->forceFill(['handled_at' => now()])->save();
             } catch (Throwable $e) {
-                $errors[] = $e->getMessage();
+                $this->markFailed($submission, $e->getMessage());
+
+                return;
             }
+
+            $submission->forceFill(['handled_at' => now()])->save();
         }
 
-        $this->notifier->notifyClaimed($submission, $page);
-        $submission->refresh();
-
-        if ($submission->status === SubmissionStatus::Failed) {
-            $errors[] = (string) $submission->error;
-        }
+        $errors = $this->notifier->deliver($submission, $page);
 
         if ($errors !== []) {
             $this->markFailed($submission, implode(' | ', $errors));

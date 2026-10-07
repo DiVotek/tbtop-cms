@@ -34,6 +34,16 @@ final class CmsAbilities
         'tbtop-cms.audit',
     ];
 
+    /**
+     * Not a section ability, so not in ALL: the admin-manager gate. Its
+     * holders edit and revoke other admins' accounts on the Users page (on
+     * top of tbtop-cms.users), the way the owner does. Read only when
+     * tbtop-cms.roles is on. Kept out of ALL so a host that grants a "full
+     * editor" every section never hands out control of other admin
+     * accounts by accident.
+     */
+    public const string ADMINS = 'tbtop-cms.admins';
+
     public static function for(string $ability): ?string
     {
         return self::enabled() ? $ability : null;

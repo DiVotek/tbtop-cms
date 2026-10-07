@@ -19,6 +19,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
+use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 
 uses(RefreshDatabase::class);
 
@@ -263,7 +264,7 @@ it('retries a submission whose form block lives in a layout slot, not the page c
         ->and($submission->refresh()->status)->toBe(SubmissionStatus::Handled);
 });
 
-it('keeps the submission failed with a joined error when the fan-out still fails on retry', function (): void {
+it('keeps the submission failed with the channel error when the fan-out still fails on retry', function (): void {
     Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'still down'], 400)]);
     app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
     app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
@@ -286,4 +287,99 @@ it('keeps the submission failed with a joined error when the fan-out still fails
 
     expect($submission->status)->toBe(SubmissionStatus::Failed)
         ->and($submission->error)->toContain('still down');
+});
+
+/**
+ * Retries through the admin row action, signed in as an admin who is also
+ * the bell recipient — so "no notifications" is observable, not vacuous.
+ */
+function retryFromAdmin(FormSubmission $submission): AdminUser
+{
+    config(['tbtop-cms.admin.model' => AdminUser::class]);
+    config(['auth.providers.users.model' => AdminUser::class]);
+    $admin = AdminUser::create(['name' => 'Operator', 'email' => 'operator@example.test', 'password' => 'secret']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $admin->id]);
+
+    test()->actingAs($admin, 'web')->postJson('/admin/form-submissions/actions/retry', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk();
+
+    return $admin;
+}
+
+function failedSubmissionFor(string $kind, string $blockId): FormSubmission
+{
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Form'],
+        'content' => [['id' => $blockId, 'kind' => $kind, 'active' => true, 'data' => []]],
+    ]);
+
+    return FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => $blockId,
+        'kind' => $kind,
+        'locale' => 'en',
+        'payload' => ['value' => 'hello'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'previous error',
+    ]);
+}
+
+function enableTelegramForRetry(): void
+{
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+}
+
+it('keeps a retry failed with the handler error and sends nothing when the handler throws again', function (): void {
+    config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    enableTelegramForRetry();
+    $submission = failedSubmissionFor('Throwing', 'throw-1');
+
+    $admin = retryFromAdmin($submission);
+    $submission->refresh();
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toBe('handler boom')
+        ->and($submission->handled_at)->toBeNull()
+        ->and($admin->notifications()->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+it('keeps a retry failed with the channel error, handler marked done, when only the fan-out fails', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$handled = 0;
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'still down'], 400)]);
+    enableTelegramForRetry();
+    $submission = failedSubmissionFor('Recording', 'rec-1');
+
+    retryFromAdmin($submission);
+    $submission->refresh();
+
+    expect(RecordingFormBlock::$handled)->toBe(1)
+        ->and($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toContain('still down')
+        ->and($submission->error)->not->toContain('previous error')
+        ->and($submission->handled_at)->not->toBeNull();
+});
+
+it('marks a retry handled with no error when the handler and the fan-out both succeed', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    RecordingFormBlock::$handled = 0;
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    enableTelegramForRetry();
+    $submission = failedSubmissionFor('Recording', 'rec-1');
+
+    $admin = retryFromAdmin($submission);
+    $submission->refresh();
+
+    expect(RecordingFormBlock::$handled)->toBe(1)
+        ->and($submission->status)->toBe(SubmissionStatus::Handled)
+        ->and($submission->error)->toBeNull()
+        ->and($submission->handled_at)->not->toBeNull()
+        ->and($admin->notifications()->count())->toBe(1);
+    Http::assertSentCount(1);
 });

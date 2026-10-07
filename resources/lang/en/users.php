@@ -60,4 +60,8 @@ return [
         'email_taken' => 'Another user already uses this email address.',
         'password_too_short' => 'The password must be at least 8 characters.',
     ],
+    'errors' => [
+        'not_allowed' => "You can't edit this user.",
+        'revoke_not_allowed' => "You can't change this user's access.",
+    ],
 ];

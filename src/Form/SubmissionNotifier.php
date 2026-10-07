@@ -17,10 +17,10 @@ use Tbtop\Cms\Settings\Settings;
  * recipient list and payload, sends, and turns the per-channel outcome
  * (Notifications::send() is synchronous — see its docblock) into
  * FormSubmission's status. Shared by NotifiesAdminsOfSubmission (the
- * SubmissionReceived listener, the normal path) and SubmissionRetrier
- * (replays the same fan-out after a submission was previously marked
- * Failed) so both write the exact same delivery status from the exact same
- * rule.
+ * SubmissionReceived listener, the normal path, via notify()) and
+ * SubmissionRetrier (replays the same fan-out via deliver() after a
+ * submission was previously marked Failed, folding its errors into the one
+ * release it makes) so both judge the fan-out by the exact same rule.
  *
  * Status semantics: Handled when every enabled channel succeeds — including
  * when no optional channel is enabled at all (bell-only is a complete,
@@ -46,33 +46,30 @@ class SubmissionNotifier
             return;
         }
 
-        $this->notifyClaimed($submission, $page);
+        $errors = $this->deliver($submission, $page);
+
+        SubmissionClaim::release($submission, [
+            'status' => ($errors === [] ? SubmissionStatus::Handled : SubmissionStatus::Failed)->value,
+            'error' => $errors === [] ? null : implode(' | ', $errors),
+        ]);
     }
 
-    /** Assumes the caller already holds the claim (SubmissionClaim::take). */
-    public function notifyClaimed(FormSubmission $submission, Page $page): void
+    /**
+     * Runs the fan-out and returns every channel error, without touching the
+     * claim: the caller holds it (SubmissionClaim::take) and releases it once,
+     * with the outcome of everything it ran. Never writes handled_at — that
+     * column belongs to the block handler's own success.
+     *
+     * @return list<string>
+     */
+    public function deliver(FormSubmission $submission, Page $page): array
     {
         $built = FormSubmissionRecipients::build($this->settings, $submission->locale);
 
-        $errors = [
+        return [
             ...$this->misconfigurationErrors($built),
             ...$this->send($submission, $page, $built),
         ];
-
-        if ($errors === []) {
-            SubmissionClaim::release($submission, [
-                'status' => SubmissionStatus::Handled->value,
-                'handled_at' => $submission->handled_at ?? now(),
-                'error' => null,
-            ]);
-
-            return;
-        }
-
-        SubmissionClaim::release($submission, [
-            'status' => SubmissionStatus::Failed->value,
-            'error' => implode(' | ', $errors),
-        ]);
     }
 
     /** @return list<string> */

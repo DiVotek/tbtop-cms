@@ -311,6 +311,9 @@ Source: `src/Admin/Support/CmsAbilities.php`. Gates are host-answered only when 
 | `tbtop-cms.languages` | `src/Admin/Pages/LanguagesPage.php` |
 | `tbtop-cms.users` | `src/Admin/Pages/UsersPage.php` |
 | `tbtop-cms.audit` | `src/Admin/Pages/AuditLogPage.php`, `src/Admin/Pages/AuditActivityPage.php` |
+| `tbtop-cms.admins` (`CmsAbilities::ADMINS`, not in `ALL`) | No page. `src/Admin/Pages/UsersPage.php` reads it (roles on only) to make its holder an admin manager, who may edit and revoke other admins. **Granting it gives control of other admin accounts.** |
+
+The media API routes (`tbtop.cms.media.*`, registered by tbtop/admin) are gated by `src/Admin/Http/Middleware/AuthorizeMediaApi.php` when roles are on: reading and adding needs any of `tbtop-cms.media`, `.pages`, `.settings`, `.design`; changing, replacing and deleting files and folders, and any unmapped media route, need `tbtop-cms.media` (map: `AuthorizeMediaApi::ROUTES`; see wiring.md#admin-access-and-roles).
 
 `DashboardPage` checks `Gate::allows('tbtop-cms.submissions')` to conditionally show a widget but declares no page-level ability itself. `PageEditPage` (under `tbtop-cms.pages`) shows and accepts a block's "Make shared" action (`pageBlockShare_{id}`) only when `tbtop-cms.design` also allows — it creates a shared block; a hand-made post without it is a 403. `PageEditPage` and `LayoutEditPage` show **Problem blocks (N)** (`pageProblemBlocks` / `layoutProblemBlocks`, a modal with one `…ProblemDelete_{rowId}` action per row) when the container has rows the site skips, under the page's own ability; lang keys `tbtop-cms::pages.problem_blocks.{action,title,description,reasons.{unregistered,shared_missing,shared_kind_mismatch},delete,delete_title,delete_confirm,deleted}` — see blocks.md#problem-blocks. `ProfilePage` and `LoginPage` declare none.
 

@@ -27,5 +27,9 @@ _Avoid_: "custom template", "theme".
 The package- or host-shipped Blade view a notification type registers for a format. What a template override replaces, and what it falls back to when absent or broken.
 
 **Owner**:
-The admin marked `is_owner`, the only admin permitted to edit template overrides, since a template runs as real Blade.
+The admin marked `is_owner`, the only admin permitted to edit template overrides, since a template runs as real Blade. The owner also manages other admins.
+_Avoid_: "superadmin", "root".
+
+**Admin manager**:
+The admin who may edit and revoke other admins' accounts: the owner, plus, when roles are on, holders of the host gate `tbtop-cms.admins`. Other admins edit only themselves and users without CMS access. Holding the gate does not allow editing template overrides.
 _Avoid_: "superadmin", "root".

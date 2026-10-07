@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
@@ -31,9 +33,15 @@ use Tbtop\Cms\Admin\Support\CurrentAdmin;
  *
  * Access is binary: a CmsUserProfile row means admin access, no row means
  * none. What an admin may then do is the host's business via tbtop-cms.roles
- * — this page never reads or writes a role. is_owner is a protection, not a
- * privilege: the owner row cannot be revoked or edited by anyone but the
- * owner themselves, and grants no extra section rights.
+ * — this page never reads or writes a role.
+ *
+ * Other admins' accounts belong to the admin manager only: the owner, plus —
+ * when tbtop-cms.roles is on — whoever the host gives the
+ * CmsAbilities::ADMINS gate. Any admin may edit their own row and rows
+ * without CMS access (and grant those access); editing or revoking another
+ * admin needs the admin manager. The owner row itself cannot be revoked, or
+ * edited by anyone but the owner. Every rule is checked on the server: the
+ * row id comes from the client, hidden buttons are only a convenience.
  */
 class UsersPage extends AdminPage
 {
@@ -119,6 +127,10 @@ class UsersPage extends AdminPage
                 Column::make('is_owner')->label('is_owner')
                     ->toggleable(true, hiddenByDefault: true)
                     ->formatUsing(static fn (mixed $v): bool => (bool) $v),
+                // Whether the actor is the admin manager (same on every row).
+                Column::make('manages_admins')->label('manages_admins')
+                    ->toggleable(true, hiddenByDefault: true)
+                    ->formatUsing(static fn (mixed $v): bool => (bool) $v),
             ])
             ->searchable(['name', 'email'])
             ->defaultSort('name', 'asc')
@@ -153,22 +165,20 @@ class UsersPage extends AdminPage
         $query = $model::query()->select($table . '.*');
 
         if (is_a($model, CmsAdmin::class, true)) {
-            return $query
-                ->selectRaw("'managed' as has_access")
-                ->selectRaw('0 as is_owner')
-                ->selectRaw(
-                    $currentId !== null ? $table . '.id = ? as is_self' : '0 as is_self',
-                    $currentId !== null ? [$currentId] : [],
-                );
-        }
-
-        return $query
-            ->selectSub(
+            // The application decides access, so the list cannot tell an
+            // admin from a stranger — but the owner still has a profile row
+            // (cms:admin:create), and its Edit must stay hidden from others.
+            $query->selectRaw("'managed' as has_access");
+        } else {
+            $query->selectSub(
                 CmsUserProfile::query()->selectRaw("CASE WHEN is_owner THEN 'owner' ELSE 'granted' END")
                     ->whereColumn('user_id', $table . '.id')
                     ->limit(1),
                 'has_access',
-            )
+            );
+        }
+
+        return $query
             ->selectSub(
                 CmsUserProfile::query()->selectRaw('1')
                     ->whereColumn('user_id', $table . '.id')
@@ -179,7 +189,8 @@ class UsersPage extends AdminPage
             ->selectRaw(
                 $currentId !== null ? $table . '.id = ? as is_self' : '0 as is_self',
                 $currentId !== null ? [$currentId] : [],
-            );
+            )
+            ->selectRaw('? as manages_admins', [$this->actorManagesAdmins() ? 1 : 0]);
     }
 
     private function accessLabel(mixed $value): string
@@ -231,6 +242,7 @@ class UsersPage extends AdminPage
                 Cond::eq('has_access', __('tbtop-cms::users.access.managed')),
                 Cond::eq('has_access', __('tbtop-cms::users.access.none')),
                 Cond::eq('is_owner', true),
+                Cond::neq('manages_admins', true),
             ));
     }
 
@@ -243,6 +255,7 @@ class UsersPage extends AdminPage
             $this->assertNotSelf($userId);
             $this->assertExistingProfile($userId);
             $this->assertNotOwner($userId, 'cannot_revoke_owner');
+            $this->assertManagesAdmins('revoke_not_allowed');
         } catch (ValidationException $e) {
             return Effects::make()->notify(self::firstError($e), 'error');
         }
@@ -264,20 +277,37 @@ class UsersPage extends AdminPage
             $s->flex([$s->spacer(), $cancel, $save], justify: 'end'),
         ]);
 
-        // Any admin may edit their own row here (ProfilePage stays the place
-        // for display-name/locale/avatar); an owner's row is otherwise
-        // editable only by the owner themselves — protection, not a
-        // privilege the owner grants themselves over their own data.
+        // ProfilePage stays the place for display-name/locale/avatar. In
+        // CmsAdmin mode every row is 'managed', so Edit shows on other
+        // admins too and assertMayEdit() answers not_allowed.
         return $s->action('userEdit')->label(__('tbtop-cms::users.actions.edit'))
             ->modal(__('tbtop-cms::users.actions.edit_title'), $form)
-            ->query(
-                fn (ActionCtx $ctx): array => UserForm::loadRow($this->userModel(), self::rowId($ctx)),
-                needs: ['row'],
-            )
-            ->hiddenIf(Cond::all(
-                Cond::eq('is_owner', true),
-                Cond::neq('is_self', true),
+            ->query($this->loadEditRow(...), needs: ['row'])
+            ->hiddenIf(Cond::any(
+                Cond::all(
+                    Cond::eq('is_owner', true),
+                    Cond::neq('is_self', true),
+                ),
+                Cond::all(
+                    Cond::eq('has_access', __('tbtop-cms::users.access.granted')),
+                    Cond::neq('is_self', true),
+                    Cond::neq('manages_admins', true),
+                ),
             ));
+    }
+
+    /** @return array<string, mixed> */
+    private function loadEditRow(ActionCtx $ctx): array
+    {
+        $userId = self::rowId($ctx);
+
+        try {
+            $this->assertMayEdit($userId);
+        } catch (ValidationException) {
+            abort(403, __('tbtop-cms::users.errors.not_allowed'));
+        }
+
+        return UserForm::loadRow($this->userModel(), $userId);
     }
 
     private function update(ActionCtx $ctx): Effects
@@ -285,7 +315,7 @@ class UsersPage extends AdminPage
         $userId = self::rowId($ctx);
 
         try {
-            $this->assertNotOwner($userId, 'cannot_edit_owner');
+            $this->assertMayEdit($userId);
             UserForm::update($ctx->form, $this->userModel(), $userId);
         } catch (ValidationException $e) {
             return self::haltWithErrors($e);
@@ -327,17 +357,76 @@ class UsersPage extends AdminPage
         return Effects::make()->notify(__('tbtop-cms::users.actions.created'))->closeModal()->refreshTable();
     }
 
-    /**
-     * Self-revoke is the only guard left on this page, so the comparison must
-     * hold for every key type the package supports (int, uuid, ulid) — casting
-     * to int would collapse every string key to 0 and match the wrong user.
-     */
     private function assertNotSelf(int | string $userId): void
     {
-        $currentId = CurrentAdmin::user()?->getKey();
-        if ($currentId !== null && (string) $currentId === (string) $userId) {
+        if ($this->isSelf($userId)) {
             throw ValidationException::withMessages(['user' => __('tbtop-cms::users.validation.cannot_manage_self')]);
         }
+    }
+
+    private function assertMayEdit(int | string $userId): void
+    {
+        if ($this->isSelf($userId)) {
+            return;
+        }
+
+        $this->assertNotOwner($userId, 'cannot_edit_owner');
+
+        if ($this->targetIsAdmin($userId)) {
+            $this->assertManagesAdmins('not_allowed');
+        }
+    }
+
+    private function assertManagesAdmins(string $message): void
+    {
+        if (! $this->actorManagesAdmins()) {
+            throw ValidationException::withMessages(['user' => __('tbtop-cms::users.errors.' . $message)]);
+        }
+    }
+
+    /**
+     * The admin manager: the owner in every mode, plus — only when
+     * tbtop-cms.roles is on — holders of the CmsAbilities::ADMINS gate. With
+     * roles off the gate is never read, so a host's leftover definition
+     * cannot hand out the right.
+     */
+    private function actorManagesAdmins(): bool
+    {
+        $actor = CurrentAdmin::user();
+        if (! $actor instanceof Model) {
+            return false;
+        }
+
+        $actorId = $actor->getKey();
+        if (AdminAccess::isOwner(is_int($actorId) ? $actorId : (string) $actorId)) {
+            return true;
+        }
+
+        return CmsAbilities::enabled() && Gate::forUser($actor)->allows(CmsAbilities::ADMINS);
+    }
+
+    /**
+     * Same rule that lets a user into the CMS (CurrentAdmin::allows): the
+     * application's canAccessCmsAdmin() in CmsAdmin mode, a profile row
+     * otherwise.
+     */
+    private function targetIsAdmin(int | string $userId): bool
+    {
+        $target = $this->userModel()::query()->find($userId);
+
+        return $target instanceof Authenticatable && CurrentAdmin::allows($target);
+    }
+
+    /**
+     * Must hold for every key type the package supports (int, uuid, ulid) —
+     * casting to int would collapse every string key to 0 and match the
+     * wrong user.
+     */
+    private function isSelf(int | string $userId): bool
+    {
+        $currentId = CurrentAdmin::user()?->getKey();
+
+        return $currentId !== null && (string) $currentId === (string) $userId;
     }
 
     private function assertProfileControlsAccess(): void
@@ -368,12 +457,7 @@ class UsersPage extends AdminPage
      */
     private function assertNotOwner(int | string $userId, string $message): void
     {
-        if (! AdminAccess::isOwner($userId)) {
-            return;
-        }
-
-        $currentId = CurrentAdmin::user()?->getKey();
-        if ($currentId !== null && (string) $currentId === (string) $userId) {
+        if (! AdminAccess::isOwner($userId) || $this->isSelf($userId)) {
             return;
         }
 

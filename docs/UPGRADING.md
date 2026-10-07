@@ -365,6 +365,44 @@ whitespace counts as missing. Before, a blank translation shipped `''`, and
 a missing one fell back to `app.fallback_locale` rather than the default
 language. The four page props are typed `string | null`.
 
+## Only the admin manager edits or revokes other admins
+
+The Users page used to let any admin edit (name, email, password) or revoke
+any other admin except the owner. Now only the **admin manager** can: the
+owner, plus, when `tbtop-cms.roles` is on, users the host gives the new gate
+`tbtop-cms.admins` (`CmsAbilities::ADMINS`; not part of `CmsAbilities::ALL`,
+and read only on top of `tbtop-cms.users`). Every admin still edits their own
+row and rows without CMS access, and grants access to those. The owner
+therefore gains a privilege: managing other admins, next to editing
+notification template overrides. Granting `tbtop-cms.admins` gives control of
+other admin accounts; give it only to people you would make owner.
+
+**`CmsAdmin` hosts.** The list cannot tell admins apart, so Edit shows on
+every row except the owner's (the list now reads the real `is_owner` in this
+mode too). Editing a row whose `canAccessCmsAdmin()` is true is refused with
+"You can't edit this user." unless the actor is the owner or, with roles on,
+holds `tbtop-cms.admins`. Without an owner and with roles off, admins can
+edit only themselves and non-admin rows.
+
+## The media API follows section abilities when roles are on
+
+With `tbtop-cms.roles` on, tbtop/admin's media API (`api/media/*`) is now
+gated by `AuthorizeMediaApi`: listing, viewing, downloading, uploading,
+importing and creating folders needs any of `tbtop-cms.media`, `.pages`,
+`.settings` or `.design`; editing, replacing and deleting files, and renaming
+or deleting folders, needs `tbtop-cms.media`. A host page of its own with a
+media field must be used by people who hold one of those four abilities, or
+its picker gets 403. With roles off nothing changes.
+
+## A retried submission whose handler throws stays failed
+
+`SubmissionRetrier::retry()` now follows the first-submit rule: if the
+block's `handleSubmit()` throws again, the row stays `Failed` with the
+handler's error, `handled_at` stays null and no notification is sent (it
+used to send the fan-out and end `Handled`). `SubmissionNotifier::notifyClaimed()`
+is replaced by `deliver()`, which returns the channel errors and leaves the
+claim to its caller.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
@@ -440,7 +478,12 @@ hand, in order.
    render, but any later type/subtype change is refused until fixed), and
    `page_subtype_bases` lists subtypes whose `base()` is not a registered
    top-level type.
+10. **With `tbtop-cms.roles` on, review two gates.** Give
+    `tbtop-cms.admins` to whoever besides the owner must manage other admins
+    (only then can they edit or revoke them). Make sure the users of any
+    host page with a media field hold `tbtop-cms.media`, `.pages`,
+    `.settings` or `.design`, or the media API refuses them.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
-`page.fields` as an object, page-text fallback, site contacts) have their own
-sections above.
+`page.fields` as an object, page-text fallback, site contacts, the admin
+manager, the media API gate, failed retries) have their own sections above.
