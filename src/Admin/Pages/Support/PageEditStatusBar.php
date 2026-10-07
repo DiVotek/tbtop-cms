@@ -9,6 +9,7 @@ use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\DisplayValueBlock;
+use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
@@ -69,45 +70,92 @@ final class PageEditStatusBar
      * site. A live page has nothing to preview, so the action (and the
      * modal it opens) simply doesn't exist for it — mirrors canDelete()'s
      * server-side conditional-build pattern in PageEditPage rather than
-     * hiding a built action client-side.
+     * hiding a built action client-side. An error page has no slug and no
+     * URL of its own, so it gets no action either.
+     *
+     * One read-only field per site locale with a saved slug, in site-locale
+     * order: a locale without a path has nothing to link to, and signing
+     * its empty path would point the link at the home page.
      *
      * @return list<ActionBuilder>
      */
     private static function previewLinkAction(S $s, Page $page): array
     {
-        if ($page->isLive()) {
+        if ($page->isLive() || $page->isErrorPage()) {
             return [];
         }
+
+        $locales = self::previewLocales($page);
 
         $close = $s->action('pagePreviewLinkClose')->label(__('tbtop-cms::pages.preview.close'))
             ->handle(static fn (ActionCtx $ctx): Effects => Effects::make()->closeModal());
 
-        // Regenerates the signed URL (same deterministic call as query() below)
-        // instead of reading the disabled field's displayed value.
-        $copy = $s->action('pagePreviewLinkCopy')->label(__('tbtop-cms::pages.preview.copy'))
-            ->handle(static fn (ActionCtx $ctx): Effects => Effects::make()->copyToClipboard(
-                app(PreviewLink::class)->for($page, app(Languages::class)->defaultLocale()),
-            ));
+        $body = $locales === []
+            ? [
+                $s->displayText(__('tbtop-cms::pages.preview.no_slug'))->variant('muted'),
+                $s->flex([$s->spacer(), $close], justify: 'end'),
+            ]
+            : [
+                ...array_map(
+                    static fn (string $locale, string $name): Field => $s->text(self::fieldName($locale))->label($name)->meta('disabled', true),
+                    array_keys($locales),
+                    array_values($locales),
+                ),
+                $s->displayText(__('tbtop-cms::pages.preview.helper', ['hours' => self::ttlHours()]))->variant('muted'),
+                $s->flex([$s->spacer(), self::copyAction($s, $page, array_key_first($locales)), $close], justify: 'end'),
+            ];
 
-        $field = $s->text('previewUrl')->label(__('tbtop-cms::pages.preview.field_label'))->meta('disabled', true);
-
-        // The signed URL is only fetched via the action's query() below (which
-        // runs when the modal opens) — this form carries no onSubmit because
-        // there's nothing to save, only a value to display and copy.
-        $form = $s->form('pagePreviewLinkForm', [
-            $field,
-            $s->displayText(__('tbtop-cms::pages.preview.helper', ['hours' => self::ttlHours()]))->variant('muted'),
-            $s->flex([$s->spacer(), $copy, $close], justify: 'end'),
-        ])->guardUnsaved(false);
+        // The signed URLs are only fetched via the action's query() below
+        // (which runs when the modal opens) — this form carries no onSubmit
+        // because there's nothing to save, only values to display and copy.
+        $form = $s->form('pagePreviewLinkForm', $body)->guardUnsaved(false);
 
         return [
             $s->action('pagePreviewLink')->label(__('tbtop-cms::pages.actions.preview_link'))
                 ->icon('eye')
                 ->modal(__('tbtop-cms::pages.actions.preview_link_title'), $form)
-                ->query(static fn (ActionCtx $ctx): array => [
-                    'previewUrl' => app(PreviewLink::class)->for($page, app(Languages::class)->defaultLocale()),
-                ], needs: []),
+                ->query(static fn (ActionCtx $ctx): array => array_combine(
+                    array_map(self::fieldName(...), array_keys($locales)),
+                    array_map(static fn (string $locale): string => app(PreviewLink::class)->for($page, $locale), array_keys($locales)),
+                ), needs: []),
         ];
+    }
+
+    /**
+     * Copies the first locale's link. Regenerates the signed URL (same
+     * deterministic call as the modal's query()) instead of reading the
+     * disabled field's displayed value.
+     */
+    private static function copyAction(S $s, Page $page, string $locale): ActionBuilder
+    {
+        return $s->action('pagePreviewLinkCopy')->label(__('tbtop-cms::pages.preview.copy'))
+            ->handle(static fn (ActionCtx $ctx): Effects => Effects::make()->copyToClipboard(
+                app(PreviewLink::class)->for($page, $locale),
+            ));
+    }
+
+    /**
+     * Site locales (frontendActive order) whose saved slug gives the page a
+     * path — `!== null`, not truthiness: a system root's path is ''.
+     *
+     * @return array<string, string> locale => language name
+     */
+    private static function previewLocales(Page $page): array
+    {
+        $locales = [];
+
+        foreach (app(Languages::class)->frontendActive() as $language) {
+            if ($page->pathFor($language['locale']) !== null) {
+                $locales[$language['locale']] = $language['name'];
+            }
+        }
+
+        return $locales;
+    }
+
+    private static function fieldName(string $locale): string
+    {
+        return 'previewUrl_' . $locale;
     }
 
     private static function ttlHours(): int

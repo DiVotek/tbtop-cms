@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form;
 
+use Illuminate\Support\Facades\Context;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Support\FormBlockLocator;
 use Tbtop\Cms\Form\Support\LocatedFormBlock;
@@ -39,35 +40,59 @@ class SubmissionRetrier
         private readonly SubmissionNotifier $notifier,
     ) {}
 
+    /**
+     * Any exception after the claim — the page or block lookup, the
+     * handled_at write, the fan-out — ends the row Failed with its message
+     * and goes to report(); it is never rethrown, so the admin retry action
+     * shows the error toast instead of a 500.
+     */
     public function retry(FormSubmission $submission): void
     {
         if (! SubmissionClaim::take($submission, SubmissionStatus::Failed)) {
             return;
         }
 
+        // Not null: if even report() throws, the row must not be released Handled.
+        $error = 'Retry did not finish.';
+
+        try {
+            $error = $this->run($submission);
+        } catch (Throwable $e) {
+            // The original exception, so host trackers group and filter it by its
+            // own type; the id rides along in the log context.
+            Context::add('submission_id', $submission->id);
+            report($e);
+            Context::forget('submission_id');
+
+            $error = $e->getMessage();
+        } finally {
+            SubmissionClaim::release($submission, [
+                'status' => ($error === null ? SubmissionStatus::Handled : SubmissionStatus::Failed)->value,
+                'error' => $error,
+            ]);
+        }
+    }
+
+    /** @return string|null the error the row is released Failed with, null for Handled */
+    private function run(FormSubmission $submission): ?string
+    {
         $page = $submission->page_id !== null ? Page::query()->find($submission->page_id) : null;
 
         if (! $page instanceof Page) {
-            $this->markFailed($submission, 'Page no longer exists.');
-
-            return;
+            return 'Page no longer exists.';
         }
 
         $located = $this->locator->locate($page, $submission->block_id, $submission->locale);
 
         if (! $located instanceof LocatedFormBlock) {
-            $this->markFailed($submission, 'Form block no longer exists on the page.');
-
-            return;
+            return 'Form block no longer exists on the page.';
         }
 
         if ($submission->handled_at === null) {
             try {
                 $located->block->handleSubmit($submission->payload, $located->data, $located->context);
             } catch (Throwable $e) {
-                $this->markFailed($submission, $e->getMessage());
-
-                return;
+                return $e->getMessage();
             }
 
             $submission->forceFill(['handled_at' => now()])->save();
@@ -75,22 +100,6 @@ class SubmissionRetrier
 
         $errors = $this->notifier->deliver($submission, $page);
 
-        if ($errors !== []) {
-            $this->markFailed($submission, implode(' | ', $errors));
-
-            return;
-        }
-
-        $this->finish($submission, SubmissionStatus::Handled, null);
-    }
-
-    private function markFailed(FormSubmission $submission, string $error): void
-    {
-        $this->finish($submission, SubmissionStatus::Failed, $error);
-    }
-
-    private function finish(FormSubmission $submission, SubmissionStatus $status, ?string $error): void
-    {
-        SubmissionClaim::release($submission, ['status' => $status->value, 'error' => $error]);
+        return $errors === [] ? null : implode(' | ', $errors);
     }
 }

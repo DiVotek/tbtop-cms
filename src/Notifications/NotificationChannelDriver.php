@@ -32,34 +32,12 @@ final readonly class NotificationChannelDriver
         $channel = $this->registry->channel($notification->channelKey);
         $recipient = $notification->recipient;
 
-        $log = NotificationLog::query()->create([
-            'type' => $notification->type,
-            'channel' => $notification->channelKey,
-            'audience' => $recipient->audience,
-            'recipient' => $this->recipientLabel($recipient),
-            'locale' => $recipient->locale,
-            'status' => NotificationLogStatus::Pending,
-        ]);
+        $log = $this->openLog($notification->type, $notification->channelKey, $recipient);
 
         try {
             $channel->send($notification->rendered, $recipient, $this->settings);
         } catch (Throwable $e) {
-            $log->forceFill(['status' => NotificationLogStatus::Failed, 'error' => $e->getMessage()])->save();
-
-            $this->recorder->record(new Delivery(
-                $notification->type,
-                $notification->channelKey,
-                $recipient,
-                NotificationLogStatus::Failed,
-                $e->getMessage(),
-            ));
-
-            $this->events->dispatch(new NotificationFailed(
-                $notification->type,
-                $notification->channelKey,
-                $recipient,
-                $e->getMessage(),
-            ));
+            $this->fail($log, $notification->type, $notification->channelKey, $recipient, $e->getMessage(), DeliveryStage::Send);
 
             return;
         }
@@ -74,6 +52,38 @@ final readonly class NotificationChannelDriver
         ));
 
         $this->events->dispatch(new NotificationSent($notification->type, $notification->channelKey, $recipient));
+    }
+
+    /**
+     * Records a pair that failed before reaching a channel (Notifications::send
+     * calls it when the template throws), through the same log row, Delivery
+     * and NotificationFailed a send failure gets — so this class stays their
+     * only writer.
+     */
+    public function recordFailure(string $type, string $channelKey, Recipient $recipient, string $error, DeliveryStage $stage = DeliveryStage::Send): void
+    {
+        $this->fail($this->openLog($type, $channelKey, $recipient), $type, $channelKey, $recipient, $error, $stage);
+    }
+
+    private function openLog(string $type, string $channelKey, Recipient $recipient): NotificationLog
+    {
+        return NotificationLog::query()->create([
+            'type' => $type,
+            'channel' => $channelKey,
+            'audience' => $recipient->audience,
+            'recipient' => $this->recipientLabel($recipient),
+            'locale' => $recipient->locale,
+            'status' => NotificationLogStatus::Pending,
+        ]);
+    }
+
+    private function fail(NotificationLog $log, string $type, string $channelKey, Recipient $recipient, string $error, DeliveryStage $stage): void
+    {
+        $log->forceFill(['status' => NotificationLogStatus::Failed, 'error' => $error])->save();
+
+        $this->recorder->record(new Delivery($type, $channelKey, $recipient, NotificationLogStatus::Failed, $error, $stage));
+
+        $this->events->dispatch(new NotificationFailed($type, $channelKey, $recipient, $error, $stage));
     }
 
     private function recipientLabel(Recipient $recipient): string

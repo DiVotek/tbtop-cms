@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -26,6 +28,7 @@ use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
+use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
 
 uses(RefreshDatabase::class);
 
@@ -432,4 +435,55 @@ it('does not fan out when storage is disabled — nothing to track delivery stat
 
     Mail::assertNothingSent();
     expect(FormSubmission::query()->count())->toBe(0);
+});
+
+// -----------------------------------------------------------------------
+// Failures inside the fan-out never strand the claim
+// -----------------------------------------------------------------------
+
+it('marks a submission failed with the render prefix once while the other format still delivers', function (): void {
+    Mail::fake();
+    $admin = notifierAdmin();
+    ThrowingNotificationView::html();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
+    app(Settings::class)->set('notifications.mail.recipients', "ops@example.test\nsales@example.test");
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    $prefix = "Couldn't render the Email notification: ";
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toStartWith($prefix)
+        ->and($submission->error)->toContain('html boom')
+        // Two mail recipients, one identical error: written once.
+        ->and(substr_count((string) $submission->error, $prefix))->toBe(1)
+        ->and($submission->error)->not->toContain('Mail delivery failed')
+        ->and($admin->notifications()->count())->toBe(1)
+        ->and(NotificationLog::query()->where('channel', 'mail')->where('status', NotificationLogStatus::Failed)->count())->toBe(2);
+    Mail::assertNothingSent();
+});
+
+it('marks a submission failed, not processing, when anything else in the fan-out throws', function (): void {
+    $reported = [];
+    app(ExceptionHandler::class)->reportable(function (Throwable $e) use (&$reported): void {
+        $reported[] = [$e::class, $e->getMessage(), Context::get('submission_id')];
+    });
+    notifierAdmin();
+    Event::listen(NotificationSent::class, fn () => throw new RuntimeException('listener boom'));
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toBe('listener boom');
+    expect($reported)->toBe([[RuntimeException::class, 'listener boom', $submission->id]])
+        ->and(Context::has('submission_id'))->toBeFalse();
 });

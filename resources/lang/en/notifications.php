@@ -20,9 +20,15 @@ return [
         'message_title' => 'New form submission',
         'test_message' => 'This is a test message from your CMS Telegram notifications.',
     ],
+    'channels' => [
+        'mail' => 'Email',
+        'telegram' => 'Telegram',
+        'bell' => 'Bell',
+    ],
     'errors' => [
         'bell' => 'Bell notification failed: :error',
         'mail' => 'Mail delivery failed: :error',
+        'render' => 'Couldn\'t render the :channel notification: :error',
         'mail_no_recipients' => 'Mail notifications are enabled but no recipients are configured.',
         'telegram' => 'Telegram delivery failed: :error',
         'telegram_not_configured' => 'Telegram notifications are enabled but the bot token or chat IDs are not configured.',
