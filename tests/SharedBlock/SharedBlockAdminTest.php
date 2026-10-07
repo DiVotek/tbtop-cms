@@ -336,3 +336,35 @@ it('numbers a derived shared-block name that is already taken', function (): voi
 
     expect(SharedBlock::query()->pluck('name')->all())->toBe(['Simple — About', 'Simple — About 2']);
 });
+
+it('leaves no shared block behind when the page save fails validation', function (): void {
+    $page = sharedPage([['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'Old']]]);
+
+    sharedActing()->postJson("/admin/pages/{$page->id}/edit/actions/pageBlockShare_blk1", [
+        'payload' => ['form' => [
+            ...PageEditHelpers::baseEditPayload(),
+            'published_at' => '2026-05-02 10:00:00',
+            'unpublish_at' => '2026-05-01 10:00:00',
+            'block_blk1_heading' => 'Old', 'block_blk1_active' => true, 'block_blk1_sort' => 0,
+        ]],
+    ])->assertUnprocessable();
+
+    expect(SharedBlock::count())->toBe(0)
+        ->and(array_key_exists('shared', $page->refresh()->content[0]))->toBeFalse();
+});
+
+it('leaves no shared block behind and tells the editor when the page changed meanwhile', function (): void {
+    $page = sharedPage([['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'Old']]]);
+
+    $response = sharedActing()->postJson("/admin/pages/{$page->id}/edit/actions/pageBlockShare_blk1", [
+        'payload' => ['form' => [
+            ...PageEditHelpers::baseEditPayload(),
+            'lock_version' => $page->lock_version + 1,
+            'block_blk1_heading' => 'Old', 'block_blk1_active' => true, 'block_blk1_sort' => 0,
+        ]],
+    ])->assertOk();
+
+    expect(collect($response->json('effects'))->firstWhere('kind', 'notify')['message'] ?? null)->toBe(__('tbtop-cms::pages.conflict.message'))
+        ->and(SharedBlock::count())->toBe(0)
+        ->and(array_key_exists('shared', $page->refresh()->content[0]))->toBeFalse();
+});
