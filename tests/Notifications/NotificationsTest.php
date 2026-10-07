@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Tbtop\Cms\Notifications\Audience;
 use Tbtop\Cms\Notifications\Delivery;
+use Tbtop\Cms\Notifications\DeliveryStage;
 use Tbtop\Cms\Notifications\Events\NotificationFailed;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
 use Tbtop\Cms\Notifications\Format;
@@ -261,4 +262,72 @@ it('falls back to the built-in view and logs a warning when a stored override fa
 
             return true;
         });
+});
+
+// Templates are picked by format, not channel: a built-in view that throws
+// fails every channel of its format, and only those.
+it('records a built-in view render failure per pair while the other format still delivers to every recipient', function (): void {
+    Event::fake([NotificationFailed::class]);
+    Log::spy();
+    File::put(resource_path('views/test-notification-text.blade.php'), '@php throw new RuntimeException(\'boom\') @endphp');
+
+    $ana = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+    $bob = new Recipient(Audience::Customer, 'uk', email: 'bob@example.test');
+
+    $deliveries = Notifications::send('test.recorded', new TestNotificationPayload('hi'), [$ana, $bob]);
+
+    expect(array_map(fn (array $delivery): ?string => $delivery['recipient']->email, RecordingShortChannel::deliveries()))
+        ->toBe(['ana@example.test', 'bob@example.test'])
+        ->and(RecordingChannel::deliveries())->toBeEmpty();
+
+    $failedLogs = NotificationLog::query()->where('channel', 'recording')->orderBy('id')->get();
+    expect($failedLogs->pluck('recipient')->all())->toBe(['ana@example.test', 'bob@example.test'])
+        ->and($failedLogs->pluck('status')->all())->each->toBe(NotificationLogStatus::Failed)
+        ->and($failedLogs->first()->error)->toContain('boom');
+
+    $failed = array_values(array_filter($deliveries, fn (Delivery $delivery): bool => $delivery->failed()));
+    expect($deliveries)->toHaveCount(4)
+        ->and($failed)->toHaveCount(2)
+        ->and(array_map(fn (Delivery $delivery): string => $delivery->channel, $failed))->toBe(['recording', 'recording'])
+        ->and(array_map(fn (Delivery $delivery): DeliveryStage => $delivery->stage, $failed))->each->toBe(DeliveryStage::Render);
+
+    Event::assertDispatchedTimes(NotificationFailed::class, 2);
+    Event::assertDispatched(
+        NotificationFailed::class,
+        fn (NotificationFailed $event): bool => $event->channel === 'recording'
+            && $event->stage === DeliveryStage::Render
+            && $event->recipient->email === 'bob@example.test'
+            && str_contains($event->error, 'boom'),
+    );
+
+    Log::shouldHaveReceived('error')
+        ->with('notifications.template_render_failed', Mockery::on(fn (array $context): bool => $context['type'] === 'test.recorded'
+            && $context['channel'] === 'recording'
+            && $context['format'] === 'text'
+            && $context['locale'] === 'uk'
+            && str_contains($context['error'], 'boom')))
+        ->once();
+});
+
+it('records a render failure when a broken override falls back to a built-in view that throws too', function (): void {
+    Log::spy();
+    File::put(resource_path('views/test-notification-text.blade.php'), '@php throw new RuntimeException(\'boom\') @endphp');
+    NotificationTemplate::query()->create([
+        'type' => 'test.recorded',
+        'format' => Format::Text,
+        'locale' => 'en',
+        'subject' => 'Broken',
+        'body' => '@if($message)unclosed',
+    ]);
+
+    $deliveries = Notifications::send('test.recorded', new TestNotificationPayload('hi'), [new Recipient(Audience::Customer, 'en', email: 'ana@example.test')]);
+
+    $byChannel = collect($deliveries)->keyBy(fn (Delivery $delivery): string => $delivery->channel);
+    expect($byChannel['recording']->failed())->toBeTrue()
+        ->and($byChannel['recording']->stage)->toBe(DeliveryStage::Render)
+        ->and($byChannel['recording-short']->failed())->toBeFalse()
+        ->and(NotificationLog::query()->where('channel', 'recording')->sole()->status)->toBe(NotificationLogStatus::Failed);
+
+    Log::shouldHaveReceived('warning')->with('notifications.template_override_failed', Mockery::any())->once();
+    Log::shouldHaveReceived('error')->with('notifications.template_render_failed', Mockery::any())->once();
 });
