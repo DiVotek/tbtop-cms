@@ -23,6 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('tbtop_form_submissions', function (Blueprint $table): void {
+            // SQLite cannot drop a column an index still covers.
+            $table->dropIndex(['lead_status']);
             $table->dropColumn('lead_status');
         });
     }
