@@ -362,7 +362,11 @@ language. The four page props are typed `string | null`.
 The sections above cover each change in depth; this is what a host does by
 hand, in order.
 
-1. **Run `php artisan migrate`.** New migrations, in order:
+1. **Page types that implement `PageTypeInterface` directly** add the five
+   methods listed under "Page subtypes and type fields" — before migrating:
+   the subtype migration reads the page-type registry, which fails on a
+   class missing them. Types extending `BasePageType` need nothing.
+2. **Run `php artisan migrate`.** New migrations, in order:
    `2026_10_03_000002_create_shared_blocks_table`,
    `2026_10_06_000000_add_subtype_and_fields_to_pages_table`,
    `2026_10_07_000000_add_lock_version_to_shared_blocks_table`,
@@ -378,12 +382,9 @@ hand, in order.
    - Dropping `tbtop_shared_blocks` (`create_shared_blocks` `down()`)
      empties every block that points at one: those rows hold only
      `shared: <id>` and become Problem blocks.
-2. **Run `php artisan cms:page-refs:rebuild` once** if any page type has a
+3. **Run `php artisan cms:page-refs:rebuild` once** if any page type has a
    `pages`-kind field, or its reverse lists stay empty until each source
    page is saved again.
-3. **Page types that implement `PageTypeInterface` directly** add the five
-   methods listed under "Page subtypes and type fields". Types extending
-   `BasePageType` need nothing.
 4. **A published `config/tbtop-cms.php` needs two new keys.** Add
    `admin.pages.shared_blocks` (`Tbtop\Cms\Admin\Pages\SharedBlocksPage::class`)
    and `admin.pages.shared_block_edit`
