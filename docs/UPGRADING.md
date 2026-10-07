@@ -420,7 +420,7 @@ hand, in order.
 8. **Content rows may carry `shared: <id>` with an empty `data`.** A seeder,
    export or any code that reads a page's or layout's `content` directly
    sees no data for such a row; resolve it with
-   `Tbtop\Cms\SharedBlock\SharedBlocks::dataOf($row, $kind)`.
+   `app(Tbtop\Cms\SharedBlock\SharedBlocks::class)->dataOf($row, $kind)`.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts) have their own
