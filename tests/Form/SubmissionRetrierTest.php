@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\Models\FormSubmission;
-use Tbtop\Cms\Form\SubmissionDeliveryFailed;
 use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
@@ -416,7 +415,7 @@ it('shows the error toast, not a 500, and keeps the retry failed when the fan-ou
         ->and($submission->error)->toBe('listener boom')
         ->and(collect($response->json('effects'))->firstWhere('kind', 'notify'))
         ->toMatchArray(['message' => 'listener boom', 'level' => 'error']);
-    Exceptions::assertReported(SubmissionDeliveryFailed::class);
+    Exceptions::assertReported(fn (RuntimeException $e): bool => $e->getMessage() === 'listener boom');
 });
 
 it('keeps a retry failed with the render prefix, not the send prefix, when the template still throws', function (): void {

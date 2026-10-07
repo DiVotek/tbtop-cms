@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Form\Models\FormSubmission;
-use Tbtop\Cms\Form\SubmissionDeliveryFailed;
 use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
@@ -468,7 +468,10 @@ it('marks a submission failed with the render prefix once while the other format
 });
 
 it('marks a submission failed, not processing, when anything else in the fan-out throws', function (): void {
-    Exceptions::fake();
+    $reported = [];
+    app(ExceptionHandler::class)->reportable(function (Throwable $e) use (&$reported): void {
+        $reported[] = [$e::class, $e->getMessage(), Context::get('submission_id')];
+    });
     notifierAdmin();
     Event::listen(NotificationSent::class, fn () => throw new RuntimeException('listener boom'));
     $page = notifierContactPage();
@@ -481,6 +484,6 @@ it('marks a submission failed, not processing, when anything else in the fan-out
 
     expect($submission->status)->toBe(SubmissionStatus::Failed)
         ->and($submission->error)->toBe('listener boom');
-    Exceptions::assertReported(fn (SubmissionDeliveryFailed $e): bool => $e->context() === ['submission_id' => $submission->id]
-        && $e->getPrevious()?->getMessage() === 'listener boom');
+    expect($reported)->toBe([[RuntimeException::class, 'listener boom', $submission->id]])
+        ->and(Context::has('submission_id'))->toBeFalse();
 });

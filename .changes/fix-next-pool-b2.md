@@ -13,8 +13,8 @@ touches: notifications (send, channel driver, Delivery, NotificationFailed), sub
   submission ends `Failed` with `Couldn't render the Email notification: …`
   (distinct errors joined once). Any other exception after the claim, in
   `notify()` or anywhere in `retry()`, ends the row `Failed` with its message
-  (claim released in `finally`), is reported as `SubmissionDeliveryFailed`
-  with the submission id and is not rethrown: the admin retry shows a toast,
+  (claim released in `finally`), is reported as is, with `submission_id` in
+  the log context, and is not rethrown: the admin retry shows a toast,
   not a 500.
 - **B11.** The preview link signed only the default locale, and a page
   without a default-locale slug got a link to `/`. The modal now lists one

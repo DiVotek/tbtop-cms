@@ -432,8 +432,8 @@ format.
 - Any other exception after a submission is claimed (in `notify()` or
   anywhere in `retry()`) now ends the row `Failed` with the exception's
   message instead of leaving it `Processing`. It is reported through
-  `report()` as `Tbtop\Cms\Form\SubmissionDeliveryFailed` (context
-  `submission_id`) and not rethrown, so the admin retry shows an error toast
+  `report()` unchanged, with `submission_id` in Laravel's `Context` while
+  it is reported, and not rethrown, so the admin retry shows an error toast
   instead of a 500.
 
 ## Breadcrumbs leave out ancestors that are not live

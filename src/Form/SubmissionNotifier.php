@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form;
 
+use Illuminate\Support\Facades\Context;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Notifications\FormSubmissionPayloadFactory;
 use Tbtop\Cms\Form\Notifications\FormSubmissionRecipients;
@@ -65,7 +66,11 @@ class SubmissionNotifier
                 'error' => $errors === [] ? null : implode(' | ', $errors),
             ];
         } catch (Throwable $e) {
-            report(new SubmissionDeliveryFailed($submission->id, $e));
+            // The original exception, so host trackers group and filter it by its
+            // own type; the id rides along in the log context.
+            Context::add('submission_id', $submission->id);
+            report($e);
+            Context::forget('submission_id');
 
             $outcome = ['status' => SubmissionStatus::Failed->value, 'error' => $e->getMessage()];
         } finally {
