@@ -478,9 +478,9 @@ to extending `Block`:
   deferred `SubmissionNotifier::notify()` runs after the response, so its
   claim fails and nothing is sent. Nobody is notified until an admin
   retries the row. With `forms.store` off there is no row: the visitor gets
-  the error, nothing is stored or notified. **Known issue:** a retry that
-  re-runs the fan-out successfully while `handleSubmit()` throws again
-  leaves the row `Handled` (see notifications.md); not intended.
+  the error, nothing is stored or notified. A retry follows the same rule:
+  if `handleSubmit()` throws again the row stays `Failed` with its error
+  and nothing is sent (see notifications.md).
 
 `SubmitContext` (`src/Block/SubmitContext.php`) is the trimmed version of
 `ResolveContext` available at submit time: `locale`, `fallbackLocale`,
