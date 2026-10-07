@@ -48,7 +48,9 @@ Workbench quirks:
   `vendor/orchestra/testbench-core/laravel/storage/logs/laravel.log`.
 - DB: `vendor/orchestra/testbench-core/laravel/database/database.sqlite`; every
   package table is prefixed `tbtop_`. Log in via `/_workbench/login/1`
-  (seeded admin@admin.com / password).
+  (seeded admin@admin.com / password). `AutoLoginAdmin` overrides
+  `/_workbench/login/{id}` for any other id: to act as another user, rename
+  admin@admin.com in the DB first. The seeded admin is not the owner.
 - Workbench has no SSR, so JSON-LD and props are not in the HTML body: read them
   from the JSON in `<script data-page>` of the GET response.
 - The tbtop demo app often holds the usual ports. Check
