@@ -170,7 +170,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
-| `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; `[]` when fewer than two crumbs (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
+| `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; a non-live ancestor or site root is left out (the page itself never is); `[]` when fewer than two crumbs remain (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
 
@@ -237,7 +237,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `CmsAccessGranted` | `src/Admin/Events/CmsAccessGranted.php` | `AdminAccess::grant()`, when a `CmsUserProfile` row is created for a user | `int\|string $userId` |
 | `CmsAccessRevoked` | `src/Admin/Events/CmsAccessRevoked.php` | `AdminAccess::revoke()`, when a non-owner `CmsUserProfile` row is deleted | `int\|string $userId` |
 | `NotificationSent` | `src/Notifications/Events/NotificationSent.php` | `NotificationChannelDriver`, after one channel delivers to one recipient | `string $type`, `string $channel`, `Recipient $recipient` |
-| `NotificationFailed` | `src/Notifications/Events/NotificationFailed.php` | same call site, on a caught channel-send exception (other channels still run) | `string $type`, `string $channel`, `Recipient $recipient`, `string $error` |
+| `NotificationFailed` | `src/Notifications/Events/NotificationFailed.php` | same call site, on a caught channel-send exception, and via `NotificationChannelDriver::recordFailure()` when the pair's template fails to render (other pairs still run) | `string $type`, `string $channel`, `Recipient $recipient`, `string $error`, `DeliveryStage $stage = DeliveryStage::Send` (`Render` for a render failure) |
 
 Caveat: `PagePublished`/`PageUnpublished` fire on the DB status transition at save time, not on scheduled go-live/go-dark (`published_at`/`unpublish_at`) — the scheduled-transition case is not wired to these events yet.
 
@@ -351,7 +351,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `Tbtop\Cms\Cms` (facade `Tbtop\Cms\Facades\Cms`) | `frontendRoutes(): void` | Registers all CMS frontend routes — call from a `web`-middleware route file |
 | | `resolve(string $path, ?string $locale = null): ?Page` | Resolves a path to a `Page` for the given/current locale |
 | | `url(Page $page, ?string $locale = null): string` | Builds the absolute frontend URL for a page in a locale |
-| | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, `[]` for home |
+| | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, non-live ancestors and a non-live home left out, `[]` for home or when fewer than two crumbs remain |
 | | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |

@@ -40,7 +40,7 @@ Field-by-field:
   The `{title}` placeholder is the *own* title cascade: `seo.title` →
   `page.title` → `page.name` (`PageOwnSeo::title()`). Templates also support
   `{site_name}`, `{sep}` (`seo.title_separator`, default `—`), `{parent}`
-  (immediate breadcrumb ancestor, labelled `name` → `title`), `{date}`
+  (nearest live ancestor, labelled `name` → `title`; empty when none), `{date}`
   (published date, only when the page `isLive()`).
   `SeoResolver::cleanupRendered()` collapses whitespace and strips dangling
   separators left by an empty placeholder — one template can serve both a
@@ -159,8 +159,8 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    whenever `site.name` is set.
 2. **`JsonLd::breadcrumbList()`** — a `BreadcrumbList` from the same trail
    as the `breadcrumbs` prop (`Breadcrumbs::forPage()`: site root, ancestry,
-   the page), except that the page's own item carries the canonical URL
-   rather than its slug path. A top-level page lists `Home › Page` and a
+   the page — a non-live ancestor or root left out), except that the page's
+   own item carries the canonical URL rather than its slug path. A top-level page lists `Home › Page` and a
    nested one `Home › Category › Article`. Omitted on the home page itself,
    and on a site with no seeded root page (`is_system` + no parent —
    `PageSeeder`), where the trail is the plain ancestry and so needs two

@@ -344,7 +344,7 @@ response:
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
 | `render` | `Spec` (json-render, `{root, elements}`) | The assembled page spec — resolved block content passed through `PageSpecAssembler`; a row that cannot render is not in it (see blocks.md#problem-blocks); see blocks.md for the block/envelope/resolved-block vocabulary |
 | `seo` | `object` | Full SEO tag set (title, description, canonical, OG/Twitter, hreflang alternates, JSON-LD, `noindex`) — see seo.md for field-by-field detail; `CmsHead.tsx`'s `<Head>` and `head.blade.php` both render this same payload |
-| `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` — home › ancestors › the page itself; `[]` on the home page and on error pages. Render every crumb but the last as a link |
+| `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` — home › ancestors › the page itself, a non-live ancestor or home left out; `[]` on the home page, on error pages and when fewer than two crumbs remain. Render every crumb but the last as a link |
 | `path` | `string` | The resolved request path |
 | `isPreview` | `bool` | `true` for draft/scheduled/expired pages reachable only via preview access — `seo.noindex` is forced `true` alongside it |
 
