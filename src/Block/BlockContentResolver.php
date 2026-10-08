@@ -23,7 +23,6 @@ class BlockContentResolver
         private readonly BlockRegistry $registry,
         private readonly Languages $languages,
         private readonly MediaUrlResolver $mediaUrlResolver,
-        private readonly SharedBlocks $sharedBlocks,
         private readonly PageTypeRegistry $pageTypes,
         private readonly BackReferences $backReferences,
     ) {}
@@ -172,7 +171,7 @@ class BlockContentResolver
         $kind = $raw['kind'];
         // A row the editor has to deal with (see BlockRowProblem) is skipped without a trace on the site or in the
         // log: the admin editor lists it under "Problem blocks", and its data stays in `content` untouched.
-        $problem = BlockRowProblem::of($raw, $this->registry, $this->sharedBlocks);
+        $problem = BlockRowProblem::of($raw, $this->registry, self::sharedBlocks());
         if ($problem !== null) {
             if ($strict) {
                 throw self::strictException($problem, $raw, $kind);
@@ -180,7 +179,7 @@ class BlockContentResolver
 
             return null;
         }
-        $data = $this->sharedBlocks->dataOf($raw, $kind) ?? [];
+        $data = self::sharedBlocks()->dataOf($raw, $kind) ?? [];
         $block = $this->registry->get($kind);
 
         try {
@@ -217,5 +216,15 @@ class BlockContentResolver
             $kind,
             new RuntimeException("Block [{$kind}] points at shared block #" . SharedBlocks::refOf($raw) . ', which does not exist.'),
         );
+    }
+
+    /**
+     * Resolved per call, not injected: the route caches the controller that
+     * holds this resolver, so under Octane an injected request-scoped memo
+     * would outlive its request and serve stale shared blocks.
+     */
+    private static function sharedBlocks(): SharedBlocks
+    {
+        return app(SharedBlocks::class);
     }
 }
