@@ -326,6 +326,19 @@ it('offers and accepts "Make shared" only to an editor with the design ability',
         ->and(array_key_exists('shared', $page->refresh()->content[0]))->toBe($design);
 })->with(['with design' => true, 'without design' => false]);
 
+it('offers "Edit shared block" on a reference only to an editor with the design ability, and always offers Detach', function (bool $design): void {
+    config(['tbtop-cms.roles' => true]);
+    Gate::define('tbtop-cms.pages', static fn (): bool => true);
+    Gate::define('tbtop-cms.design', static fn (): bool => $design);
+    $shared = sharedSimple();
+    $page = sharedPage([['id' => 'ref1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'shared' => $shared->id, 'data' => []]]);
+
+    $json = (string) json_encode(PageEditHelpers::formTabs($page->id));
+
+    expect(str_contains($json, 'pageBlockEditShared_ref1'))->toBe($design)
+        ->and($json)->toContain('pageBlockDetach_ref1');
+})->with(['with design' => true, 'without design' => false]);
+
 it('numbers a derived shared-block name that is already taken', function (): void {
     SharedBlock::query()->create(['name' => 'Simple — About', 'kind' => 'Simple', 'data' => []]);
     $page = sharedPage([['id' => 'blk1', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'X']]]);
