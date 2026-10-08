@@ -116,7 +116,7 @@ final class PageEditBlockTabs
             $s->flex([
                 self::removeAction($s, $page, $id),
                 $s->spacer(),
-                ...(self::canShare() ? [$share] : []),
+                ...(self::mayEditShared() ? [$share] : []),
             ]),
         ]);
 
@@ -144,8 +144,10 @@ final class PageEditBlockTabs
         $body = $s->stack([
             $s->displayText(__('tbtop-cms::shared-blocks.reference.info', ['name' => $source->name]))->variant('muted'),
             $s->flex([
-                $s->action("pageBlockEditShared_{$id}")->label(__('tbtop-cms::shared-blocks.reference.edit_source'))
-                    ->url(route('tbtop.cms.shared-block-edit-page', ['sharedBlock' => $source->getKey()])),
+                ...(self::mayEditShared() ? [
+                    $s->action("pageBlockEditShared_{$id}")->label(__('tbtop-cms::shared-blocks.reference.edit_source'))
+                        ->url(route('tbtop.cms.shared-block-edit-page', ['sharedBlock' => $source->getKey()])),
+                ] : []),
                 self::detachAction($s, $page, $id, $source),
             ], gap: 2),
             $s->flex([
@@ -219,7 +221,7 @@ final class PageEditBlockTabs
 
     private static function handleShare(ActionCtx $ctx, Page $page, BlockRegistry $registry, string $id, string $kind): Effects
     {
-        if (! self::canShare()) {
+        if (! self::mayEditShared()) {
             abort(403);
         }
 
@@ -257,8 +259,8 @@ final class PageEditBlockTabs
             ->redirect(route('tbtop.cms.page-edit-page', ['page' => $page->getKey()]));
     }
 
-    /** Sharing creates a shared block, and shared blocks are design, not page content. */
-    private static function canShare(): bool
+    /** Shared blocks are design, not page content: making one and editing one both need the design ability. */
+    private static function mayEditShared(): bool
     {
         $gate = CmsAbilities::for('tbtop-cms.design');
 
