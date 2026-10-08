@@ -6,7 +6,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
@@ -67,40 +66,39 @@ return new class extends Migration
     }
 
     /**
-     * Each chunk is read in full with get() before any row is written: an
-     * open cursor on MySQL does not survive a write on the same connection.
+     * Raw rows, not the Page model: a historical migration must not change
+     * with later model scopes, casts or hooks. Each chunk is read in full
+     * with get() before any row is written: an open cursor on MySQL does not
+     * survive a write on the same connection. Soft-deleted rows are included.
      */
     private function dropOwners(): void
     {
         $lastId = 0;
 
         do {
-            $pages = Page::withTrashed()->select(['id', 'content'])
+            $rows = DB::table('tbtop_pages')->select(['id', 'content'])
                 ->where('id', '>', $lastId)->orderBy('id')->limit(self::CHUNK)->get();
 
-            foreach ($pages as $page) {
-                $lastId = (int) $page->getKey();
-                // getAttribute(), not ->content: the JSON may hold anything written outside Eloquent.
-                $content = $page->getAttribute('content');
+            foreach ($rows as $row) {
+                $lastId = (int) $row->id;
+                $content = is_string($row->content) ? json_decode($row->content, true) : null;
                 if (! is_array($content)) {
                     continue;
                 }
 
                 $isChanged = false;
-                foreach ($content as $index => $row) {
-                    if (is_array($row) && array_key_exists('owner', $row)) {
-                        unset($row['owner']);
-                        $content[$index] = $row;
+                foreach ($content as $index => $block) {
+                    if (is_array($block) && array_key_exists('owner', $block)) {
+                        unset($block['owner']);
+                        $content[$index] = $block;
                         $isChanged = true;
                     }
                 }
 
                 if ($isChanged) {
-                    $page->content = $content;
-                    $page->timestamps = false;
-                    $page->saveQuietly();
+                    DB::table('tbtop_pages')->where('id', $lastId)->update(['content' => json_encode($content)]);
                 }
             }
-        } while ($pages->count() === self::CHUNK);
+        } while ($rows->count() === self::CHUNK);
     }
 };
