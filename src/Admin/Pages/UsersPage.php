@@ -483,7 +483,8 @@ class UsersPage extends AdminPage
             return $id;
         }
 
-        if (! ctype_digit($id)) {
+        // Canonical digits only: "01" or a value past PHP_INT_MAX would cast to some other key.
+        if ((string) (int) $id !== $id || (int) $id < 0) {
             throw (new ModelNotFoundException)->setModel($model, [$id]);
         }
 
