@@ -94,7 +94,7 @@ final class Pages extends Select
 
         $isRequired = array_any($declared, static fn (string $rule): bool => str_starts_with($rule, 'required'));
 
-        return [...($isRequired ? [] : ['nullable']), ...$declared, PageRefRule::forFilter($this->filter(), $this->exceptPageId)];
+        return [...($isRequired ? [] : ['nullable']), ...$declared, PageRefRule::except($this->exceptPageId)];
     }
 
     private function filter(): PageTypeFilter

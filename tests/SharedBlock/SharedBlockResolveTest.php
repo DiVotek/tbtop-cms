@@ -30,6 +30,19 @@ it('resolves a reference with the shared block content, flattened to the locale 
         ->and($out[0]->props['title'])->toBe('Pryvit');
 });
 
+it('reads a shared block fresh in the next request when the resolver outlives the request scope, as under Octane', function (): void {
+    $shared = SharedBlock::query()->create(['name' => 'CTA', 'kind' => 'Hero', 'data' => ['title' => ['uk' => 'Old']]]);
+    $row = ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'shared' => $shared->getKey()];
+    // The route caches the controller, and with it this resolver, across requests.
+    $resolver = app(BlockContentResolver::class);
+    expect($resolver->resolve([$row])[0]->props['title'])->toBe('Old');
+
+    app()->forgetScopedInstances();
+    $shared->update(['data' => ['title' => ['uk' => 'New']]]);
+
+    expect($resolver->resolve([$row])[0]->props['title'])->toBe('New');
+});
+
 it('drops a reference to a deleted shared block', function (): void {
     $out = app(BlockContentResolver::class)->resolve([
         ['id' => 'a', 'kind' => 'Hero', 'active' => true, 'shared' => 999],

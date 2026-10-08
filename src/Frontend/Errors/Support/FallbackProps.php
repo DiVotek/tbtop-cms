@@ -36,6 +36,7 @@ final class FallbackProps
                 'title' => null,
                 'heading' => __("tbtop-cms::errors.{$key}.heading"),
                 'summary' => null,
+                'body' => '',
                 'image' => null,
                 'fields' => (object) [],
             ],

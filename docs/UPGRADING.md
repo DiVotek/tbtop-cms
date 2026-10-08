@@ -13,7 +13,7 @@ Existing installs: just run
 php artisan migrate
 ```
 
-The new `2026_01_01_000018_update_tables_add_tbtop_prefix_table` migration
+The new `2026_01_01_000000_update_tables_add_tbtop_prefix_table` migration
 renames each existing table to its `tbtop_`-prefixed name in place — data is
 preserved, no manual steps required. A fresh install has nothing to rename:
 the `create_*_table` migrations already create the tables under their new
@@ -474,9 +474,9 @@ hand, in order.
    subtype migration reads the registry. Rolling back is lossy:
    - `move_identity_contacts_to_site_contacts` has an empty `down()`; the
      old `seo.identity.*` keys are not restored.
-   - `add_subtype_and_fields` `down()` drops the `subtype` and `fields`
-     columns, so every stored `fields` value is lost (and pages already
-     moved to `type = <base>` do not move back).
+   - `add_subtype_and_fields` `down()` moves each subtype page back to
+     `type = <subtype>`, then drops the `subtype` and `fields` columns, so
+     every stored `fields` value is lost.
    - Dropping `tbtop_shared_blocks` (`create_shared_blocks` `down()`)
      empties every block that points at one: those rows hold only
      `shared: <id>` and become Problem blocks.
@@ -509,12 +509,16 @@ hand, in order.
 6. **A leaf's type follows its category.** A page given a category becomes
    an article; an article whose category is removed becomes a page. Under
    other containers that allow `page` children (a host `section`, say) a
-   page stays a page. The pages list tabs "Pages" and "Articles" now filter
-   by `type` (`page` / `article`), not by "no parent" / "has a parent". A
+   page stays a page. The pages list has one tab per page type that has
+   pages, keyed and filtered by `type` (`?tab=page`, `?tab=article`, a host
+   type's key), between "All" and "Deleted". The old `?tab=categories`,
+   `pages` and `articles` values and the `tbtop-cms::pages.tabs.categories`,
+   `.pages` and `.articles` translation keys are gone: update bookmarked
+   links and drop those keys from lang overrides. A
    type change that would orphan the page's stored subtype is rejected on
    `type`; it used to drop the subtype silently.
 7. **`BlockContentResolver` has new constructor dependencies**
-   (`SharedBlocks`, `PageTypeRegistry`, `BackReferences`). This only matters
+   (`PageTypeRegistry`, `BackReferences`). This only matters
    to a host that builds it with `new`; container resolution is unaffected.
 8. **Content rows may carry `shared: <id>` with an empty `data`.** A seeder,
    export or any code that reads a page's or layout's `content` directly
