@@ -82,6 +82,7 @@
         "test:refactor": "rector --dry-run",
         "test:refactor:changed": "{ git diff --name-only --diff-filter=ACMR HEAD; git ls-files --others --exclude-standard; } | grep -E '^(src|config|database)/.*\\.php$' | xargs -r rector process --dry-run",
         "test": "pest --parallel",
+        "test:mysql": "TBTOP_TEST_DB=mysql LARAVEL_PARALLEL_TESTING=1 CACHE_STORE=array QUEUE_CONNECTION=sync pest --parallel",
         "test:changed": "{ git diff --name-only --diff-filter=ACMR HEAD -- tests; git ls-files --others --exclude-standard -- tests; } | grep '\\.php$' | xargs -r pest",
         "test:coverage": "pest --coverage",
         "test:all:changed": [

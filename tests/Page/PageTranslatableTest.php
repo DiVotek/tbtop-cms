@@ -22,7 +22,7 @@ it('stores block content as a locale-neutral array', function (): void {
 
     $page = Page::factory()->create(['type' => 'page', 'content' => $content])->fresh();
 
-    expect($page->content)->toBe($content);
+    expect($page->content)->toBeIgnoringKeyOrder($content);
 });
 
 it('falls back to the default locale for a missing translation', function (): void {
