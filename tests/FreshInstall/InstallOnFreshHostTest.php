@@ -6,6 +6,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+afterEach(fn () => forgetPublishedConfig());
+
 it('installs cleanly on a host that has never run a migration', function (): void {
     $this->artisan('cms:install')->assertExitCode(0);
 });

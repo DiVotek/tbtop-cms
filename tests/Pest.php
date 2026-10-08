@@ -175,3 +175,47 @@ function isShownFor(array $node, array $data): bool
     return ($meta['hidden'] ?? false) !== true
         && ! (isset($meta['hiddenIf']) && evalCond($meta['hiddenIf'], $data));
 }
+
+/*
+ * toBe() for a value read back from a JSON column: MySQL stores JSON objects
+ * with normalised key order, SQLite keeps insertion order. Object keys are
+ * compared in any order; list order and every scalar stay strict.
+ */
+expect()->extend('toBeIgnoringKeyOrder', function (mixed $expected) {
+    return expect(canonicalKeyOrder($this->value))->toBe(canonicalKeyOrder($expected));
+});
+
+function canonicalKeyOrder(mixed $value): mixed
+{
+    if (! is_array($value)) {
+        return $value;
+    }
+
+    $value = array_map(canonicalKeyOrder(...), $value);
+
+    if (! array_is_list($value)) {
+        ksort($value);
+    }
+
+    return $value;
+}
+
+/**
+ * Whether the suite runs on MySQL (see TestCase::suiteConnection()). For
+ * ->skip() on a test that reproduces a known MySQL-only bug; the reason names
+ * the card that tracks it.
+ */
+function runsOnMySql(): bool
+{
+    return TestCase::suiteConnection() === 'mysql';
+}
+
+/** Deletes the tbtop-cms.php that cms:install publishes, so the next test in the process starts without it. */
+function forgetPublishedConfig(): void
+{
+    $published = config_path('tbtop-cms.php');
+
+    if (is_file($published)) {
+        unlink($published);
+    }
+}

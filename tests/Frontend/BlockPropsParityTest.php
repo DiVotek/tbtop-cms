@@ -64,7 +64,8 @@ it('ships the package blocks with props that match the committed parity fixture'
             $content[] = ['id' => "{$kind}-{$case}", 'kind' => $kind, 'data' => $data];
         }
     }
-    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Parity'], 'content' => $content]);
+    // The page id ends up in the ContactForm action URL; MySQL keeps AUTO_INCREMENT across rollbacks.
+    Page::factory()->create(['id' => 1, 'status' => PageStatus::Published, 'name' => ['en' => 'Parity'], 'content' => $content]);
 
     $elements = $this->get('/parity', ['X-Inertia' => 'true'])->assertOk()->json('props.render.elements');
 

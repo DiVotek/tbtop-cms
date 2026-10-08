@@ -14,12 +14,15 @@ PHP ^8.4 · Laravel 11 / 12 / 13 · No Filament.
 - Static analysis: PHPStan / Larastan (level 6)
 - Refactor: Rector
 - CI: GitHub Actions — `ci.yml` runs lint, analyse, blocks-types
-  (`composer types:blocks:check`), test and frontend (bun) as parallel jobs
+  (`composer types:blocks:check`), test and frontend (bun) as parallel jobs;
+  `Test (MySQL)` (`composer test:mysql`) runs only on PRs into and pushes to
+  `main`, so it shows Skipped on PRs into `release/**`
 
 ## Commands
 
 ```bash
 composer test        # Pest
+composer test:mysql  # Pest on MySQL (DB_HOST, DB_PORT, … from env)
 composer lint        # Pint (fix)
 composer test:lint   # Pint (check only)
 composer analyse     # PHPStan
@@ -29,6 +32,14 @@ composer serve       # Boot the Workbench app for manual review
 
 `:changed` variants (`composer test:all:changed`, `lint:changed`, `analyse:changed`, …)
 run the same tools against git-changed PHP files — prefer them during development.
+
+`composer test:mysql` sets `TBTOP_TEST_DB=mysql`, which `TestCase` reads to pick
+the connection (default `testing`, SQLite `:memory:`). The `DB_DATABASE`
+database must exist and the user needs `CREATE DATABASE`: each parallel worker
+gets its own `{DB_DATABASE}_test_N`. Those worker databases persist between
+runs (the first `migrate:fresh` of each run resets them); drop them for a
+clean start.
+Before the release PR, the local run stands in for the CI job.
 
 Headless checks: `vendor/bin/testbench route:list`, `vendor/bin/testbench tinker
 --execute=…`, or a one-off Pest test on the existing TestCase.

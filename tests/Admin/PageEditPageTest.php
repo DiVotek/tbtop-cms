@@ -471,7 +471,7 @@ it('saves general and SEO fields including the seo json column', function (): vo
 
     expect($page->getTranslation('name', 'en'))->toBe('About Updated')
         ->and($page->sort_order)->toBe(5)
-        ->and($page->seo)->toBe([
+        ->and($page->seo)->toBeIgnoringKeyOrder([
             'title' => ['en' => 'Meta title'],
             'description' => ['en' => 'Meta description'],
             'focus_keyword' => ['en' => 'widgets'],
@@ -619,11 +619,11 @@ it('round-trips two blocks through save: data, active, and order are preserved',
 
     expect($content)->toHaveCount(2)
         ->and($content[0]['id'])->toBe('blk1')
-        ->and($content[0]['data'])->toBe(['heading' => 'One Updated', 'body' => 'First Updated'])
+        ->and($content[0]['data'])->toBeIgnoringKeyOrder(['heading' => 'One Updated', 'body' => 'First Updated'])
         ->and($content[0]['active'])->toBeTrue()
         ->and($content[0]['sort'])->toBe(0)
         ->and($content[1]['id'])->toBe('blk2')
-        ->and($content[1]['data'])->toBe(['heading' => 'Two', 'body' => 'Second'])
+        ->and($content[1]['data'])->toBeIgnoringKeyOrder(['heading' => 'Two', 'body' => 'Second'])
         ->and($content[1]['active'])->toBeFalse()
         ->and($content[1]['sort'])->toBe(1);
 });

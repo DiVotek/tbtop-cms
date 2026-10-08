@@ -10,13 +10,7 @@ use Tbtop\Cms\Page\Models\Page;
 
 uses(RefreshDatabase::class);
 
-afterEach(function (): void {
-    $published = config_path('tbtop-cms.php');
-
-    if (is_file($published)) {
-        unlink($published);
-    }
-});
+afterEach(fn () => forgetPublishedConfig());
 
 it('prepares default languages, a home page and the two error pages on a fresh app', function (): void {
     $this->artisan('cms:install')->assertExitCode(0);
