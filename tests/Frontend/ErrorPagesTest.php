@@ -111,6 +111,7 @@ it('falls back to an empty render with the lang-file heading when the 4xx page r
         ->assertJsonPath('props.page.title', null)
         ->assertJsonPath('props.page.summary', null)
         ->assertJsonPath('props.page.subtype', null)
+        ->assertJsonPath('props.page.body', '')
         // The page prop shape is a normal page's: fields is a JSON object even when empty.
         ->assertSee('"fields":{}', false);
 });
