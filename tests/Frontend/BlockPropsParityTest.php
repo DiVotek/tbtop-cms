@@ -127,7 +127,7 @@ function formParityCases(): array
 }
 
 /**
- * Fails on a prop that came out empty — null, [] or false — here and in the first row of each nested list.
+ * Fails on a prop that came out empty — null, [] or false — here, inside nested objects and in the first row of each nested list.
  *
  * @param  array<array-key, mixed>  $props
  */
@@ -136,7 +136,9 @@ function expectFormParityFilled(array $props, string $path): void
     foreach ($props as $key => $value) {
         expect($value)->not->toBeIn([null, [], false], "{$path}.{$key} resolved empty in the full case: give it a non-empty value in formParityCases(), then rerun with UPDATE_BLOCK_FIXTURES=1.");
 
-        if (is_array($value) && array_is_list($value) && is_array($value[0] ?? null)) {
+        if (is_array($value) && ! array_is_list($value)) {
+            expectFormParityFilled($value, "{$path}.{$key}");
+        } elseif (is_array($value) && is_array($value[0] ?? null)) {
             expectFormParityFilled($value[0], "{$path}.{$key}.0");
         }
     }
