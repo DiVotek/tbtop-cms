@@ -29,9 +29,14 @@ return new class extends Migration
 
     public function up(): void
     {
+        // Each column on its own: SQLite adds them in separate statements, so a failed run can leave one behind.
         if (! Schema::hasColumn('tbtop_pages', 'subtype')) {
             Schema::table('tbtop_pages', function (Blueprint $table): void {
                 $table->string('subtype')->nullable()->after('type')->index();
+            });
+        }
+        if (! Schema::hasColumn('tbtop_pages', 'fields')) {
+            Schema::table('tbtop_pages', function (Blueprint $table): void {
                 $table->json('fields')->nullable()->after('content');
             });
         }
