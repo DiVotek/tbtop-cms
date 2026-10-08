@@ -101,6 +101,13 @@ Bump `tbtop/admin` in `composer.json` and `@tbtop/inertia-admin` in
 
 ## PRs
 
+Work for a release goes to `release/<version>` (e.g. `release/0.1`), cut from
+a fresh `main` only after the previous release merged — a branch cut earlier
+diverges once that release is squashed. Feature and fix PRs target the release
+branch. The release is a PR `release/<version>` → `main`, merged with
+`gh pr merge --squash`; GitHub deletes the branch. History lives in
+`.changes/*.md` and the closed PRs.
+
 Merging to `main` needs the Lint, Analyse, Test and Frontend checks green and
 every review thread resolved. Auto-merge is off: merge with
 `gh pr merge --squash`. Auto-review is `pr-agent-pilot[bot]`: its verdict is
