@@ -183,11 +183,12 @@ function expectParityFixture(string $path, array $props): void
 {
     $json = json_encode($props, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
 
-    if (getenv('UPDATE_BLOCK_FIXTURES') === '1' || ! is_file($path)) {
+    if (getenv('UPDATE_BLOCK_FIXTURES') === '1') {
         file_put_contents($path, $json);
     }
 
-    expect(file_get_contents($path))->toBe($json, basename($path) . ' is stale: rerun this test with UPDATE_BLOCK_FIXTURES=1.');
+    expect(is_file($path))->toBeTrue(basename($path) . ' is missing: run this test with UPDATE_BLOCK_FIXTURES=1 and commit it.')
+        ->and(file_get_contents($path))->toBe($json, basename($path) . ' is stale: rerun this test with UPDATE_BLOCK_FIXTURES=1.');
 }
 
 it('ships the package blocks with props that match the committed parity fixture', function (): void {
