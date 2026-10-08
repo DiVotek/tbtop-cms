@@ -166,20 +166,17 @@ it('rejects self-revoke, keeping the actor row', function (): void {
     expect(CmsUserProfile::query()->where('user_id', $actor->id)->exists())->toBeTrue();
 });
 
-// Keys are compared as strings so uuid/ulid hosts work: an (int) cast would
-// read "1-2" as the actor's own key 1 and answer "cannot manage self" for a
-// row that is not the actor at all.
-it('does not treat a string id sharing the actor numeric prefix as the actor', function (): void {
+// MySQL compares "1-2" with an integer user_id as 1: such an id would reach
+// the actor's own profile past the self guard. It is no user at all.
+it('rejects a row id that is not a key of the user model', function (): void {
     $actor = makeUsersPageActor('actor@example.com');
 
-    $response = test()->postJson('/admin/users/actions/userRevoke', [
+    test()->postJson('/admin/users/actions/userRevoke', [
         'payload' => ['row' => ['id' => $actor->id . '-2']],
-    ]);
+    ])->assertNotFound();
 
-    $response->assertOk();
-    expect(collect($response->json('effects'))->firstWhere('kind', 'notify')['message'])
-        ->toBe(__('tbtop-cms::users.validation.no_access'));
-})->skip(runsOnMySql(), 'tbtop-cms-next-bugs: MySQL coerces the row id "1-2" to 1 in UsersPage::assertExistingProfile');
+    expect(CmsUserProfile::query()->where('user_id', $actor->id)->exists())->toBeTrue();
+});
 
 it('creates a user, grants access, defaults the name to the email, and sets a verifiable password', function (): void {
     makeUsersPageActor('actor@example.com');

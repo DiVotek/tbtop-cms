@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Admin\Pages;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
@@ -217,7 +218,7 @@ class UsersPage extends AdminPage
 
     private function grant(ActionCtx $ctx): Effects
     {
-        $userId = self::rowId($ctx);
+        $userId = $this->rowId($ctx);
 
         try {
             $this->assertProfileControlsAccess();
@@ -248,7 +249,7 @@ class UsersPage extends AdminPage
 
     private function revoke(ActionCtx $ctx): Effects
     {
-        $userId = self::rowId($ctx);
+        $userId = $this->rowId($ctx);
 
         try {
             $this->assertProfileControlsAccess();
@@ -299,7 +300,7 @@ class UsersPage extends AdminPage
     /** @return array<string, mixed> */
     private function loadEditRow(ActionCtx $ctx): array
     {
-        $userId = self::rowId($ctx);
+        $userId = $this->rowId($ctx);
 
         try {
             $this->assertMayEdit($userId);
@@ -312,7 +313,7 @@ class UsersPage extends AdminPage
 
     private function update(ActionCtx $ctx): Effects
     {
-        $userId = self::rowId($ctx);
+        $userId = $this->rowId($ctx);
 
         try {
             $this->assertMayEdit($userId);
@@ -464,11 +465,30 @@ class UsersPage extends AdminPage
         throw ValidationException::withMessages(['user' => __('tbtop-cms::users.validation.' . $message)]);
     }
 
-    private static function rowId(ActionCtx $ctx): int | string
+    /**
+     * The row id in the user model's key type. MySQL compares a string with an
+     * integer column numerically ("1-2" = 1), so a non-numeric string for an
+     * int key would load another user — the actor included, past isSelf().
+     */
+    private function rowId(ActionCtx $ctx): int | string
     {
         $id = $ctx->row['id'] ?? '';
+        if (is_int($id)) {
+            return $id;
+        }
 
-        return is_int($id) ? $id : (string) $id;
+        $id = (string) $id;
+        $model = $this->userModel();
+        if ((new $model)->getKeyType() !== 'int') {
+            return $id;
+        }
+
+        // Canonical digits only: "01" or a value past PHP_INT_MAX would cast to some other key.
+        if ((string) (int) $id !== $id || (int) $id < 0) {
+            throw (new ModelNotFoundException)->setModel($model, [$id]);
+        }
+
+        return (int) $id;
     }
 
     /** @return class-string<Model> */
