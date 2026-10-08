@@ -288,8 +288,8 @@ when that list has no entry yet, then deletes the identity key. Where both
 were set, the contacts value is kept and the identity value is dropped. A
 moved profile link gets a label and name derived from its host
 (`https://www.facebook.com/acme` → label `facebook`, name `facebook.com`);
-rename them on the Contacts tab. Non-URL profile entries are not moved. The
-migration has no `down()` restore.
+rename them on the Contacts tab. Non-URL profile entries are not moved and
+are dropped with the old key. The migration has no `down()` restore.
 
 A host that writes these keys from code (a seeder, a migration) writes the
 `site.contacts.*` lists instead; a value written to the old keys is no longer
