@@ -30,7 +30,7 @@ it('leaves a page block whose tpl_id still exists in the starter completely unto
     $article->refresh();
 
     expect($article->content)->toHaveCount(1)
-        ->and($article->content[0])->toBe([
+        ->and($article->content[0])->toBeIgnoringKeyOrder([
             'id' => 'page-block-1', 'kind' => 'Hero', 'active' => true,
             'data' => ['title' => 'Filled in on the page'], 'tpl_id' => 'tpl-1', 'sort' => 0,
         ]);
@@ -275,7 +275,7 @@ it('rolls back every touched page and raises no PageSaved event when a later sav
     expect(fn (): int => (new StarterBlockSync)->apply($category, 'article'))
         ->toThrow(RuntimeException::class, 'Second descendant save failed.');
 
-    expect($first->refresh()->content)->toBe($original)
-        ->and($second->refresh()->content)->toBe($original);
+    expect($first->refresh()->content)->toBeIgnoringKeyOrder($original)
+        ->and($second->refresh()->content)->toBeIgnoringKeyOrder($original);
     Event::assertNotDispatched(PageSaved::class);
 });

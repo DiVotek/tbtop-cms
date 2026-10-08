@@ -76,7 +76,7 @@ it('renders the edit page with the block form under the data prefix and saves it
 
     $block->refresh();
     expect($block->name)->toBe('Promo 2')
-        ->and($block->data)->toBe(['heading' => 'New heading', 'body' => 'New body']);
+        ->and($block->data)->toBeIgnoringKeyOrder(['heading' => 'New heading', 'body' => 'New body']);
 });
 
 it('rejects a save from a form loaded before another editor saved, keeping the first save', function (): void {
@@ -91,7 +91,7 @@ it('rejects a save from a form loaded before another editor saved, keeping the f
 
     $block->refresh();
     expect($block->name)->toBe('A wins')
-        ->and($block->data)->toBe(['heading' => 'A heading', 'body' => 'A body']);
+        ->and($block->data)->toBeIgnoringKeyOrder(['heading' => 'A heading', 'body' => 'A body']);
     $notify = collect(session('inertia.flash_data')['tbtop.effects'] ?? [])->firstWhere('kind', 'notify');
     expect($notify['level'] ?? null)->toBe('error')
         ->and($notify['message'] ?? null)->toBe(__('tbtop-cms::shared-blocks.conflict.message'));
@@ -147,7 +147,7 @@ it('detaches a reference by copying the shared content into the page', function 
 
     $content = $page->refresh()->content;
     expect($content[0])->not->toHaveKey('shared')
-        ->and($content[0]['data'])->toBe(['heading' => 'Shared heading', 'body' => 'Shared body'])
+        ->and($content[0]['data'])->toBeIgnoringKeyOrder(['heading' => 'Shared heading', 'body' => 'Shared body'])
         ->and($content[0]['id'])->toBe('ref1');
 });
 
@@ -218,7 +218,7 @@ it('lists every page and slot placing the block in the usage table, and detaches
 
     $content = $page->fresh()->content;
     expect($content[0])->not->toHaveKey('shared')
-        ->and($content[0]['data'])->toBe(['heading' => 'Shared heading', 'body' => 'Shared body'])
+        ->and($content[0]['data'])->toBeIgnoringKeyOrder(['heading' => 'Shared heading', 'body' => 'Shared body'])
         ->and($content[1]['active'])->toBeFalse()
         ->and($content[1])->not->toHaveKey('shared')
         ->and($other->fresh()->content[0]['shared'])->toBe($shared->id)

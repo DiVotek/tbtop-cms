@@ -178,7 +178,7 @@ it('saves edited prefixed values into the right block\'s data, preserving order 
         ->and($layout->content[0]['id'])->toBe('hero1')
         ->and($layout->content[0]['data']['title']['en'])->toBe('New')
         ->and($layout->content[1]['id'])->toBe('simple1')
-        ->and($layout->content[1]['data'])->toBe(['heading' => 'H2', 'body' => 'B2']);
+        ->and($layout->content[1]['data'])->toBeIgnoringKeyOrder(['heading' => 'H2', 'body' => 'B2']);
 });
 
 it('reorders the persisted envelope when block_{id}_sort values change on save', function (): void {

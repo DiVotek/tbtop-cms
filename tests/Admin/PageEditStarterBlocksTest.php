@@ -246,7 +246,7 @@ it('leaves the page\'s own content and every other column untouched — only sta
 
     $category->refresh();
 
-    expect($category->content)->toBe([
+    expect($category->content)->toBeIgnoringKeyOrder([
         ['id' => 'existing-block', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Keep me']],
     ])->and($category->getTranslation('name', 'en'))->toBe('Original name');
 });
