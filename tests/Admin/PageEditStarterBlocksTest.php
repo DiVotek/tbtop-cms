@@ -310,7 +310,7 @@ it('moves a starter block even when the page\'s own content has an invalid requi
 });
 
 /**
- * PageObserver::saving() bumps lock_version on any real Eloquent save() with
+ * PageObserver bumps lock_version on any real Eloquent save() with
  * a dirty attribute. A starter-block action must not trigger that: the
  * user's already-open edit form still carries the lock_version it loaded
  * with, and a bump here would make its next legitimate "Save" bounce off

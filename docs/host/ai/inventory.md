@@ -228,7 +228,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `PageDeleted` | `src/Page/Events/PageDeleted.php` | `PageEditPage` soft-delete action (`forced: false`), `PagesPage` force-delete action (`forced: true`) | `Page $page`, `bool $forced` |
 | `PageRestored` | `src/Page/Events/PageRestored.php` | `PagesPage` restore action | `Page $page` |
 | `LayoutSaved` | `src/Layout/Events/LayoutSaved.php` | `LayoutForm::save()` after `Layout::updateOrCreate` | `Layout $layout` |
-| `SharedBlockSaved` | `src/SharedBlock/Events/SharedBlockSaved.php` | `SharedBlockForm::create()` / `update()` after the write | `SharedBlock $block` |
+| `SharedBlockSaved` | `src/SharedBlock/Events/SharedBlockSaved.php` | `SharedBlockForm::create()` after the write; `update()` via `DB::afterCommit`, after the save transaction commits | `SharedBlock $block` |
 | `SharedBlockDeleted` | `src/SharedBlock/Events/SharedBlockDeleted.php` | `SharedBlocksPage` delete action, after `delete()` (offered only while nothing places the block, re-checked server-side) | `SharedBlock $block` |
 | `LanguagesChanged` | `src/Language/Events/LanguagesChanged.php` | `LanguageObserver`, on any create/update/soft-delete/restore/force-delete of a `Language` | none |
 | `SettingsSaved` | `src/Settings/Events/SettingsSaved.php` | `SettingsForm::apply()`, once per form submission that wrote at least one key | `array $keys` (dotted store keys written) |
@@ -331,7 +331,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_settings` | `src/Settings/Models/Setting.php` | Yes | |
 | `tbtop_form_submissions` | `src/Form/Models/FormSubmission.php` | Yes | gained `lead_status` in a later migration |
 | `tbtop_layouts` | `src/Layout/Models/Layout.php` | Yes | |
-| `tbtop_shared_blocks` | `src/SharedBlock/Models/SharedBlock.php` | Yes | `name`, `kind`, json `data` (same shape as a page content row's `data`), `lock_version` (bumped on every update; a stale edit form is rejected); page content rows point at it via a top-level `shared` key |
+| `tbtop_shared_blocks` | `src/SharedBlock/Models/SharedBlock.php` | Yes | `name`, `kind`, json `data` (same shape as a page content row's `data`), `lock_version` (bumped in SQL on every update; an edit form save claims it atomically, so a stale or concurrent save is rejected); page content rows point at it via a top-level `shared` key |
 | `tbtop_page_revisions` | `src/Page/Models/PageRevision.php` | Yes | `user_id` via `UserKeyColumn::define` (nullable) |
 | `tbtop_page_refs` | `src/Page/Refs/PageRefIndex.php` (no model) | Yes | Migration `2026_10_07_000002_create_page_refs_table.php`; `page_id` (FK, cascade on delete), `field`, `target_id` (no FK), `position`; indexes `(target_id, field)` and `page_id`. Derived: rewritten per page on save, `cms:page-refs:rebuild` recomputes it |
 | `tbtop_form_submission_comments` | `src/Form/Models/FormSubmissionComment.php` | Yes | `user_id` via `UserKeyColumn::define` |

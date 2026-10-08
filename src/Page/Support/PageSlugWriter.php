@@ -51,6 +51,44 @@ class PageSlugWriter
         $page->unsetRelation('slugs');
     }
 
+    /**
+     * Whether sync() would take a slug base other than the stored one from
+     * these overrides. Suffixes from path collisions are not predicted.
+     *
+     * @param  array<string, string>  $slugOverrides
+     */
+    public function overridesChange(Page $page, array $slugOverrides): bool
+    {
+        if ($page->isErrorPage() || $page->is_system) {
+            return false;
+        }
+
+        $overrides = array_filter(
+            array_intersect_key($slugOverrides, array_flip($this->locales())),
+            static fn (string $slug): bool => $slug !== '',
+        );
+
+        if ($overrides === []) {
+            return false;
+        }
+
+        $stored = PageSlug::query()
+            ->where('page_id', $page->getKey())
+            ->whereIn('locale', array_keys($overrides))
+            ->get()
+            ->keyBy('locale');
+
+        foreach ($overrides as $locale => $override) {
+            $existing = $stored->get($locale);
+
+            if ($this->baseFor($page, (string) $locale, $existing, $override) !== $existing?->slug) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function backfillLocale(string $locale): void
     {
         $this->writeLevels(Page::query()->whereNull('parent_id')->get(), [$locale], changedOnly: false);
