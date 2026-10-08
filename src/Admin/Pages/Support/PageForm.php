@@ -422,10 +422,10 @@ class PageForm
         // skip the check outright: there is no prior version to conflict
         // with, and requiring the key would break every caller that predates
         // this feature.
+        $expectedLockVersion = null;
         if (! $isCreate && array_key_exists('lock_version', $form)) {
             self::guardLockVersion($page, $form);
-            // PageObserver claims the row against it at write time.
-            $page->expectedLockVersion = (int) $form['lock_version'];
+            $expectedLockVersion = (int) $form['lock_version'];
         }
 
         if ($isCreate && is_string($form['type'] ?? null) && array_key_exists(self::CREATE_SUBTYPE_PREFIX . $form['type'], $form)) {
@@ -493,6 +493,8 @@ class PageForm
         $hierarchyDirty = $page->isDirty(['type', 'parent_id']);
 
         try {
+            // Set only around the save, so a guard that throws earlier leaves no claim on the instance; PageObserver claims against it.
+            $page->expectedLockVersion = $expectedLockVersion;
             $save = static fn (): bool => $page->save();
             $event = ! $isCreate && $statusBefore !== $page->status
                 ? ($page->status === PageStatus::Published ? 'published' : 'unpublished')

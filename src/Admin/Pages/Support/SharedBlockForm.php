@@ -107,12 +107,12 @@ final class SharedBlockForm
     {
         // Checked before anything is written; a caller without the key
         // (none in the admin) skips it, as PageForm::save() does.
+        $expectedLockVersion = null;
         if (array_key_exists('lock_version', $form)) {
-            if ((int) $form['lock_version'] !== (int) $block->lock_version) {
+            $expectedLockVersion = (int) $form['lock_version'];
+            if ($expectedLockVersion !== (int) $block->lock_version) {
                 throw new SharedBlockConflictException("Shared block #{$block->getKey()} was changed since this form was loaded.");
             }
-            // SharedBlock claims the row against it at write time.
-            $block->expectedLockVersion = (int) $form['lock_version'];
         }
 
         $valid = Validator::make($form, ['name' => ['required', 'string', 'max:255']])->validate();
@@ -131,6 +131,8 @@ final class SharedBlockForm
         }
 
         try {
+            // Set only around the save, so a failed validation leaves no claim on the instance; SharedBlock claims against it.
+            $block->expectedLockVersion = $expectedLockVersion;
             LockedSave::run(
                 static fn (): bool => $block->fill(['name' => $valid['name'], 'data' => $data])->save(),
                 static fn (Throwable $e): SharedBlockConflictException => new SharedBlockConflictException("Shared block #{$block->getKey()} hit a lock while saving.", 0, $e),
