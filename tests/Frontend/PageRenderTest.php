@@ -178,3 +178,25 @@ it('ships the Body as HTML in page props, falling back to the default locale whe
         ->assertOk()
         ->assertJsonPath('props.page.body', '<p>English body</p>');
 });
+
+it('falls back to the default-locale Body when the active one was typed and then erased', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $document = static fn (array $paragraphs): array => ['root' => ['type' => 'root', 'children' => array_map(
+        static fn (array $children): array => ['type' => 'paragraph', 'children' => $children],
+        $paragraphs,
+    )]];
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+        // Lexical keeps one empty paragraph after the text is erased; spaces and a bare line break are blank too.
+        'body' => [
+            'en' => $document([[['type' => 'text', 'text' => 'English body', 'format' => 0]]]),
+            'uk' => $document([[], [['type' => 'text', 'text' => '  ', 'format' => 0], ['type' => 'linebreak']]]),
+        ],
+        'content' => [],
+    ]);
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.page.body', '<p>English body</p>');
+});
