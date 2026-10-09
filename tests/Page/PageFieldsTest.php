@@ -142,7 +142,7 @@ it('lets a subtype that re-declares a base field own it: the base input yields, 
     saveEventPage($page, ['subtype' => 'box_office', 'field_capacity' => 'Sold out', 'field_box_office__capacity' => 'Few left'])
         ->assertRedirect()->assertSessionHasNoErrors();
 
-    expect($page->refresh()->fields)->toBe(['capacity' => 'Few left', 'venue' => ['en' => 'Arena']])
+    expect($page->refresh()->fields)->toBeIgnoringKeyOrder(['capacity' => 'Few left', 'venue' => ['en' => 'Arena']])
         ->and(siteProps($page)['page']['fields'])->toBe(['venue' => 'Arena', 'capacity' => 'Few left']);
 
     saveEventPage($page, ['subtype' => 'concert', 'field_capacity' => 'Sold out'])

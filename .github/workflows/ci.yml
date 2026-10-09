@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, next]
+    branches: [main, 'release/**']
 
 permissions:
   contents: read
@@ -104,6 +104,54 @@ jobs:
       # same commit), so treat that as inconclusive rather than as evidence.
       - name: Execute tests
         run: vendor/bin/pest --ci --parallel
+
+  # The MySQL run of the suite, on PRs into main (release PRs) and pushes to
+  # main only: on a PR into release/** it shows as Skipped. Locally the same
+  # run is `composer test:mysql`.
+  test-mysql:
+    name: Test (MySQL)
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    # root: Laravel's parallel testing creates one testing_test_N database per worker.
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: testing
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, pdo_mysql, bcmath, fileinfo
+          coverage: none
+
+      - name: Constrain Testbench
+        run: composer require "orchestra/testbench:^11.0" --dev --no-interaction --no-update
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          dependency-versions: highest
+
+      - name: Execute tests
+        run: composer test:mysql -- --ci
 
   frontend:
     name: Frontend

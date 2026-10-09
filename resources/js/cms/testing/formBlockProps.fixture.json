@@ -1,0 +1,115 @@
+{
+    "EveryKind": {
+        "full": {
+            "title": "Hello",
+            "note": "A note",
+            "body": "<p>Hi</p>",
+            "image": "/storage/media/photo.png",
+            "gallery": [
+                "/storage/media/photo.png"
+            ],
+            "cta": {
+                "href": "https://example.com",
+                "type": "external",
+                "label": "Go"
+            },
+            "count": 12,
+            "level": 3.5,
+            "featured": true,
+            "agreed": true,
+            "keywords": [
+                "a"
+            ],
+            "perks": [
+                "wifi"
+            ],
+            "sizes": [
+                "m"
+            ],
+            "size": "m",
+            "tone": "warm",
+            "day": "2026-01-02",
+            "color": "#ff0000",
+            "meta": {
+                "k": "v"
+            },
+            "related": [
+                {
+                    "id": "2",
+                    "name": "Other",
+                    "url": "/other"
+                }
+            ],
+            "items": [
+                {
+                    "label": "One",
+                    "qty": 2
+                }
+            ]
+        },
+        "empty": {
+            "title": null,
+            "note": null,
+            "body": null,
+            "image": null,
+            "gallery": [],
+            "cta": null,
+            "count": null,
+            "level": null,
+            "featured": false,
+            "agreed": false,
+            "keywords": [],
+            "perks": [],
+            "sizes": [],
+            "size": null,
+            "tone": null,
+            "day": null,
+            "color": null,
+            "meta": [],
+            "related": [],
+            "items": []
+        }
+    },
+    "ArrayShapes": {
+        "full": {
+            "days": [
+                "mon"
+            ],
+            "day": "tue",
+            "period": {
+                "from": "2026-01-01",
+                "to": "2026-01-31"
+            },
+            "files": [
+                "uploads/a.pdf"
+            ],
+            "file": "uploads/b.pdf",
+            "address": {
+                "street": "Main 1"
+            },
+            "sections": [
+                {
+                    "heading": "Intro",
+                    "rows": [
+                        {
+                            "cell": "A",
+                            "span": 2
+                        }
+                    ]
+                }
+            ]
+        },
+        "empty": {
+            "days": [],
+            "day": null,
+            "period": {
+                "from": null,
+                "to": null
+            },
+            "files": [],
+            "file": null,
+            "address": null,
+            "sections": []
+        }
+    }
+}

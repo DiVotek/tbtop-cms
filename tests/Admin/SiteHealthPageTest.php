@@ -59,10 +59,9 @@ it('renders one table row per registered health check', function (): void {
 
     expect($rows)->toHaveCount(count(HealthCheckRunner::defaultChecks()));
 
-    $checkIds = collect($rows)->pluck('check_id')->all();
-    foreach (HealthCheckRunner::defaultChecks() as $checkClass) {
-        expect($checkIds)->toContain(app($checkClass)->id());
-    }
+    // A row carries only declared columns, so each check is identified by its label.
+    $labels = array_map(static fn ($result): string => $result->label(), app(HealthCheckRunner::class)->run()->results);
+    expect(collect($rows)->pluck('label')->all())->toEqualCanonicalizing($labels);
 });
 
 it('carries a localized title and breadcrumbs', function (): void {

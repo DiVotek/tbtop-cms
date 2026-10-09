@@ -158,7 +158,7 @@ it('lists and deletes a problem row of a layout slot the same way', function ():
 
     $saved = Layout::query()->where('slot', Slots::HEADER)->firstOrFail()->content;
     expect(array_column($saved, 'id'))->toBe(['ok1'])
-        ->and($saved[0]['data'])->toBe(['heading' => 'H', 'body' => 'B']);
+        ->and($saved[0]['data'])->toBeIgnoringKeyOrder(['heading' => 'H', 'body' => 'B']);
 });
 
 /**

@@ -91,10 +91,11 @@ it('shows a created hit in the table query results', function (): void {
 
 it('flags a hit whose path already redirects, for its own locale or any locale', function (): void {
     actingAsNotFoundAdmin();
-    makeNotFoundHit(['path' => 'covered-en']);
-    makeNotFoundHit(['path' => 'covered-any']);
-    makeNotFoundHit(['path' => 'covered-other-locale']);
-    makeNotFoundHit(['path' => 'uncovered']);
+    // Distinct last_seen_at: the table sorts by it, and equal values leave the row order to the driver.
+    makeNotFoundHit(['path' => 'covered-en', 'last_seen_at' => now()]);
+    makeNotFoundHit(['path' => 'covered-any', 'last_seen_at' => now()->subMinute()]);
+    makeNotFoundHit(['path' => 'covered-other-locale', 'last_seen_at' => now()->subMinutes(2)]);
+    makeNotFoundHit(['path' => 'uncovered', 'last_seen_at' => now()->subMinutes(3)]);
     Redirect::query()->create(['locale' => 'en', 'from_path' => 'covered-en', 'to_path' => 'x', 'status_code' => 301]);
     Redirect::query()->create(['locale' => null, 'from_path' => 'covered-any', 'to_path' => 'x', 'status_code' => 301]);
     Redirect::query()->create(['locale' => 'de', 'from_path' => 'covered-other-locale', 'to_path' => 'x', 'status_code' => 301]);

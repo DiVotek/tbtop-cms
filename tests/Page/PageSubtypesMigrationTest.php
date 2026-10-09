@@ -44,11 +44,11 @@ it('moves a subtype key out of `type` into `subtype` and strips `owner` from con
     expect($contacts->refresh()->only(['type', 'subtype']))->toBe(['type' => 'page', 'subtype' => 'contacts'])
         ->and($concert->refresh()->only(['type', 'subtype']))->toBe(['type' => 'event', 'subtype' => 'concert'])
         ->and($plain->refresh()->only(['type', 'subtype']))->toBe(['type' => 'event', 'subtype' => null])
-        ->and($contacts->content)->toBe([
+        ->and($contacts->content)->toBeIgnoringKeyOrder([
             ['id' => 'a', 'kind' => 'Simple', 'active' => true, 'sort' => 0, 'data' => ['heading' => 'Office']],
             ['id' => 'b', 'kind' => 'Hero', 'active' => false, 'sort' => 1, 'data' => []],
         ])
-        ->and(Page::withTrashed()->findOrFail($trashed->id)->content)->toBe([
+        ->and(Page::withTrashed()->findOrFail($trashed->id)->content)->toBeIgnoringKeyOrder([
             ['id' => 'c', 'kind' => 'Hero', 'active' => true, 'sort' => 0, 'data' => []],
         ]);
 });

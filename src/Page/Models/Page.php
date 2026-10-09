@@ -65,8 +65,8 @@ class Page extends Model
     /**
      * created_by/updated_by are stamped by TracksAuthors, not mass-assigned —
      * they stay out of $fillable on purpose (see the trait's docblock).
-     * lock_version is bumped by PageObserver::saving(), also never mass-
-     * assigned. created_at is mass-assigned explicitly in list-ordering
+     * lock_version is moved in SQL by PageObserver (LockVersion), also never
+     * mass-assigned. created_at is mass-assigned explicitly in list-ordering
      * tests.
      *
      * @var list<string>
@@ -122,6 +122,13 @@ class Page extends Model
      * $pendingSlugOverrides above.
      */
     public bool $pendingRestore = false;
+
+    /**
+     * Transient: the lock_version the edit form was loaded at, set by
+     * PageForm::save() around save(). Set, PageObserver claims the row
+     * against it; null, a write bumps the version with no compare.
+     */
+    public ?int $expectedLockVersion = null;
 
     /** @var array<string, string> */
     protected $casts = [

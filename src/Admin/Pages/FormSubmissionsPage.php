@@ -99,6 +99,10 @@ class FormSubmissionsPage extends AdminPage
                     ]),
                 Column::make('created_at')->label(__('tbtop-cms::form-submissions.columns.submitted'))
                     ->datetime(__('tbtop-cms::form-submissions.date_format'))->muted(),
+                // Not shown by default — projected raw purely so retry's
+                // hiddenIf() can read it: a row carries only declared columns.
+                Column::make('status')->label(__('tbtop-cms::form-submissions.columns.delivery'))
+                    ->toggleable(true, hiddenByDefault: true),
             ])
             ->tabs($this->tabs())
             ->filters($this->filters($s))

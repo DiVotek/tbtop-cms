@@ -6,6 +6,8 @@ namespace Tbtop\Cms\SharedBlock\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
+use Tbtop\Cms\SharedBlock\Exceptions\SharedBlockConflictException;
+use Tbtop\Cms\Support\LockVersion;
 
 /**
  * One block's content edited in one place and placed on any number of pages
@@ -32,16 +34,38 @@ class SharedBlock extends Model
         'lock_version' => 'integer',
     ];
 
+    /** Transient: the lock_version the edit form was loaded at, set by SharedBlockForm::update(). */
+    public ?int $expectedLockVersion = null;
+
     /**
      * At the model rather than in the form, so any write invalidates an open
-     * edit form. updating() only fires for a dirty model, so a no-op save
-     * keeps the version.
+     * edit form. Each bump is one SQL statement (LockVersion): a form save
+     * claims the row against its loaded version, a no-op form save only
+     * compares (keeping other forms valid), any other writer bumps relatively.
      */
     protected static function booted(): void
     {
-        static::updating(static function (SharedBlock $block): void {
-            $block->lock_version = (int) $block->getOriginal('lock_version') + 1;
+        static::saving(static function (SharedBlock $block): void {
+            if ($block->exists && ! $block->isDirty() && $block->expectedLockVersion !== null) {
+                self::takeLock($block, write: false);
+            }
         });
+
+        static::updating(static function (SharedBlock $block): void {
+            $block->expectedLockVersion === null
+                ? LockVersion::bump($block)
+                : self::takeLock($block, write: true);
+        });
+    }
+
+    private static function takeLock(SharedBlock $block, bool $write): void
+    {
+        LockVersion::take(
+            $block,
+            (int) $block->expectedLockVersion,
+            $write,
+            static fn (): SharedBlockConflictException => new SharedBlockConflictException("Shared block #{$block->getKey()} was changed since this form was loaded."),
+        );
     }
 
     protected function auditFields(): array

@@ -64,9 +64,9 @@ it('renders the divotek-style pages list wire shape', function (): void {
         'deleted' => 'Deleted',
     ])->and(array_column($opts['tabs'], 'description'))->toHaveCount(4);
 
-    // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge (computed display_state) / SEO badge (computed seo_state) / Updated date / Updated by (hidden) / deleted_at (hidden helper).
+    // Columns: Title (emphasized) / Type (muted+uppercase) / Parent / Status badge (computed display_state) / SEO badge (computed seo_state) / Updated date / Updated by (hidden) / deleted_at and path (hidden helpers).
     $cols = array_column($opts['columns'], null, 'name');
-    expect(array_keys($cols))->toBe(['name', 'type', 'parent_name', 'display_state', 'seo_state', 'updated_at', 'updated_by_name', 'deleted_at'])
+    expect(array_keys($cols))->toBe(['name', 'type', 'parent_name', 'display_state', 'seo_state', 'updated_at', 'updated_by_name', 'deleted_at', 'path'])
         ->and($cols['name']['emphasized'] ?? null)->toBeTrue()
         ->and($cols['type']['muted'] ?? null)->toBeTrue()
         ->and($cols['type']['uppercase'] ?? null)->toBeTrue()

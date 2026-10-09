@@ -246,7 +246,7 @@ it('leaves the page\'s own content and every other column untouched — only sta
 
     $category->refresh();
 
-    expect($category->content)->toBe([
+    expect($category->content)->toBeIgnoringKeyOrder([
         ['id' => 'existing-block', 'kind' => 'Simple', 'active' => true, 'data' => ['heading' => 'Keep me']],
     ])->and($category->getTranslation('name', 'en'))->toBe('Original name');
 });
@@ -310,7 +310,7 @@ it('moves a starter block even when the page\'s own content has an invalid requi
 });
 
 /**
- * PageObserver::saving() bumps lock_version on any real Eloquent save() with
+ * PageObserver bumps lock_version on any real Eloquent save() with
  * a dirty attribute. A starter-block action must not trigger that: the
  * user's already-open edit form still carries the lock_version it loaded
  * with, and a bump here would make its next legitimate "Save" bounce off

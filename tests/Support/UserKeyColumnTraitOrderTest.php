@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\ColumnDefinition;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tbtop\Cms\Support\UserKeyColumn;
 use Tbtop\Cms\Tests\Fixtures\UlidAdminUser;
+
+// DDL on the default connection: on MySQL it must land in the worker database, not the shared base one.
+uses(RefreshDatabase::class);
 
 it('declares a ulid-shaped column (char length 26, not uuid) for a HasUlids host, so the HasUlids branch is checked before HasUuids', function (): void {
     config(['tbtop-cms.admin.model' => UlidAdminUser::class]);

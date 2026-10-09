@@ -12,6 +12,8 @@ return [
         'last_seen_at' => 'Last seen',
         'last_referer' => 'Last referer',
         'last_user_agent' => 'Last user agent',
+        'has_redirect' => 'Has redirect',
+        'is_ignored' => 'Ignored',
     ],
     'tabs' => [
         'active' => 'Active',

@@ -45,7 +45,7 @@ use Tbtop\Cms\Page\Support\StarterBlockSync;
  * - With no validated form, save() has nothing safe to hand PageForm::save()
  *   — calling it with an empty/partial form would blank out every other
  *   field on the page. Instead save() writes starter_blocks directly via a
- *   raw query-builder update(), which also sidesteps PageObserver::saving()'s
+ *   raw query-builder update(), which also sidesteps PageObserver's
  *   lock_version bump: a real Eloquent save() on any dirty attribute bumps
  *   lock_version, which would make the user's already-open edit form's next
  *   "Save" bounce off PageForm::guardLockVersion() as a false conflict even
@@ -235,8 +235,8 @@ final class PageEditStarterBlocks
      * and no other field on the page is meant to change here anyway.
      *
      * Goes around Eloquent entirely (toBase()->update(), not $page->save()):
-     * an Eloquent save on this dirty attribute would fire PageObserver::
-     * saving() and bump lock_version, which the user's already-open edit
+     * an Eloquent save on this dirty attribute would fire PageObserver's
+     * update path and bump lock_version, which the user's already-open edit
      * form has no way to know about — its next "Save" would then bounce off
      * PageForm::guardLockVersion() as a false conflict, even though nothing
      * IT was editing changed. json_encode() is manual because the base query
