@@ -138,6 +138,10 @@ class PagesPage extends AdminPage
                 // distinguish trashed rows client-side (empty vs non-empty).
                 Column::make('deleted_at')->label(__('tbtop-cms::pages.columns.deleted_at'))
                     ->date(__('tbtop-cms::pages.date_format'))->toggleable(true, hiddenByDefault: true),
+                // Not shown by default — projected purely for the view-on-site
+                // link's '/{path}' template: a row carries only declared columns.
+                Column::make('path')->label(__('tbtop-cms::pages.columns.path'))
+                    ->toggleable(true, hiddenByDefault: true)->muted(),
             ])
             ->tabs([
                 $this->tab('all', __('tbtop-cms::pages.tabs.all')),

@@ -21,6 +21,7 @@ return [
         'updated' => 'Оновлено',
         'updated_by' => 'Оновив(-ла)',
         'deleted_at' => 'Видалено',
+        'path' => 'Шлях',
     ],
     'status' => [
         'published' => 'Опубліковано',

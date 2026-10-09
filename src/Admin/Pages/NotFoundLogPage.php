@@ -96,6 +96,12 @@ class NotFoundLogPage extends AdminPage
                     ->toggleable(true, hiddenByDefault: true)->muted(),
                 Column::make('last_user_agent')->label(__('tbtop-cms::not-found.columns.last_user_agent'))
                     ->toggleable(true, hiddenByDefault: true)->muted(),
+                // Not shown by default — projected purely so the row actions'
+                // hiddenIf() can read them: a row carries only declared columns.
+                Column::make('has_redirect')->label(__('tbtop-cms::not-found.columns.has_redirect'))
+                    ->toggleable(true, hiddenByDefault: true),
+                Column::make('is_ignored')->label(__('tbtop-cms::not-found.columns.is_ignored'))
+                    ->toggleable(true, hiddenByDefault: true),
             ])
             ->tabs([
                 Tab::make('active')->label(__('tbtop-cms::not-found.tabs.active'))->count()

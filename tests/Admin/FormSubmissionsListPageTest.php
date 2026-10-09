@@ -58,14 +58,15 @@ it('carries the title, subtitle, and breadcrumbs from translations', function ()
 it('labels every column from translations, mirroring the Pages table shape', function (): void {
     $labels = array_column(formSubmissionsTableNode()['options']['columns'] ?? [], 'label');
 
-    // Identity -> attributes -> status -> date; delivery and locale live on
-    // the detail page only.
+    // Identity -> attributes -> status -> date; locale lives on the detail
+    // page only, delivery ships as a hidden helper for retry's hiddenIf.
     expect($labels)->toBe([
         __('tbtop-cms::form-submissions.columns.lead'),
         __('tbtop-cms::form-submissions.columns.form'),
         __('tbtop-cms::form-submissions.columns.page'),
         __('tbtop-cms::form-submissions.columns.status'),
         __('tbtop-cms::form-submissions.columns.submitted'),
+        __('tbtop-cms::form-submissions.columns.delivery'),
     ]);
 });
 
