@@ -81,7 +81,7 @@ final class PageTranslation
                 return false;
             }
             foreach (is_array($paragraph['children'] ?? null) ? $paragraph['children'] : [] as $inline) {
-                $isBlankText = is_array($inline) && ($inline['type'] ?? null) === 'text' && trim((string) ($inline['text'] ?? '')) === '';
+                $isBlankText = is_array($inline) && ($inline['type'] ?? null) === 'text' && preg_match('/^[\s\x{00A0}]*$/u', (string) ($inline['text'] ?? '')) === 1;
                 $isLineBreak = is_array($inline) && ($inline['type'] ?? null) === 'linebreak';
                 if (! $isBlankText && ! $isLineBreak) {
                     return false;

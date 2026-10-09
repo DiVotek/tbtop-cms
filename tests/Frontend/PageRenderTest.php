@@ -191,7 +191,7 @@ it('falls back to the default-locale Body when the active one was typed and then
         // Lexical keeps one empty paragraph after the text is erased; spaces and a bare line break are blank too.
         'body' => [
             'en' => $document([[['type' => 'text', 'text' => 'English body', 'format' => 0]]]),
-            'uk' => $document([[], [['type' => 'text', 'text' => '  ', 'format' => 0], ['type' => 'linebreak']]]),
+            'uk' => $document([[], [['type' => 'text', 'text' => " \u{00A0}", 'format' => 0], ['type' => 'linebreak']]]),
         ],
         'content' => [],
     ]);
