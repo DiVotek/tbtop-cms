@@ -193,13 +193,13 @@ it('filters the table by locale', function (): void {
     actingAsLifecycleAdmin();
     Language::factory()->create(['locale' => 'uk', 'is_admin_active' => true, 'is_frontend_active' => true]);
     lifecycleSubmission(['locale' => 'en']);
-    lifecycleSubmission(['locale' => 'uk']);
+    $uk = lifecycleSubmission(['locale' => 'uk']);
 
     $rows = $this->getJson('/admin/form-submissions/tables/formSubmissions?filters[locale]=uk')
         ->assertOk()->json('data.data');
 
     expect($rows)->toHaveCount(1)
-        ->and($rows[0]['locale'])->toBe('uk');
+        ->and($rows[0]['_key'])->toBe($uk->id);
 });
 
 it('declares delivery and locale as filter fields in the table structure', function (): void {

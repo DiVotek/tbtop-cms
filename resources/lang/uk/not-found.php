@@ -12,6 +12,8 @@ return [
         'last_seen_at' => 'Востаннє',
         'last_referer' => 'Останній referer',
         'last_user_agent' => 'Останній user agent',
+        'has_redirect' => 'Є редирект',
+        'is_ignored' => 'Ігнорується',
     ],
     'tabs' => [
         'active' => 'Активні',

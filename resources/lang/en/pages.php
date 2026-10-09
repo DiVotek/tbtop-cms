@@ -21,6 +21,7 @@ return [
         'updated' => 'Updated',
         'updated_by' => 'Updated by',
         'deleted_at' => 'Deleted',
+        'path' => 'Path',
     ],
     'status' => [
         'published' => 'Published',
