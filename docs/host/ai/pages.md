@@ -30,7 +30,9 @@ blocks.md), `starter_blocks` (array cast, per-child-type starter structure
 — see Starter blocks below), `image` (a media id, not a URL — resolve with
 `MediaUrlResolver`), `seo` (array cast — see seo.md), `is_indexable`,
 `is_system`, `sort_order`, `lock_version` (optimistic-lock counter, bumped
-by `PageObserver::saving()` on every real update — not mass-assignable).
+in SQL by `PageObserver` on every real update — not mass-assignable; an
+admin form save claims it atomically, so of two saves loaded at one version
+only one writes and the other gets the conflict toast).
 
 `created_by`/`updated_by` are stamped by `TracksAuthors`, never
 mass-assigned. Every field a seeder needs is in `$fillable`.

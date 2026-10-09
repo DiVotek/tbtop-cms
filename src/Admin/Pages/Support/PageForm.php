@@ -30,6 +30,8 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Support\StarterBlocks;
 use Tbtop\Cms\Page\Types\PageType;
+use Tbtop\Cms\Support\LockedSave;
+use Throwable;
 
 class PageForm
 {
@@ -402,7 +404,9 @@ class PageForm
      *                               longer matches the row (someone else saved or restored this
      *                               page since the form was loaded). Checked first, before any
      *                               fill/guard side effect, so a stale submit never partially
-     *                               applies — see PageEditPage::save()/PageEditBlockTabs for how
+     *                               applies, and again at write time by PageObserver's atomic
+     *                               claim, which a save racing this one loses — see
+     *                               PageEditPage::save()/PageEditBlockTabs for how
      *                               callers turn this into a non-destructive error notify that
      *                               keeps the submitter's unsaved edits in the form.
      */
@@ -418,8 +422,10 @@ class PageForm
         // skip the check outright: there is no prior version to conflict
         // with, and requiring the key would break every caller that predates
         // this feature.
+        $expectedLockVersion = null;
         if (! $isCreate && array_key_exists('lock_version', $form)) {
             self::guardLockVersion($page, $form);
+            $expectedLockVersion = (int) $form['lock_version'];
         }
 
         if ($isCreate && is_string($form['type'] ?? null) && array_key_exists(self::CREATE_SUBTYPE_PREFIX . $form['type'], $form)) {
@@ -487,18 +493,26 @@ class PageForm
         $hierarchyDirty = $page->isDirty(['type', 'parent_id']);
 
         try {
+            // Set only around the save, so a guard that throws earlier leaves no claim on the instance; PageObserver claims against it.
+            $page->expectedLockVersion = $expectedLockVersion;
             $save = static fn (): bool => $page->save();
+            $event = ! $isCreate && $statusBefore !== $page->status
+                ? ($page->status === PageStatus::Published ? 'published' : 'unpublished')
+                : null;
 
-            if (! $isCreate && $statusBefore !== $page->status) {
-                $event = $page->status === PageStatus::Published ? 'published' : 'unpublished';
-                app(AuditContext::class)->during($event, [], $save);
-            } else {
-                $save();
-            }
+            // One transaction: a failure after the lock claim (revision, slugs, refs) rolls the claim back too.
+            LockedSave::run(
+                static fn (): mixed => $event !== null ? app(AuditContext::class)->during($event, [], $save) : $save(),
+                static fn (Throwable $e): PageConflictException => new PageConflictException("Page #{$page->getKey()} hit a lock while saving.", 0, $e),
+            );
+        } catch (PageConflictException $e) {
+            throw $e;
         } catch (DomainException $e) {
             $field = $statusDirty ? 'status' : ($hierarchyDirty ? 'type' : 'status');
 
             throw ValidationException::withMessages([$field => $e->getMessage()]);
+        } finally {
+            $page->expectedLockVersion = null;
         }
 
         return $page;

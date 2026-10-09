@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages\Support;
 
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Tbtop\Admin\Actions\ActionCtx;
@@ -20,6 +19,8 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 use Tbtop\Cms\SharedBlock\SharedBlockUsage;
+use Tbtop\Cms\Support\LockedSave;
+use Throwable;
 
 /**
  * Builds one form tab per saved block on PageEditPage (fields prefixed
@@ -226,9 +227,10 @@ final class PageEditBlockTabs
         }
 
         // One transaction: any failed page save (conflict, validation, …)
-        // must not leave the new shared block behind as an orphan.
+        // must not leave the new shared block behind as an orphan. It is the
+        // outermost one, so it maps lock errors of the nested page save.
         try {
-            $shared = DB::transaction(static function () use ($ctx, $page, $registry, $id, $kind): ?SharedBlock {
+            $shared = LockedSave::run(static function () use ($ctx, $page, $registry, $id, $kind): ?SharedBlock {
                 $rows = [];
                 $shared = null;
                 foreach (PageEditBlocks::toRows($ctx->form, $page) as $row) {
@@ -247,7 +249,7 @@ final class PageEditBlockTabs
                 }
 
                 return $shared;
-            });
+            }, static fn (Throwable $e): PageConflictException => new PageConflictException("Page #{$page->getKey()} hit a lock while sharing a block.", 0, $e));
         } catch (PageConflictException) {
             return Effects::make()->notify(__('tbtop-cms::pages.conflict.message'), 'error');
         }

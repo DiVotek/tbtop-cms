@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\SharedBlock\Events\SharedBlockSaved;
 use Tbtop\Cms\SharedBlock\Exceptions\SharedBlockConflictException;
 use Tbtop\Cms\SharedBlock\Models\SharedBlock;
+use Tbtop\Cms\Support\LockedSave;
+use Throwable;
 
 /**
  * Create takes a name and a kind; the content is edited afterwards on
@@ -97,14 +100,19 @@ final class SharedBlockForm
     /**
      * @param  array<string, mixed>  $form
      *
-     * @throws SharedBlockConflictException when the form's lock_version is behind the row
+     * @throws SharedBlockConflictException when the form's lock_version is behind the row, checked
+     *                                      first and again by the atomic claim at write time
      */
     public static function update(array $form, SharedBlock $block): SharedBlock
     {
         // Checked before anything is written; a caller without the key
         // (none in the admin) skips it, as PageForm::save() does.
-        if (array_key_exists('lock_version', $form) && (int) $form['lock_version'] !== (int) $block->lock_version) {
-            throw new SharedBlockConflictException("Shared block #{$block->getKey()} was changed since this form was loaded.");
+        $expectedLockVersion = null;
+        if (array_key_exists('lock_version', $form)) {
+            $expectedLockVersion = (int) $form['lock_version'];
+            if ($expectedLockVersion !== (int) $block->lock_version) {
+                throw new SharedBlockConflictException("Shared block #{$block->getKey()} was changed since this form was loaded.");
+            }
         }
 
         $valid = Validator::make($form, ['name' => ['required', 'string', 'max:255']])->validate();
@@ -122,8 +130,18 @@ final class SharedBlockForm
             $data = $block->data;
         }
 
-        $block->fill(['name' => $valid['name'], 'data' => $data])->save();
-        event(new SharedBlockSaved($block));
+        try {
+            // Set only around the save, so a failed validation leaves no claim on the instance; SharedBlock claims against it.
+            $block->expectedLockVersion = $expectedLockVersion;
+            LockedSave::run(
+                static fn (): bool => $block->fill(['name' => $valid['name'], 'data' => $data])->save(),
+                static fn (Throwable $e): SharedBlockConflictException => new SharedBlockConflictException("Shared block #{$block->getKey()} hit a lock while saving.", 0, $e),
+            );
+        } finally {
+            $block->expectedLockVersion = null;
+        }
+        // After the commit, as PageSaved: the cache bump must not precede it.
+        DB::afterCommit(static fn () => event(new SharedBlockSaved($block)));
 
         return $block;
     }
