@@ -384,7 +384,7 @@ class PagesPage extends AdminPage
 
     private function duplicate(ActionCtx $ctx): Effects
     {
-        $page = Page::findOrFail((int) ($ctx->row['id'] ?? 0));
+        $page = Page::findOrFail((int) $ctx->key());
 
         app(PageDuplicator::class)->duplicate($page);
 
@@ -400,7 +400,7 @@ class PagesPage extends AdminPage
 
     private function restore(ActionCtx $ctx): Effects
     {
-        $page = Page::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $page = Page::withTrashed()->findOrFail((int) $ctx->key());
 
         try {
             $page->restore();
@@ -423,7 +423,7 @@ class PagesPage extends AdminPage
 
     private function forceDelete(ActionCtx $ctx): Effects
     {
-        $page = Page::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $page = Page::withTrashed()->findOrFail((int) $ctx->key());
 
         try {
             app(AuditContext::class)->during(

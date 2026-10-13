@@ -155,8 +155,8 @@ class LanguagesPage extends AdminPage
         return EditAction::make(
             $s,
             $s->form('languageEdit', LanguageForm::editFields($s)),
-            static fn (ActionCtx $ctx): array => LanguageForm::load((int) ($ctx->row['id'] ?? 0)),
-            static fn (ActionCtx $ctx): Language => LanguageForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
+            static fn (ActionCtx $ctx): array => LanguageForm::load((int) $ctx->key()),
+            static fn (ActionCtx $ctx): Language => LanguageForm::save($ctx->form, (int) $ctx->key()),
             name: 'languageEdit',
             title: __('tbtop-cms::languages.edit_title'),
         )->hiddenIf('deleted_at', 'not empty');
@@ -167,7 +167,7 @@ class LanguagesPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
-                $language = Language::query()->find($ctx->row['id'] ?? null);
+                $language = Language::query()->find($ctx->key());
                 $language?->delete();
 
                 return Effects::make()->notify(__('tbtop-cms::languages.actions.deleted'))->refreshTable();
@@ -187,7 +187,7 @@ class LanguagesPage extends AdminPage
 
     private function restore(ActionCtx $ctx): Effects
     {
-        $language = Language::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $language = Language::withTrashed()->findOrFail((int) $ctx->key());
 
         try {
             $language->restore();
@@ -208,7 +208,7 @@ class LanguagesPage extends AdminPage
 
     private function forceDelete(ActionCtx $ctx): Effects
     {
-        $language = Language::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $language = Language::withTrashed()->findOrFail((int) $ctx->key());
 
         try {
             app(AuditContext::class)->during(
