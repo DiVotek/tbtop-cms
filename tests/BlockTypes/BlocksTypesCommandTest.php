@@ -34,6 +34,8 @@ use Tbtop\Cms\Tests\Fixtures\FormResolver\EveryKindBlock;
 
 beforeEach(function (): void {
     $this->outputPath = sys_get_temp_dir() . '/tbtop-cms-blocks-types-test-' . uniqid() . '.ts';
+    // Page types have their own test; the default would share one pages.generated.ts in the temp dir.
+    config()->set('tbtop-cms.pages.types_path', false);
 });
 
 afterEach(function (): void {

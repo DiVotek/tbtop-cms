@@ -16,6 +16,8 @@ beforeEach(function (): void {
     $this->typesPath = $this->dir . '/blocks.generated.ts';
     $this->registryPath = $this->dir . '/registry.generated.ts';
     config()->set('tbtop-cms.blocks.types', []);
+    // Page types have their own test; this one removes the folder file by file.
+    config()->set('tbtop-cms.pages.types_path', false);
 });
 
 afterEach(function (): void {

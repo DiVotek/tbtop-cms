@@ -570,6 +570,42 @@ public function backReferences(): array
   fields only: a `pages` field inside a block is resolved forward but is
   invisible to `backReferences()`.
 
+## Page prop types
+
+`cms:blocks:types` also writes the `page` prop's zod schemas and TS types to
+`pages.generated.ts` beside `blocks.generated.ts`
+(`config('tbtop-cms.pages.types_path')`; `false` turns it off), and its
+`--check` covers that file too. One variant per registered type and
+subtype, discriminated by the literal pair `type`/`subtype`:
+
+```tsx
+import type { CmsPage, PageOf } from "./cms/pages.generated";
+
+const { page } = usePage<{ page: CmsPage }>().props;
+if (page.subtype === "concert") page.fields.artist; // narrowed
+
+function ConcertHeader({ page }: { page: PageOf<"concert"> }) { /* … */ }
+```
+
+- **Exports.** `<key>Fields` / `<key>Page` (const and type) per type key in
+  camel/Studly case, `cmsPage` / `CmsPage` (the union), and `pageProps` /
+  `PageOf<K>` keyed by type or subtype key. A base type's variant has
+  `subtype: null`; a subtype's has its base's `type` literal.
+- **Fields.** Built like the resolver: the base's part, the subtype's over
+  it (a subtype key wins), then both types' `backReferences()` keys as
+  `{id, name, url}` lists. A part keeping the base `resolveFields()` is typed
+  from its `fields()` (same rules as a form-driven block); an override is
+  typed from its `@return array{...}`. An override without one prints a
+  warning and makes the variant's `fields` a `z.looseObject`: the other
+  part's keys stay typed, any other key is `unknown`.
+- **Skipped.** A subtype whose `base()` is not a registered top-level type
+  gets no variant, with a warning (`cms:doctor` reports it as
+  `page_subtype_bases`).
+- **Runtime.** Nothing parses the page prop with these schemas; they are
+  exported for a host that wants to. The error-page fallback (no published
+  DB page) sends `type: "page"` with `fields: {}`, so it misses the schema
+  when the host gives the `page` type fields.
+
 ## Revisions
 
 Config-gated content-snapshot history per page, `config('tbtop-cms.revisions.keep', 25)`
