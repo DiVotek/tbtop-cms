@@ -45,6 +45,8 @@ foreach ($passes as $path => [$types, $pageTypes]) {
         'tbtop-cms.pages.types' => $pageTypes,
         // The package ships a handwritten catalog.ts and registry.tsx next to its demo components.
         'tbtop-cms.blocks.registry_path' => false,
+        // Page types go next to each pass's --path, never to one configured file both passes would share.
+        'tbtop-cms.pages.types_path' => null,
     ]);
     // The registry reads the configured types once, on first boot.
     $app->forgetInstance(BlockRegistry::class);
