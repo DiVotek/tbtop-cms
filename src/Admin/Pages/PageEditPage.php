@@ -21,6 +21,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageEditStatusBar;
 use Tbtop\Cms\Admin\Pages\Support\PageEditTypeFields;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Admin\Pages\Support\PageLeafType;
+use Tbtop\Cms\Admin\Pages\Support\PageSubtypeChange;
 use Tbtop\Cms\Admin\Pages\Support\ProblemBlocks;
 use Tbtop\Cms\Admin\Pages\Support\ProblemBlocksAction;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
@@ -100,8 +101,9 @@ class PageEditPage extends AdminPage
     public function view(S $s): Node
     {
         $page = $this->page();
-        $saveTop = $this->saveActions($s, $page, 'saveTop');
-        $saveFooter = $this->saveActions($s, $page, 'save');
+        $confirms = $this->saveConfirms($page);
+        $saveTop = $this->saveActions($s, 'saveTop', $confirms);
+        $saveFooter = $this->saveActions($s, 'save', $confirms);
 
         $footer = EditFooter::build(
             $s,
@@ -182,29 +184,54 @@ class PageEditPage extends AdminPage
     }
 
     /**
-     * A save that would turn a page into an article or back (PageLeafType)
-     * asks first. The admin's confirm text is fixed per action, so the button
-     * is swapped by a form condition: the plain one while the type stays, the
-     * confirming one while the type would change. Both footer twins carry
-     * mod+s: the client binds a shortcut only while its action is mounted.
+     * A save that would turn a page into an article or back (PageLeafType),
+     * or pick a subtype that pages referencing this one do not accept
+     * (PageSubtypeChange), asks first. The admin's confirm text is fixed per
+     * action, so the button is swapped by form conditions: the plain one
+     * while nothing needs confirming, else exactly one confirming twin — a
+     * flip wins over a subtype pick. Every footer twin carries mod+s: the
+     * client binds a shortcut only while its action is mounted.
      *
+     * @param  array<string, array{when: Cond, title: string, description: string}>  $confirms
      * @return list<ActionBuilder>
      */
-    private function saveActions(S $s, Page $page, string $name): array
+    private function saveActions(S $s, string $name, array $confirms): array
     {
         $isShortcut = $name === 'save';
         $action = $this->saveAction($s, $name, $isShortcut);
-        $flip = $this->isSourceBacked($page) || $page->is_system ? null : PageLeafType::flip($page);
-        if ($flip === null) {
+        if ($confirms === []) {
             return [$action];
         }
 
-        return [
-            $action->hiddenIf($flip['when']),
-            $this->saveAction($s, "{$name}LeafFlip", $isShortcut)
-                ->confirm($flip['title'], $flip['description'])
-                ->hiddenIf(Cond::not($flip['when'])),
-        ];
+        $actions = [$action->hiddenIf(Cond::any(...array_column($confirms, 'when')))];
+        foreach ($confirms as $suffix => $confirm) {
+            $actions[] = $this->saveAction($s, $name . $suffix, $isShortcut)
+                ->confirm($confirm['title'], $confirm['description'])
+                ->hiddenIf(Cond::not($confirm['when']));
+        }
+
+        return $actions;
+    }
+
+    /**
+     * The confirming save twins by name suffix, their conditions mutually exclusive.
+     *
+     * @return array<string, array{when: Cond, title: string, description: string}>
+     */
+    private function saveConfirms(Page $page): array
+    {
+        if ($this->isSourceBacked($page)) {
+            return [];
+        }
+
+        $flip = $page->is_system ? null : PageLeafType::flip($page);
+        $confirms = $flip === null ? [] : ['LeafFlip' => $flip];
+        foreach (PageSubtypeChange::warnings($page) as $i => $warning) {
+            $when = $flip === null ? $warning['when'] : Cond::all($warning['when'], Cond::not($flip['when']));
+            $confirms["Subtype{$i}"] = [...$warning, 'when' => $when];
+        }
+
+        return $confirms;
     }
 
     private function saveAction(S $s, string $name, bool $isShortcut): ActionBuilder

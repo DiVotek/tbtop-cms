@@ -97,7 +97,8 @@ final class Pages extends Select
         return [...($isRequired ? [] : ['nullable']), ...$declared, PageRefRule::except($this->exceptPageId)];
     }
 
-    private function filter(): PageTypeFilter
+    /** The type/subtype pairs of(): which pages the search offers. */
+    public function typeFilter(): PageTypeFilter
     {
         $pairs = $this->opts[self::TYPES] ?? [];
 
@@ -112,7 +113,7 @@ final class Pages extends Select
     private function search(string $search): array
     {
         $locale = LocaleService::currentLocale();
-        $query = $this->filter()->apply(Page::query());
+        $query = $this->typeFilter()->apply(Page::query());
 
         if ($this->exceptPageId !== null) {
             $query->whereKeyNot($this->exceptPageId);

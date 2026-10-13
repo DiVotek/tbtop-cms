@@ -244,6 +244,11 @@ return [
         'to_page_title' => 'Turn this article into a page?',
         'to_page' => 'Without a category it becomes a standalone page: its category is removed, the schema.org type and the type\'s fields switch to the page\'s, and it moves to the Page tab. Content and SEO texts stay; the address loses the category segment (a redirect is created).',
     ],
+    'subtype_change' => [
+        'title' => 'Change the subtype?',
+        'description' => 'Pages that reference this one through a field that does not accept the new subtype (:count): :pages. They keep the reference and the site keeps listing it, but the field will no longer offer this page in its search.',
+        'more' => 'and :count more',
+    ],
     'validation' => [
         'article_needs_category' => 'An article lives in a category — choose one.',
         'type_change_subtype' => 'This page has the subtype :subtype, which the new type does not have — clear the subtype first.',
