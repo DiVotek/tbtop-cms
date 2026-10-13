@@ -35,14 +35,24 @@ final class PageNameSearch
         $connection = $query->getModel()->getConnection();
         $lower = self::lowerFunction($connection);
         $grammar = $query->getQuery()->getGrammar();
-        $like = '%' . mb_strtolower($term) . '%';
+        $like = '%' . self::escapeLike(mb_strtolower($term)) . '%';
 
         $query->where(static function (Builder $q) use ($locales, $lower, $grammar, $like): void {
             foreach (array_values(array_unique($locales)) as $locale) {
                 $column = $grammar->wrap('name->' . $locale);
-                $q->orWhereRaw("{$lower}({$column}) like ?", [$like]);
+                $q->orWhereRaw("{$lower}({$column}) like ? escape '!'", [$like]);
             }
         });
+    }
+
+    /**
+     * `%` and `_` typed into the search match themselves, not any text. `!` is
+     * the escape character because a backslash would need driver-specific
+     * quoting inside the SQL literal (MySQL reads it as an escape there).
+     */
+    private static function escapeLike(string $term): string
+    {
+        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term);
     }
 
     private static function lowerFunction(Connection $connection): string

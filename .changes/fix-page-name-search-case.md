@@ -13,3 +13,4 @@ connection.
 - Out of scope: the parent picker (`relation('parent_id')`) and the Pages list
   search run through tbtop/admin (`RelationSearchResponder`, table search) and
   keep their current matching; the parent-picker test stays skipped on MySQL.
+- `%` and `_` typed into the search match themselves (LIKE with `escape '!'`).
