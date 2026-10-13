@@ -82,6 +82,10 @@ when it's already current.
 path to the host's `.prettierignore` (and any other formatter's ignore list).
 A reformatted file keeps working at runtime but fails `--check`.
 
+The same run writes `pages.generated.ts` beside the blocks file — the `page`
+prop's schemas (pages.md, "Page prop types") — and `--check` covers it too;
+give it the same ignore-list entry.
+
 ### Generating the catalog and registry: `registry.generated.ts`
 
 When the component folder exists (`tbtop-cms.blocks.components_dir`,

@@ -17,6 +17,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 |---|---|---|---|---|
 | `languages.seed` | `list<array{name:string,locale:string,is_default:bool,is_admin_active:bool,is_frontend_active:bool,sort_order:int}>` | one English entry | Rows seeded into `tbtop_languages` on `cms:install` / `LanguageSeeder` | wiring.md |
 | `pages.types` | `array<string,class-string>` | `[]` | Host page-type classes merged into `PageTypeRegistry` (`Page/PageTypeRegistry.php`) | pages.md |
+| `pages.types_path` | `string\|false\|null` | `null`, falls back to `pages.generated.ts` next to the blocks types file | Output path for the `page` prop's zod schemas/TS types written by `cms:blocks:types` (`BlockTypes/PageTypeScriptEmitter.php`); `false` turns it off | pages.md |
 | `pages.home.name` | `string` | `'Home'` | Name given to the seeded home page (`database/seeders/PageSeeder.php`) | wiring.md |
 | `pages.home.title` | `string` | falls back to `pages.home.name` | Title given to the seeded home page | wiring.md |
 | `pages.errors.4xx.name` / `.title` | `string` | `'Page not found'` | Name/title given to the seeded 4xx error page (`database/seeders/PageSeeder.php`) | pages.md |
@@ -74,7 +75,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `ScheduleWiring::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
 | `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
 | `cms:page-refs:rebuild` | (none) | Recompute `tbtop_page_refs` from every page's (trashed included) type fields of kind `pages` | No |
-| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists | No |
+| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists, and `pages.generated.ts` (the `page` prop per page type and subtype, pages.md "Page prop types") unless `pages.types_path` is `false`; `--check` compares every file it would write | No |
 
 All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
@@ -167,7 +168,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.summary` | `string\|null` | translated summary, same fallback |
 | `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
-| `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none |
+| `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none; typed per type and subtype in `pages.generated.ts` (pages.md, "Page prop types") |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; a non-live ancestor or site root is left out (the page itself never is); `[]` when fewer than two crumbs remain (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |

@@ -19,6 +19,17 @@ final class EmitterNames
         return self::identifier(Str::studly($name)) . 'Props';
     }
 
+    /** Page type key "legal_service" -> const `legalServiceFields`/`legalServicePage`, type `LegalServiceFields`/`LegalServicePage`. */
+    public static function pageConst(string $key, string $suffix): string
+    {
+        return self::identifier(Str::camel($key)) . $suffix;
+    }
+
+    public static function pageType(string $key, string $suffix): string
+    {
+        return self::identifier(Str::studly($key)) . $suffix;
+    }
+
     /** kind() is any non-empty string; names that collapse together are caught by assertDistinctExportNames(). */
     private static function identifier(string $name): string
     {
