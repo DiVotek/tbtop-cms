@@ -529,7 +529,7 @@ route group and are never rewritten.
 ## SEO audit and per-page checklist
 
 **`SeoChecklist::for(Page $page, string $locale)`** — rendered beside the
-page editor's SEO tab (`PageForm::seoFields()` → `seoChecklistSection()`,
+page editor's SEO tab (`PageForm::seoFields()` → `PageSeoFields::seoChecklistSection()`,
 client component `resources/js/cms/admin/seoChecklist.tsx`, needs
 `@cms/admin/blocks` imported — see wiring.md). Checks, each `pass`/`warn`/
 `fail`, `required` ones affecting result-list appearance
