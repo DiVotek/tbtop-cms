@@ -63,7 +63,12 @@ it('lists the payload fields in the order the form submitted them', function ():
     $json = (string) json_encode($this->get("/admin/form-submissions/{$submission->id}", ['X-Inertia' => 'true'])
         ->assertOk()->json('props.structure'));
 
-    expect(strpos($json, 'Partnership inquiry'))->toBeLessThan(strpos($json, 'urgent'));
+    $subject = strpos($json, 'Partnership inquiry');
+    $notes = strpos($json, 'urgent');
+
+    expect($subject)->toBeInt()
+        ->and($notes)->toBeInt()
+        ->and($subject)->toBeLessThan($notes);
 });
 
 it('marks a new submission read when the detail page is opened', function (): void {

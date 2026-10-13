@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Form\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 use JsonException;
 
 /**
@@ -50,7 +51,13 @@ final class OrderedPayload implements CastsAttributes
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): array
     {
-        $payload = is_array($value) ? $value : [];
+        // The column is NOT NULL and every writer stores a validated array:
+        // anything else is a bug to surface, not a value to coerce.
+        if (! is_array($value)) {
+            throw new InvalidArgumentException("[{$key}] must be an array, got " . get_debug_type($value) . '.');
+        }
+
+        $payload = $value;
 
         return [
             $key => json_encode($payload, JSON_THROW_ON_ERROR),
