@@ -35,14 +35,14 @@ Field-by-field:
 - **title** — `SeoTemplates::title($page->type, $locale)` picks a template:
   per-subtype, then per-type (`seo.type_templates.{type}.title`), else site-wide
   (`seo.title_template`). An empty template falls back to the legacy
-  `{title} {seo.title_suffix}` behavior (`SeoResolver::titleWithSuffix()`) —
+  `{title} {seo.title_suffix}` behavior (`SeoTextRenderer::titleWithSuffix()`) —
   existing sites with no template configured render byte-identical titles.
   The `{title}` placeholder is the *own* title cascade: `seo.title` →
   `page.title` → `page.name` (`PageOwnSeo::title()`). Templates also support
   `{site_name}`, `{sep}` (`seo.title_separator`, default `—`), `{parent}`
   (nearest live ancestor, labelled `name` → `title`; empty when none), `{date}`
   (published date, only when the page `isLive()`).
-  `SeoResolver::cleanupRendered()` collapses whitespace and strips dangling
+  `SeoTextRenderer::cleanupRendered()` collapses whitespace and strips dangling
   separators left by an empty placeholder — one template can serve both a
   top-level and a nested page.
 - **description** — same two-rung template lookup

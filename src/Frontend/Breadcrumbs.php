@@ -54,7 +54,7 @@ class Breadcrumbs
 
     /**
      * Real live ancestry only — no site root, no self. The `{parent}` SEO
-     * template variable reads its last element (SeoResolver::parentLabel()),
+     * template variable reads its last element (SeoTextRenderer::parentLabel()),
      * so it names the nearest live ancestor; feeding it forPage() would turn
      * `{parent}` into "Home" on top-level pages and into the page's own
      * label everywhere else.
