@@ -287,7 +287,7 @@ none.
 
 **Automatic**, on every slug change: `PageSlugRedirects` observer
 (`src/Redirect/Observers/PageSlugRedirects.php`), wired independently of
-`PageObserver` in `CmsServiceProvider::wireRedirectMaintenance()`. On
+`PageObserver` in `ContentEventsWiring::wireRedirectMaintenance()`. On
 `PageSlug::updated()` with a changed `path`, `RedirectWriter::recordMove()`
 retargets any existing auto-redirect that pointed at the *old* path (a
 chain of moves collapses to one hop, not N) and upserts a new `from → to`
@@ -577,7 +577,7 @@ Config-gated content-snapshot history per page, `config('tbtop-cms.revisions.kee
 disables the feature entirely, including the very first create snapshot.
 Wired as a second, independent `Page` observer
 (`src/Page/Observers/PageRevisions.php`, registered in
-`CmsServiceProvider::wirePageRevisions()`, deliberately separate from
+`ContentEventsWiring::wirePageRevisions()`, deliberately separate from
 `PageObserver` so turning revisions off can never risk the structural
 hierarchy/slug guards).
 
@@ -656,7 +656,7 @@ runs the seeder — nothing else needs re-running.
 Every domain write that changes frontend-visible content already bumps the
 shared content-cache version — `InvalidatesContentCache`
 (`src/Cache/InvalidatesContentCache.php`) is registered in
-`CmsServiceProvider::wireContentCacheInvalidation()` against `PageSaved`,
+`ContentEventsWiring::wireContentCacheInvalidation()` against `PageSaved`,
 `PagePublished`, `PageUnpublished`, `PageDeleted`, `PageRestored`,
 `LayoutSaved`, `SettingsSaved`, `LanguagesChanged`. A host that writes
 `Page`/`Layout` rows through the normal Eloquent model — `save()`, seeders

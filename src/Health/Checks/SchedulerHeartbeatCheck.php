@@ -12,7 +12,7 @@ use Tbtop\Cms\Health\HealthStatus;
 
 /**
  * Reads the cache key CmsServiceProvider's everyMinute() schedule callback
- * writes (see wireSchedulerHeartbeat()). A missing key doesn't distinguish
+ * writes (see ScheduleWiring::wireSchedulerHeartbeat()). A missing key doesn't distinguish
  * "scheduler never configured" from "scheduler configured seconds ago, has
  * not ticked yet" — both look identical from here — so a fresh install must
  * not read as broken; the hint says so explicitly rather than alarming an

@@ -90,7 +90,7 @@ class Cms
      * Always returns a response: the seeded DB page for this status class,
      * or (4xx/5xx alike) a chrome-fallback render when it's missing, or (5xx
      * only) a static Blade view when rendering itself throws. Works whether
-     * or not `errors.handle` auto-registered anything — see wireErrorPages().
+     * or not `errors.handle` auto-registered anything — see ErrorPagesWiring::wireErrorPages().
      */
     public function errorResponse(Request $request, int $status): Response
     {
