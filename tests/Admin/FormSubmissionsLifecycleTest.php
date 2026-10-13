@@ -247,7 +247,7 @@ it('falls back to the first non-empty scalar payload value in the Lead column', 
         ->assertOk()->json('data.data.0');
 
     expect($row['payload'])->toBe('Partnership inquiry');
-})->skip(runsOnMySql(), 'tbtop-cms-next-bugs: Lead column follows MySQL JSON key order');
+});
 
 it('renders an em dash in the Lead column when the payload has no usable scalar value', function (): void {
     actingAsLifecycleAdmin();
