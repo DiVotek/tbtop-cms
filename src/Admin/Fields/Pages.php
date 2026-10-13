@@ -12,6 +12,7 @@ use Tbtop\Cms\Page\Refs\PageIds;
 use Tbtop\Cms\Page\Refs\PageRefList;
 use Tbtop\Cms\Page\Refs\PageRefRule;
 use Tbtop\Cms\Page\Refs\PageTypeFilter;
+use Tbtop\Cms\Page\Support\PageNameSearch;
 
 /**
  * `$s->pages('services')->of('article', 'legal_service')` — a searchable
@@ -120,9 +121,7 @@ final class Pages extends Select
 
         $search = trim($search);
         if ($search !== '') {
-            $like = '%' . $search . '%';
-            $query->where(static fn ($q) => $q->where('name->' . $locale, 'like', $like)
-                ->orWhere('name->' . LocaleService::defaultContentLocale(), 'like', $like));
+            PageNameSearch::apply($query, $search, [$locale, LocaleService::defaultContentLocale()]);
         }
 
         return $query->orderBy('sort_order')->orderBy('id')->limit(self::SEARCH_LIMIT)->get()

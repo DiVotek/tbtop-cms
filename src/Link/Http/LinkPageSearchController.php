@@ -13,6 +13,7 @@ use Tbtop\Admin\I18n\TranslatableValue;
 use Tbtop\Cms\Admin\Pages\Support\EditorLocales;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Support\PageNameSearch;
 
 /** POST {admin.prefix}/link/page-search — relation-search protocol: `{search}` → `{options}`, `{value}` → `{option}`. */
 final class LinkPageSearchController
@@ -38,7 +39,7 @@ final class LinkPageSearchController
         $query = self::query();
 
         if ($search !== '') {
-            $query->where('name->' . LocaleService::defaultContentLocale(), 'like', '%' . $search . '%');
+            PageNameSearch::apply($query, $search, [LocaleService::defaultContentLocale()]);
         }
 
         $options = $query->limit(RelationSearchLimit::resolve())->get()

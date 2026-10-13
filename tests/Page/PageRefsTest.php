@@ -139,6 +139,22 @@ it('offers matching pages in the admin search, drafts included, the edited page 
         ->and(array_column($search($reviewer), 'label'))->toBe(['Divorce', 'Diversion']);
 });
 
+it('matches page names in the admin search regardless of case, Cyrillic included', function (): void {
+    $specialist = refsArticle('specialist', 'Anna');
+    refsArticle('legal_service', 'Divorce');
+    refsArticle('legal_service', 'Розлучення');
+
+    test()->actingAs(PageEditHelpers::admin(), 'web');
+    $search = fn (string $term): array => array_column(test()
+        ->postJson("/admin/pages/{$specialist->id}/edit/select-options/field_specialist__services", ['search' => $term])
+        ->assertOk()
+        ->json('options'), 'label');
+
+    expect($search('DIV'))->toBe(['Divorce'])
+        ->and($search('розл'))->toBe(['Розлучення'])
+        ->and($search('РОЗЛ'))->toBe(['Розлучення']);
+});
+
 it('rewrites the reverse index on save: a removed reference leaves the target\'s list', function (): void {
     $service = refsArticle('legal_service', 'Divorce');
     $specialist = refsArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id]]]);
