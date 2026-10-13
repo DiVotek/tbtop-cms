@@ -257,7 +257,7 @@ class PageEditPage extends AdminPage
 
     /**
      * Not DeleteAction/RecordAction: those helpers are built for table row
-     * actions (needs: ['row'], row-scoped model lookup via $ctx->row['id']).
+     * actions (needs: ['row'], row-scoped model lookup via $ctx->key()).
      * This is a page-level footer action with no row payload — the target
      * record is the page resolved from the route param, same as save().
      */

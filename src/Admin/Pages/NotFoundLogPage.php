@@ -210,7 +210,7 @@ class NotFoundLogPage extends AdminPage
             return Effects::make()->haltModal(is_string($first) ? $first : $e->getMessage());
         }
 
-        $hit = NotFoundHit::query()->find($ctx->row['id'] ?? null);
+        $hit = NotFoundHit::query()->find($ctx->key());
         $hit?->forceFill(['is_ignored' => true])->save();
         if ($hit !== null) {
             self::logHit($hit, 'ignored');
@@ -228,7 +228,7 @@ class NotFoundLogPage extends AdminPage
     private function ignoreAction(S $s): ActionBuilder
     {
         return RecordAction::server($s, 'notFoundIgnore', static function (ActionCtx $ctx): Effects {
-            $hit = NotFoundHit::query()->findOrFail($ctx->row['id'] ?? null);
+            $hit = NotFoundHit::query()->findOrFail($ctx->key());
             $hit->forceFill(['is_ignored' => true])->save();
             self::logHit($hit, 'ignored');
 
@@ -241,7 +241,7 @@ class NotFoundLogPage extends AdminPage
     private function unignoreAction(S $s): ActionBuilder
     {
         return RecordAction::server($s, 'notFoundUnignore', static function (ActionCtx $ctx): Effects {
-            $hit = NotFoundHit::query()->findOrFail($ctx->row['id'] ?? null);
+            $hit = NotFoundHit::query()->findOrFail($ctx->key());
             $hit->forceFill(['is_ignored' => false])->save();
             self::logHit($hit, 'unignored');
 
@@ -256,7 +256,7 @@ class NotFoundLogPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
-                $hit = NotFoundHit::query()->findOrFail($ctx->row['id'] ?? null);
+                $hit = NotFoundHit::query()->findOrFail($ctx->key());
                 $hit->delete();
                 self::logHit($hit, 'deleted');
 
