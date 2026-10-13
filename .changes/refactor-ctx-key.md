@@ -9,7 +9,8 @@ every table row carries as the raw model key, so a handler keeps finding its
 record if an `id` column is ever formatted or a model is keyed otherwise; rows
 without `_key` fall back to `id`, so behaviour is unchanged today.
 
-Tests: existing page action suites (no behaviour change).
+Tests: `tests/Admin/RedirectsListPageTest.php` (a row whose `_key` and `id`
+differ deletes the `_key` record); the page action suites cover the rest.
 
 **Read by eye:**
 - `src/Admin/Pages/*Page.php` (one-line swaps)
