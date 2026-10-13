@@ -142,6 +142,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_10_07_000000_add_lock_version_to_shared_blocks_table')
             ->hasMigration('2026_10_07_000001_move_identity_contacts_to_site_contacts')
             ->hasMigration('2026_10_07_000002_create_page_refs_table')
+            ->hasMigration('2026_10_13_000000_add_payload_order_to_form_submissions_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

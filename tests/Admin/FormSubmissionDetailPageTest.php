@@ -56,6 +56,16 @@ it('renders the payload on the detail page', function (): void {
     expect($json)->toContain('Ada Lovelace')->toContain('ada@example.test');
 });
 
+it('lists the payload fields in the order the form submitted them', function (): void {
+    actingAsDetailAdmin();
+    $submission = detailSubmission(['payload' => ['subject' => 'Partnership inquiry', 'notes' => 'urgent']]);
+
+    $json = (string) json_encode($this->get("/admin/form-submissions/{$submission->id}", ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure'));
+
+    expect(strpos($json, 'Partnership inquiry'))->toBeLessThan(strpos($json, 'urgent'));
+});
+
 it('marks a new submission read when the detail page is opened', function (): void {
     actingAsDetailAdmin();
     $submission = detailSubmission(['lead_status' => LeadStatus::New]);
