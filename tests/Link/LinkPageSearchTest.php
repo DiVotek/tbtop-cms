@@ -49,7 +49,36 @@ it('narrows results by name', function (): void {
 
     $response->assertOk();
     expect(array_column($response->json('options'), 'label'))->toBe(['Contact']);
-})->skip(runsOnMySql(), 'spec-cms-tbtop-search-case-insensitive: the JSON name search is case-sensitive on MySQL');
+});
+
+it('matches a name regardless of case, Cyrillic included', function (string $search, string $expected): void {
+    Page::factory()->create(['name' => ['en' => 'About']]);
+    Page::factory()->create(['name' => ['en' => 'Контакти']]);
+
+    $response = pageSearch(['search' => $search]);
+
+    $response->assertOk();
+    expect(array_column($response->json('options'), 'label'))->toBe([$expected]);
+})->with([
+    'upper-case query' => ['ABOUT', 'About'],
+    'lower-case Cyrillic query' => ['контакти', 'Контакти'],
+    'upper-case Cyrillic query' => ['КОНТ', 'Контакти'],
+]);
+
+it('matches % and _ in the search literally', function (string $search, array $expected): void {
+    Page::factory()->create(['name' => ['en' => 'About']]);
+    Page::factory()->create(['name' => ['en' => '100% natural']]);
+    Page::factory()->create(['name' => ['en' => 'snake_case!']]);
+
+    $response = pageSearch(['search' => $search]);
+
+    $response->assertOk();
+    expect(array_column($response->json('options'), 'label'))->toBe($expected);
+})->with([
+    'percent' => ['%', ['100% natural']],
+    'underscore' => ['_', ['snake_case!']],
+    'escape character' => ['e!', ['snake_case!']],
+]);
 
 it('offers a draft page an editor is about to publish', function (): void {
     $draft = Page::factory()->create(['name' => ['en' => 'Unpublished'], 'status' => PageStatus::Draft]);
