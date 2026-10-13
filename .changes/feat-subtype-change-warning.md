@@ -11,4 +11,5 @@ existence) and the site keeps listing the page; only the field's search
 stops offering it. A leaf-type flip confirm wins when both apply. Automatic
 retyping without the form (#250/#254) is not covered.
 
-Tests: `tests/Admin/PageSubtypeChangeTest.php`.
+Tests: `tests/Admin/PageSubtypeChangeTest.php`, `tests/Page/PageTypeFilterTest.php`
+(`accepts()` agrees with the search query).
