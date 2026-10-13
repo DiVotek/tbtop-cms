@@ -98,5 +98,6 @@ it('lets the leaf-type flip confirm win when the same save also changes the subt
     $service = subtypeChangeArticle('legal_service', 'Divorce');
     subtypeChangeArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id]]]);
 
-    expect(subtypeChangeSaves($service, ['type' => 'page', 'subtype' => ''])->pluck('name')->all())->toBe(['saveLeafFlip']);
+    // The type select stays on article, so the subtype pick holds too; emptying the category flips it to a page.
+    expect(subtypeChangeSaves($service, ['parent_id' => '', 'subtype' => ''])->pluck('name')->all())->toBe(['saveLeafFlip']);
 });
