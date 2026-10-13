@@ -94,7 +94,7 @@ final class PageRefIndex
         $stored = is_array($page->fields) ? $page->fields : [];
         $rows = [];
 
-        foreach ($this->pagesFieldNames($page) as $name) {
+        foreach (array_keys($this->pagesFields($page)) as $name) {
             foreach (PageIds::list($stored[$name] ?? null) as $position => $target) {
                 // A page never lists itself among its own back references, whatever path wrote the id.
                 if ($target === (int) $page->getKey()) {
@@ -111,9 +111,9 @@ final class PageRefIndex
      * A name the subtype shares with its base is indexed by the subtype's
      * declaration of it — the later one wins, as in page.fields.
      *
-     * @return list<string>
+     * @return array<string, Pages>
      */
-    private function pagesFieldNames(Page $page): array
+    public function pagesFields(Page $page): array
     {
         $declared = [];
         foreach ($this->types->forPage($page) as $type) {
@@ -124,6 +124,6 @@ final class PageRefIndex
             }
         }
 
-        return array_keys(array_filter($declared, static fn (Field $field): bool => $field instanceof Pages));
+        return array_filter($declared, static fn (Field $field): bool => $field instanceof Pages);
     }
 }
