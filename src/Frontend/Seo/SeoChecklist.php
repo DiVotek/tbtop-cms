@@ -140,7 +140,7 @@ class SeoChecklist
     /**
      * Warns when the page has a slug in some, but not all, frontend-active
      * locales — a page fully absent from a locale is a normal, deliberate
-     * choice (see SeoResolver::alternates()), so only the partial case is
+     * choice (see SeoAlternates::forPage()), so only the partial case is
      * worth flagging.
      *
      * @return Check
