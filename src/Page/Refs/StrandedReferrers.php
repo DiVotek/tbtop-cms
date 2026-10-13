@@ -58,14 +58,17 @@ final class StrandedReferrers
             return [];
         }
 
+        // Only what the match and the confirm's names need: a widely referenced page can have many referrers.
         $pages = Page::query()->whereKey($rows->pluck('page_id')->unique()->all())
-            ->orderBy('sort_order')->orderBy('id')->get();
+            ->orderBy('sort_order')->orderBy('id')->get(['id', 'type', 'subtype', 'name', 'sort_order']);
         $type = (string) $target->type;
         $subtype = $target->subtype === null ? null : (string) $target->subtype;
         $out = [];
+        $fieldsByType = [];
 
         foreach ($pages as $page) {
-            $fields = $this->index->pagesFields($page);
+            // Declarations depend on the type/subtype pair alone, so referrers of one kind share them.
+            $fields = $fieldsByType[$page->type . '/' . $page->subtype] ??= $this->index->pagesFields($page);
             foreach ($rows->where('page_id', $page->getKey())->pluck('field')->unique() as $name) {
                 $filter = isset($fields[$name]) ? $fields[$name]->typeFilter() : null;
                 if ($filter !== null && $filter->accepts($type, $subtype)) {
