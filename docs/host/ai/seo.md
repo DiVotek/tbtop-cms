@@ -640,7 +640,7 @@ Response` always returns a response, in three fallback layers:
    dependency, so a broken database or a broken block cannot take down the
    error page meant to report it.
 
-**Auto-registration** (`CmsServiceProvider::wireErrorPages()`), gated by
+**Auto-registration** (`ErrorPagesWiring::wireErrorPages()`), gated by
 `config('tbtop-cms.errors.handle')` (default `true`): registers a
 `renderable()` on the host's exception handler for
 `Symfony\Component\HttpKernel\Exception\HttpExceptionInterface`, whitelisted

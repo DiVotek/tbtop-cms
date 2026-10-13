@@ -71,7 +71,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
-| `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `CmsServiceProvider::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
+| `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `ScheduleWiring::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
 | `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
 | `cms:page-refs:rebuild` | (none) | Recompute `tbtop_page_refs` from every page's (trashed included) type fields of kind `pages` | No |
 | `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists | No |
@@ -79,8 +79,8 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
 Two more schedule entries exist but are not Artisan commands owned by this package:
-- `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `CmsServiceProvider::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
-- An inline `$schedule->call(...)` heartbeat writing `SchedulerHeartbeatCheck::CACHE_KEY` — every minute, unconditional. `CmsServiceProvider::wireSchedulerHeartbeat()`, schedule name `tbtop-cms:health:scheduler-heartbeat`.
+- `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `ScheduleWiring::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
+- An inline `$schedule->call(...)` heartbeat writing `SchedulerHeartbeatCheck::CACHE_KEY` — every minute, unconditional. `ScheduleWiring::wireSchedulerHeartbeat()`, schedule name `tbtop-cms:health:scheduler-heartbeat`.
 
 ## 3. Routes
 
@@ -96,13 +96,13 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | `tbtop-cms.sitemap.chunk` | GET | `sitemap-{chunk}.xml` | `SitemapController@chunk` — one sitemap chunk; registered before the catch-all so it isn't shadowed by a page slug |
 | `tbtop-cms.page` | GET | `{path?}` (catch-all, `.*`) | `PageController` — resolves and renders any CMS page; must be registered last |
 
-**Not a route**: `CmsServiceProvider::wireErrorPages()` registers a `renderable()` on the host's exception handler (`Illuminate\Contracts\Debug\ExceptionHandler::renderable()`), gated by `tbtop-cms.errors.handle` — see seo.md/wiring.md.
+**Not a route**: `ErrorPagesWiring::wireErrorPages()` registers a `renderable()` on the host's exception handler (`Illuminate\Contracts\Debug\ExceptionHandler::renderable()`), gated by `tbtop-cms.errors.handle` — see seo.md/wiring.md.
 
 **Admin, registered directly by `CmsServiceProvider`:**
 
 | Name | Method | Path | Purpose |
 |---|---|---|---|
-| `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
+| `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `AdminWiring::wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
 | `tbtop.cms.logout` | POST | `{admin.prefix}/logout` | `LogoutController`, middleware `['web','auth:{admin.guard}']` |
 | `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
 

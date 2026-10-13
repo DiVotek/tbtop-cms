@@ -15,7 +15,7 @@ use Tbtop\Cms\Page\Support\PageRevisionWriter;
  * each caller remembering to snapshot itself.
  *
  * A second, separate observer from PageObserver (wired in
- * CmsServiceProvider::wirePageRevisions(), pattern of wireRedirectMaintenance())
+ * ContentEventsWiring::wirePageRevisions(), pattern of wireRedirectMaintenance())
  * rather than added to PageObserver directly: revisions are an optional,
  * config-gated feature bolted onto Page writes, not a structural invariant
  * like PageObserver's slug/hierarchy/system-page guards — keeping it separate

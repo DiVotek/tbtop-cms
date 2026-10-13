@@ -10,7 +10,7 @@ use Tbtop\Cms\Settings\Settings;
 
 /**
  * Scheduled daily by the package itself (see
- * CmsServiceProvider::wireNotFoundPruneSchedule()); opt out with
+ * ScheduleWiring::wireNotFoundPruneSchedule()); opt out with
  * tbtop-cms.not_found.auto_prune => false and schedule it yourself, or not at
  * all — see docs/host/ai/seo.md, "404 log".
  */

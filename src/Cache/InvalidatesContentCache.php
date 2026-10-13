@@ -6,7 +6,7 @@ namespace Tbtop\Cms\Cache;
 
 /**
  * Registered against every domain event that changes frontend-visible
- * content (see CmsServiceProvider::wireContentCacheInvalidation()).
+ * content (see ContentEventsWiring::wireContentCacheInvalidation()).
  * A single blanket bump() rather than per-event targeted invalidation:
  * versioned keys make every previously cached entry unreachable regardless
  * of which one actually changed, so precision would only save a cache

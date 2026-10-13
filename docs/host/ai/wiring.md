@@ -105,7 +105,7 @@ that must run before language resolution; don't remove the trailing three.
 
 **The `login`-route ownership rule.** Admin routes other than the login page
 carry `auth:{guard}`; Laravel's `auth` middleware redirects an unauthenticated
-visitor to `route('login')`. `CmsServiceProvider::wireAdminLoginRedirect()`
+visitor to `route('login')`. `AdminWiring::wireAdminLoginRedirect()`
 registers `Route::redirect('login', "{$prefix}/login")->name('login')` —
 **but only when nothing else already owns that name** (scanned directly off
 `Route::getRoutes()`, not `Route::has()`, since that lookup's cache predates
@@ -125,7 +125,7 @@ handler at a redirect to `admin/login`, or just link there directly.
 ## Error pages (`Cms::errorResponse()`)
 
 The package auto-registers a `renderable()` on the host's exception handler
-(`CmsServiceProvider::wireErrorPages()`) that turns a whitelisted HTTP
+(`ErrorPagesWiring::wireErrorPages()`) that turns a whitelisted HTTP
 status into the matching editable error page instead of Laravel's stock
 error view — nothing to wire in `routes/web.php` for this to work on a plain
 `abort(404)`/`abort(500)` raised anywhere in the app, including outside
