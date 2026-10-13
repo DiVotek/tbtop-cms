@@ -37,6 +37,8 @@ final class PageSubtypeChange
 
         $out = [];
         foreach (app(StrandedReferrers::class)->bySubtype($page, $picks) as $pick => $pages) {
+            // A numeric subtype key comes back as an int array key; the form posts a string.
+            $pick = (string) $pick;
             $out[] = [
                 'when' => Cond::all(
                     Cond::eq('type', $page->type),
