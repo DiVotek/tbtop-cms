@@ -55,6 +55,116 @@ copy the `<Head>` block**: render the package's exported `CmsHead`
 `CmsPage.tsx`, so the SEO tags keep matching `head.blade.php` across package
 updates. Host-only head tags go in a separate `<Head>` next to it.
 
+### A page type with a fixed frame and a blocks slot
+
+What you want: every page of a type shares fixed parts (banner, description,
+a list computed from other pages, a sidebar), and the editor adds optional
+sections between or under them. Where each piece goes is decided by
+[placement.md](./placement.md); this is the wiring. Nothing here is a
+package hook — it is the existing props composed in host code.
+
+1. **Fields.** The page's own texts and picture are the standard fields
+   (`page.name`, `page.heading`, `page.summary`, `page.body`, `page.image`);
+   the type declares only what they cannot hold:
+
+   ```php
+   final class ServiceType extends BasePageType
+   {
+       public function key(): string { return 'service'; }
+       public function base(): string { return 'category'; }   // a subtype: stock tree rules and parent picker; its children are the tiles below
+
+       public function fields(S $s): array
+       {
+           return [$s->text('price')->label('Price')->translatable()];
+       }
+
+       public function backReferences(): array
+       {
+           return ['specialists' => ['field' => 'services', 'from' => 'specialist']];
+       }
+   }
+   ```
+
+2. **Computed values.** Override `resolveFields()`, keep the parent's
+   resolved fields, add what the frame computes (`Page`, `PageTranslation`
+   from `Tbtop\Cms\Page\Support`, the `Cms` facade):
+
+   ```php
+   public function resolveFields(array $input, ResolveContext $ctx): array
+   {
+       $page = $ctx->page;
+       $children = $page === null ? [] : Page::query()->live()->with('slugs')
+           ->where('parent_id', $page->getKey())->orderBy('sort_order')->get()
+           ->map(fn (Page $child): array => [
+               'name' => PageTranslation::text($child, 'name', $ctx->locale, $ctx->fallbackLocale) ?? '',
+               'url' => Cms::url($child, $ctx->locale),
+           ])->all();
+
+       return [...parent::resolveFields($input, $ctx), 'children' => $children];
+   }
+   ```
+
+   - `$input` is the stored `fields`, flattened to the request locale;
+     `$ctx->page` is the page. `$ctx->fields` is still empty here — type
+     fields resolve before blocks, and this is where they resolve.
+   - `backReferences()` lists are added **after** `resolveFields()` and hold
+     `{id, name, url}` only. For more per entry (a photo, a position), read
+     `app(BackReferences::class)->resolve($page, $ctx->locale)`
+     (`Tbtop\Cms\Page\Refs\BackReferences`) inside `resolveFields()` and
+     load those pages yourself, under a key of your own — a computed key
+     named like a `backReferences()` key is replaced by the plain list, and
+     `cms:doctor`'s `page_field_collisions` does not see computed keys.
+   - A throw drops this type's fields from `page.fields` (logged as
+     `page.fields_resolve_failed`; rethrown under `blocks.strict`). Block
+     resolution is not cached: an expensive query here runs on every
+     request — wrap it in `CmsCache::rememberLive()` (see "Custom cached
+     frontend read").
+
+3. **The frame.** Own `resources/js/cms/CmsPage.tsx` (see "Host-owned
+   `CmsPage.tsx`") and pick the frame by `page.subtype` (or `page.type` for
+   a host base type). `page.fields` is not in the generated catalog — parse
+   it with a zod schema of your own (add `page` to the props type; its keys
+   are in [inventory.md](./inventory.md#4-inertia-props)); fall back to the bare blocks when
+   it does not parse:
+
+   ```tsx
+   const { render, seo, isPreview, cms, page } = usePage<CmsPageProps>().props;
+   const showErrors = isPreview === true || cms?.debug === true;
+   const blocks = <CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={showErrors} />;
+
+   let body = blocks;
+   if (page.subtype === "service") {
+       const fields = serviceFields.safeParse(page.fields);   // z.object({ price: z.string().nullable(), children: z.array(...), specialists: z.array(...) })
+       if (fields.success) body = <ServiceFrame page={page} fields={fields.data}>{blocks}</ServiceFrame>;
+   }
+
+   return (
+       <>
+           <CmsHead seo={seo} />
+           <JSONUIProvider registry={registry}>{body}</JSONUIProvider>
+       </>
+   );
+   ```
+
+   `ServiceFrame` draws `page.heading` (else `page.name`), `page.image`,
+   `page.body` (safe HTML from the package's richtext renderer) and
+   `fields`, and puts `children` — the blocks — where the optional sections
+   go. Keep one `JSONUIProvider` around the frame and any chrome; render
+   every spec with `CmsRenderer`, never the bare `Renderer`. To place
+   blocks in two spots of the frame, split `render.elements[render.root].children`
+   into two specs and render each with its own `CmsRenderer`.
+
+4. **Optional sections.** Blocks that make sense only on this type return
+   `['service']` from `placements()` (a subtype key works); the editor
+   gets them in "+ Add block" there and nowhere else.
+
+5. **Content.** Seed or import the description into `body`, the picture into
+   `image`, the lead into `summary`; type fields only for the rest. Then
+   count fills per type ([placement.md](./placement.md#after-modelling-or-importing-count-the-fills)).
+
+A form drawn by the frame itself (not a block) cannot be submitted — see
+[blocks.md](./blocks.md#known-limitation-a-form-must-be-a-stored-block).
+
 ### Block-derived JSON-LD (FAQ, Service, …)
 
 `Block::toSchema(array $props, SchemaContext $ctx): ?array` is the extension
@@ -129,8 +239,9 @@ SeedsPages.php` trait, method `upsertPage()`, looks the page up by
 PageSlugWriter::sync()` on first insert (see `BlogSeeder.php` for a concrete
 seeder). One host doc-comment in that trait flags a real gap worth knowing before
 copying the pattern: `withContactForm()` notes `Tbtop\Cms\Form\Support\
-FormBlockLocator` only finds a form inside `$page->content` — a page without
-an actual form block in its content renders dead CTA buttons. (The same
+FormBlockLocator` only finds a form block that is stored — in `$page->content`
+or (since then) a layout slot; a CTA with no such block behind it is dead
+(blocks.md, "Known limitation: a form must be a stored block"). (The same
 trait also works around `seo.description` not accepting a locale map — stale:
 `LocalizedSeo::value()` reads locale maps now.)
 
@@ -229,6 +340,9 @@ extend()`/`PageTypeRegistry::extend()` give by latching on first *read*
 instead. See `notifications.md` for `TypeDefinition`'s full field list.
 
 ### Reusable block content across pages
+
+> Deciding between blocks, shared blocks, type fields and a type frame:
+> [placement.md](./placement.md).
 
 The name invites confusion: `Tbtop\Cms\Page\
 Support\StarterBlocks` and `StarterBlockSync` are **not** a shared/reusable
@@ -380,6 +494,10 @@ the least-bad pattern until/unless the package grows a real hook (e.g. a
 `ResolvedBlock`-level chrome hint).
 
 ### Per-page custom Inertia component
+
+> Different markup per page type does not need a second component: pick a
+> frame by `page.subtype` in the host `CmsPage.tsx` — see "A page type with
+> a fixed frame and a blocks slot" above.
 
 `PageController::component()` returns the single value at
 `config('tbtop-cms.render.component')` (default `Cms/Page`) and calls
