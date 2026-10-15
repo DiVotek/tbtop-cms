@@ -13,6 +13,7 @@ use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Exceptions\PageConflictException;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Support\StarterBlocks;
+use Tbtop\Cms\Page\Support\TypeTemplateContent;
 use Tbtop\Cms\Support\LockedSave;
 use Throwable;
 
@@ -167,8 +168,9 @@ final class PageFormWriter
      * parent_id/etc. by the time this runs (see save()).
      *
      * Create with no submitted content (the create-modal form has no block
-     * repeater — see PageForm::fields()) inherits from StarterBlocks
-     * instead of starting empty; a create THAT does submit content (e.g. a
+     * repeater — see PageForm::fields()) inherits from StarterBlocks, else
+     * copies its type's template() (TypeTemplateContent), instead of starting
+     * empty; a create THAT does submit content (e.g. a
      * duplicate-via-form flow, if one is ever added) is trusted as-is and
      * skips inheritance, since the caller already decided what content this
      * page should start with.
@@ -180,7 +182,9 @@ final class PageFormWriter
     private static function fillContent(Page $page, array $form, array $contentBefore, bool $isCreate): array
     {
         if ($isCreate && ! array_key_exists('content', $form)) {
-            return app(StarterBlocks::class)->contentFor($page);
+            $starter = app(StarterBlocks::class)->contentFor($page);
+
+            return $starter !== [] ? $starter : app(TypeTemplateContent::class)->contentFor($page);
         }
 
         $envelope = BlockContent::toEnvelope($form['content'] ?? null);
