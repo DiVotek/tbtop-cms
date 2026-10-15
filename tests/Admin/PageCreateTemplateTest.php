@@ -38,7 +38,7 @@ it('starts a page created in the admin with its type\'s template() blocks', func
         ->and(array_column($content, 'active'))->toBe([true, false])
         ->and($content[0]['data'])->toBe(['title' => ['en' => 'Welcome']])
         ->and($content[1]['data'])->toBe([])
-        ->and($content[0]['id'])->toBeString()->not->toBe('')
+        ->and($content[0]['id'])->toBeString()->not->toBeIn(['', 'hero'])
         ->and($content[0]['id'])->not->toBe($content[1]['id']);
 });
 

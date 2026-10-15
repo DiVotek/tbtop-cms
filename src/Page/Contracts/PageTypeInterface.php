@@ -43,8 +43,9 @@ interface PageTypeInterface
      * template. Same envelope shape as Page::$content.
      *
      * A page created in the admin starts with a copy of these blocks in its
-     * content (unless it inherits a category's starter blocks); a block may
-     * leave out id, active, sort and data. Called there on the unsaved page.
+     * content (unless it inherits a category's starter blocks), each block with
+     * a fresh id; it may leave out active, sort and data. Called there on the
+     * unsaved page.
      *
      * @return array<int, array<string, mixed>>|null
      */

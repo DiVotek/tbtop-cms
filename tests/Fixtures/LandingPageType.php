@@ -20,7 +20,7 @@ class LandingPageType extends BasePageType
     public function template(Page $page): array
     {
         return [
-            ['kind' => 'Hero', 'data' => ['title' => ['en' => 'Welcome']]],
+            ['id' => 'hero', 'kind' => 'Hero', 'data' => ['title' => ['en' => 'Welcome']]],
             ['kind' => 'Faq', 'active' => false],
         ];
     }

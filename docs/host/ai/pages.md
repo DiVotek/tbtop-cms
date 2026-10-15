@@ -375,10 +375,11 @@ the column).
 
 A content-only (not source-backed) type can return `template()` too: a page
 of it created in the admin starts with a copy of those blocks in `content`
-(`TypeTemplateContent`, called from `PageForm::save()` on create when the page
+(`TypeTemplateContent`, called from `PageFormWriter::fillContent()` on create when the page
 inherits no category starter blocks), so the editor shows them and they
-survive every save. A template block may leave out `id`, `active`, `sort` and
-`data`; they default to a fresh ULID, `true`, its position and `[]`. Pages
+survive every save. Each copied block gets a fresh ULID `id` (any `id` in the
+template is replaced); `active`, `sort` and `data` may be left out and default
+to `true`, its position and `[]`. Pages
 written straight to the database (a seeder, an import) get no copy: they
 render the template only while their `content` is null, and the first editor
 save writes the empty list the editor showed. Such code writes `content`
