@@ -91,7 +91,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 
 | Name | Method | Path | Purpose |
 |---|---|---|---|
-| `tbtop-cms.form.submit` | POST | `_cms/forms/{locale}/{page}/{block}` | `FormSubmitController` — handles a form block submission; throttled by `tbtop-cms.forms.throttle` |
+| `tbtop-cms.form.submit` | POST | `_cms/forms/{locale}/{page}/{block}` | `FormSubmitController` — handles a form block submission; `{block}` is a placed block id or a `HasForm` form name (blocks.md); throttled by `tbtop-cms.forms.throttle` |
 | `tbtop-cms.robots` | GET | `robots.txt` | `RobotsController` — dynamic robots.txt |
 | `tbtop-cms.sitemap` | GET | `sitemap.xml` | `SitemapController@index` — sitemap index; only if `tbtop-cms.seo.sitemap.enabled` (default true) |
 | `tbtop-cms.sitemap.chunk` | GET | `sitemap-{chunk}.xml` | `SitemapController@chunk` — one sitemap chunk; registered before the catch-all so it isn't shadowed by a page slug |
@@ -202,6 +202,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `SchemaType` (abstract) | `src/Frontend/Seo/Schema/SchemaType.php` | Required: `key()`, `build(SchemaContext $ctx): list<array<string,mixed>>`. Overridable (have defaults): `label()` (`Str::headline($this->key())`), `openGraph()` (`OpenGraph::website()`) | Convenience base for a host schema type — extend this, not `SchemaTypeInterface` directly |
 | `SchemaContextFactory` | `src/Frontend/Seo/Schema/SchemaContextFactory.php` | `make(Page $page, string $locale, ?object $source = null): SchemaContext` — one og-image media lookup per call, its `alt`/`mime`/`width`/`height` ride on the context | Builds the `SchemaContext` a page's schema node(s) and its blocks' `toSchema()` share; constructible with a purpose-built `Settings` the same way `SeoResolver` is |
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
+| `HasForm` (trait, opt-in on a `HandlesFormSubmission` block) | `src/Form/HasForm.php` | `formName(): string` (default `kind()`) | Registers the form by name in `Forms` (`Cms::forms()`), so a template posts to it from any page |
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
 | `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms) |
 | `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `DatabaseTemplateStore` (backed by `tbtop_notification_templates`, strict locale match, no fallback) |
@@ -354,6 +355,8 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `url(Page $page, ?string $locale = null): string` | Builds the absolute frontend URL for a page in a locale |
 | | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, non-live ancestors and a non-live home left out, `[]` for home or when fewer than two crumbs remain |
 | | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
+| | `forms(): Forms` | The `HasForm` forms by name (blocks.md "Forms reachable from any page") |
+| `Tbtop\Cms\Form\Forms` | `props(string $name, Page $page, ?string $locale = null): array` | `{action, honeypotField?}` for a template-rendered form posting from `$page`; also `all()`, `has()`, `get()`, `action()` |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |
 | | `forget(string $key): void` | Deletes one setting, bumps the content cache |

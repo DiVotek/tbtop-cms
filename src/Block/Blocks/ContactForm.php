@@ -10,6 +10,7 @@ use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
+use Tbtop\Cms\Form\HasForm;
 
 /**
  * Reference form block: an anonymous contact form. Notifying the team about
@@ -20,10 +21,13 @@ use Tbtop\Cms\Block\SubmitContext;
  * edits copy. Real projects swap {@see handleSubmit()} to forward to a CRM,
  * queue a job, store a lead, etc.; it still runs (and is still retried by
  * SubmissionRetrier) for that purpose, independent of the notification
- * fan-out.
+ * fan-out. HasForm makes it reachable by name from any page as well:
+ * `Cms::forms()->props('ContactForm', $page)` for a template-rendered form.
  */
 class ContactForm extends Block implements HandlesFormSubmission
 {
+    use HasForm;
+
     /** @var list<array{name: string, label: string, type: string, required: bool}> */
     private const array FIELDS = [
         ['name' => 'name', 'label' => 'Name', 'type' => 'text', 'required' => true],

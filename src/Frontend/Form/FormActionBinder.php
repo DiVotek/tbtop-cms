@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Frontend\Form;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\ResolvedBlock;
+use Tbtop\Cms\Form\Support\FormActionProps;
 use Tbtop\Cms\Page\Models\Page;
 
 /**
@@ -46,14 +47,7 @@ class FormActionBinder
             return $block;
         }
 
-        $action = route('tbtop-cms.form.submit', ['locale' => app()->getLocale(), 'page' => $page->getKey(), 'block' => $block->id]);
-        $honeypotField = config('tbtop-cms.forms.honeypot_field');
-
-        $props = [...$block->props, 'action' => $action];
-
-        if (is_string($honeypotField) && $honeypotField !== '') {
-            $props['honeypotField'] = $honeypotField;
-        }
+        $props = [...$block->props, ...FormActionProps::for($page, $block->id)];
 
         return new ResolvedBlock($block->id, $block->kind, $props);
     }

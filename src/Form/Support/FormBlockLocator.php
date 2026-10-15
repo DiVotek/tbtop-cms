@@ -9,6 +9,7 @@ use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\SubmitContext;
 use Tbtop\Cms\Block\Support\LocaleFlattener;
+use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Page\Models\Page;
@@ -21,18 +22,24 @@ class FormBlockLocator
         private readonly Languages $languages,
         private readonly LayoutResolver $layouts,
         private readonly SharedBlocks $sharedBlocks,
+        private readonly Forms $forms,
     ) {}
 
     /**
      * Searches the page's own content first, then the active blocks of the
-     * layout slots (header/footer) — a form block can live in either.
+     * layout slots (header/footer) — a form block can live in either. With no
+     * row of that id, `$blockId` is tried as a {@see Forms} name: a HasForm
+     * block reachable from any page, with no editor data.
      */
     public function locate(Page $page, string $blockId, ?string $locale = null): ?LocatedFormBlock
     {
         $raw = $this->findBlock($page->content ?? [], $blockId) ?? $this->findInLayouts($blockId);
+        $resolvedLocale = $locale ?? (string) app()->getLocale();
 
         if ($raw === null) {
-            return null;
+            return $this->forms->has($blockId)
+                ? new LocatedFormBlock($this->forms->get($blockId), [], $this->context($page, $resolvedLocale))
+                : null;
         }
 
         $kind = (string) ($raw['kind'] ?? '');
@@ -53,8 +60,6 @@ class FormBlockLocator
         if ($data === null) {
             return null;
         }
-
-        $resolvedLocale = $locale ?? (string) app()->getLocale();
 
         return new LocatedFormBlock($block, $this->flatten($data, $block, $resolvedLocale), $this->context($page, $resolvedLocale));
     }
