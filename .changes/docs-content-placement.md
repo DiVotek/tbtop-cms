@@ -24,4 +24,7 @@ standard page fields come first.
   pages, Subtypes and type fields, Shared blocks and the related recipes;
   the stale "form only in `$page->content`" note in recipes is corrected.
 
+- The admin hint for a page's `name` (en, uk) no longer says it is not shown
+  on the site: breadcrumbs and page-link labels use it.
+
 No code, contract or test change.
