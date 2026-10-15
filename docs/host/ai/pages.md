@@ -371,7 +371,21 @@ Render path (`PageController::props()`): `$content = $page->content ??
 $type->template($page) ?? []` — an explicit `content` on the page always
 wins over the template (a host can still hand-edit a source-backed page's
 content by writing the column directly; the *form* is what's locked, not
-the column). `source($page)` is resolved once per request and handed to
+the column).
+
+A content-only (not source-backed) type can return `template()` too: a page
+of it created in the admin starts with a copy of those blocks in `content`
+(`TypeTemplateContent`, called from `PageFormWriter::fillContent()` on create when the page
+inherits no category starter blocks), so the editor shows them and they
+survive every save. Each copied block gets a fresh ULID `id` (any `id` in the
+template is replaced); `active`, `sort` and `data` may be left out and default
+to `true`, its position and `[]`. Pages
+written straight to the database (a seeder, an import) get no copy: they
+render the template only while their `content` is null, and the first editor
+save writes the empty list the editor showed. Such code writes `content`
+itself.
+
+`source($page)` is resolved once per request and handed to
 every block as `ResolveContext::$source`; a source-backed type whose
 `source()` returns null (deleted, unpublished on the source's own side)
 renders the same not-found → redirect → 404 path as an unpublished page —
