@@ -29,9 +29,15 @@ source is under `vendor/tbtop/admin/packages/php/src/`.
 
 ## Where does my code go
 
+Modelling pages, writing seeders or importing a site? Read
+[placement.md](./placement.md) first: an ordered rule for where each piece of
+a page's content goes — standard field, type field, computed value, type
+frame, block, layout slot.
+
 | You're adding… | It goes in… | Read |
 |---|---|---|
 | A block | **all three**: PHP class + zod entry in `catalog.ts` + component in `registry.tsx`, same change; two of three renders nothing, silently | [blocks.md](./blocks.md) |
+| A page's text, picture, typed data or fixed parts | the standard page fields first, then type fields, `resolveFields()`, a host frame by `page.subtype` — blocks only for optional sections | [placement.md](./placement.md) |
 | A section that holds pages other than `category`/`article` | a host page type extending `BasePageType` (`CategoryType` is not configurable) | [pages.md](./pages.md) |
 | Site content | idempotent seeders per section, keyed by slug — never admin clicks | [pages.md](./pages.md#seeding-content) |
 | Header / footer | layout blocks in the two slots, rendered by the host's `SiteChrome` from `cms.layout` | [wiring.md](./wiring.md), [recipes.md](./recipes.md) |
@@ -47,13 +53,14 @@ If the table can't place it, ask.
 
 ## The files
 
-1. **[wiring.md](./wiring.md)** — installing and connecting a host: route order, the two Vite entries, why the host owns `CmsPage.tsx`, shared props, `<head>`/SSR fallbacks, admin access, symptom → cause.
-2. **[blocks.md](./blocks.md)** — the three-layer rule, `Block` API, `ResolveContext`, envelope → spec data flow, locale flattening, form-handling blocks, the client catalog/registry.
-3. **[pages.md](./pages.md)** — `Page` columns, status vs. live, page types and hierarchy rules, slugs/URLs/redirects, source-backed pages, revisions, layout slots, seeding, cache invalidation, events.
-4. **[seo.md](./seo.md)** — what the `seo` prop contains and where each value is edited, structured data, sitemap, robots, GTM, the audit/checklist, 404 log.
-5. **[notifications.md](./notifications.md)** — submission lifecycle, the type/channel registry, built-in channels and their Settings keys, templates, where to register.
-6. **[recipes.md](./recipes.md)** — compositions real hosts built from existing parts, and what is verified absent with the least-bad workaround.
-7. **[inventory.md](./inventory.md)** — every config key, command, route, Inertia prop, contract, event, Settings key, ability, table, facade method.
+1. **[placement.md](./placement.md)** — where each piece of page content goes (first match wins), wrong placements seen in imports, the fill-count check after modelling.
+2. **[wiring.md](./wiring.md)** — installing and connecting a host: route order, the two Vite entries, why the host owns `CmsPage.tsx`, shared props, `<head>`/SSR fallbacks, admin access, symptom → cause.
+3. **[blocks.md](./blocks.md)** — the three-layer rule, `Block` API, `ResolveContext`, envelope → spec data flow, locale flattening, form-handling blocks, the client catalog/registry.
+4. **[pages.md](./pages.md)** — `Page` columns, status vs. live, page types and hierarchy rules, slugs/URLs/redirects, source-backed pages, revisions, layout slots, seeding, cache invalidation, events.
+5. **[seo.md](./seo.md)** — what the `seo` prop contains and where each value is edited, structured data, sitemap, robots, GTM, the audit/checklist, 404 log.
+6. **[notifications.md](./notifications.md)** — submission lifecycle, the type/channel registry, built-in channels and their Settings keys, templates, where to register.
+7. **[recipes.md](./recipes.md)** — compositions real hosts built from existing parts, and what is verified absent with the least-bad workaround.
+8. **[inventory.md](./inventory.md)** — every config key, command, route, Inertia prop, contract, event, Settings key, ability, table, facade method.
 
 ## Ground rules
 
@@ -61,6 +68,7 @@ If the table can't place it, ask.
 - **The host owns `CmsPage.tsx`.** Copy the package's `resources/js/cms/CmsPage.tsx` the moment you need chrome, a provider, or an extra `<head>` tag; the vendor file has no slots. Keep the SEO tags by rendering `<CmsHead seo={seo} />` from `@cms/CmsHead`, not by copying the `<Head>` block.
 - **`Cms::frontendRoutes()` is the last line of `routes/web.php`.** It ends in a catch-all.
 - **Content is seeded, not clicked.** Seeders are idempotent by slug and split per section.
+- **Standard page fields first.** A page's description is `body`, its picture `image`; a type field or block holds only what they cannot ([placement.md](./placement.md)).
 - **Vendor is read-only.** A bug in `vendor/tbtop/cms` is reported, not patched in place; a missing hook is a finding to flag, not something to work around silently.
 - **`cms:doctor` after any wiring change**, instead of re-deriving from this guide.
 

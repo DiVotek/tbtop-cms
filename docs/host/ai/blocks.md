@@ -529,6 +529,30 @@ what `handleSubmit()` does, but it is skipped when `handleSubmit()` throws
 (see above), so a custom handler should not throw for a failure the team
 must still hear about.
 
+### Known limitation: a form must be a stored block
+
+`FormBlockLocator::locate()` (`src/Form/Support/FormBlockLocator.php`)
+finds the submitted block id only in the page's stored `content`, then in
+the active blocks of the two layout slots. Anything else 404s on submit:
+
+- a form a host page-type frame draws from `page.fields` (no block at all —
+  see [recipes.md](./recipes.md#a-page-type-with-a-fixed-frame-and-a-blocks-slot));
+- a form block that comes from `PageTypeInterface::template()` on a page
+  whose `content` is null — `FormActionBinder` still gives it an `action`,
+  but the locator never reads `template()`.
+
+Workaround, until the package can locate a form outside stored content:
+put an active `HandlesFormSubmission` block in the `header` or `footer`
+slot as the **receiver** — its component may render nothing. Build the
+action in the type's `resolveFields()` the way `FormActionBinder` does —
+`route('tbtop-cms.form.submit', ['locale' => $ctx->locale, 'page' =>
+$page->getKey(), 'block' => <receiver id>])` — and have the frame post the
+fields the receiver's `submitRules()` accepts. The receiver's
+`data` is the one configuration every such form shares,
+and the submission is stored and notified as that block's. Seed the
+receiver in the layout seeder: removing it from the slot breaks every form
+that posts to it.
+
 ## Client side
 
 `resources/js/cms/catalog.ts` and `resources/js/cms/registry.tsx`
@@ -618,6 +642,9 @@ first, then the layout slots, so the submission and any later retry
 (`SubmissionRetrier`) locate it regardless of which page rendered it.
 
 ## Shared blocks
+
+> For content the same on every page of a type, a shared block is the
+> wrong tool — see [placement.md](./placement.md), rules 5 and 7.
 
 A block whose content should be the same on many pages (a CTA banner, a
 contact strip) is created once under **Design → Shared blocks**
