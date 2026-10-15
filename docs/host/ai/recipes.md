@@ -136,6 +136,9 @@ package hook — it is the existing props composed in host code.
    if (page.subtype === "service") {
        const fields = serviceFields.safeParse(page.fields);   // z.object({ price: z.string().nullable(), children: z.array(...), specialists: z.array(...) })
        if (fields.success) body = <ServiceFrame page={page} fields={fields.data}>{blocks}</ServiceFrame>;
+       // The fallback hides a broken frame (a renamed resolveFields() key):
+       // say so where block errors are shown.
+       else if (showErrors) console.error("service frame: page.fields did not parse", fields.error);
    }
 
    return (

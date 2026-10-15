@@ -103,7 +103,11 @@ Page::query()->get()
             $f => $pages->filter(fn (Page $p): bool => PageTranslation::get($p, $f, $locale, $locale) !== null)->count(),
         ])->all(),
         'image' => $pages->filter(fn (Page $p): bool => $filled($p->image))->count(),
-        'fields' => $pages->flatMap(fn (Page $p): array => array_keys(array_filter($p->fields ?? [], $filled)))->countBy()->all(),
+        // A translatable field stores a {locale: value} map: count its default-locale value.
+        'fields' => $pages->flatMap(fn (Page $p): array => array_keys(array_filter(
+            array_map(fn (mixed $v): mixed => is_array($v) && array_key_exists($locale, $v) ? $v[$locale] : $v, $p->fields ?? []),
+            $filled,
+        )))->countBy()->all(),
     ])
     ->all();
 ```
