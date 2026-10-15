@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Form\SubmissionRetrier;
+use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -51,6 +53,35 @@ it('validates a name-addressed submission with the form rules', function (): voi
     $this->post(app(Cms::class)->forms()->action('ServiceOrder', $page), [])->assertSessionHasErrors('phone');
 
     expect(FormSubmission::query()->count())->toBe(0);
+});
+
+it('does not accept a name-addressed submission on a draft page', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Draft]);
+    app(Cms::class)->frontendRoutes();
+
+    $this->postJson(app(Cms::class)->forms()->action('ServiceOrder', $page), ['phone' => '+380'])->assertNotFound();
+
+    expect(FormSubmission::query()->count())->toBe(0);
+});
+
+it('retries a failed name-addressed submission through the form name', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'content' => []]);
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => $page->getKey(),
+        'block_id' => 'ServiceOrder',
+        'kind' => 'ServiceOrder',
+        'locale' => 'en',
+        'payload' => ['phone' => '+380'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'crm down',
+    ]);
+
+    app(SubmissionRetrier::class)->retry($submission);
+
+    expect($submission->fresh()?->handled_at)->not->toBeNull()
+        ->and($submission->fresh()?->error)->not->toBe('Form block no longer exists on the page.')
+        ->and(NamedFormBlock::$data)->toBe([]);
 });
 
 it('does not reach a form block without HasForm by its kind', function (): void {

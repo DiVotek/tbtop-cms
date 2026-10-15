@@ -525,7 +525,9 @@ the `{block}` segment, so it posts from any live page. `FormBlockLocator`
 tries a block row of that id on the page and in the layout slots first, then
 the name, so a placed block keeps its own id and editor data. A
 name-addressed submit runs `submitRules()` / `handleSubmit()` with empty
-`$blockData` (no placed row carries editor copy) and is stored with
+`$blockData` (no placed row carries editor copy), so a `HasForm` block's
+rules and handler must not depend on it; the notification fan-out never
+reads it and is stored with
 `block_id` = the form name, which is also what an admin retry looks up. Two
 blocks declaring one name throw on first use of `Forms`. A block without
 `HasForm` is never reachable by its kind. `Forms` API: `all()`, `has()`,
