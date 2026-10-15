@@ -22,6 +22,7 @@ use Tbtop\Cms\Cache\CmsCache;
 use Tbtop\Cms\Console\BlocksTypesCommand;
 use Tbtop\Cms\Console\DoctorCommand;
 use Tbtop\Cms\Console\InstallCommand;
+use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Frontend\Errors\ErrorPageResolver;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
@@ -123,6 +124,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->singleton(BlockRegistry::class);
+        $this->app->singleton(Forms::class);
         $this->app->singleton(RobotsRegistry::class);
         $this->app->singleton(SchemaTypeRegistry::class);
         $this->app->scoped(BlockContentResolver::class);

@@ -7,6 +7,7 @@ namespace Tbtop\Cms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\Response;
+use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
@@ -28,6 +29,7 @@ class Cms
         private readonly PageUrl $pageUrl,
         private readonly Breadcrumbs $crumbs,
         private readonly ErrorResponse $errors,
+        private readonly Forms $forms,
     ) {}
 
     /**
@@ -84,6 +86,12 @@ class Cms
     public function breadcrumbs(Page $page, ?string $locale = null): array
     {
         return $this->crumbs->forPage($page, $locale ?? (string) app()->getLocale());
+    }
+
+    /** Every HasForm block by name, e.g. `forms()->props('ServiceForm', $page)` for a template-rendered form. */
+    public function forms(): Forms
+    {
+        return $this->forms;
     }
 
     /**
