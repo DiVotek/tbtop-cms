@@ -63,6 +63,32 @@ goes where it first matches.
    - A form block in it cannot be submitted: `FormBlockLocator` searches the
      page's stored `content` and the layout slots, never `template()`.
 
+## Picking the field: a list of single texts is `tags`
+
+Once a piece of content has its place, pick the field kind by the shape of
+one item. **A list whose item is one short text** (advantages, topics,
+checklist points, a card's labels) **→ `$s->tags('x')`, not a repeater with
+one text sub-field.** The editor types a value and presses Enter, sees every
+item at once, and removes one with its ×; a repeater makes them open, fill
+and collapse a row per word.
+
+- Use a repeater only when an item has **two or more fields** (title and
+  description, name and price), a non-text field (media, link, select), or
+  the editor must reorder items: `tags` has no drag or up/down, a new value
+  goes last.
+- `tags` resolves to `list<string>` ([blocks.md](./blocks.md), the resolve
+  table) and works in a type's `fields()` and a block's `form()` alike.
+  `->translatable()` stores `{locale: list<string>}` and is flattened to the
+  request locale like any translatable field.
+- Read it as a list of strings in `resolve()`/`resolveFields()`; guard each
+  item (`is_string`, trim, skip empty) — input is untrusted.
+- Importing a site whose items sat in one-field rows (`[{label: {uk: …}}]`):
+  convert them to `{uk: [ … ]}` in the import, so nothing in the database
+  keeps the row shape.
+
+Wrong: `$s->repeater('advantages')->fields([$s->text('value')])` — six rows
+for six words. Right: `$s->tags('advantages')->translatable()`.
+
 ## Wrong placements seen in real imports
 
 - **Every fixed part as a block.** Banner, description, a list computed from
