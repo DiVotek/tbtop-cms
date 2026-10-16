@@ -392,6 +392,8 @@ here. Block-specific usage:
   each row (`is_array($row)`, `$row['field'] ?? null`) rather than assuming
   the form's shape. See any real block's `resolve()` for the pattern
   (`ProjectsGridBlock::items()` in the divotek host).
+  A row of **one text field** is a `tags` field instead
+  ([placement.md](./placement.md#picking-the-field-a-list-of-single-texts-is-tags)).
 - **Media fields** (`$s->media('image')`) — store the media *id*
   (string/int), never a URL. Resolve it in `resolve()` via
   `$ctx->mediaUrl($input['image'] ?? null)`, which returns `null` for a
