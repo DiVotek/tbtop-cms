@@ -22,6 +22,7 @@ use Tbtop\Cms\NotFound\Models\NotFoundHit;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\Models\Redirect;
 use Tbtop\Cms\Settings\Models\Setting;
+use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 
 class AuditLogPage extends AdminPage
 {
@@ -173,6 +174,7 @@ class AuditLogPage extends AdminPage
             Redirect::class => __('tbtop-cms::audit.types.redirect'),
             Language::class => __('tbtop-cms::audit.types.language'),
             Layout::class => __('tbtop-cms::audit.types.layout'),
+            SharedBlock::class => __('tbtop-cms::audit.types.shared_block'),
             Setting::class => __('tbtop-cms::audit.types.setting'),
             FormSubmission::class => __('tbtop-cms::audit.types.submission'),
             NotFoundHit::class => __('tbtop-cms::audit.types.not_found'),

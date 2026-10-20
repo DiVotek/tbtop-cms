@@ -51,3 +51,21 @@ it('counts and lists a shared block by every pointer form, once per container', 
     expect(array_column($rows, 'id'))->toBe(["page:{$twice->id}", "page:{$string->id}", "page:{$trashed->id}", 'layout:' . Slots::FOOTER])
         ->and(array_column($rows, 'container'))->toBe(['page', 'page', 'trashed_page', 'layout']);
 });
+
+it('does not link a trashed page usage row to an editor that would 404', function (): void {
+    SharedBlock::query()->forceCreate(['id' => 7, 'name' => 'Seven', 'kind' => 'Simple', 'data' => []]);
+    $content = [['id' => 'a', 'kind' => 'Simple', 'active' => true, 'data' => [], 'shared' => 7]];
+    $live = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Live'], 'content' => $content]);
+    $trashed = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'Gone'], 'content' => $content]);
+    $trashed->delete();
+
+    $this->actingAs(PageEditHelpers::admin(), 'web');
+    $rows = collect($this->getJson('/admin/shared-blocks/7/edit/tables/sharedBlockUsage')->assertOk()->json('data.data'))->keyBy('id');
+
+    expect($rows["page:{$live->id}"]['_recordUrl'] ?? null)->toEndWith("/admin/pages/{$live->id}/edit")
+        ->and($rows["page:{$trashed->id}"]['_recordUrl'] ?? null)->toBeNull();
+
+    $effects = $this->postJson('/admin/shared-blocks/7/edit/actions/sharedBlockUsageOpen', ['payload' => ['row' => ['id' => "page:{$trashed->id}"]]])
+        ->assertOk()->json('effects');
+    expect(collect($effects)->pluck('kind')->all())->not->toContain('redirect');
+});

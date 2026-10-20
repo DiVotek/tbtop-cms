@@ -9,6 +9,7 @@ use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\Actions\ReplicateAction;
+use Tbtop\Admin\Dsl\Cond;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Page\Events\PageDeleted;
@@ -40,8 +41,10 @@ final class PagesRowActions
             ->tooltip(__('tbtop-cms::pages.actions.view_on_site'))
             ->url('/{path}')->openUrlInNewTab()
             // A trashed page has no live path (its slugs were removed by
-            // PageObserver::deleting()) — the link would 404.
-            ->hiddenIf('deleted_at', 'not empty');
+            // PageObserver::deleting()) — the link would 404. An error page
+            // has no slug at all (null path, not the root page's ''), so the
+            // link would open the homepage instead.
+            ->hiddenIf(Cond::any(Cond::notEmpty('deleted_at'), Cond::eq('path', null)));
     }
 
     private static function duplicateAction(S $s): ActionBuilder
@@ -58,7 +61,11 @@ final class PagesRowActions
     {
         $page = Page::findOrFail((int) $ctx->key());
 
-        app(PageDuplicator::class)->duplicate($page);
+        try {
+            app(PageDuplicator::class)->duplicate($page);
+        } catch (DomainException $e) {
+            return Effects::make()->notify($e->getMessage(), 'error');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::pages.duplicate.notify'))->refreshTable();
     }

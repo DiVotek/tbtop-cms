@@ -210,9 +210,10 @@ class NotFoundLogPage extends AdminPage
             return Effects::make()->haltModal(is_string($first) ? $first : $e->getMessage());
         }
 
+        // An already-ignored hit stays as it is: re-ignoring it would log a second "ignored".
         $hit = NotFoundHit::query()->find($ctx->key());
-        $hit?->forceFill(['is_ignored' => true])->save();
-        if ($hit !== null) {
+        if ($hit !== null && ! $hit->is_ignored) {
+            $hit->forceFill(['is_ignored' => true])->save();
             self::logHit($hit, 'ignored');
         }
 

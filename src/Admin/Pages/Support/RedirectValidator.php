@@ -12,10 +12,15 @@ use Tbtop\Cms\Redirect\Support\RedirectPath;
 
 class RedirectValidator
 {
-    /** @param array{locale: string|null, from: string, to: string, status: int} $data */
+    /**
+     * `to` is normalized, so '' is the homepage (typed as `/`); the form
+     * rejects a blank target before normalizing.
+     *
+     * @param  array{locale: string|null, from: string, to: string, status: int}  $data
+     */
     public static function assert(array $data, ?int $id): void
     {
-        if ($data['from'] === '' || $data['to'] === '') {
+        if ($data['from'] === '') {
             throw ValidationException::withMessages(['from_path' => __('tbtop-cms::redirects.validation.paths_required')]);
         }
 

@@ -7,6 +7,7 @@ use Spatie\Activitylog\Models\Activity;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Settings\Models\Setting;
+use Tbtop\Cms\SharedBlock\Models\SharedBlock;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\ContractAdminUser;
 
@@ -75,4 +76,20 @@ it('offers a recorded profile-less CmsAdmin actor in the author filter', functio
         'value' => (string) $admin->id,
         'label' => 'Contract Admin',
     ]);
+});
+
+it('offers shared blocks in the entity type filter with a translated label', function (): void {
+    config(['tbtop-cms.admin.model' => AdminUser::class]);
+    config(['auth.providers.users.model' => AdminUser::class]);
+    $admin = AdminUser::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'secret']);
+    CmsUserProfile::query()->forceCreate(['user_id' => $admin->id]);
+    test()->actingAs($admin, 'web');
+
+    $structure = test()->get('/admin/audit-log', ['X-Inertia' => 'true'])->assertOk()->json('props.structure');
+    $typeFilter = collect(data_get($structure, 'options.children.0.options.filters'))->firstWhere('name', 'subject_type');
+
+    expect($typeFilter['options']['options'] ?? [])->toContain([
+        'value' => SharedBlock::class,
+        'label' => __('tbtop-cms::audit.types.shared_block'),
+    ])->and(__('tbtop-cms::audit.types.shared_block', [], 'uk'))->not->toBe('tbtop-cms::audit.types.shared_block');
 });
