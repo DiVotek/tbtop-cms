@@ -227,6 +227,25 @@ it('marks the submission failed when telegram is enabled but token or chat ids a
         ->and($submission->error)->toContain(__('tbtop-cms::notifications.errors.telegram_not_configured'));
 });
 
+it('reports a missing bot token once and attempts no telegram send per chat id', function (): void {
+    Http::fake();
+    notifierAdmin();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
+    app(Settings::class)->set('notifications.telegram.bot_token', '');
+    app(Settings::class)->set('notifications.telegram.chat_ids', "111\n222");
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toBe(__('tbtop-cms::notifications.errors.telegram_not_configured'))
+        ->and(NotificationLog::query()->where('channel', 'telegram')->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
 it('names a failing host channel through the generic error text', function (): void {
     Notifications::channel(ThrowingHostChannel::class);
     notifierAdmin();
