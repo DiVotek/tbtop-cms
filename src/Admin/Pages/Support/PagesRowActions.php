@@ -58,7 +58,11 @@ final class PagesRowActions
     {
         $page = Page::findOrFail((int) $ctx->key());
 
-        app(PageDuplicator::class)->duplicate($page);
+        try {
+            app(PageDuplicator::class)->duplicate($page);
+        } catch (DomainException $e) {
+            return Effects::make()->notify($e->getMessage(), 'error');
+        }
 
         return Effects::make()->notify(__('tbtop-cms::pages.duplicate.notify'))->refreshTable();
     }

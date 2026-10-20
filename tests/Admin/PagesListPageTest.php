@@ -274,6 +274,19 @@ it('duplicates a page via the row action, creating a draft copy next to the orig
     expect($effects)->toContain('notify', 'refreshTable');
 });
 
+it('reports an error instead of failing when duplicating a page whose type is no longer registered', function (): void {
+    $page = Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+    Page::query()->whereKey($page->id)->toBase()->update(['type' => 'retired']);
+
+    $response = $this->postJson('/admin/pages/actions/pageDuplicate', ['payload' => ['row' => ['id' => $page->id]]]);
+
+    $response->assertOk();
+    expect(Page::query()->count())->toBe(1);
+
+    $notify = collect($response->json('effects'))->firstWhere('kind', 'notify');
+    expect($notify['level'] ?? null)->toBe('error');
+});
+
 it('force-deletes a trashed page permanently via the row action', function (): void {
     $page = Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
     $page->delete();
