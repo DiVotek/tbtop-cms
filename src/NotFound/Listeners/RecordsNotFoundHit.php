@@ -52,7 +52,7 @@ final class RecordsNotFoundHit
      * Settings::get() applies its $default only when the KEY is absent, and
      * the settings form writes whatever the boolean field submitted, so an
      * untouched toggle must not silently stop recording. Same rule as
-     * SeoResolver::indexingEnabled().
+     * IndexingSetting::enabled().
      */
     private function enabled(): bool
     {
