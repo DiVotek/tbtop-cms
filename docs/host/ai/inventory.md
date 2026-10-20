@@ -257,6 +257,7 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s are the identity `sameAs` (the only source) |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
+| `seo.title_suffix` | none — legacy, still mapped by `SeoSettingsPage` with no field; a stored value keeps working | no | yes |
 | `seo.description_template` | `SeoSettingsPage` | no | yes |
 | `seo.default_description` | `SeoSettingsPage` | no | yes |
 | `seo.default_og_image` | `SeoSettingsPage` | no | yes (media URL) |
@@ -267,8 +268,8 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.verification.google` | `SeoSettingsPage` | no | yes |
 | `seo.verification.bing` | `SeoSettingsPage` | no | yes |
 | `seo.identity.type` | `SeoSettingsPage` | no | yes |
-| `seo.identity.name` | `SeoSettingsPage` | no | yes |
-| `seo.identity.logo` | `SeoSettingsPage` | no | yes (media URL) |
+| `seo.identity.name` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.name` | no | yes |
+| `seo.identity.logo` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.logo` | no | yes (media URL) |
 | `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |

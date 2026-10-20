@@ -99,9 +99,10 @@ Field-by-field:
 | OG title/description/image | `page.seo.og_title` / `og_description` / `og_image` | SEO tab → *Social* section (`og_image` is a plain scalar, not translatable — an image isn't per-locale) |
 | Canonical override | `page.seo.canonical` (translatable) | SEO tab: *Canonical URL* (validated `url:http,https`) |
 | Schema.org node type | `page.seo.schema.type` | SEO tab → *Schema* section, only present when the page type's `schemaTypes()` offers more than one key |
-| Article author / publisher | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab — same entity (same `@id`) as the site-wide identity node |
+| Article author / publisher | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab for the type; the name falls back to `site.name` (Site settings) unless a legacy `seo.identity.name` value exists — same entity (same `@id`) as the site-wide identity node |
 | `is_indexable` | `page.is_indexable` column | Page edit sidebar → *Publication* card, not the SEO tab |
-| Site title/description templates, separator, suffix | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`, `seo.title_suffix`) | Admin → SEO settings → *Titles* tab |
+| Site title/description templates, separator | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`) | Admin → SEO settings → *Titles* tab |
+| Legacy title suffix | `Settings` (`seo.title_suffix`) | No field: still mapped by `SeoSettingsPage` and honoured by `SeoTextRenderer` when a value already exists in the database (legacy/scripted); `seo.title_template` replaces it in the UI |
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type and subtype; a page reads its subtype's pair first, then its type's |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
