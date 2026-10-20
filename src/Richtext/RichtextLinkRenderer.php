@@ -67,12 +67,12 @@ class RichtextLinkRenderer
             return true;
         }
 
-        $scheme = parse_url($url, PHP_URL_SCHEME);
-
-        if ($scheme === null) {
+        // Read the scheme the way the URL spec does, not via parse_url(): it
+        // takes "javascript:1/alert(1)" for host:port and reports no scheme.
+        if (preg_match('/^([a-z][a-z0-9+.\-]*):/i', $url, $match) !== 1) {
             return true;
         }
 
-        return in_array(strtolower((string) $scheme), self::ALLOWED_SCHEMES, true);
+        return in_array(strtolower($match[1]), self::ALLOWED_SCHEMES, true);
     }
 }

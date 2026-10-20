@@ -261,6 +261,35 @@ it('drops javascript: urls disguised with whitespace the browser strips before p
     'newline inside the scheme' => ["java\nscript:alert(1)"],
 ]);
 
+it('drops urls whose scheme parse_url misreads as host:port', function (string $url): void {
+    $html = $this->renderer->render(editorState([
+        ['type' => 'link', 'url' => $url, 'children' => [textNode('click me')]],
+    ]));
+
+    expect($html)->toBe('click me');
+})->with([
+    'digits after the colon' => ['javascript:1/alert(document.domain)'],
+    'digits only' => ['javascript:1'],
+    'data with digits' => ['data:1/text/html,x'],
+    'vbscript with digits' => ['vbscript:1/msgbox(1)'],
+    'unknown scheme' => ['foo:bar'],
+]);
+
+it('keeps relative and allowlisted links whose scheme the browser reads the same way', function (string $url): void {
+    $html = $this->renderer->render(editorState([
+        ['type' => 'link', 'url' => $url, 'children' => [textNode('go')]],
+    ]));
+
+    expect($html)->toBe('<a href="' . htmlspecialchars($url, ENT_QUOTES) . '">go</a>');
+})->with([
+    'query only' => ['?q=1'],
+    'bare relative path' => ['about/team'],
+    'colon after a slash' => ['docs/a:b'],
+    'tel' => ['tel:+380441234567'],
+    'mailto' => ['mailto:a@b.com'],
+    'https with port' => ['https://example.com:8080/x'],
+]);
+
 it('escapes script tags inside text nodes', function (): void {
     $html = $this->renderer->render(editorState([
         ['type' => 'paragraph', 'children' => [textNode('<script>alert(1)</script>')]],
