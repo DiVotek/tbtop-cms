@@ -105,7 +105,9 @@ it('falls back to an empty render with the lang-file heading when the 4xx page r
     $this->get('/nonexistent', ['X-Inertia' => 'true'])
         ->assertNotFound()
         ->assertJsonPath('component', 'Cms/Page')
-        ->assertJsonPath('props.render', [])
+        // An empty spec the client renders, not [] (which has no `elements` to walk).
+        ->assertJsonPath('props.render.root', '$root')
+        ->assertJsonPath('props.render.elements.$root.children', [])
         ->assertJsonPath('props.page.heading', __('tbtop-cms::errors.4xx.heading'))
         ->assertJsonPath('props.page.name', null)
         ->assertJsonPath('props.page.title', null)

@@ -157,7 +157,7 @@ public function respond(Request $request, Throwable $e): Response
 ```
 
 See `docs/host/ai/seo.md`'s "Editable error pages" section for the three
-fallback layers (DB page → chrome fallback with `render: []` → static Blade
+fallback layers (DB page → chrome fallback with an empty `render` spec → static Blade
 view for a 5xx that fails to render) and `docs/host/ai/pages.md`'s "Error
 pages" section for how the two pages are identified and seeded. No package
 Blade layout exists for any of this — every layer except the last-resort 5xx

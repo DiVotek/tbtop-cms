@@ -125,3 +125,10 @@ it("renders nothing in place of a throwing component on the server, where no bou
     expect(html).not.toContain("Welcome");
     expect(lines).toEqual([]);
 });
+
+it("renders nothing, without throwing, for a spec with no elements (an older server's error-page fallback sends [])", () => {
+    const empty = [] as unknown as RenderSpec;
+
+    expect(dropBrokenBlocks(empty, catalog, registry).dropped).toEqual([]);
+    expect(renderSpec(empty, true).container.innerHTML).toBe("");
+});

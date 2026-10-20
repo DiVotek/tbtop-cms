@@ -638,7 +638,7 @@ Response` always returns a response, in three fallback layers:
    a `BreadcrumbList`/`WebPage` would claim "Home › 404" lives at the home
    URL.
 2. Missing/unpublished page (e.g. seeder not run yet): the same `Cms/Page`
-   component with `render: []` and `page.heading` from
+   component with an empty `render` spec (a root with no children) and `page.heading` from
    `tbtop-cms::errors.{4xx,5xx}.heading` — never Laravel's stock error view.
 3. **5xx only**: if rendering the page itself throws, a static Blade view
    (`resources/views/errors/fallback.blade.php`) with no DB/Inertia/Settings
