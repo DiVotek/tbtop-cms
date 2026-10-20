@@ -22,12 +22,14 @@ use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
 use Tbtop\Cms\Notifications\Models\NotificationLog;
 use Tbtop\Cms\Notifications\NotificationLogStatus;
+use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
+use Tbtop\Cms\Tests\Fixtures\ThrowingHostChannel;
 use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
 
 uses(RefreshDatabase::class);
@@ -221,6 +223,20 @@ it('marks the submission failed when telegram is enabled but token or chat ids a
     $submission = FormSubmission::query()->sole();
     expect($submission->status)->toBe(SubmissionStatus::Failed)
         ->and($submission->error)->toContain(__('tbtop-cms::notifications.errors.telegram_not_configured'));
+});
+
+it('names a failing host channel through the generic error text', function (): void {
+    Notifications::channel(ThrowingHostChannel::class);
+    notifierAdmin();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'sms']);
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    expect(FormSubmission::query()->sole()->error)
+        ->toBe(__('tbtop-cms::notifications.errors.channel', ['channel' => 'SMS', 'error' => 'gateway down']));
 });
 
 // -----------------------------------------------------------------------

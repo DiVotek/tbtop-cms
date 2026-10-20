@@ -28,6 +28,7 @@ return [
     'errors' => [
         'bell' => 'Bell notification failed: :error',
         'mail' => 'Mail delivery failed: :error',
+        'channel' => ':channel delivery failed: :error',
         'render' => 'Couldn\'t render the :channel notification: :error',
         'mail_no_recipients' => 'Mail notifications are enabled but no recipients are configured.',
         'telegram' => 'Telegram delivery failed: :error',
