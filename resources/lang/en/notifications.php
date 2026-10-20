@@ -11,6 +11,8 @@ return [
             'submitted_at' => 'Submitted',
         ],
         'view_submission' => 'View submission',
+        'test_subject' => 'Test email from :site',
+        'test_body' => 'This is a test email from :site mail settings.',
     ],
     'bell' => [
         'title' => 'New form submission',

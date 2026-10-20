@@ -13,13 +13,13 @@ class TestMail extends Mailable
 {
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Test email from ' . $this->siteName());
+        return new Envelope(subject: __('tbtop-cms::notifications.mail.test_subject', ['site' => $this->siteName()]));
     }
 
     public function content(): Content
     {
         return new Content(
-            htmlString: '<p>This is a test email from ' . e($this->siteName()) . ' mail settings.</p>',
+            htmlString: '<p>' . e(__('tbtop-cms::notifications.mail.test_body', ['site' => $this->siteName()])) . '</p>',
         );
     }
 
