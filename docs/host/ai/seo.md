@@ -582,7 +582,9 @@ issue count), each holding a list of that page's issues.
 
 **Daily snapshots** (`tbtop_seo_audit_snapshots`, one row per calendar day,
 `Tbtop\Cms\Seo\Models\SeoAuditSnapshot`) back the Overview sparklines and
-history chart. `php artisan cms:seo:snapshot` runs the audit and
+history chart. `issue_counts` is keyed by the stable issue key
+(`missing_title`, `duplicate_description`, …), never the translated label, so
+rows written in different locales stay comparable. `php artisan cms:seo:snapshot` runs the audit and
 upserts/updates today's row via `SeoAuditSnapshotWriter` — it is **not**
 auto-scheduled by the package, so a host wanting daily history needs its own
 cron entry for it. As a fallback so history still accumulates without cron,

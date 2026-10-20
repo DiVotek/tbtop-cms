@@ -251,10 +251,10 @@ it('creates a snapshot row with correct counts when the report is opened', funct
         ->and($snapshot->fail_count)->toBe(2)
         ->and($snapshot->warn_count)->toBe(2)
         ->and($snapshot->issue_counts)->toEqualCanonicalizing([
-            __('tbtop-cms::seo_report.issues.missing_title.label') => 1,
-            __('tbtop-cms::seo_report.issues.missing_description.label') => 1,
-            __('tbtop-cms::seo_report.issues.missing_og_image.label') => 1,
-            __('tbtop-cms::seo_report.issues.missing_translation.label') => 1,
+            'missing_title' => 1,
+            'missing_description' => 1,
+            'missing_og_image' => 1,
+            'missing_translation' => 1,
         ]);
 });
 
@@ -305,6 +305,25 @@ it('writes/updates today\'s snapshot via the artisan command, which is not auto-
     );
 
     expect($summaries)->not->toContain('cms:seo:snapshot');
+});
+
+it('keys snapshot issue counts by a locale-independent issue key', function (): void {
+    createBrokenPage();
+
+    app()->setLocale('uk');
+    test()->artisan('cms:seo:snapshot')->assertExitCode(0);
+    $fromUk = SeoAuditSnapshot::query()->firstOrFail()->issue_counts;
+
+    app()->setLocale('en');
+    test()->artisan('cms:seo:snapshot')->assertExitCode(0);
+    $fromEn = SeoAuditSnapshot::query()->firstOrFail()->issue_counts;
+
+    expect($fromUk)->toEqualCanonicalizing([
+        'missing_title' => 1,
+        'missing_description' => 1,
+        'missing_og_image' => 1,
+        'missing_translation' => 1,
+    ])->and($fromEn)->toEqualCanonicalizing($fromUk);
 });
 
 it('leaves the seeded error pages out of the audit and the pages-scanned counts', function (): void {
