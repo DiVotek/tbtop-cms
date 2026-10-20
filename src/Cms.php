@@ -81,6 +81,11 @@ class Cms
         return $this->resolver->resolve($path, $locale ?? (string) app()->getLocale());
     }
 
+    /**
+     * The page's root-relative frontend path in a locale (`/about`,
+     * `/uk/about` for a non-default locale). Wrap it in url() for an
+     * absolute URL.
+     */
     public function url(Page $page, ?string $locale = null): string
     {
         $locale ??= (string) app()->getLocale();
