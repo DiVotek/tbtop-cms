@@ -69,7 +69,7 @@ return [
     ],
     'fields' => [
         'name' => 'Name',
-        'name_hint' => 'Internal name shown in the admin lists and navigation tree — not shown on the site.',
+        'name_hint' => 'Short name for the admin lists and tree; the site uses it as the breadcrumb and link label.',
         'title' => 'Title',
         'title_hint' => 'Browser-tab and SEO title — falls back to Name when left empty.',
         'slug' => 'Slug',

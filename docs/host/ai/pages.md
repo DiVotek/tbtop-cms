@@ -134,6 +134,9 @@ warning (the admin's restore action shows it as an error notice).
 
 ### Starter blocks
 
+> Starter blocks seed optional sections, not a type's fixed parts — see
+> [placement.md](./placement.md) for where each kind of content goes.
+
 A category can define `starter_blocks: {article: [...], category: [...]}`
 — structure only (`{id, kind}`, no `data`) per child type, edited on the
 category's own edit page. `StarterBlocks::contentFor()`
@@ -352,6 +355,9 @@ true, regardless of the page's own indexability settings.
 
 ## Source-backed pages
 
+> `template()` is not how a content-only type draws its fixed parts — see
+> [placement.md](./placement.md), rule 8.
+
 A page type can be backed by a domain object the host owns elsewhere (a
 product, a listing — anything with its own table). Three methods on
 `PageTypeInterface`, all defaulted to off by `BasePageType`:
@@ -419,6 +425,9 @@ has one; `source($page)` must handle a null `source_id` itself.
 and block resolution — an expensive template build costs a full request.
 
 ## Subtypes and type fields
+
+> A type field holds only what the standard page fields cannot — see
+> [placement.md](./placement.md) before declaring one.
 
 A subtype is a key and a set of fields, not a type of its own.
 `PageTypeInterface::base()` returns the type's own key by default (a
@@ -685,6 +694,9 @@ clicking through the admin — every real host does this. The pattern (from
 - **`content` is a plain PHP array of block envelopes** — see blocks.md for
   the `{id, kind, data, sort, active}` shape; a seeder builds a
   `list<array<string, mixed>>` and assigns it like any other fillable field.
+- **Check where the text landed.** After a seeder or import, count field
+  fills per type ([placement.md](./placement.md#after-modelling-or-importing-count-the-fills)):
+  a type whose `body` is empty on most pages is a modelling error.
 
 The package's own `PageSeeder` (`database/seeders/PageSeeder.php`, run by
 `cms:install`, verified against `tests/Page/PageSeederTest.php`) follows
