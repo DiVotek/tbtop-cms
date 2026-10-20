@@ -130,6 +130,17 @@ class Page extends Model
      */
     public ?int $expectedLockVersion = null;
 
+    /**
+     * Mirrors the column default so a page created without a status has one
+     * in memory too: create() does not read column defaults back, and the
+     * observers (revision snapshot, publish transition) read $page->status.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'draft',
+    ];
+
     /** @var array<string, string> */
     protected $casts = [
         'status' => PageStatus::class,

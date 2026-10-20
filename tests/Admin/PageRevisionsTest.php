@@ -312,3 +312,10 @@ it('cascades its revisions when a page is force-deleted (DB-level FK)', function
 
     DB::purge('fk_test');
 });
+
+it('snapshots a page created without an explicit status as draft', function (): void {
+    $page = Page::create(['type' => 'page', 'name' => ['en' => 'X']]);
+
+    expect($page->status)->toBe(PageStatus::Draft)
+        ->and(PageRevision::query()->where('page_id', $page->id)->value('kind'))->toBe('create');
+});
