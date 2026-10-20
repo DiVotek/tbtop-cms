@@ -241,7 +241,7 @@ Overridable, all with sane defaults:
 - **`translatableFields(): array`** — dotted paths (e.g. `'items.caption'`)
   the flattener treats as locale maps. Default: walks `form()`'s field tree
   and collects every field marked `->translatable()`, at any repeater
-  nesting depth (`Block::collectTranslatablePaths()`). Override only if a
+  nesting depth (`Tbtop\Cms\Block\Support\TranslatablePaths::of()`). Override only if a
   block's translatable set can't be read off its own form — the default is
   right for the overwhelming majority of blocks and is exercised directly by
   `tests/Block/TranslatableFieldsTest.php`.
