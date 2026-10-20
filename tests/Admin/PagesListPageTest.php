@@ -7,7 +7,10 @@ use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Enums\ErrorClass;
+use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Types\BasePageType;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -106,8 +109,29 @@ it('hides restore/delete-permanently/duplicate on active rows and view-on-site o
     // Active rows: deleted_at is empty → restore/forceDelete hidden, view-on-site shown.
     expect($actions['pageRestore']['meta']['hiddenIf'])->toBe(['op' => 'empty', 'field' => 'deleted_at'])
         ->and($actions['pageForceDelete']['meta']['hiddenIf'])->toBe(['op' => 'empty', 'field' => 'deleted_at'])
-        ->and($actions['pageView']['meta']['hiddenIf'])->toBe(['op' => 'notEmpty', 'field' => 'deleted_at'])
+        ->and($actions['pageView']['meta']['hiddenIf'])->toBe(['op' => 'any', 'conds' => [
+            ['op' => 'notEmpty', 'field' => 'deleted_at'],
+            ['op' => 'eq', 'field' => 'path', 'value' => null],
+        ]])
         ->and($actions['pageDuplicate']['meta']['hiddenIf'])->toBe(['op' => 'notEmpty', 'field' => 'deleted_at']);
+});
+
+it('hides view-on-site for an error page, which has no path, but not for a page at the root path', function (): void {
+    Page::factory()->create(['is_system' => true, 'error_class' => ErrorClass::ClientError, 'status' => PageStatus::Draft, 'name' => ['en' => 'Not found']]);
+    $about = Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+    PageSlug::query()->where('page_id', $about->id)->update(['path' => '']);
+
+    $rows = collect($this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data'))->keyBy('name');
+    $hiddenIf = array_column(pagesTableNode()['options']['rowActions'], null, 'name')['pageView']['meta']['hiddenIf'];
+
+    // Evaluates the any(...) the way the client does for these two ops ('' and null differ under eq).
+    $hidden = static fn (array $row): bool => collect($hiddenIf['conds'])->contains(static fn (array $c): bool => match ($c['op']) {
+        'notEmpty' => ! in_array($row[$c['field']] ?? null, [null, ''], true),
+        'eq' => array_key_exists($c['field'], $row) && $row[$c['field']] === $c['value'],
+    });
+
+    expect($hidden($rows['Not found']))->toBeTrue()
+        ->and($hidden($rows['About']))->toBeFalse();
 });
 
 it('links each row to its dedicated edit page', function (): void {
