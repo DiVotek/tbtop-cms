@@ -111,7 +111,7 @@ class Page extends Model
     /**
      * Transient marker set by PageRevisionWriter::restore() immediately
      * before save() (and cleared by it in a finally), read by the
-     * PageRevisions observer's saved() hook to label the resulting snapshot
+     * PageRevisions observer to label the resulting snapshot
      * kind='restore' instead of 'save'. Lives on the model instance rather
      * than on the writer service:
      * the writer has no container binding forcing it to be shared, so the

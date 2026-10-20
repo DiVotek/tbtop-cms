@@ -335,3 +335,13 @@ it('drops a locale added after the revision when restoring it', function (): voi
     expect($fresh->getTranslations('name'))->toBe(['en' => 'Old'])
         ->and($fresh->getTranslations('title'))->toBe(['en' => 'Old title']);
 });
+
+it('records a later save of a just-created instance as a save, not a second create', function (): void {
+    $page = Page::create(['type' => 'page', 'name' => ['en' => 'First']]);
+
+    $page->setTranslation('name', 'en', 'Second');
+    $page->save();
+
+    expect(PageRevision::query()->where('page_id', $page->id)->orderBy('id')->pluck('kind')->all())
+        ->toBe(['create', 'save']);
+});
