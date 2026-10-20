@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Page\Refs\PageRefList;
+use Tbtop\Cms\Support\BlankValue;
 
 /**
  * Resolves block input by the form's field kinds, so a block without its own
@@ -106,7 +107,8 @@ final class FormResolver
             ],
             $kind === 'richtext' => [
                 'type' => 'string|null',
-                'resolve' => static fn (mixed $v, ResolveContext $ctx): ?string => self::blankToNull($ctx->richtextHtml($v)),
+                // An emptied editor saves one empty paragraph, which would render as "<p></p>".
+                'resolve' => static fn (mixed $v, ResolveContext $ctx): ?string => BlankValue::is($v) ? null : self::blankToNull($ctx->richtextHtml($v)),
             ],
             $kind === 'media' && $isMultiple => [
                 'type' => 'list<string>',

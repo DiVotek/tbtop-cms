@@ -153,3 +153,11 @@ it('resolves the array-valued field kinds instead of dropping them to null', fun
         'sections' => [['heading' => 'Intro', 'rows' => [['cell' => 'A', 'span' => 2]]]],
     ]);
 });
+
+it('resolves an emptied richtext document to null', function (): void {
+    $emptied = ['root' => ['children' => [['type' => 'paragraph', 'children' => []]]]];
+
+    $props = (new EveryKindBlock)->resolve(['body' => $emptied], everyKindContext());
+
+    expect($props['body'])->toBeNull();
+});
