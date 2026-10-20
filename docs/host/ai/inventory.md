@@ -77,7 +77,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:page-refs:rebuild` | (none) | Recompute `tbtop_page_refs` from every page's (trashed included) type fields of kind `pages` | No |
 | `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists, and `pages.generated.ts` (the `page` prop per page type and subtype, pages.md "Page prop types") unless `pages.types_path` is `false`; `--check` compares every file it would write | No |
 
-All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
+All nine registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
 Two more schedule entries exist but are not Artisan commands owned by this package:
 - `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `ScheduleWiring::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
@@ -257,6 +257,7 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s are the identity `sameAs` (the only source) |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
+| `seo.title_suffix` | none — legacy, still mapped by `SeoSettingsPage` with no field; a stored value keeps working | no | yes |
 | `seo.description_template` | `SeoSettingsPage` | no | yes |
 | `seo.default_description` | `SeoSettingsPage` | no | yes |
 | `seo.default_og_image` | `SeoSettingsPage` | no | yes (media URL) |
@@ -267,8 +268,8 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.verification.google` | `SeoSettingsPage` | no | yes |
 | `seo.verification.bing` | `SeoSettingsPage` | no | yes |
 | `seo.identity.type` | `SeoSettingsPage` | no | yes |
-| `seo.identity.name` | `SeoSettingsPage` | no | yes |
-| `seo.identity.logo` | `SeoSettingsPage` | no | yes (media URL) |
+| `seo.identity.name` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.name` | no | yes |
+| `seo.identity.logo` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.logo` | no | yes (media URL) |
 | `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |

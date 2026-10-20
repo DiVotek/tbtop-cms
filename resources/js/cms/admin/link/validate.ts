@@ -3,10 +3,10 @@ import type { LinkValue } from "./types";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Mirrors PHONE_PATTERN in src/Link/LinkShapeValidator.php; the 6-20 digit count is checked below. */
+/** Mirrors PHONE_PATTERN in src/Link/LinkTarget.php; the 6-20 digit count is checked below. */
 const PHONE_SHAPE = /^\+?[0-9 ()-]{5,40}$/;
 
-/** Bare fragment, no leading `#`. Mirrors ANCHOR_PATTERN in src/Link/LinkShapeValidator.php. */
+/** Bare fragment, no leading `#`. Mirrors ANCHOR_PATTERN in src/Link/LinkTarget.php. */
 const ANCHOR = /^[A-Za-z0-9_-]+$/;
 
 /** Mirrors LABEL_MAX in src/Link/LinkShapeValidator.php. */
@@ -25,8 +25,10 @@ export function linkError(link: LinkValue): LinkErrorKey | null {
 
 	if (link.type === "page") {
 		// An unpicked page is not yet wrong, the same as an empty value below;
-		// `required` is the server's to enforce. A typed anchor still is.
-		return link.anchor !== null && !ANCHOR.test(link.anchor) ? "anchor" : null;
+		// `required` is the server's to enforce. A typed anchor still is,
+		// trimmed first like LinkValue::parse() does, so padding is not an error.
+		const anchor = link.anchor?.trim() ?? "";
+		return anchor !== "" && !ANCHOR.test(anchor) ? "anchor" : null;
 	}
 
 	const value = link.value?.trim() ?? "";
