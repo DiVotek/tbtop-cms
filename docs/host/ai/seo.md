@@ -659,10 +659,14 @@ throws `NotFoundHttpException` like any other route, so it goes through this
 same registration and obeys every gate above — `errors.handle = false` leaves
 the CMS's own not-found handling to stock Laravel too.
 
-**Maintenance mode**: a `503` served by Laravel's maintenance screen (`php
-artisan down`) happens before the framework boots the request pipeline —
-this package's exception handler registration is never reached, so a
-maintenance page is unaffected by any of the above.
+**Maintenance mode**: a plain `php artisan down` is enforced by Laravel's
+`PreventRequestsDuringMaintenance` middleware, which throws a `503`
+`HttpException` through the exception handler — so, with `503` in
+`tbtop-cms.errors.statuses` (the default) and `app.debug` off, frontend
+requests get the seeded 5xx error page above. Only `--render=<view>`
+(answered from `public/index.php` before the framework boots) and
+`--redirect` (a redirect, not an exception) bypass this package. To keep Laravel's own maintenance
+screen without `--render`, drop `503` from `tbtop-cms.errors.statuses`.
 
 ## Redirects, briefly
 
