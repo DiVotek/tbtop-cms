@@ -223,3 +223,14 @@ it('labels an external link with its stored label', function (): void {
     expect(linkCtx()->link($value))
         ->toBe(['href' => 'https://example.com', 'type' => 'external', 'label' => 'Our shop']);
 });
+
+it('falls back to the page name in the CMS default language before any other', function (): void {
+    Language::query()->where('locale', 'uk')->firstOrFail()->update(['is_default' => true]);
+    Language::factory()->create(['locale' => 'de']);
+    $page = Page::factory()->create([
+        'name' => ['en' => 'Contact', 'uk' => 'Контакти'],
+        'status' => PageStatus::Published,
+    ]);
+
+    expect(linkCtx('de')->link(['type' => 'page', 'page' => (string) $page->id])['label'] ?? null)->toBe('Контакти');
+});

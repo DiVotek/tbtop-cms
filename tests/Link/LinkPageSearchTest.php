@@ -158,3 +158,16 @@ it('returns the name map when resolving a stored id', function (): void {
 
     expect($option['names'])->toBe(['en' => 'About', 'uk' => 'Про нас']);
 });
+
+it('searches and labels pages by the CMS default language when it is not English', function (): void {
+    Language::query()->where('locale', 'uk')->firstOrFail()->update(['is_default' => true]);
+    Page::factory()->create(['name' => ['uk' => 'Контакти', 'en' => 'Contacts']]);
+    Page::factory()->create(['name' => ['uk' => 'Про нас']]);
+
+    test()->actingAs(pageSearchAdmin(), 'web');
+    $found = test()->postJson('/admin/link/page-search', ['search' => 'конт']);
+    $listed = test()->postJson('/admin/link/page-search', ['search' => '']);
+
+    expect(array_column($found->json('options'), 'label'))->toBe(['Контакти'])
+        ->and(array_column($listed->json('options'), 'label'))->toBe(['Контакти', 'Про нас']);
+});
