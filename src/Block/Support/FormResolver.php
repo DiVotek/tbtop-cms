@@ -181,12 +181,22 @@ final class FormResolver
                 continue;
             }
             $resolved = $this->resolve($fields, $row, $ctx);
-            if (array_filter($resolved, static fn (mixed $v): bool => $v !== null && $v !== [] && $v !== false) !== []) {
+            if (! array_all($resolved, self::isEmpty(...))) {
                 $rows[] = $resolved;
             }
         }
 
         return $rows;
+    }
+
+    /** A resolved value a blank row holds: a daterange resolves to all-null keys, not null. */
+    private static function isEmpty(mixed $value): bool
+    {
+        if (is_array($value) && $value !== []) {
+            return ! array_is_list($value) && array_all($value, static fn (mixed $v): bool => $v === null);
+        }
+
+        return $value === null || $value === [] || $value === false;
     }
 
     private static function blankToNull(string $value): ?string

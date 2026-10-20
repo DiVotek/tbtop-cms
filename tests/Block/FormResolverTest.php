@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Media\Models\Media;
+use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\Support\FormResolver;
 use Tbtop\Cms\Language\Models\Language;
@@ -160,4 +162,35 @@ it('resolves an emptied richtext document to null', function (): void {
     $props = (new EveryKindBlock)->resolve(['body' => $emptied], everyKindContext());
 
     expect($props['body'])->toBeNull();
+});
+
+it('drops a repeater row whose only filled-looking value is an empty date range', function (): void {
+    $block = new class extends Block
+    {
+        public function kind(): string
+        {
+            return 'Schedule';
+        }
+
+        /** @return list<Node> */
+        public function form(S $s): array
+        {
+            return [
+                $s->repeater('slots')->fields([
+                    $s->text('label'),
+                    $s->daterange('period'),
+                ]),
+            ];
+        }
+    };
+
+    $props = $block->resolve(['slots' => [
+        ['label' => 'Spring', 'period' => ['from' => '2026-03-01', 'to' => '']],
+        ['label' => '', 'period' => ['from' => '', 'to' => '']],
+        ['label' => ''],
+    ]], everyKindContext());
+
+    expect($props['slots'])->toBe([
+        ['label' => 'Spring', 'period' => ['from' => '2026-03-01', 'to' => null]],
+    ]);
 });
