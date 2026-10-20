@@ -104,35 +104,13 @@ export const gigPage = z.object({
 });
 export type GigPage = z.infer<typeof gigPage>;
 
-export const shadowingFields = z.object({
-    venue: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        url: z.string(),
-    })),
-    capacity: z.number().nullable(),
-    lineup: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        url: z.string(),
-    })),
-});
-export type ShadowingFields = z.infer<typeof shadowingFields>;
-
-export const shadowingPage = z.object({
-    ...pageCommon,
-    type: z.literal("event"),
-    subtype: z.literal("shadowing"),
-    fields: shadowingFields,
-});
-export type ShadowingPage = z.infer<typeof shadowingPage>;
-
 export const specialistFields = z.object({
     services: z.array(z.object({
         id: z.string(),
         name: z.string(),
         url: z.string(),
     })),
+    bio: z.string().nullable(),
 });
 export type SpecialistFields = z.infer<typeof specialistFields>;
 
@@ -150,6 +128,10 @@ export const legalServiceFields = z.object({
         name: z.string(),
         url: z.string(),
     })),
+    specialistCards: z.array(z.object({
+        name: z.string(),
+        bio: z.string().nullable(),
+    })),
 });
 export type LegalServiceFields = z.infer<typeof legalServiceFields>;
 
@@ -161,7 +143,7 @@ export const legalServicePage = z.object({
 });
 export type LegalServicePage = z.infer<typeof legalServicePage>;
 
-export const cmsPage = z.union([pagePage, categoryPage, articlePage, eventPage, concertPage, festivalPage, gigPage, shadowingPage, specialistPage, legalServicePage]);
+export const cmsPage = z.union([pagePage, categoryPage, articlePage, eventPage, concertPage, festivalPage, gigPage, specialistPage, legalServicePage]);
 export type CmsPage = z.infer<typeof cmsPage>;
 
 export const pageProps = {
@@ -172,7 +154,6 @@ export const pageProps = {
     concert: concertPage,
     festival: festivalPage,
     gig: gigPage,
-    shadowing: shadowingPage,
     specialist: specialistPage,
     legal_service: legalServicePage,
 } as const;

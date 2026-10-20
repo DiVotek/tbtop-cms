@@ -21,6 +21,8 @@ use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageUrl;
+use Tbtop\Cms\Page\Refs\PageRefIndex;
+use Tbtop\Cms\Page\Refs\PageRefList;
 
 class Cms
 {
@@ -30,6 +32,8 @@ class Cms
         private readonly Breadcrumbs $crumbs,
         private readonly ErrorResponse $errors,
         private readonly Forms $forms,
+        private readonly PageRefIndex $refs,
+        private readonly PageRefList $refList,
     ) {}
 
     /**
@@ -86,6 +90,35 @@ class Cms
     public function breadcrumbs(Page $page, ?string $locale = null): array
     {
         return $this->crumbs->forPage($page, $locale ?? (string) app()->getLocale());
+    }
+
+    /**
+     * The live pages whose page-type `pages` field `$field` picks `$page`,
+     * optionally only those whose type or subtype is `$from`; by sort_order,
+     * then name. Empty for a null page, so `$ctx->page` passes as is.
+     *
+     * @return list<Page>
+     */
+    public function referencedBy(?Page $page, string $field, ?string $from = null, ?string $locale = null): array
+    {
+        if ($page === null) {
+            return [];
+        }
+
+        return $this->refs->sources($page, $field, $from, $locale ?? (string) app()->getLocale());
+    }
+
+    /**
+     * referencedBy() as the `{id, name, url}` list a `pages` field resolves
+     * to; a page with no name or no slug in the locale is left out.
+     *
+     * @return list<array{id: string, name: string, url: string}>
+     */
+    public function referencedByLinks(?Page $page, string $field, ?string $from = null, ?string $locale = null): array
+    {
+        $locale ??= (string) app()->getLocale();
+
+        return $this->refList->items($this->referencedBy($page, $field, $from, $locale), $locale);
     }
 
     /** Every HasForm block by name, e.g. `forms()->props('ServiceForm', $page)` for a template-rendered form. */

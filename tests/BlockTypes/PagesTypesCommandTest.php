@@ -7,7 +7,6 @@ use Tbtop\Cms\Tests\Fixtures\ConcertPageType;
 use Tbtop\Cms\Tests\Fixtures\EventPageType;
 use Tbtop\Cms\Tests\Fixtures\GigPageType;
 use Tbtop\Cms\Tests\Fixtures\OrphanSubtypePageType;
-use Tbtop\Cms\Tests\Fixtures\ShadowingSubtypePageType;
 
 beforeEach(function (): void {
     $this->dir = sys_get_temp_dir() . '/tbtop-cms-pages-types-test-' . uniqid();
@@ -15,7 +14,7 @@ beforeEach(function (): void {
     $this->blocksPath = $this->dir . '/blocks.generated.ts';
     $this->pagesPath = $this->dir . '/pages.generated.ts';
     config()->set('tbtop-cms.blocks.types', []);
-    PageTypeRegistry::extend(fn (): array => [EventPageType::class, ConcertPageType::class, GigPageType::class, ShadowingSubtypePageType::class]);
+    PageTypeRegistry::extend(fn (): array => [EventPageType::class, ConcertPageType::class, GigPageType::class]);
 });
 
 afterEach(function (): void {
@@ -35,9 +34,7 @@ it('writes a page variant per type and subtype next to the blocks file', functio
         // A subtype with a typed resolveFields(): the base's fields, then its @return keys; the base's type literal.
         ->toContain("export const gigFields = z.object({\n    venue: z.string().nullable(),\n    capacity: z.number().nullable(),\n    band: z.string().nullable(),\n    soldOut: z.boolean(),\n});")
         ->toContain("    type: z.literal(\"event\"),\n    subtype: z.literal(\"gig\"),\n    fields: gigFields,")
-        // A back-reference replaces the base field of the same name.
-        ->toContain("export const shadowingFields = z.object({\n    venue: z.array(z.object({\n        id: z.string(),\n        name: z.string(),\n        url: z.string(),\n    })),\n    capacity: z.number().nullable(),\n    lineup: z.array(")
-        ->toContain('export const cmsPage = z.union([pagePage, categoryPage, articlePage, eventPage, concertPage, gigPage, shadowingPage]);')
+        ->toContain('export const cmsPage = z.union([pagePage, categoryPage, articlePage, eventPage, concertPage, gigPage]);')
         ->toContain('    concert: concertPage,');
 });
 

@@ -13,6 +13,8 @@ use Tbtop\Cms\Cms as CmsManager;
  * @method static string url(\Tbtop\Cms\Page\Models\Page $page, ?string $locale = null)
  * @method static list<array{label: string, path: string, url: string}> breadcrumbs(\Tbtop\Cms\Page\Models\Page $page, ?string $locale = null)
  * @method static \Tbtop\Cms\Form\Forms forms()
+ * @method static list<\Tbtop\Cms\Page\Models\Page> referencedBy(\Tbtop\Cms\Page\Models\Page|null $page, string $field, ?string $from = null, ?string $locale = null)
+ * @method static list<array{id: string, name: string, url: string}> referencedByLinks(\Tbtop\Cms\Page\Models\Page|null $page, string $field, ?string $from = null, ?string $locale = null)
  *
  * @see CmsManager
  */

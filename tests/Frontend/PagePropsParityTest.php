@@ -16,7 +16,6 @@ use Tbtop\Cms\Tests\Fixtures\EventPageType;
 use Tbtop\Cms\Tests\Fixtures\FestivalPageType;
 use Tbtop\Cms\Tests\Fixtures\GigPageType;
 use Tbtop\Cms\Tests\Fixtures\LegalServicePageType;
-use Tbtop\Cms\Tests\Fixtures\ShadowingSubtypePageType;
 use Tbtop\Cms\Tests\Fixtures\SpecialistPageType;
 
 /*
@@ -40,7 +39,7 @@ beforeEach(function (): void {
     // The same types bin/generate-block-types.php writes resources/js/cms/testing/pages.generated.ts from.
     config()->set('tbtop-cms.pages.types', [
         EventPageType::class, ConcertPageType::class, FestivalPageType::class, GigPageType::class,
-        ShadowingSubtypePageType::class, SpecialistPageType::class, LegalServicePageType::class,
+        SpecialistPageType::class, LegalServicePageType::class,
     ]);
     Storage::fake('public');
     Language::factory()->default()->create(['locale' => 'en']);
@@ -93,9 +92,8 @@ function pageParityCases(): array
             'full' => $event(50, 'Full gig', 'gig', ['venue' => ['en' => 'Pub'], 'capacity' => '40', 'band' => 'Pulp']),
             'empty' => $event(51, 'Empty gig', 'gig'),
         ],
-        'shadowing' => ['empty' => $event(60, 'Shadowing', 'shadowing', ['venue' => ['en' => 'Shadowed']])],
         'specialist' => [
-            'full' => $article(70, 'Anna', 'specialist', ['services' => ['80']]),
+            'full' => $article(70, 'Anna', 'specialist', ['services' => ['80'], 'bio' => 'Family law']),
             'empty' => $article(71, 'Bob', 'specialist'),
         ],
         'legal_service' => [

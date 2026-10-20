@@ -63,7 +63,7 @@ re-implements a frontend read path — `PageResolver` already applies it.
 
 `PageTypeInterface` (`src/Page/Contracts/PageTypeInterface.php`): `key()`,
 `label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, `base()`,
-`fields()`, `resolveFields()`, `backReferences()`, `childSubtype()` (see
+`fields()`, `resolveFields()`, `childSubtype()` (see
 Subtypes and type fields and Page references), plus the source-backed trio
 below. `BasePageType` (`src/Page/Types/BasePageType.php`)
 gives every method a content-only, leaf-type default (`allowedChildren()`
@@ -523,8 +523,8 @@ final class ConcertType extends BasePageType
 
 ## Page references
 
-A `pages` field picks several pages; a page type can list, in turn, the
-pages that pick it.
+A `pages` field picks several pages; a page type can read, in turn, the
+pages that pick it with `Cms::referencedBy()` inside its `resolveFields()`.
 
 ```php
 // SpecialistType — base 'article'
@@ -534,9 +534,13 @@ public function fields(S $s): array
 }
 
 // LegalServiceType — base 'article'
-public function backReferences(): array
+/** @return array{specialists: list<array{id: string, name: string, url: string}>} */
+public function resolveFields(array $input, ResolveContext $ctx): array
 {
-    return ['specialists' => ['field' => 'services', 'from' => 'specialist']];
+    return [
+        ...parent::resolveFields($input, $ctx),
+        'specialists' => Cms::referencedByLinks($ctx->page, 'services', 'specialist'),
+    ];
 }
 ```
 
@@ -559,19 +563,19 @@ public function backReferences(): array
   default/first filled locale; a page with no slug in that locale, or no
   name in any locale, is left out). Unknown, trashed and unpublished ids drop out
   silently. Works in a type's `fields()` and in a block's `form()` alike.
-- **Reverse lists.** `backReferences(): array<string, array{field: string,
-  from?: string}>` (empty from `BasePageType`) adds a key to `page.fields`
-  per entry: the live pages whose type field `field` holds this page, by
-  `sort_order` then name, as the same `{id, name, url}` list. `from`
-  narrows to sources whose `type` or `subtype` is that key. A subtype's
-  entries merge over its base's. A throw is logged
-  (`page.back_references_resolve_failed`) and the lists drop out. The lists
-  are added after the type fields, so a key named like a field (the base's
-  or the subtype's) replaces that field's value in `page.fields`;
-  `cms:doctor` warns about each such name under `page_field_collisions`
-  (declared `fields()` names only, not keys a `resolveFields()` override
-  computes).
-- **Index.** The lists read `tbtop_page_refs` (`page_id`, `field`,
+- **Reverse lookup.** `Cms::referencedBy(?Page $page, string $field,
+  ?string $from = null, ?string $locale = null): list<Page>` returns the
+  live pages whose type field `$field` holds `$page`, by `sort_order` then
+  name; `$from` narrows to sources whose `type` or `subtype` is that key. A
+  null page gives `[]`, so `$ctx->page` passes as is.
+  `Cms::referencedByLinks()` takes the same arguments and returns the same
+  `{id, name, url}` list a `pages` field resolves to. The type calls either
+  from its own `resolveFields()` and picks the key, so nothing else writes
+  into `page.fields`. For more per entry (a photo, a position), map the
+  `Page` models from `referencedBy()`. Type the key in the override's
+  `@return array{...}` (see Page prop types) — the base's keys stay typed
+  from its form.
+- **Index.** The lookup reads `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
   for a page on every save; a force delete cascades. Only a page type's
   `fields()` are indexed. A page whose types change at deploy time (a
@@ -580,9 +584,9 @@ public function backReferences(): array
   deploy, or after importing pages with a raw query. `cms:install` runs it
   too.
 - **Gotchas.** A draft can be picked but never appears on the site until it
-  is live, on either side of the reference. A reverse list covers page-type
-  fields only: a `pages` field inside a block is resolved forward but is
-  invisible to `backReferences()`.
+  is live, on either side of the reference. The reverse lookup covers
+  page-type fields only: a `pages` field inside a block is resolved forward
+  but is invisible to `Cms::referencedBy()`.
 
 ## Page prop types
 
@@ -606,8 +610,7 @@ function ConcertHeader({ page }: { page: PageOf<"concert"> }) { /* … */ }
   `PageOf<K>` keyed by type or subtype key. A base type's variant has
   `subtype: null`; a subtype's has its base's `type` literal.
 - **Fields.** Built like the resolver: the base's part, the subtype's over
-  it (a subtype key wins), then both types' `backReferences()` keys as
-  `{id, name, url}` lists. A part keeping the base `resolveFields()` is typed
+  it (a subtype key wins). A part keeping the base `resolveFields()` is typed
   from its `fields()` (same rules as a form-driven block); an override is
   typed from its `@return array{...}`. An override without one prints a
   warning and makes the variant's `fields` a `z.looseObject`: the other

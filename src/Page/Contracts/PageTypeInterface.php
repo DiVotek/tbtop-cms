@@ -88,17 +88,6 @@ interface PageTypeInterface
     public function resolveFields(array $input, ResolveContext $ctx): array;
 
     /**
-     * Reverse lists added to `page.fields`: key => the pages-kind field on
-     * other pages' types that points here (`field`), optionally only from
-     * pages whose type or subtype key is `from`. Each resolves to the live
-     * referencing pages as `list<{id, name, url}>`, by sort_order then name.
-     * A subtype's declarations merge over its base type's.
-     *
-     * @return array<string, array{field: string, from?: string}>
-     */
-    public function backReferences(): array;
-
-    /**
      * The subtype a new article under a page of this type gets when none is
      * picked (a "Services" category's children are services). Read from the
      * parent's subtype first, then its base; only a subtype of the article

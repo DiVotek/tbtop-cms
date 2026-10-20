@@ -73,12 +73,6 @@ abstract class BasePageType implements PageTypeInterface
         return [];
     }
 
-    /** @return array<string, array{field: string, from?: string}> */
-    public function backReferences(): array
-    {
-        return [];
-    }
-
     /**
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
