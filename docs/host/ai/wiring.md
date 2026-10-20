@@ -336,12 +336,14 @@ response:
 | `cms.layout` | `array<string, list<ResolvedBlock>>` | Resolved `header`/`footer` block lists — cached across requests per locale under the content version (`CmsCache::remember('layout:{locale}', ...)`) at this call site, not inside `LayoutResolver`, so the admin layout editor reads live data. A `HandlesFormSubmission` block gets `action` bound after the cache read, against the current page or the home page — see blocks.md#layout-blocks |
 
 **Page props** (`Tbtop\Cms\Frontend\Http\Controllers\PageController::props`)
-— the per-request Inertia props, in addition to `cms`:
+— the per-request Inertia props, in addition to `cms` (full per-field detail: inventory.md §4):
 
 | Field | Type | Meaning |
 |---|---|---|
-| `page.id`, `.type`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` already resolved to the request locale via `getTranslation()` |
+| `page.id`, `.type`, `.subtype`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` resolved via `PageTranslation::text()` — the request locale, else the default locale, else `null` |
+| `page.body` | `string` | The Body rendered to HTML, same locale fallback; `''` when empty |
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
+| `page.fields` | `object` | The page type's resolved type fields, keyed by field name; `{}` when none |
 | `render` | `Spec` (json-render, `{root, elements}`) | The assembled page spec — resolved block content passed through `PageSpecAssembler`; a row that cannot render is not in it (see blocks.md#problem-blocks); see blocks.md for the block/envelope/resolved-block vocabulary |
 | `seo` | `object` | Full SEO tag set (title, description, canonical, OG/Twitter, hreflang alternates, JSON-LD, `noindex`) — see seo.md for field-by-field detail; `CmsHead.tsx`'s `<Head>` and `head.blade.php` both render this same payload |
 | `breadcrumbs` | `list<{label, path, url}>` | From `Breadcrumbs::forPage()` — home › ancestors › the page itself, a non-live ancestor or home left out; `[]` on the home page, on error pages and when fewer than two crumbs remain. Render every crumb but the last as a link |
