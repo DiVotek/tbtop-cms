@@ -15,6 +15,7 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Types\BasePageType;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\SectionType;
+use Tbtop\Cms\Tests\Fixtures\SourcedType;
 
 uses(RefreshDatabase::class);
 
@@ -113,7 +114,10 @@ it('hides restore/delete-permanently/duplicate on active rows and view-on-site o
             ['op' => 'notEmpty', 'field' => 'deleted_at'],
             ['op' => 'eq', 'field' => 'path', 'value' => null],
         ]])
-        ->and($actions['pageDuplicate']['meta']['hiddenIf'])->toBe(['op' => 'notEmpty', 'field' => 'deleted_at']);
+        ->and($actions['pageDuplicate']['meta']['hiddenIf'])->toBe(['op' => 'any', 'conds' => [
+            ['op' => 'notEmpty', 'field' => 'deleted_at'],
+            ['op' => 'truthy', 'field' => 'source_backed'],
+        ]]);
 });
 
 it('hides view-on-site for an error page, which has no path, but not for a page at the root path', function (): void {
@@ -673,4 +677,26 @@ it('labels the type column with the type label the tabs use', function (): void 
 
     expect($tabs['case_study'])->toBe('Case study')
         ->and($rows[0]['type'])->toBe('Case study');
+});
+
+it('flags source-backed rows so the duplicate action is hidden for them', function (): void {
+    config()->set('tbtop-cms.pages.types', [SourcedType::class]);
+    Page::create(['type' => 'sourced', 'source_id' => 'thing-1', 'status' => 'published', 'name' => ['en' => 'Thing']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+
+    $rows = collect($this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data'))->keyBy('name');
+
+    expect((bool) $rows['Thing']['source_backed'])->toBeTrue()
+        ->and((bool) ($rows['About']['source_backed'] ?? false))->toBeFalse();
+});
+
+it('reports an error instead of duplicating a source-backed page via the row action', function (): void {
+    config()->set('tbtop-cms.pages.types', [SourcedType::class]);
+    $page = Page::create(['type' => 'sourced', 'source_id' => 'thing-1', 'status' => 'published', 'name' => ['en' => 'Thing']]);
+
+    $response = $this->postJson('/admin/pages/actions/pageDuplicate', ['payload' => ['row' => ['id' => $page->id]]]);
+
+    $response->assertOk();
+    expect(Page::query()->count())->toBe(1)
+        ->and(collect($response->json('effects'))->firstWhere('kind', 'notify')['level'] ?? null)->toBe('error');
 });

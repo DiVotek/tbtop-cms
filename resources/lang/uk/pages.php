@@ -22,6 +22,7 @@ return [
         'updated_by' => 'Оновив(-ла)',
         'deleted_at' => 'Видалено',
         'path' => 'Шлях',
+        'source_backed' => 'З джерела',
     ],
     'status' => [
         'published' => 'Опубліковано',

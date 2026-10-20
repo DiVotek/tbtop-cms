@@ -22,6 +22,7 @@ return [
         'updated_by' => 'Updated by',
         'deleted_at' => 'Deleted',
         'path' => 'Path',
+        'source_backed' => 'Source-backed',
     ],
     'status' => [
         'published' => 'Published',

@@ -11,6 +11,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageRevision;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\Support\PageDuplicator;
+use Tbtop\Cms\Tests\Fixtures\SourcedType;
 
 uses(RefreshDatabase::class);
 
@@ -157,4 +158,13 @@ it('starts the copy at the default lock_version rather than the source\'s', func
     $copy = (new PageDuplicator)->duplicate($source->fresh());
 
     expect($copy->fresh()->lock_version)->toBe(0);
+});
+
+it('refuses to duplicate a page of a source-backed type', function (): void {
+    config()->set('tbtop-cms.pages.types', [SourcedType::class]);
+    $source = Page::create(['type' => 'sourced', 'source_id' => 'thing-1', 'name' => ['en' => 'Thing']]);
+
+    expect(fn () => (new PageDuplicator)->duplicate($source))
+        ->toThrow(DomainException::class, 'Pages of type sourced are created by their source, not by hand.')
+        ->and(Page::query()->count())->toBe(1);
 });
