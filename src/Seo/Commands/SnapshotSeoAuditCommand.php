@@ -23,7 +23,7 @@ class SnapshotSeoAuditCommand extends Command
     public function handle(SeoAuditSnapshotWriter $writer): int
     {
         $issues = app(SeoAudit::class)->run();
-        $pagesScanned = Page::query()->live()->count();
+        $pagesScanned = Page::query()->live()->whereNull('error_class')->count();
 
         $snapshot = $writer->write($issues, $pagesScanned);
 

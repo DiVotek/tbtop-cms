@@ -475,7 +475,8 @@ to extending `Block`:
   Telegram) — see [./notifications.md](./notifications.md#submission-lifecycle)
   for that pipeline. `handleSubmit()` runs after `SubmissionReceived` has
   fired. A thrown exception here is logged (`form.submit.failed`), the
-  visitor is sent back with a `form` error, and a stored `FormSubmission`
+  visitor is sent back with a `form` error (lang key
+  `tbtop-cms::forms.submit_failed`, in the submit's locale), and a stored `FormSubmission`
   is set to `Failed` with the exception message (`handled_at` stays null);
   see `FormSubmitController::__invoke()`. The throw also **skips** the
   bell/mail/telegram fan-out: the row is no longer `Pending` by the time the

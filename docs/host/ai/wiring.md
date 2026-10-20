@@ -333,7 +333,7 @@ response:
 | `cms.defaultLocale` | `string` | Configured default content locale (`Languages::defaultLocale()`) |
 | `cms.languages` | `list<{locale, name, is_default}>` | Active frontend languages (`Languages::frontendActive()`) |
 | `cms.debug` | `bool` | `config('app.debug')` — with `isPreview`, what `CmsRenderer`'s `showErrors` is wired to: a developer `console.error` line for a block the client could not draw, nothing on the page |
-| `cms.layout` | `array<string, list<ResolvedBlock>>` | Resolved `header`/`footer` block lists — cached across requests per locale under the content version (`CmsCache::remember('layout:{locale}', ...)`) at this call site, not inside `LayoutResolver`, so the admin layout editor reads live data. A `HandlesFormSubmission` block gets `action` bound after the cache read, against the current page or the home page — see blocks.md#layout-blocks |
+| `cms.layout` | `array<string, list<ResolvedBlock>>` | Resolved `header`/`footer` block lists — cached across requests per locale under the content version (`CmsCache::rememberLive('layout:{locale}', ...)`, TTL capped at the next page schedule transition) at this call site, not inside `LayoutResolver`, so the admin layout editor reads live data. A `HandlesFormSubmission` block gets `action` bound after the cache read, against the current page or the home page — see blocks.md#layout-blocks |
 
 **Page props** (`Tbtop\Cms\Frontend\Http\Controllers\PageController::props`)
 — the per-request Inertia props, in addition to `cms` (full per-field detail: inventory.md §4):

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Frontend\Breadcrumbs;
+use Tbtop\Cms\Frontend\Seo\SeoAudit;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
@@ -228,4 +229,23 @@ it('keeps the page own meta title above every template', function (): void {
     $this->get('/' . $article->pathFor('en'), ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.seo.title', 'Hand written — Blog');
+});
+
+it('applies subtype templates in the audit and checklist duplicate checks', function (): void {
+    // A subtype template that omits {title} makes every concert render the
+    // same <title>; the duplicate checks must render other pages with it too.
+    config(['tbtop-cms.pages.types' => [EventPageType::class, ConcertPageType::class]]);
+    app(Settings::class)->set(SeoTemplates::key('concert', 'title'), 'CONCERT');
+
+    Page::factory()->create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Published, 'name' => ['en' => 'Gig one'], 'title' => ['en' => '']]);
+    $page = Page::factory()->create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Published, 'name' => ['en' => 'Gig two'], 'title' => ['en' => '']]);
+
+    $duplicates = array_filter(
+        app(SeoAudit::class)->run(),
+        static fn (array $row): bool => $row['issue'] === __('tbtop-cms::seo_report.issues.duplicate_title.label'),
+    );
+    $checks = app(SeoChecklist::class)->for($page->fresh(), 'en');
+
+    expect($duplicates)->toHaveCount(2)
+        ->and(collect($checks)->firstWhere('key', 'duplicate_title')['status'])->toBe('warn');
 });

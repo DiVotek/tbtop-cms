@@ -246,7 +246,7 @@ class SeoChecklist
         if ($checkTitle || $checkDescription) {
             $others = Page::query()
                 ->whereKeyNot($page->getKey())
-                ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'seo', 'title', 'name', 'summary'])
+                ->select(['id', 'type', 'subtype', 'parent_id', 'status', 'published_at', 'unpublish_at', 'seo', 'title', 'name', 'summary'])
                 ->cursor();
 
             foreach ($others as $other) {

@@ -150,7 +150,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
 | `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, which only gates a developer `console.error` line for a block the client could not draw — the page looks the same either way |
-| `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::remember`; `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
+| `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::rememberLive` (TTL capped at the next page schedule transition, since layout page links resolve against the live scope); `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
 

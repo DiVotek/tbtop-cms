@@ -561,8 +561,10 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
   pass over the other pages rather than scanning twice.
 
 **`SeoAudit::run()`** — the site-wide report (`SeoReportPage`, admin nav
-group "content", gated behind the `tbtop-cms.redirects` ability). One query for every *live* page (`Page::query()->live()` — a scheduled or
-expired page is excluded), then plain PHP, deliberately never calling
+group "content", gated behind the `tbtop-cms.redirects` ability). One query for every *live* page except the error pages
+(`Page::query()->live()->whereNull('error_class')` — a scheduled or expired
+page is excluded, and so are the error pages, as in the sitemap; the
+pages-scanned count uses the same filter), then plain PHP, deliberately never calling
 `SeoResolver::resolve()` per page (would build alternates/JSON-LD/every OG
 field × pages × locales). Issues: `missing_title`/`missing_description`
 (fail), `missing_translation` (warn — no own `title`/`name` in a locale,

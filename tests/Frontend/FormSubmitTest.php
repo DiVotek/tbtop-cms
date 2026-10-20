@@ -131,6 +131,23 @@ it('persists a failed submission when the block handler throws', function (): vo
         ->and($submission->handled_at)->toBeNull();
 });
 
+it('reports a failed submission in the visitor\'s locale', function (): void {
+    config()->set('tbtop-cms.blocks.types', [ThrowingFormBlock::class]);
+    Language::factory()->create(['locale' => 'uk', 'is_frontend_active' => true]);
+
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Boom', 'uk' => 'Бум'],
+        'content' => [['id' => 'throw-1', 'kind' => 'Throwing', 'active' => true, 'data' => []]],
+    ]);
+
+    $this->post(submitUrl($page, 'throw-1'), ['value' => 'x'])
+        ->assertSessionHasErrors(['form' => 'Sorry, we could not process your submission. Please try again.']);
+
+    $this->post(submitUrl($page, 'throw-1', 'uk'), ['value' => 'x'])
+        ->assertSessionHasErrors(['form' => 'Вибачте, не вдалося обробити вашу заявку. Спробуйте ще раз.']);
+});
+
 it('does not persist a submission when forms.store is disabled', function (): void {
     config()->set('tbtop-cms.forms.store', false);
     $page = contactFormPage();
