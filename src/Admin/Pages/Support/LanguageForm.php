@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
@@ -46,6 +47,15 @@ class LanguageForm
 
     /** @param array<string, mixed> $form */
     public static function save(array $form, ?int $id = null): Language
+    {
+        // One transaction: re-picking a deleted locale restores the row before
+        // LanguageObserver's guards run on the following save(), and a rejected
+        // save must not leave that row restored.
+        return DB::transaction(static fn (): Language => self::persist($form, $id));
+    }
+
+    /** @param array<string, mixed> $form */
+    private static function persist(array $form, ?int $id): Language
     {
         $previousDefault = Language::query()->where('is_default', true)->first();
 
