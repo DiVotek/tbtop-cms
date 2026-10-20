@@ -552,8 +552,8 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
   locale) — presence of the keyword in the **rendered** title, rendered
   description, `heading`, and slug. `focus_keyword` itself warns when empty.
 - **duplicate_title / duplicate_description** — compares this page's rendered
-  title/description against every other page's rendered title/description
-  (via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
+  title/description against every other non-error page's rendered
+  title/description (drafts included; via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
   lazily only if the template uses `{parent}`) — `warn` on a collision,
   including collisions a template that omits `{title}`/`{description}` can
   create even between pages with distinct own values. Empty short-circuits

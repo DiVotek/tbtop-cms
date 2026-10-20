@@ -244,8 +244,11 @@ class SeoChecklist
         $descriptionDuplicate = false;
 
         if ($checkTitle || $checkDescription) {
+            // Error pages are resolved by error_class, never served at a URL,
+            // so their titles collide with nothing (same exclusion as SeoAudit).
             $others = Page::query()
                 ->whereKeyNot($page->getKey())
+                ->whereNull('error_class')
                 ->select(['id', 'type', 'subtype', 'parent_id', 'status', 'published_at', 'unpublish_at', 'seo', 'title', 'name', 'summary'])
                 ->cursor();
 

@@ -9,6 +9,7 @@ use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Frontend\Seo\SeoChecklist;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -198,6 +199,23 @@ it('warns when another page resolves to the same meta title', function (): void 
     $page = Page::factory()->create(['name' => ['en' => 'Mine'], 'seo' => ['title' => ['en' => 'Shared title']]]);
 
     expect(checkByKey(checklistFor($page), 'duplicate_title')['status'])->toBe('warn');
+});
+
+it('does not count an error page as a duplicate title or description', function (): void {
+    Page::factory()->create([
+        'name' => ['en' => 'Not found'],
+        'error_class' => ErrorClass::ClientError,
+        'seo' => ['title' => ['en' => 'Shared title'], 'description' => ['en' => 'Shared description']],
+    ]);
+    $page = Page::factory()->create([
+        'name' => ['en' => 'Mine'],
+        'seo' => ['title' => ['en' => 'Shared title'], 'description' => ['en' => 'Shared description']],
+    ]);
+
+    $checklist = checklistFor($page);
+
+    expect(checkByKey($checklist, 'duplicate_title')['status'])->toBe('pass')
+        ->and(checkByKey($checklist, 'duplicate_description')['status'])->toBe('pass');
 });
 
 it('does not warn about a duplicate title when every other page differs', function (): void {
