@@ -20,7 +20,7 @@ return [
     'detail' => ['summary' => 'Summary', 'before' => 'Before', 'after' => 'After', 'context' => 'Context', 'none' => 'No values.'],
     'types' => [
         'page' => 'Page', 'redirect' => 'Redirect', 'language' => 'Language',
-        'layout' => 'Layout', 'setting' => 'Setting', 'submission' => 'Form submission',
+        'layout' => 'Layout', 'shared_block' => 'Shared block', 'setting' => 'Setting', 'submission' => 'Form submission',
         'not_found' => '404 entry', 'user' => 'User',
     ],
     'events' => [
