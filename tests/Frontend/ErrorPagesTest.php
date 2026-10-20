@@ -319,3 +319,26 @@ it('falls back to the static Blade view when rendering the 5xx page itself throw
     expect($response->getStatusCode())->toBe(500)
         ->and($response->getContent())->toContain(__('tbtop-cms::errors.5xx.heading'));
 });
+
+it('marks the static Blade fallback with the request locale', function (): void {
+    config(['app.debug' => false]);
+    seedErrorPage(ErrorClass::ServerError);
+    app()->setLocale('uk');
+
+    $this->app->bind(BlockContentResolver::class, function (): BlockContentResolver {
+        return new class extends BlockContentResolver
+        {
+            public function __construct() {}
+
+            public function resolve(array $content, ?Page $page = null, ?object $source = null): array
+            {
+                throw new RuntimeException('resolver is down');
+            }
+        };
+    });
+
+    $content = (string) app(Cms::class)->errorResponse(request(), 500)->getContent();
+
+    expect($content)->toContain('<html lang="uk">')
+        ->and($content)->toContain(__('tbtop-cms::errors.5xx.heading', [], 'uk'));
+});
