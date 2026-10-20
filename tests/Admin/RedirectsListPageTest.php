@@ -173,3 +173,11 @@ it('deletes the record the row key names, not the id column', function (): void 
     expect(Redirect::find($target->id))->toBeNull()
         ->and(Redirect::find($other->id))->not->toBeNull();
 });
+
+it('shows a redirect to the home page as / in the To column', function (): void {
+    Redirect::query()->create(['from_path' => 'old-home', 'to_path' => '', 'status_code' => 301]);
+
+    $row = $this->getJson('/admin/redirects/tables/redirects')->assertOk()->json('data.data.0');
+
+    expect($row['to_path'])->toBe('/');
+});
