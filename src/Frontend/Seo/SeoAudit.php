@@ -279,7 +279,7 @@ final class SeoAudit
         return Page::query()
             ->live()
             ->whereNull('error_class')
-            ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'name', 'title', 'summary', 'seo', 'image', 'is_indexable'])
+            ->select(['id', 'type', 'subtype', 'parent_id', 'status', 'published_at', 'unpublish_at', 'name', 'title', 'summary', 'seo', 'image', 'is_indexable'])
             ->get();
     }
 
