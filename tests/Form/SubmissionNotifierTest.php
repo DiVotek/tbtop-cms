@@ -20,7 +20,9 @@ use Tbtop\Cms\Mail\SubmissionMail;
 use Tbtop\Cms\Notifications\Audience;
 use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
+use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\Models\NotificationLog;
+use Tbtop\Cms\Notifications\Models\NotificationTemplate;
 use Tbtop\Cms\Notifications\NotificationLogStatus;
 use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -259,6 +261,27 @@ it('mails every configured recipient when enabled', function (): void {
     // both — see SubmissionNotifierTest deviations in the cms-3 PR.
     Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('ops@example.test'));
     Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('sales@example.test'));
+});
+
+it('mails a subject with the submitted text unescaped', function (): void {
+    Mail::fake();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    NotificationTemplate::query()->create([
+        'type' => 'form.submission',
+        'format' => Format::Html,
+        'locale' => 'en',
+        'subject' => 'Lead: {{ $leadIdentity }}',
+        'body' => '<p>{{ $leadIdentity }}</p>',
+    ]);
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => "Ada O'Brien & Co", 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    // Blade escapes the subject section; a mail header is plain text.
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasSubject("Lead: Ada O'Brien & Co · ada@example.test"));
 });
 
 it('stays handled when a concurrent caller writes an unrelated failed log row', function (): void {

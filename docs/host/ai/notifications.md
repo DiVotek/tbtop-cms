@@ -94,7 +94,7 @@ Built with `TypeDefinition::make($key)` and its fluent setters, then handed to `
 
 ### `mail` (`Tbtop\Cms\Notifications\Channels\MailChannel`)
 
-Sends through `Tbtop\Cms\Mail\CmsMailer`, format `Html`. Settings keys (all under the flat `mail.*` namespace, shared with `NotificationSettingsPage`'s own fields — not the host's `config/mail.php`):
+Sends through `Tbtop\Cms\Mail\CmsMailer`, format `Html`; the subject header is the rendered `subject` section with HTML entities decoded (Blade escapes it like any echo). Settings keys (all under the flat `mail.*` namespace, shared with `NotificationSettingsPage`'s own fields — not the host's `config/mail.php`):
 
 | Key | Field |
 |---|---|
