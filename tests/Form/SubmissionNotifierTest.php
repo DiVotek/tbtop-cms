@@ -91,6 +91,22 @@ it('sends a bell notification to every admin on a new submission', function (): 
     }
 });
 
+it('writes the bell body as plain text', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => "Ada O'Brien", 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $data = $admin->notifications()->sole()->data;
+
+    // The short template is Telegram HTML; the bell client renders body as text.
+    expect($data['body'])->not->toContain('<b>')
+        ->and($data['body'])->not->toContain('&#039;')
+        ->and($data['body'])->toContain("Ada O'Brien");
+});
+
 it('does not notify a user with no admin profile row', function (): void {
     $stranger = AdminUser::create(['name' => 'Stranger', 'email' => 'stranger@example.test', 'password' => 'secret']);
     $page = notifierContactPage();

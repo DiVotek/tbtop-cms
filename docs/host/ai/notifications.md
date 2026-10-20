@@ -125,7 +125,7 @@ A `Recipient`'s chat id is carried in `$phone` — the only remaining generic ad
 
 ### `bell`
 
-Delivers into the admin header bell via Laravel's `database` channel through `tbtop/admin`'s `Notification` builder — same table (`notifications`, migrated by this package if the host doesn't already have one) the panel already reads. Format `Short`. `settings()` returns `[]` — the bell has no opt-out and no configurable settings.
+Delivers into the admin header bell via Laravel's `database` channel through `tbtop/admin`'s `Notification` builder — same table (`notifications`, migrated by this package if the host doesn't already have one) the panel already reads. Format `Short` (the same template Telegram reads as HTML): the bell strips tags and decodes entities from the rendered subject and body, since the panel renders them as plain text. `settings()` returns `[]` — the bell has no opt-out and no configurable settings.
 
 ## Templates
 
