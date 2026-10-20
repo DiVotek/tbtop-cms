@@ -21,10 +21,30 @@ final class LinkPageSearchController
     public function __invoke(Request $request): JsonResponse
     {
         if ($request->has('value')) {
-            return $this->resolveByValue((string) $request->input('value', ''));
+            $value = self::scalarInput($request, 'value');
+
+            return $value === null
+                ? response()->json(['option' => null])
+                : $this->resolveByValue($value);
         }
 
-        return $this->search((string) $request->input('search', ''));
+        $search = self::scalarInput($request, 'search');
+
+        return $search === null
+            ? response()->json(['options' => []])
+            : $this->search($search);
+    }
+
+    /** The input as a string, '' when absent, null when it is an array (nothing can match it). */
+    private static function scalarInput(Request $request, string $key): ?string
+    {
+        $raw = $request->input($key);
+
+        if ($raw === null) {
+            return '';
+        }
+
+        return is_scalar($raw) ? (string) $raw : null;
     }
 
     private function resolveByValue(string $value): JsonResponse
