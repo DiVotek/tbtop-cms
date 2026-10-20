@@ -231,3 +231,22 @@ it('rejects on save a reference to the page being edited', function (): void {
 
     expect($reviewer->refresh()->fields['services'] ?? null)->toBeNull();
 });
+
+it('lets a type build its own entries from the referencing pages, next to the plain links', function (): void {
+    $service = refsArticle('legal_service', 'Divorce');
+    refsArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id], 'bio' => 'Family law'], 'sort_order' => 1]);
+    refsArticle('specialist', 'Bob', ['fields' => ['services' => [(string) $service->id]], 'sort_order' => 2]);
+
+    $fields = refsFields($service);
+
+    expect(refsNames($fields['specialists']))->toBe(['Anna', 'Bob'])
+        ->and($fields['specialistCards'])->toBe([
+            ['name' => 'Anna', 'bio' => 'Family law'],
+            ['name' => 'Bob', 'bio' => null],
+        ]);
+});
+
+it('returns no referencing pages for a null page', function (): void {
+    expect(app(Cms::class)->referencedBy(null, 'services'))->toBe([])
+        ->and(app(Cms::class)->referencedByLinks(null, 'services'))->toBe([]);
+});

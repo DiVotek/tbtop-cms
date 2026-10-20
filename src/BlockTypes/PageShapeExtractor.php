@@ -25,14 +25,12 @@ use Tbtop\Cms\Page\Types\BasePageType;
 /**
  * Derives each registered page type's `page.fields` the way
  * BlockContentResolver builds them: the base type's part, the subtype's part
- * over it (same key: the subtype's), then both types' backReferences() keys.
+ * over it (same key: the subtype's).
  * A part comes from the form when the type keeps the base resolveFields(),
  * else from its own `@return array{...}` — like a block's resolve().
  */
 final class PageShapeExtractor
 {
-    private const string BACK_REFERENCE = 'z.array(z.object({ id: z.string(), name: z.string(), url: z.string() }))';
-
     private readonly Lexer $lexer;
 
     private readonly VendorPhpDocParser $parser;
@@ -91,18 +89,12 @@ final class PageShapeExtractor
         $fields = [];
         $isLoose = false;
         $usedAliases = [];
-        $backReferences = [];
 
         foreach ($types as $part) {
             $extracted = $this->parts[$part->key()] ??= $this->part($part);
             $fields = [...$fields, ...$extracted['fields']];
             $isLoose = $isLoose || $extracted['isLoose'];
             $usedAliases = [...$usedAliases, ...$extracted['usedAliases']];
-            $backReferences = [...$backReferences, ...$part->backReferences()];
-        }
-
-        foreach (array_keys($backReferences) as $name) {
-            $fields[$name] = self::BACK_REFERENCE;
         }
 
         return new PageShape($key, $type, $subtype, $fields, $isLoose, $usedAliases);

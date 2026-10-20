@@ -20,7 +20,7 @@ use Tbtop\Cms\Page\Support\PageNameSearch;
  * picked. On the wire it is a plain async `select`: the admin client already
  * renders it. The site gets `list<{id, name, url}>` of the live ones
  * (FormResolver); a page type's field also feeds the reverse index behind
- * PageTypeInterface::backReferences(). pages.md.
+ * Cms::referencedBy(). pages.md.
  *
  * Its closures are built in the constructor from the options, so
  * PrefixedField::rename(), which replays options into `$field::make()`, gets

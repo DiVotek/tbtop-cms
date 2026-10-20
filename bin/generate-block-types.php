@@ -19,7 +19,6 @@ use Tbtop\Cms\Tests\Fixtures\FormResolver\ArrayShapesBlock;
 use Tbtop\Cms\Tests\Fixtures\FormResolver\EveryKindBlock;
 use Tbtop\Cms\Tests\Fixtures\GigPageType;
 use Tbtop\Cms\Tests\Fixtures\LegalServicePageType;
-use Tbtop\Cms\Tests\Fixtures\ShadowingSubtypePageType;
 use Tbtop\Cms\Tests\Fixtures\SpecialistPageType;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -32,7 +31,7 @@ $passes = [
     __DIR__ . '/../resources/js/cms/blocks.generated.ts' => [[HeroBlock::class, ContactForm::class], []],
     __DIR__ . '/../resources/js/cms/testing/formBlocks.generated.ts' => [
         [EveryKindBlock::class, ArrayShapesBlock::class],
-        [EventPageType::class, ConcertPageType::class, FestivalPageType::class, GigPageType::class, ShadowingSubtypePageType::class, SpecialistPageType::class, LegalServicePageType::class],
+        [EventPageType::class, ConcertPageType::class, FestivalPageType::class, GigPageType::class, SpecialistPageType::class, LegalServicePageType::class],
     ],
 ];
 

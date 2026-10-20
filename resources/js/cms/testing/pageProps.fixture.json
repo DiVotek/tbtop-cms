@@ -203,25 +203,6 @@
             }
         }
     },
-    "shadowing": {
-        "empty": {
-            "id": 60,
-            "type": "event",
-            "subtype": "shadowing",
-            "status": "published",
-            "name": "Shadowing",
-            "title": null,
-            "heading": null,
-            "summary": null,
-            "body": "",
-            "image": null,
-            "fields": {
-                "venue": [],
-                "capacity": null,
-                "lineup": []
-            }
-        }
-    },
     "specialist": {
         "full": {
             "id": 70,
@@ -241,7 +222,8 @@
                         "name": "Divorce",
                         "url": "/team/divorce"
                     }
-                ]
+                ],
+                "bio": "Family law"
             }
         },
         "empty": {
@@ -256,7 +238,8 @@
             "body": "",
             "image": null,
             "fields": {
-                "services": []
+                "services": [],
+                "bio": null
             }
         }
     },
@@ -279,6 +262,12 @@
                         "name": "Anna",
                         "url": "/team/anna"
                     }
+                ],
+                "specialistCards": [
+                    {
+                        "name": "Anna",
+                        "bio": "Family law"
+                    }
                 ]
             }
         },
@@ -294,7 +283,8 @@
             "body": "",
             "image": null,
             "fields": {
-                "specialists": []
+                "specialists": [],
+                "specialistCards": []
             }
         }
     }

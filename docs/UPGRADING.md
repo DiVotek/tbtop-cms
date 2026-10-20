@@ -455,6 +455,38 @@ first. With no slug it shows `tbtop-cms::pages.preview.no_slug` and nothing to
 copy, instead of a link to the home page. Error pages no longer get the
 action.
 
+## `backReferences()` is replaced by `Cms::referencedBy()`
+
+`PageTypeInterface::backReferences()` and its `BasePageType` default are
+removed: the package no longer adds reverse lists to `page.fields` after the
+type's `resolveFields()`, where a list silently replaced a computed key of
+the same name. Move each entry into the type's own `resolveFields()`:
+
+```php
+// before
+public function backReferences(): array
+{
+    return ['specialists' => ['field' => 'services', 'from' => 'specialist']];
+}
+
+// after — same key, same {id, name, url} list
+/** @return array{specialists: list<array{id: string, name: string, url: string}>} */
+public function resolveFields(array $input, ResolveContext $ctx): array
+{
+    return [
+        ...parent::resolveFields($input, $ctx),
+        'specialists' => Cms::referencedByLinks($ctx->page, 'services', 'specialist'),
+    ];
+}
+```
+
+`Cms::referencedBy()` returns the `Page` models for richer entries. The
+`pages` field, the `tbtop_page_refs` index and `cms:page-refs:rebuild` are
+unchanged. `cms:doctor` drops the `page_field_collisions` check: remove its
+`tbtop-cms::health.checks.page_field_collisions.*` keys from lang overrides.
+Add the `@return` shape above, or `cms:blocks:types` types the variant's
+`fields` as a `z.looseObject`.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by

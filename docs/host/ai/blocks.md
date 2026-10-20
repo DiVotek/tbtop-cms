@@ -440,8 +440,8 @@ here. Block-specific usage:
 
 - **Pages fields** (`$s->pages('related')->of('article')`) — a searchable
   multiple select of pages storing their ids; resolved to `{id, name, url}`
-  of the live ones. Inside a block it resolves forward only: reverse lists
-  (`backReferences()`) index page-type fields, not block data. See pages.md,
+  of the live ones. Inside a block it resolves forward only: reverse lookups
+  (`Cms::referencedBy()`) index page-type fields, not block data. See pages.md,
   "Page references".
 
 **Editor caveat** (`src/Admin/Fields/BlockContent.php` docblock): the admin block
