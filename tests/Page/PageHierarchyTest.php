@@ -176,3 +176,17 @@ it('moves a subtree that holds a page of an unregistered type', function (): voi
 
     expect($moved->fresh()->parent_id)->toBe($target->id);
 });
+
+it('reports hierarchy violations in the admin locale', function (): void {
+    app()->setLocale('uk');
+
+    expect(fn () => Page::factory()->article()->create())
+        ->toThrow(DomainException::class, 'Тип сторінки [article] потребує батьківської сторінки.');
+
+    $a = Page::factory()->category()->create();
+    $b = Page::factory()->category()->create(['parent_id' => $a->id]);
+    $a->parent_id = $b->id;
+
+    expect(fn () => $a->save())
+        ->toThrow(DomainException::class, 'Сторінку не можна розмістити під собою або своїми нащадками.');
+});
