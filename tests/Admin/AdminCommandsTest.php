@@ -118,3 +118,11 @@ it('warns instead of claiming success when revoking a user who has no cms admin 
         ->expectsOutputToContain('host@example.com has no CMS admin access; nothing to revoke.')
         ->doesntExpectOutputToContain('Revoked');
 });
+
+it('rejects creating a user with an invalid email', function (): void {
+    $this->artisan('cms:admin:create', ['email' => 'notanemail', '--password' => 'password123'])
+        ->assertExitCode(1)
+        ->expectsOutputToContain('The email must be a valid email address.');
+
+    expect(AdminUser::query()->where('email', 'notanemail')->exists())->toBeFalse();
+});
