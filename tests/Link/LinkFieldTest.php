@@ -95,3 +95,13 @@ it('keeps a required link required after the rename, gated on the block being ac
 
     expect($renamed->ruleEntries())->toBe(['required_unless:block_x_active,false,0', 'array', 'link_shape']);
 });
+
+it('sends the page picker its search label and empty-result text, translated', function (): void {
+    app()->setLocale('uk');
+    $options = (new S)->link('cta')->toNode()->options;
+
+    expect($options['pageSearchLabel'])->toBe(__('tbtop-cms::link.page_search', [], 'uk'))
+        ->and($options['pageSearchLabel'])->not->toBe('tbtop-cms::link.page_search')
+        ->and($options['pageEmpty'])->toBe(__('tbtop-cms::link.page_empty', [], 'uk'))
+        ->and($options['pageEmpty'])->not->toBe(__('tbtop-cms::link.page_empty', [], 'en'));
+});

@@ -30,6 +30,10 @@ export interface LinkOptions {
 	anchorLabel?: string;
 	anchorPlaceholder?: string;
 	pagePlaceholder?: string;
+	/** Accessible name of the page picker's search input. */
+	pageSearchLabel?: string;
+	/** Shown in the page picker when the search finds nothing. */
+	pageEmpty?: string;
 	textLabel?: string;
 }
 

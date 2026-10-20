@@ -13,6 +13,8 @@ return [
     'anchor' => 'Якір',
     'anchor_placeholder' => 'section-id',
     'page_placeholder' => 'Пошук сторінок…',
+    'page_search' => 'Пошук сторінок',
+    'page_empty' => 'Сторінок не знайдено.',
     'placeholders' => [
         'external' => 'https://example.com',
         'email' => 'name@example.com',
