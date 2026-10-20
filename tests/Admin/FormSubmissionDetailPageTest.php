@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Activitylog\Models\Activity;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Models\FormSubmissionComment;
+use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -206,4 +208,29 @@ it('deletes the submission from the detail page and redirects to the list', func
         ->assertJsonPath('effects.1.href', route('tbtop.cms.form-submissions-page'));
 
     expect(FormSubmission::query()->whereKey($submission->id)->exists())->toBeFalse();
+});
+
+it('skips the audit entry when a concurrent retry holds the claim', function (): void {
+    actingAsDetailAdmin();
+    $submission = detailSubmission(['status' => SubmissionStatus::Failed, 'error' => 'boom']);
+    // A double click: the other request claims the row between this
+    // request's page resolve and its own claim attempt, which then no-ops.
+    app()->bind(SubmissionRetrier::class, fn () => new class extends SubmissionRetrier
+    {
+        public function __construct() {}
+
+        public function retry(FormSubmission $submission): void
+        {
+            FormSubmission::query()->whereKey($submission->getKey())
+                ->update(['status' => SubmissionStatus::Processing->value]);
+        }
+    });
+
+    $this->postJson("/admin/form-submissions/{$submission->id}/actions/retry", ['payload' => []])
+        ->assertOk()
+        ->assertJsonPath('effects.0.kind', 'notify')
+        ->assertJsonPath('effects.0.level', 'info')
+        ->assertJsonPath('effects.0.message', __('tbtop-cms::form-submissions.actions.already_retrying'));
+
+    expect(Activity::query()->where('event', 'delivery_retried')->exists())->toBeFalse();
 });
