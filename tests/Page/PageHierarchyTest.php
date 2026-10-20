@@ -154,3 +154,25 @@ it('allows soft-deleting a page whose only children are trashed', function (): v
 
     expect($category->trashed())->toBeTrue();
 });
+
+it('rejects restoring a child whose parent type is no longer registered with a DomainException', function (): void {
+    $category = Page::factory()->category()->create();
+    $article = Page::factory()->article()->create(['parent_id' => $category->id]);
+    $article->delete();
+    Page::query()->whereKey($category->id)->toBase()->update(['type' => 'legacy']);
+
+    expect(fn () => $article->restore())
+        ->toThrow(DomainException::class, 'Page type [legacy] is not registered.');
+});
+
+it('moves a subtree that holds a page of an unregistered type', function (): void {
+    $target = Page::factory()->category()->create();
+    $moved = Page::factory()->category()->create();
+    $legacy = Page::factory()->category()->create(['parent_id' => $moved->id]);
+    Page::query()->whereKey($legacy->id)->toBase()->update(['type' => 'legacy']);
+
+    $moved->parent_id = $target->id;
+    $moved->save();
+
+    expect($moved->fresh()->parent_id)->toBe($target->id);
+});

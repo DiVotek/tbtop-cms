@@ -72,6 +72,12 @@ class PageHierarchy
             throw new DomainException("Parent page [{$page->parent_id}] is missing or trashed.");
         }
 
+        // A parent whose type lost its registration accepts no children; the
+        // registry's own InvalidArgumentException would surface as a 500.
+        if (! $registry->has($parent->type)) {
+            throw new DomainException(__('tbtop-cms::pages.validation.type_unregistered', ['type' => $parent->type]));
+        }
+
         if (! in_array($page->type, $registry->get($parent->type)->allowedChildren(), true)) {
             throw new DomainException("Page type [{$parent->type}] cannot contain a [{$page->type}] child.");
         }
@@ -115,6 +121,12 @@ class PageHierarchy
 
     private static function assertPageDepth(Page $page, int $depth, PageTypeRegistry $registry): void
     {
+        // A descendant whose type lost its registration has no depth limit
+        // to check; it must not block moving its ancestors.
+        if (! $registry->has($page->type)) {
+            return;
+        }
+
         $type = $registry->get($page->type);
 
         // Leaf types do not extend nesting; depth is bounded by their containers.
