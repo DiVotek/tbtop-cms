@@ -52,7 +52,7 @@ final class SchedulerHeartbeatCheck implements HealthCheck
                 status: HealthStatus::Warning,
                 labelKey: 'tbtop-cms::health.checks.scheduler_heartbeat.label',
                 messageKey: 'tbtop-cms::health.checks.scheduler_heartbeat.stale',
-                messageReplace: ['minutes' => $ageMinutes],
+                messageReplace: ['minutes' => (int) floor($ageMinutes)],
                 hintKey: 'tbtop-cms::health.checks.scheduler_heartbeat.hints.stale',
             );
         }
