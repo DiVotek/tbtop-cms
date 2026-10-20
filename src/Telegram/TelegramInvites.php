@@ -132,7 +132,7 @@ final class TelegramInvites
             }
 
             $text = trim((string) ($message['text'] ?? ''));
-            if ($text !== "/start {$code}" && $text !== $code && $text !== "/start{$code}") {
+            if (! $this->carriesCode($text, $code)) {
                 continue;
             }
 
@@ -145,6 +145,17 @@ final class TelegramInvites
         }
 
         return null;
+    }
+
+    /**
+     * The bare code, "/start CODE", "/startCODE", or a group's
+     * "/start@BotName CODE" (with privacy mode on, a group bot only sees
+     * commands, so that is the form a group claim arrives in).
+     */
+    private function carriesCode(string $text, string $code): bool
+    {
+        return $text === $code
+            || preg_match('/^\/start(?:@\w+)?\s*' . preg_quote($code, '/') . '$/', $text) === 1;
     }
 
     /**
