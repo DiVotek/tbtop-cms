@@ -7,8 +7,10 @@ namespace Tbtop\Cms\Health\Checks;
 use Tbtop\Cms\Health\HealthCheck;
 use Tbtop\Cms\Health\HealthCheckResult;
 use Tbtop\Cms\Health\HealthStatus;
+use Tbtop\Cms\Mail\Recipients;
 use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Telegram\ChatIds;
 
 /**
  * Mail/Telegram each need settings beyond membership in form.submission's
@@ -18,7 +20,8 @@ use Tbtop\Cms\Settings\Settings;
  * already reports a misconfigured channel as a Failed submission
  * per-occurrence (see its docblock), but only after a form is actually
  * submitted — this check surfaces the same misconfiguration proactively,
- * from the health page, before the first real submission hits it.
+ * from the health page, before the first real submission hits it. Recipients
+ * and chat ids go through the same parsers delivery uses.
  */
 final class NotificationsConfiguredCheck implements HealthCheck
 {
@@ -64,7 +67,7 @@ final class NotificationsConfiguredCheck implements HealthCheck
 
         $problems = [];
 
-        if (! $this->hasRecipients($this->settings->get('notifications.mail.recipients'))) {
+        if (Recipients::parse($this->settings->get('notifications.mail.recipients')) === []) {
             $problems[] = __('tbtop-cms::health.checks.notifications_configured.hints.mail_no_recipients');
         }
 
@@ -88,7 +91,7 @@ final class NotificationsConfiguredCheck implements HealthCheck
             $problems[] = __('tbtop-cms::health.checks.notifications_configured.hints.telegram_no_token');
         }
 
-        if (! $this->hasRecipients($this->settings->get('notifications.telegram.chat_ids'))) {
+        if (ChatIds::parse($this->settings->get('notifications.telegram.chat_ids')) === []) {
             $problems[] = __('tbtop-cms::health.checks.notifications_configured.hints.telegram_no_chat_ids');
         }
 
@@ -98,11 +101,5 @@ final class NotificationsConfiguredCheck implements HealthCheck
     private function isNonEmptyString(mixed $value): bool
     {
         return is_string($value) && trim($value) !== '';
-    }
-
-    /** Recipients/chat ids are stored as a newline-joined string (see Recipients::parse/ChatIds). */
-    private function hasRecipients(mixed $value): bool
-    {
-        return $this->isNonEmptyString($value);
     }
 }

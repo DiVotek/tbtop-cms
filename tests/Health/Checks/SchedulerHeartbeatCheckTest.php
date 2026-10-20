@@ -25,10 +25,11 @@ it('is ok when the heartbeat is fresh', function (): void {
 });
 
 it('warns when the heartbeat is older than 5 minutes', function (): void {
-    Cache::forever(SchedulerHeartbeatCheck::CACHE_KEY, now()->subMinutes(10)->toIso8601String());
+    Cache::forever(SchedulerHeartbeatCheck::CACHE_KEY, now()->subMinutes(10)->subSeconds(29)->toIso8601String());
 
     $result = (new SchedulerHeartbeatCheck)->run();
 
+    // Carbon 3's diffInMinutes() is a float; the message shows whole minutes.
     expect($result->status)->toBe(HealthStatus::Warning)
-        ->and($result->message())->toContain('10');
+        ->and($result->message())->toBe(__('tbtop-cms::health.checks.scheduler_heartbeat.stale', ['minutes' => 10]));
 });

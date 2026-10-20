@@ -20,14 +20,18 @@ use Tbtop\Cms\Mail\SubmissionMail;
 use Tbtop\Cms\Notifications\Audience;
 use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
+use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\Models\NotificationLog;
+use Tbtop\Cms\Notifications\Models\NotificationTemplate;
 use Tbtop\Cms\Notifications\NotificationLogStatus;
+use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
+use Tbtop\Cms\Tests\Fixtures\ThrowingHostChannel;
 use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
 
 uses(RefreshDatabase::class);
@@ -89,6 +93,22 @@ it('sends a bell notification to every admin on a new submission', function (): 
         expect($notification->data['title'])->toBe(__('tbtop-cms::notifications.bell.title'))
             ->and($notification->data['actions'][0]['url'])->toBe($detailUrl);
     }
+});
+
+it('writes the bell body as plain text', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => "Ada O'Brien", 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $data = $admin->notifications()->sole()->data;
+
+    // The short template is Telegram HTML; the bell client renders body as text.
+    expect($data['body'])->not->toContain('<b>')
+        ->and($data['body'])->not->toContain('&#039;')
+        ->and($data['body'])->toContain("Ada O'Brien");
 });
 
 it('does not notify a user with no admin profile row', function (): void {
@@ -207,6 +227,20 @@ it('marks the submission failed when telegram is enabled but token or chat ids a
         ->and($submission->error)->toContain(__('tbtop-cms::notifications.errors.telegram_not_configured'));
 });
 
+it('names a failing host channel through the generic error text', function (): void {
+    Notifications::channel(ThrowingHostChannel::class);
+    notifierAdmin();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'sms']);
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    expect(FormSubmission::query()->sole()->error)
+        ->toBe(__('tbtop-cms::notifications.errors.channel', ['channel' => 'SMS', 'error' => 'gateway down']));
+});
+
 // -----------------------------------------------------------------------
 // Mail
 // -----------------------------------------------------------------------
@@ -227,6 +261,27 @@ it('mails every configured recipient when enabled', function (): void {
     // both — see SubmissionNotifierTest deviations in the cms-3 PR.
     Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('ops@example.test'));
     Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasTo('sales@example.test'));
+});
+
+it('mails a subject with the submitted text unescaped', function (): void {
+    Mail::fake();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    NotificationTemplate::query()->create([
+        'type' => 'form.submission',
+        'format' => Format::Html,
+        'locale' => 'en',
+        'subject' => 'Lead: {{ $leadIdentity }}',
+        'body' => '<p>{{ $leadIdentity }}</p>',
+    ]);
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => "Ada O'Brien & Co", 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    // Blade escapes the subject section; a mail header is plain text.
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasSubject("Lead: Ada O'Brien & Co · ada@example.test"));
 });
 
 it('stays handled when a concurrent caller writes an unrelated failed log row', function (): void {

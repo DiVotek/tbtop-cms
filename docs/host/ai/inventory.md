@@ -381,7 +381,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `setCurrent(string $locale): void` | Sets the active locale for this request; throws if not frontend-active |
 | | `frontendActive(): array` | Languages with `is_frontend_active` |
 | | `adminActive(): array` | Languages with `is_admin_active` |
-| | `setDefault(string $locale): void` | Transactionally reassigns the default language |
+| | `setDefault(string $locale): void` | Transactionally reassigns the default language, then dispatches `LanguagesChanged` |
 | | `refresh(): void` | Forces a re-read from the database, bypassing the cross-request cache |
 
 ## 11. Built-in blocks and page types

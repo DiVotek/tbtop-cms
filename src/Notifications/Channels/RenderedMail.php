@@ -16,7 +16,8 @@ final class RenderedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->rendered->subject);
+        // Blade escapes the subject section like any echo; a mail header is plain text.
+        return new Envelope(subject: html_entity_decode($this->rendered->subject, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     public function content(): Content

@@ -134,7 +134,8 @@ class SubmissionNotifier
     /**
      * A send failure reads through the channel's own errors.{channel}
      * prefix; a render failure has its own prefix naming the channel — the
-     * channel never ran, so its send prefix would mislead.
+     * channel never ran, so its send prefix would mislead. A host channel
+     * with no errors.{channel} key gets the generic errors.channel text.
      */
     private function errorFor(Delivery $delivery): string
     {
@@ -145,7 +146,16 @@ class SubmissionNotifier
             ]);
         }
 
-        return __("tbtop-cms::notifications.errors.{$delivery->channel}", ['error' => (string) $delivery->error]);
+        $translationKey = "tbtop-cms::notifications.errors.{$delivery->channel}";
+
+        if (! trans()->has($translationKey)) {
+            return __('tbtop-cms::notifications.errors.channel', [
+                'channel' => $this->channelName($delivery->channel),
+                'error' => (string) $delivery->error,
+            ]);
+        }
+
+        return __($translationKey, ['error' => (string) $delivery->error]);
     }
 
     /** The short channel name; a host channel without one falls back to its label(). */

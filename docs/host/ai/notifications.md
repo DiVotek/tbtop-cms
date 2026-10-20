@@ -16,7 +16,7 @@ A visitor POSTs to the named route `tbtop-cms.form.submit` (`{locale}/{page}/{bl
 
 `SubmissionReceived` also drives the built-in admin fan-out: `Tbtop\Cms\Form\Listeners\NotifiesAdminsOfSubmission` is wired in `NotificationWiring::wireSubmissionNotifications()` and defers `Tbtop\Cms\Form\SubmissionNotifier::notify()` to `app()->terminating()` — after the visitor's response is sent, since this package has no queue requirement. It's a no-op when `$submission` is `null` (nothing to track delivery against or retry). `SubmissionNotifier::notify()` calls `Notifications::send('form.submission', …)` (see below) and turns the returned deliveries into `FormSubmission::status`.
 
-`FormSubmission::error` joins the distinct failure texts with ` | ` (two recipients failing with the same text show it once). A send failure reads through `tbtop-cms::notifications.errors.{channel}` (`Mail delivery failed: …`); a render failure (`Delivery::$stage === DeliveryStage::Render`) reads through `tbtop-cms::notifications.errors.render` (`Couldn't render the :channel notification: :error`), where `:channel` is the short name from `tbtop-cms::notifications.channels.{key}` (Email / Telegram / Bell; a host channel without that key falls back to its `label()`).
+`FormSubmission::error` joins the distinct failure texts with ` | ` (two recipients failing with the same text show it once). A send failure reads through `tbtop-cms::notifications.errors.{channel}` (`Mail delivery failed: …`), or `tbtop-cms::notifications.errors.channel` (`:channel delivery failed: :error`, same `:channel` name as below) for a host channel without that key; a render failure (`Delivery::$stage === DeliveryStage::Render`) reads through `tbtop-cms::notifications.errors.render` (`Couldn't render the :channel notification: :error`), where `:channel` is the short name from `tbtop-cms::notifications.channels.{key}` (Email / Telegram / Bell; a host channel without that key falls back to its `label()`).
 
 ### Statuses
 
@@ -94,7 +94,7 @@ Built with `TypeDefinition::make($key)` and its fluent setters, then handed to `
 
 ### `mail` (`Tbtop\Cms\Notifications\Channels\MailChannel`)
 
-Sends through `Tbtop\Cms\Mail\CmsMailer`, format `Html`. Settings keys (all under the flat `mail.*` namespace, shared with `NotificationSettingsPage`'s own fields — not the host's `config/mail.php`):
+Sends through `Tbtop\Cms\Mail\CmsMailer`, format `Html`; the subject header is the rendered `subject` section with HTML entities decoded (Blade escapes it like any echo). Settings keys (all under the flat `mail.*` namespace, shared with `NotificationSettingsPage`'s own fields — not the host's `config/mail.php`):
 
 | Key | Field |
 |---|---|
@@ -125,7 +125,7 @@ A `Recipient`'s chat id is carried in `$phone` — the only remaining generic ad
 
 ### `bell`
 
-Delivers into the admin header bell via Laravel's `database` channel through `tbtop/admin`'s `Notification` builder — same table (`notifications`, migrated by this package if the host doesn't already have one) the panel already reads. Format `Short`. `settings()` returns `[]` — the bell has no opt-out and no configurable settings.
+Delivers into the admin header bell via Laravel's `database` channel through `tbtop/admin`'s `Notification` builder — same table (`notifications`, migrated by this package if the host doesn't already have one) the panel already reads. Format `Short` (the same template Telegram reads as HTML): the bell strips tags and decodes entities from the rendered subject and body, since the panel renders them as plain text. `settings()` returns `[]` — the bell has no opt-out and no configurable settings.
 
 ## Templates
 
