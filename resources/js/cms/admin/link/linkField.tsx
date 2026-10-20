@@ -83,6 +83,7 @@ export function LinkForm({ id, value, onChange, onBlur, disabled, invalid, descr
 					onChange={onChange}
 					disabled={disabled}
 					invalid={invalid || error !== null}
+					describedBy={describedBy}
 					options={options}
 					remote={remote}
 				/>
@@ -127,11 +128,12 @@ interface PageTargetProps {
 	onChange: (next: LinkValue) => void;
 	disabled?: boolean;
 	invalid?: boolean;
+	describedBy?: string;
 	options?: LinkOptions;
 	remote: ReturnType<typeof usePageOptions>;
 }
 
-function PageTarget({ id, link, onChange, disabled, invalid, options, remote }: PageTargetProps) {
+function PageTarget({ id, link, onChange, disabled, invalid, describedBy, options, remote }: PageTargetProps) {
 	const [isOpen, setOpen] = useState(false);
 	const [term, setTerm] = useState("");
 
@@ -158,6 +160,7 @@ function PageTarget({ id, link, onChange, disabled, invalid, options, remote }: 
 						variant="outline"
 						disabled={disabled}
 						aria-invalid={invalid}
+						aria-describedby={describedBy}
 						className="min-w-0 flex-1 justify-start font-normal"
 					>
 						<span className="truncate">
