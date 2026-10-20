@@ -32,6 +32,8 @@ export function measureTextWidth(text: string, font: string): number | null {
 export interface TextLayout {
 	/** Width of the widest line — what decides whether the column overflows. */
 	width: number;
+	/** Width of the last line — what a wrapped title takes of its final line. */
+	lastWidth: number;
 	lines: number;
 }
 
@@ -87,5 +89,7 @@ export function layOutText(text: string, font: string, columnWidth: number): Tex
 
 	const width = lines.reduce((widest, line) => Math.max(widest, ctx.measureText(line).width), 0);
 
-	return { width, lines: Math.max(1, lines.length) };
+	const lastWidth = ctx.measureText(lines.at(-1) ?? "").width;
+
+	return { width, lastWidth, lines: Math.max(1, lines.length) };
 }
