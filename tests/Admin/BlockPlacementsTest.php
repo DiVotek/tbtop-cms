@@ -14,6 +14,7 @@ use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\ArticleOnlyBlock;
 use Tbtop\Cms\Tests\Fixtures\LayoutOnlyBlock;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
+use Tbtop\Cms\Tests\Fixtures\RequiredFieldBlock;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
 
 uses(RefreshDatabase::class);
@@ -132,6 +133,15 @@ it('lists every registered kind from BlockContent::make() with no placement, for
     $values = array_column($kindField['options']['options'] ?? [], 'value');
 
     expect($values)->toContain('Simple', 'LayoutOnly', 'ArticleOnly');
+});
+
+it('labels each kind option in BlockContent::make() with the block label, not its raw kind', function (): void {
+    config(['tbtop-cms.blocks.types' => [SimpleBlock::class, RequiredFieldBlock::class]]);
+    $node = json_decode(json_encode(BlockContent::make(app(S::class))), true);
+
+    $options = array_column(findFieldByName($node, 'kind')['options']['options'] ?? [], 'label', 'value');
+
+    expect($options['RequiredField'] ?? null)->toBe('Needs a value');
 });
 
 it('still renders a layout-only kind on the frontend and still shows its edit tab, even though it is filtered from add-block actions', function (): void {

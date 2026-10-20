@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Pages\Support\BlockPicker;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
 
@@ -155,7 +156,7 @@ final class BlockContent
         $kinds = $placement === null ? $registry->kinds() : array_keys($registry->forPlacement($placement));
 
         return array_map(
-            static fn (string $kind): array => ['value' => $kind, 'label' => $kind],
+            static fn (string $kind): array => ['value' => $kind, 'label' => BlockPicker::label($registry, $kind)],
             $kinds,
         );
     }
