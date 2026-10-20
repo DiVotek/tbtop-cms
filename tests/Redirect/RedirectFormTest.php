@@ -190,3 +190,25 @@ it('rejects a blank target with the error on the target field', function (): voi
         expect(array_keys($e->errors()))->toBe(['to_path']);
     }
 });
+
+it('localizes the loop and chain-length errors', function (): void {
+    app()->setLocale('uk');
+    $firstError = static function (array $form): ?string {
+        try {
+            RedirectForm::save([...$form, 'locale' => 'en', 'status_code' => '301']);
+        } catch (ValidationException $e) {
+            return $e->errors()['to_path'][0] ?? null;
+        }
+
+        return null;
+    };
+
+    Redirect::create(['locale' => 'en', 'from_path' => 'b', 'to_path' => 'a', 'status_code' => 301]);
+    foreach (range(1, 21) as $i) {
+        Redirect::create(['locale' => 'en', 'from_path' => "hop{$i}", 'to_path' => 'hop' . ($i + 1), 'status_code' => 301]);
+    }
+
+    expect($firstError(['from_path' => 'a', 'to_path' => 'b']))->toBe(__('tbtop-cms::redirects.validation.loop'))
+        ->and($firstError(['from_path' => 'start', 'to_path' => 'hop1']))->toBe(__('tbtop-cms::redirects.validation.chain_too_long'))
+        ->and(__('tbtop-cms::redirects.validation.loop'))->not->toBe(__('tbtop-cms::redirects.validation.loop', [], 'en'));
+});

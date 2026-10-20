@@ -34,7 +34,7 @@ class RedirectCycle
 
         for ($hop = 0; $hop < self::MAX_HOPS; $hop++) {
             if (in_array($current, $seen, true)) {
-                throw ValidationException::withMessages(['to_path' => 'This redirect would create a loop.']);
+                throw ValidationException::withMessages(['to_path' => __('tbtop-cms::redirects.validation.loop')]);
             }
 
             $seen[] = $current;
@@ -47,7 +47,7 @@ class RedirectCycle
             $current = $next;
         }
 
-        throw ValidationException::withMessages(['to_path' => 'Redirect chain is too long.']);
+        throw ValidationException::withMessages(['to_path' => __('tbtop-cms::redirects.validation.chain_too_long')]);
     }
 
     private static function nextTarget(?string $locale, string $path, ?int $id): ?string
