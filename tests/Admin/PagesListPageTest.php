@@ -9,6 +9,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Types\BasePageType;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\SectionType;
 
@@ -624,4 +625,28 @@ it('gives a host type and an unregistered type their own tab', function (): void
     expect($tabs)->toBe(['all' => 'All', 'page' => 'Page', 'section' => 'Section', 'legacy_promo' => 'legacy_promo', 'deleted' => 'Deleted'])
         ->and($names('section'))->toBe(['Work'])
         ->and($names('legacy_promo'))->toBe(['Promo']);
+});
+
+it('labels the type column with the type label the tabs use', function (): void {
+    $caseStudy = new class extends BasePageType
+    {
+        public function key(): string
+        {
+            return 'case_study';
+        }
+
+        #[Override]
+        public function label(): string
+        {
+            return 'Case study';
+        }
+    };
+    PageTypeRegistry::extend(fn (): array => [$caseStudy::class]);
+    Page::create(['type' => 'case_study', 'status' => 'published', 'name' => ['en' => 'Acme']]);
+
+    $tabs = array_column(pagesTableNode()['options']['tabs'], 'label', 'name');
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data');
+
+    expect($tabs['case_study'])->toBe('Case study')
+        ->and($rows[0]['type'])->toBe('Case study');
 });

@@ -118,7 +118,7 @@ class PagesPage extends AdminPage
             // Only once a host registers a subtype: before that every row would be blank.
             ...($subtypes === [] ? [] : [
                 Column::make('subtype')->label(__('tbtop-cms::pages.columns.subtype'))
-                    ->formatUsing($this->subtypeLabel(...))
+                    ->formatUsing($this->typeLabel(...))
                     ->muted()->uppercase(),
             ]),
             Column::make('parent_name')->label(__('tbtop-cms::pages.columns.parent'))->translatable()->muted(),
@@ -269,12 +269,8 @@ class PagesPage extends AdminPage
         );
     }
 
+    /** Same label as the type's tab: the translation, then the type's own label(), then the raw key. */
     private function typeLabel(mixed $value): string
-    {
-        return EnumLabel::make('tbtop-cms::pages.types', $value);
-    }
-
-    private function subtypeLabel(mixed $value): string
     {
         if (! is_string($value) || $value === '') {
             return '';
