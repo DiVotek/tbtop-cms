@@ -13,6 +13,7 @@ use Tbtop\Cms\Cms;
 use Tbtop\Cms\Form\Events\SubmissionReceived;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\Slots;
@@ -344,5 +345,14 @@ it('raises LanguagesChanged once when a language is directly soft-deleted, resto
 
     Event::fake([LanguagesChanged::class]);
     $language->forceDelete();
+    Event::assertDispatched(LanguagesChanged::class, 1);
+});
+
+it('raises LanguagesChanged once when Languages::setDefault() reassigns the default', function (): void {
+    Language::factory()->create(['locale' => 'pl']);
+
+    Event::fake([LanguagesChanged::class]);
+    app(Languages::class)->setDefault('pl');
+
     Event::assertDispatched(LanguagesChanged::class, 1);
 });
