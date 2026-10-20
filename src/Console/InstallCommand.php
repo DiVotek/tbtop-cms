@@ -135,8 +135,10 @@ class InstallCommand extends Command
         $this->line("       @include('tbtop-cms::head')");
         $this->newLine();
 
-        $this->line('  3. Point the @cms alias at this package (vite.config.ts and tsconfig.json):');
-        $this->line("       '@cms' => 'vendor/tbtop/cms/resources/js/cms'");
+        $this->line('  3. Point the @cms alias at this package. vite.config.ts:');
+        $this->line("       resolve: { alias: { '@cms': path.resolve(__dirname, 'vendor/tbtop/cms/resources/js/cms') } },");
+        $this->line('     tsconfig.json:');
+        $this->line('       { "compilerOptions": { "paths": { "@cms/*": ["./vendor/tbtop/cms/resources/js/cms/*"] } } }');
         $this->newLine();
 
         $this->line('  4. Register the admin blocks from your admin entry (resources/js/admin.tsx):');
