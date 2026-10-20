@@ -310,6 +310,14 @@ it('404s a chunk beyond the last one', function (): void {
     $this->get('/sitemap-2.xml', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
+it('404s a chunk number too large for an integer instead of erroring', function (): void {
+    app(Cms::class)->frontendRoutes();
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About'], 'is_indexable' => true]);
+
+    $this->get('/sitemap-99999999999999999999.xml', ['X-Inertia' => 'true'])->assertNotFound();
+    $this->get('/sitemap-0.xml', ['X-Inertia' => 'true'])->assertNotFound();
+});
+
 it('gives the home page the top priority and nests the rest below it', function (): void {
     app(Cms::class)->frontendRoutes();
 

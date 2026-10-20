@@ -68,9 +68,11 @@ class Cms
         Route::get('sitemap.xml', [SitemapController::class, 'index'])->name('tbtop-cms.sitemap');
         // Declared before the catch-all page route (frontendRoutes() calls this
         // first), so a page whose slug happens to be "sitemap-1.xml" cannot
-        // shadow a chunk.
+        // shadow a chunk. Chunks are numbered from 1 with no leading zeros;
+        // the length cap keeps the value inside an int, so an oversized number
+        // falls through to a 404 instead of a TypeError on chunk(int).
         Route::get('sitemap-{chunk}.xml', [SitemapController::class, 'chunk'])
-            ->where('chunk', '[0-9]+')
+            ->where('chunk', '[1-9][0-9]{0,8}')
             ->name('tbtop-cms.sitemap.chunk');
     }
 
