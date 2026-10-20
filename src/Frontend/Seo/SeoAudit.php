@@ -274,8 +274,11 @@ final class SeoAudit
     /** @return Collection<int, Page> */
     private function pages()
     {
+        // Error pages are resolved by error_class, never served at a URL —
+        // same exclusion as the sitemap.
         return Page::query()
             ->live()
+            ->whereNull('error_class')
             ->select(['id', 'type', 'parent_id', 'status', 'published_at', 'unpublish_at', 'name', 'title', 'summary', 'seo', 'image', 'is_indexable'])
             ->get();
     }
