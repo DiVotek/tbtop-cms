@@ -109,14 +109,23 @@ it('increments the hit count on a connection with a table prefix', function (): 
         'prefix' => 'app_',
         'foreign_key_constraints' => true,
     ]]);
+    // Switch the default back before teardown: RefreshDatabase rolls back the
+    // default connection, and on MySQL the suite's open transaction would
+    // otherwise hold its locks until a later migrate blocks on them.
+    $default = config('database.default');
     config(['database.default' => 'prefixed']);
-    $this->artisan('migrate', ['--database' => 'prefixed'])->assertExitCode(0);
 
-    foreach ([1, 2] as $_) {
-        event(new PageNotFound('missing', 'en', null, null));
-        app()->terminate();
-        clearTerminatingCallbacks();
+    try {
+        $this->artisan('migrate', ['--database' => 'prefixed'])->assertExitCode(0);
+
+        foreach ([1, 2] as $_) {
+            event(new PageNotFound('missing', 'en', null, null));
+            app()->terminate();
+            clearTerminatingCallbacks();
+        }
+
+        expect(DB::connection('prefixed')->table('tbtop_not_found_hits')->value('hits'))->toBe(2);
+    } finally {
+        config(['database.default' => $default]);
     }
-
-    expect(DB::connection('prefixed')->table('tbtop_not_found_hits')->value('hits'))->toBe(2);
 });
