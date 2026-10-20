@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Block\Blocks\HeroBlock as PackageHeroBlock;
 use Tbtop\Cms\Tests\Fixtures\EmptyKindBlock;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
 use Tbtop\Cms\Tests\Fixtures\SimpleBlock;
@@ -61,11 +62,21 @@ it('registers two extensions in order', function (): void {
     expect((new BlockRegistry)->kinds())->toBe(['Hero', 'Simple']);
 });
 
-it('rejects a duplicate kind coming from an extension', function (): void {
+it('rejects a different class declaring the same kind from an extension', function (): void {
+    config()->set('tbtop-cms.blocks.types', [HeroBlock::class]);
+    BlockRegistry::extend(fn (): array => [PackageHeroBlock::class]);
+
+    expect(fn () => (new BlockRegistry)->kinds())->toThrow(InvalidArgumentException::class);
+});
+
+it('registers a class from both config and an extension once', function (): void {
     config()->set('tbtop-cms.blocks.types', [HeroBlock::class]);
     BlockRegistry::extend(fn (): array => [HeroBlock::class]);
 
-    expect(fn () => (new BlockRegistry)->kinds())->toThrow(InvalidArgumentException::class);
+    $registry = new BlockRegistry;
+
+    expect($registry->kinds())->toBe(['Hero'])
+        ->and($registry->get('Hero'))->toBeInstanceOf(HeroBlock::class);
 });
 
 it('does not invoke the extension callable until the registry is first used', function (): void {

@@ -120,7 +120,10 @@ class BlockRegistry
 
         foreach (self::$extensions as $extension) {
             foreach ($extension() as $class) {
-                $this->register($class);
+                // Same rule as discovery: a class already registered is not a conflict.
+                if (! $this->hasClass($class)) {
+                    $this->register($class);
+                }
             }
         }
 
