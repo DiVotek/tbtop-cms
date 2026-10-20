@@ -201,12 +201,15 @@ class SharedBlockEditPage extends Page
         };
     }
 
+    /** A trashed page has no editor (it 404s), so its row gets no link, as on PagesPage. */
     private function containerUrl(string $rowId): ?string
     {
         [$type, $key] = array_pad(explode(':', $rowId, 2), 2, '');
 
         return match (true) {
-            $type === 'page' && Route::has('tbtop.cms.page-edit-page') => route('tbtop.cms.page-edit-page', ['page' => $key]),
+            $type === 'page' && Route::has('tbtop.cms.page-edit-page') => ctype_digit($key) && CmsPage::query()->whereKey((int) $key)->exists()
+                ? route('tbtop.cms.page-edit-page', ['page' => $key])
+                : null,
             $type === 'layout' && Route::has('tbtop.cms.layout-edit-page') => route('tbtop.cms.layout-edit-page', ['slot' => $key]),
             default => null,
         };
