@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Pages\Support;
 
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Redirect\Models\Redirect;
@@ -33,7 +34,11 @@ class RedirectForm
     {
         $locale = self::nullableString($form['locale'] ?? null);
         $from = RedirectPath::normalize((string) ($form['from_path'] ?? ''));
-        $to = self::normalizeTarget((string) ($form['to_path'] ?? ''));
+        $rawTo = trim((string) ($form['to_path'] ?? ''));
+        if ($rawTo === '') {
+            throw ValidationException::withMessages(['to_path' => __('tbtop-cms::redirects.validation.paths_required')]);
+        }
+        $to = self::normalizeTarget($rawTo);
         $status = (int) ($form['status_code'] ?? 301);
 
         RedirectValidator::assert(['locale' => $locale, 'from' => $from, 'to' => $to, 'status' => $status], $id);
