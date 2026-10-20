@@ -357,6 +357,24 @@ it('gives the home page the top priority', function (): void {
         ->and((string) $nodes[0])->toBe('1.0');
 });
 
+it('does not give a page with no default-locale slug the home priority', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    app(Cms::class)->frontendRoutes();
+
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['uk' => 'Pro nas'], 'is_indexable' => true]);
+    $page->slugs()->where('locale', 'en')->delete();
+    $page->unsetRelation('slugs');
+
+    $xml = new SimpleXMLElement($this->get('/sitemap-1.xml')->assertOk()->getContent());
+    $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+
+    $nodes = $xml->xpath('//s:url[s:loc="' . url('uk/' . $page->pathFor('uk')) . '"]/s:priority');
+
+    expect($page->pathFor('en'))->toBeNull()
+        ->and($nodes)->not->toBeEmpty()
+        ->and((string) $nodes[0])->toBe('0.8');
+});
+
 it("lists the page's own image", function (): void {
     app(Cms::class)->frontendRoutes();
 
