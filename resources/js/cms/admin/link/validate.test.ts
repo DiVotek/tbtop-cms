@@ -91,6 +91,11 @@ describe("page", () => {
 	it("reports an anchor carrying a hash", () => {
 		expect(linkError(link("page", "7", "#how"))).toBe("anchor");
 	});
+
+	it("trims the anchor before checking it, as the server does", () => {
+		expect(linkError(link("page", "7", " how "))).toBeNull();
+		expect(linkError(link("page", "7", "   "))).toBeNull();
+	});
 });
 
 it("stays quiet on an untouched value", () => {
