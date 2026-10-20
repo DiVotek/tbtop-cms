@@ -72,7 +72,7 @@ class FormSubmitController
 
             $submission?->forceFill(['status' => SubmissionStatus::Failed, 'error' => $e->getMessage()])->save();
 
-            return back()->withErrors(['form' => 'Sorry, we could not process your submission. Please try again.']);
+            return back()->withErrors(['form' => __('tbtop-cms::forms.submit_failed')]);
         }
 
         return back();
