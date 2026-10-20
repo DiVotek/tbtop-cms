@@ -77,7 +77,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | `cms:page-refs:rebuild` | (none) | Recompute `tbtop_page_refs` from every page's (trashed included) type fields of kind `pages` | No |
 | `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists, and `pages.generated.ts` (the `page` prop per page type and subtype, pages.md "Page prop types") unless `pages.types_path` is `false`; `--check` compares every file it would write | No |
 
-All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
+All nine registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
 Two more schedule entries exist but are not Artisan commands owned by this package:
 - `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `ScheduleWiring::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
