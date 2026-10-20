@@ -441,3 +441,34 @@ it('keeps a retry failed with the render prefix, not the send prefix, when the t
         ->and($submission->error)->toContain('html boom')
         ->and($submission->error)->not->toContain('Mail delivery failed');
 });
+
+it('records the retry error in the admin locale when the page or block is gone', function (): void {
+    app()->setLocale('uk');
+
+    $emptyPage = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Contact'],
+        'content' => [],
+    ]);
+
+    $attrs = [
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada'],
+        'status' => SubmissionStatus::Failed,
+        'error' => 'mail server unreachable',
+    ];
+
+    $blockGone = FormSubmission::query()->create([...$attrs, 'page_id' => $emptyPage->getKey()]);
+    $pageGone = FormSubmission::query()->create([...$attrs, 'page_id' => null]);
+
+    app(SubmissionRetrier::class)->retry($blockGone);
+    app(SubmissionRetrier::class)->retry($pageGone);
+
+    expect($blockGone->refresh()->error)->toBe(__('tbtop-cms::form-submissions.errors.block_missing'))
+        ->and($blockGone->error)->not->toBe('tbtop-cms::form-submissions.errors.block_missing')
+        ->and($blockGone->error)->not->toBe('Form block no longer exists on the page.')
+        ->and($pageGone->refresh()->error)->toBe(__('tbtop-cms::form-submissions.errors.page_missing'))
+        ->and($pageGone->error)->not->toBe('Page no longer exists.');
+});

@@ -41,6 +41,11 @@ return [
         'no_error' => '—',
         'empty_payload' => '(empty payload)',
     ],
+    'errors' => [
+        'retry_unfinished' => 'Retry did not finish.',
+        'page_missing' => 'Page no longer exists.',
+        'block_missing' => 'Form block no longer exists on the page.',
+    ],
     'actions' => [
         'close' => 'Back to inbox',
         'retry' => 'Retry',
