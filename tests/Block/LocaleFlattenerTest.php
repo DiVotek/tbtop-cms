@@ -220,3 +220,27 @@ it('yields null for a link label present in neither the active nor the fallback 
 
     expect($out['cta']['label'])->toBeNull();
 });
+
+it('falls back to the default locale when the active translation is blank', function () use ($locales): void {
+    $emptyDoc = ['root' => ['children' => [['type' => 'paragraph', 'children' => []]]]];
+    $doc = ['root' => ['children' => [['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => 'Hi']]]]]];
+
+    $out = LocaleFlattener::flattenData(
+        [
+            'title' => ['en' => '', 'uk' => 'Pryvit'],
+            'subtitle' => ['en' => "  \n", 'uk' => 'Pidzagolovok'],
+            'body' => ['en' => $emptyDoc, 'uk' => $doc],
+        ],
+        'en',
+        'uk',
+        $locales,
+    );
+
+    expect($out)->toBe(['title' => 'Pryvit', 'subtitle' => 'Pidzagolovok', 'body' => $doc]);
+});
+
+it('keeps the active blank value when the fallback is blank too', function () use ($locales): void {
+    $out = LocaleFlattener::flattenData(['title' => ['en' => '', 'uk' => '']], 'en', 'uk', $locales);
+
+    expect($out)->toBe(['title' => '']);
+});
