@@ -160,6 +160,32 @@ it('claims a pending invite from getUpdates and appends the chat id to settings'
     expect(app(Settings::class)->get('notifications.telegram.chat_ids'))->toContain('555 # Ops Team');
 });
 
+it('claims a group invite sent as /start@BotName CODE', function (): void {
+    Http::fake([
+        'api.telegram.org/*getMe*' => Http::response(['ok' => true, 'result' => ['username' => 'my_cms_bot']]),
+        'api.telegram.org/*getUpdates*' => function () {
+            $code = Cache::get('tbtop-cms:telegram:current-invite-code');
+
+            return Http::response(['ok' => true, 'result' => [
+                [
+                    'update_id' => 1,
+                    'message' => [
+                        'message_id' => 5,
+                        'text' => "/start@my_cms_bot {$code}",
+                        'chat' => ['id' => -100555, 'title' => 'Sales', 'type' => 'supergroup'],
+                    ],
+                ],
+            ]]);
+        },
+    ]);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+
+    $this->postJson('/admin/notification-settings/actions/createTelegramInvite', ['payload' => []])->assertOk();
+    $this->postJson('/admin/notification-settings/actions/checkTelegramInvite', ['payload' => []])->assertOk();
+
+    expect(app(Settings::class)->get('notifications.telegram.chat_ids'))->toContain('-100555 # Sales');
+});
+
 it('labels a claimed private chat with the person name and username', function (): void {
     Http::fake([
         'api.telegram.org/*getMe*' => Http::response(['ok' => true, 'result' => ['username' => 'my_cms_bot']]),

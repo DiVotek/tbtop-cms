@@ -11,11 +11,14 @@ use Illuminate\Support\Carbon;
 use Tbtop\Cms\Form\Models\FormSubmission;
 
 /**
- * Generic replacement for the old ContactFormMail: any HandlesFormSubmission
- * block's payload, not just the built-in ContactForm's. Built and sent by
- * SubmissionNotifier's mail channel, never by a block directly. Subject and
- * body are translated in the app's current locale (kept simple — no
- * per-recipient locale) via tbtop-cms::notifications.
+ * A ready-made Mailable for any HandlesFormSubmission block's payload, kept
+ * for hosts that send it themselves. The package's own pipeline does not use
+ * it: SubmissionNotifier's mail channel (MailChannel) sends a RenderedMail
+ * built from the form.submission template,
+ * tbtop-cms::notifications.form-submission.html — to change that email,
+ * override resources/views/vendor/tbtop-cms/notifications/form-submission/html.blade.php
+ * (see docs/host/ai/notifications.md). Subject and body are translated in the
+ * app's current locale via tbtop-cms::notifications.
  */
 class SubmissionMail extends Mailable
 {

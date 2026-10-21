@@ -49,3 +49,21 @@ it('sends a test email to the configured recipients and notifies success', funct
         fn (TestMail $mail): bool => $mail->hasTo('ops@example.test') && $mail->hasTo('sales@example.test'),
     );
 });
+
+it('writes the test email subject and body in the admin locale', function (): void {
+    Mail::fake();
+    app()->setLocale('uk');
+    app(Settings::class)->set('site.name', 'Acme <Shop>');
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+
+    $this->postJson('/admin/notification-settings/actions/sendTestEmail', ['payload' => []])->assertOk();
+
+    Mail::assertSent(TestMail::class, function (TestMail $mail): bool {
+        $subject = __('tbtop-cms::notifications.mail.test_subject', ['site' => 'Acme <Shop>']);
+        $body = e(__('tbtop-cms::notifications.mail.test_body', ['site' => 'Acme <Shop>']));
+
+        return $subject !== 'tbtop-cms::notifications.mail.test_subject'
+            && $mail->envelope()->subject === $subject
+            && str_contains($mail->render(), $body);
+    });
+});

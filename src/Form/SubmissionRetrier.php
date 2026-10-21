@@ -53,7 +53,7 @@ class SubmissionRetrier
         }
 
         // Not null: if even report() throws, the row must not be released Handled.
-        $error = 'Retry did not finish.';
+        $error = __('tbtop-cms::form-submissions.errors.retry_unfinished');
 
         try {
             $error = $this->run($submission);
@@ -79,13 +79,13 @@ class SubmissionRetrier
         $page = $submission->page_id !== null ? Page::query()->find($submission->page_id) : null;
 
         if (! $page instanceof Page) {
-            return 'Page no longer exists.';
+            return __('tbtop-cms::form-submissions.errors.page_missing');
         }
 
         $located = $this->locator->locate($page, $submission->block_id, $submission->locale);
 
         if (! $located instanceof LocatedFormBlock) {
-            return 'Form block no longer exists on the page.';
+            return __('tbtop-cms::form-submissions.errors.block_missing');
         }
 
         if ($submission->handled_at === null) {
