@@ -39,6 +39,29 @@ it('authenticates and redirects on valid credentials', function (): void {
     expect(auth('web')->check())->toBeTrue();
 });
 
+it('redirects to the intended admin URL after sign-in and forgets it', function (): void {
+    makeLoginableAdmin();
+
+    // The auth guard remembers where a guest was headed (url.intended).
+    test()->get('/admin/pages?tab=draft')->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])
+        ->assertRedirect(url('/admin/pages?tab=draft'))
+        ->assertSessionMissing('url.intended');
+});
+
+it('ignores an intended URL outside the admin or on another host', function (string $intended): void {
+    makeLoginableAdmin();
+
+    test()->withSession(['url.intended' => $intended]);
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])
+        ->assertRedirect(url('/admin/dashboard'));
+})->with([
+    'frontend page' => fn (): string => url('/about'),
+    'prefix look-alike' => fn (): string => url('/administrator'),
+    'other host' => 'https://evil.example/admin/pages',
+    'protocol-relative' => '//evil.example/admin/pages',
+]);
+
 it('rejects an invalid password without authenticating', function (): void {
     makeLoginableAdmin();
 

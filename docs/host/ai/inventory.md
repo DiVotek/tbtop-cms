@@ -113,7 +113,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|
 | DashboardPage | `dashboard` |
 | ProfilePage | `profile` |
-| LoginPage | `login` |
+| LoginPage | `login` — after sign-in redirects to the session's `url.intended` when it is an admin URL on this host, else `dashboard` (wiring.md) |
 | LanguagesPage | `languages` |
 | PagesPage | `pages` |
 | PageEditPage | `pages/{page}/edit` |
