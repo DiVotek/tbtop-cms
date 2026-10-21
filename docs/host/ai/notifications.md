@@ -62,7 +62,7 @@ Do not reconstruct the outcome by re-reading `tbtop_notification_log`: the log i
 
 Built with `TypeDefinition::make($key)` and its fluent setters, then handed to `Notifications::type()`:
 
-- `label(string)` — display label (settings page, bell title).
+- `label(string|Closure)` — display label (settings page, bell title). Pass a closure (`fn () => __('…')`) for a translated label: types are registered at boot, so `__('…')` passed directly is fixed in the boot locale (`app.locale`), while a closure is resolved per `labelValue()` call in the current request's locale.
 - `group(string)` — which settings tab/section this type is grouped under (real values in use: `'forms'`, `'orders'`, `'inventory'`).
 - `payload(class-string $payloadClass)` — **must be a `readonly` DTO whose public properties are exactly the template variables** (`FormSubmissionPayload`, `Tbtop\Storefront\Notifications\OrderPayload`). Plain values only — a template never queries; a money amount is pre-formatted before it reaches the payload, not formatted in the Blade view.
 - `templates(array<value-of<Format>, string> $views)` — one view name per `Format` the type supports; `templateFor(Format $format)` returns `null` for a format with no view, which `Notifications::send()` treats as "skip this channel for this recipient" rather than an error.
@@ -178,7 +178,7 @@ Register types and channels from a host service provider's `packageBooted()`/`bo
 // StorefrontServiceProvider::packageBooted()
 Notifications::type(
     TypeDefinition::make('order.placed')
-        ->label(__('tbtop-storefront::notifications.order.placed.label'))
+        ->label(fn () => __('tbtop-storefront::notifications.order.placed.label'))
         ->group('orders')
         ->payload(OrderPayload::class)
         ->templates([

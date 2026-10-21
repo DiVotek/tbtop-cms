@@ -87,6 +87,20 @@ it('groups form.submission under the forms tab with a channel toggle offering ev
     expect($values)->toBe(['mail', 'telegram', 'bell']);
 });
 
+it('titles the form.submission card in the admin user\'s locale, not the boot locale', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $owner = actingAsOwner();
+    CmsUserProfile::query()->where('user_id', $owner->id)->update(['locale' => 'uk']);
+
+    $page = test()->withSession(['tbtop.locale' => 'uk'])
+        ->get('/admin/notification-settings', ['X-Inertia' => 'true'])
+        ->assertOk();
+
+    expect(app()->getLocale())->toBe('uk')
+        ->and($page->getContent())->toContain(json_encode(trans('tbtop-cms::notifications.bell.title', [], 'uk')))
+        ->and($page->getContent())->not->toContain(json_encode(trans('tbtop-cms::notifications.bell.title', [], 'en')));
+});
+
 it('labels the channel toggle options with the short channel names', function (): void {
     actingAsOwner();
 
