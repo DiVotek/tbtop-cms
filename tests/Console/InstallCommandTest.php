@@ -55,3 +55,11 @@ it('stops installation when configuration publishing fails', function (): void {
     expect(Language::count())->toBe(0)
         ->and(Page::count())->toBe(0);
 });
+
+it('prints the @cms alias as valid vite and tsconfig snippets', function (): void {
+    $this->artisan('cms:install')
+        ->expectsOutputToContain("resolve: { alias: { '@cms': path.resolve(__dirname, 'vendor/tbtop/cms/resources/js/cms') } },")
+        ->expectsOutputToContain('{ "compilerOptions": { "paths": { "@cms/*": ["./vendor/tbtop/cms/resources/js/cms/*"] } } }')
+        ->doesntExpectOutputToContain("'@cms' => ")
+        ->assertExitCode(0);
+});

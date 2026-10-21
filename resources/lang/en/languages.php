@@ -58,6 +58,11 @@ return [
         'force_delete_confirm' => 'This cannot be undone.',
         'force_deleted' => 'Language deleted permanently',
     ],
+    'errors' => [
+        'default_not_deletable' => "Default language ':locale' cannot be deleted. Reassign default first.",
+        'frontend_requires_admin' => "Language ':locale' cannot be frontend-active without being admin-active.",
+        'only_default' => "Language ':locale' is the only default and cannot be unset. Assign another default first.",
+    ],
     'validation' => [
         'locale_taken' => 'A language with this locale already exists.',
         'locale_unknown' => 'Unknown locale — pick a language from the list.',

@@ -36,6 +36,14 @@ class RevokeAdminCommand extends Command
             return self::FAILURE;
         }
 
+        // A CmsAdmin user has no profile row by design; its own warning below
+        // covers it. Anyone else without a row has nothing to revoke.
+        if (! $this->overridesProfileAccess($user) && ! $this->hasProfile($user)) {
+            $this->warn("{$email} has no CMS admin access; nothing to revoke.");
+
+            return self::SUCCESS;
+        }
+
         $this->revokeAccess($user);
 
         if ($this->overridesProfileAccess($user)) {

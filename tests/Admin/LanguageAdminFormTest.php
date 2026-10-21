@@ -91,6 +91,19 @@ it('restores a soft-deleted language when its locale is picked again', function 
         ->and(Language::query()->where('locale', 'de')->count())->toBe(1);
 });
 
+it('leaves a soft-deleted language trashed when re-picking it is rejected', function (): void {
+    $original = LanguageForm::save(['locale' => 'de', 'sort_order' => 3]);
+    $original->delete();
+
+    expect(fn () => LanguageForm::save([
+        'locale' => 'de',
+        'is_admin_active' => false,
+        'is_frontend_active' => true,
+    ]))->toThrow(DomainException::class);
+
+    expect(Language::withTrashed()->findOrFail($original->id)->trashed())->toBeTrue();
+});
+
 it('keeps a page translation intact across a language delete and revive-on-recreate cycle', function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
     $de = LanguageForm::save(['locale' => 'de', 'is_admin_active' => true, 'is_frontend_active' => true]);

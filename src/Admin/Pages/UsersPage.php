@@ -159,7 +159,9 @@ class UsersPage extends AdminPage
     private function query(): Builder
     {
         $model = $this->userModel();
-        $table = (new $model)->getTable();
+        $user = new $model;
+        $table = $user->getTable();
+        $key = $user->getQualifiedKeyName();
         $currentId = CurrentAdmin::user()?->getKey();
         // Built before the is_a() branch: larastan's Builder<T> is invariant, so a
         // query started from the narrowed class-string would not be Builder<Model>.
@@ -173,7 +175,7 @@ class UsersPage extends AdminPage
         } else {
             $query->selectSub(
                 CmsUserProfile::query()->selectRaw("CASE WHEN is_owner THEN 'owner' ELSE 'granted' END")
-                    ->whereColumn('user_id', $table . '.id')
+                    ->whereColumn('user_id', $key)
                     ->limit(1),
                 'has_access',
             );
@@ -182,13 +184,13 @@ class UsersPage extends AdminPage
         return $query
             ->selectSub(
                 CmsUserProfile::query()->selectRaw('1')
-                    ->whereColumn('user_id', $table . '.id')
+                    ->whereColumn('user_id', $key)
                     ->where('is_owner', true)
                     ->limit(1),
                 'is_owner',
             )
             ->selectRaw(
-                $currentId !== null ? $table . '.id = ? as is_self' : '0 as is_self',
+                $currentId !== null ? $key . ' = ? as is_self' : '0 as is_self',
                 $currentId !== null ? [$currentId] : [],
             )
             ->selectRaw('? as manages_admins', [$this->actorManagesAdmins() ? 1 : 0]);

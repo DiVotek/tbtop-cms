@@ -131,6 +131,13 @@ it('redirects an already-authenticated admin away from the login page', function
     test()->get('/admin/login')->assertRedirect(url('/admin/dashboard'));
 });
 
+it('shows the login form to a signed-in host user without cms access', function (): void {
+    $user = AdminUser::create(['name' => 'H', 'email' => 'h@example.com', 'password' => 'secret']);
+    test()->actingAs($user, 'web');
+
+    test()->get('/admin/login', ['X-Inertia' => 'true'])->assertOk();
+});
+
 it('carries the page title and a single breadcrumb from translations', function (): void {
     $response = test()->get('/admin/login', ['X-Inertia' => 'true'])->assertOk();
 

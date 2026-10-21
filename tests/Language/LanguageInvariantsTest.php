@@ -103,3 +103,37 @@ it('converges to exactly one default when two concurrent saves race', function (
     expect(Language::where('is_default', true)->count())->toBe(1)
         ->and(Language::where('is_default', true)->value('locale'))->toBe('de');
 });
+
+it('translates the invariant messages shown in the admin', function (string $locale, string $key, Closure $act): void {
+    app()->setLocale($locale);
+    $language = Language::factory()->default()->create(['locale' => 'en']);
+    $other = Language::factory()->create([
+        'locale' => 'de',
+        'is_default' => false,
+        'is_admin_active' => false,
+        'is_frontend_active' => false,
+    ]);
+
+    [$subject, $run] = $act($language, $other);
+
+    expect($run)->toThrow(DomainException::class, __("tbtop-cms::languages.errors.{$key}", ['locale' => $subject->locale]));
+})->with(['en', 'uk'])->with([
+    'delete default' => ['default_not_deletable', fn (Language $default, Language $other): array => [$default, fn () => $default->delete()]],
+    'unset only default' => ['only_default', fn (Language $default, Language $other): array => [$default, fn () => $default->update(['is_default' => false])]],
+    'frontend without admin' => ['frontend_requires_admin', fn (Language $default, Language $other): array => [$other, fn () => $other->update(['is_frontend_active' => true])]],
+    'new frontend without admin' => ['frontend_requires_admin', fn (Language $default, Language $other): array => [
+        new Language(['locale' => 'fr']),
+        fn () => Language::factory()->create(['locale' => 'fr', 'is_admin_active' => false, 'is_frontend_active' => true]),
+    ]],
+]);
+
+it('keeps the english invariant messages unchanged', function (): void {
+    app()->setLocale('en');
+
+    expect(__('tbtop-cms::languages.errors.default_not_deletable', ['locale' => 'en']))
+        ->toBe("Default language 'en' cannot be deleted. Reassign default first.")
+        ->and(__('tbtop-cms::languages.errors.frontend_requires_admin', ['locale' => 'de']))
+        ->toBe("Language 'de' cannot be frontend-active without being admin-active.")
+        ->and(__('tbtop-cms::languages.errors.only_default', ['locale' => 'en']))
+        ->toBe("Language 'en' is the only default and cannot be unset. Assign another default first.");
+});

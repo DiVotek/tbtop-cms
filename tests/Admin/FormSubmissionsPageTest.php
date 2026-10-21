@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Spatie\Activitylog\Models\Activity;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\LeadStatus;
@@ -262,3 +263,29 @@ it('omits the inbox badge when nothing is unread', function (): void {
 // Detail-page equivalents (open marks New -> Read, other statuses untouched)
 // live in FormSubmissionDetailPageTest.php now that payload viewing moved
 // off this list page's removed viewPayload modal.
+
+it('skips a retry and its audit entry for a submission that is not failed', function (SubmissionStatus $status): void {
+    actingAsCmsAdmin();
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => contactPageForListing()->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => $status,
+    ]);
+
+    $this->postJson('/admin/form-submissions/actions/retry', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk()
+        ->assertJsonPath('effects.0.kind', 'notify')
+        ->assertJsonPath('effects.0.level', 'info')
+        ->assertJsonPath('effects.0.message', __('tbtop-cms::form-submissions.actions.already_retrying'));
+
+    expect(Activity::query()->where('event', 'delivery_retried')->exists())->toBeFalse()
+        ->and($submission->refresh()->status)->toBe($status);
+})->with([
+    'processing' => [SubmissionStatus::Processing],
+    'handled' => [SubmissionStatus::Handled],
+]);

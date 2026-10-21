@@ -278,8 +278,18 @@ class FormSubmissionPage extends AdminPage
     private function retry(): Effects
     {
         $submission = $this->submission();
+        $target = route('tbtop.cms.form-submission-page', ['submission' => $submission->id]);
+
         app(SubmissionRetrier::class)->retry($submission);
         $submission->refresh();
+
+        // The action is only offered on a Failed row, but retry() still
+        // no-ops when a concurrent retry (a double click) won the claim:
+        // nothing ran, so nothing to audit.
+        if (in_array($submission->status, [SubmissionStatus::Pending, SubmissionStatus::Processing], true)) {
+            return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.already_retrying'), 'info')->redirect($target);
+        }
+
         $this->logSubmission(
             $submission,
             'delivery_retried',
@@ -290,7 +300,7 @@ class FormSubmissionPage extends AdminPage
             ? Effects::make()->notify(__('tbtop-cms::form-submissions.actions.retried'))
             : Effects::make()->notify((string) $submission->error, 'error');
 
-        return $effects->redirect(route('tbtop.cms.form-submission-page', ['submission' => $submission->id]));
+        return $effects->redirect($target);
     }
 
     private function commentsSection(S $s, FormSubmission $submission): Node

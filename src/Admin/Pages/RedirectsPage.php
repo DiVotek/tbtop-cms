@@ -78,7 +78,8 @@ class RedirectsPage extends AdminPage
             ->query($this->query(...))
             ->columns([
                 Column::make('from_path')->label(__('tbtop-cms::redirects.columns.from'))->searchable(),
-                Column::make('to_path')->label(__('tbtop-cms::redirects.columns.to'))->searchable(),
+                Column::make('to_path')->label(__('tbtop-cms::redirects.columns.to'))->searchable()
+                    ->formatUsing($this->pathLabel(...)),
                 Column::make('locale')->label(__('tbtop-cms::redirects.columns.locale'))
                     ->formatUsing($this->localeLabel(...)),
                 Column::make('status_code')->label(__('tbtop-cms::redirects.columns.status'))
@@ -175,6 +176,12 @@ class RedirectsPage extends AdminPage
             'redirectDelete',
         )->label(__('tbtop-cms::redirects.actions.delete'))
             ->confirm(__('tbtop-cms::redirects.actions.delete_title'), __('tbtop-cms::redirects.actions.delete_confirm'));
+    }
+
+    /** Paths are stored without slashes, so the home page target is ''. */
+    private function pathLabel(mixed $value): string
+    {
+        return $value === null || $value === '' ? '/' : (string) $value;
     }
 
     private function localeLabel(mixed $value): string

@@ -153,7 +153,11 @@ it('claims a pending invite from getUpdates and appends the chat id to settings'
         ->assertJsonPath('effects.0.message', __('tbtop-cms::settings.notifications.actions.telegram_invite_claimed', [
             'chat' => 'Ops Team',
             'id' => '555',
-        ]));
+        ]))
+        // The open settings form still holds the old chat-id list: reload the
+        // page so a later Save does not write that stale list back.
+        ->assertJsonPath('effects.1.kind', 'redirect')
+        ->assertJsonPath('effects.1.href', route('tbtop.cms.notification-settings-page'));
 
     // The claimed line carries the chat's name so the admin can tell whose
     // chat each id is.

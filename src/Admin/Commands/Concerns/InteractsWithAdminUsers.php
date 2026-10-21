@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Admin\Commands\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Tbtop\Cms\Admin\Contracts\CmsAdmin;
+use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Admin\Support\AdminAccess;
 
 trait InteractsWithAdminUsers
@@ -37,6 +38,11 @@ trait InteractsWithAdminUsers
     protected function isOwner(Model $user): bool
     {
         return AdminAccess::isOwner(self::userId($user));
+    }
+
+    protected function hasProfile(Model $user): bool
+    {
+        return CmsUserProfile::query()->where('user_id', self::userId($user))->exists();
     }
 
     private static function userId(Model $user): int | string

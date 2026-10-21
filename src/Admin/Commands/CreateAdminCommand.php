@@ -24,6 +24,13 @@ class CreateAdminCommand extends Command
         $user = $this->findUser($email);
 
         if (! $user instanceof Model) {
+            // Same rule as the admin Users form (UserForm::assertValidEmail).
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                $this->error('The email must be a valid email address.');
+
+                return self::FAILURE;
+            }
+
             $providedPassword = $this->option('password');
 
             if (is_string($providedPassword) && $providedPassword !== '' && strlen($providedPassword) < 8) {

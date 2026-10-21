@@ -165,10 +165,13 @@ final class NotificationTestActions
         $updated = ChatIds::append($settings->get('notifications.telegram.chat_ids'), $chatId, $chatTitle);
         $settings->set('notifications.telegram.chat_ids', $updated);
 
+        // A header action has no enclosing form, so setFormData would be
+        // ignored: reload the page instead, or the open form keeps the old
+        // chat-id list and the next Save writes it back over the new id.
         return Effects::make()->notify(__('tbtop-cms::settings.notifications.actions.telegram_invite_claimed', [
             'chat' => $chatTitle,
             'id' => $chatId,
-        ]));
+        ]))->redirect(route('tbtop.cms.notification-settings-page'));
     }
 
     private static function telegramToken(Settings $settings): ?string
