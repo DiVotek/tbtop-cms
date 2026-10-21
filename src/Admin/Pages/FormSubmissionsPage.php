@@ -287,9 +287,9 @@ class FormSubmissionsPage extends AdminPage
     {
         $submission = FormSubmission::query()->findOrFail((int) $ctx->key());
 
-        // retry() no-ops when it cannot claim the row (not Failed, or a
+        // retry() no-ops when it cannot claim the row (not retryable, or a
         // concurrent retry won the claim): nothing ran, so nothing to audit.
-        if ($submission->status !== SubmissionStatus::Failed) {
+        if (! SubmissionRetrier::isRetryable($submission)) {
             return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.already_retrying'), 'info')->refreshTable();
         }
 
