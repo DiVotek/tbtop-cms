@@ -10,6 +10,7 @@ use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -131,6 +132,36 @@ it('keeps the submission failed when the retry cause is still present', function
 
     $submission->refresh();
     expect($submission->status)->toBe(SubmissionStatus::Failed);
+});
+
+it('offers retry in the list for a submission stuck in processing, not for one still sending', function (): void {
+    actingAsCmsAdmin();
+    $stuck = FormSubmission::query()->create([
+        'block_id' => 'form-1', 'kind' => 'ContactForm', 'locale' => 'en',
+        'payload' => ['name' => 'Ada'], 'status' => SubmissionStatus::Processing,
+    ]);
+    $this->travel(SubmissionRetrier::STALE_AFTER_MINUTES + 1)->minutes();
+    $sending = FormSubmission::query()->create([
+        'block_id' => 'form-1', 'kind' => 'ContactForm', 'locale' => 'en',
+        'payload' => ['name' => 'Bob'], 'status' => SubmissionStatus::Processing,
+    ]);
+
+    $rows = collect($this->getJson('/admin/form-submissions/tables/formSubmissions')->assertOk()->json('data.data'))
+        ->keyBy('id');
+    $structure = json_encode($this->get('/admin/form-submissions', ['X-Inertia' => 'true'])->json('props.structure'));
+
+    // The retry row action's hiddenIf keys on the per-row retryable flag.
+    expect($structure)->toContain('"retryable"')
+        ->and($rows[$stuck->id]['retryable'] ?? null)->toBe('yes')
+        ->and($rows[$sending->id]['retryable'] ?? null)->toBe('no');
+
+    $this->postJson('/admin/form-submissions/actions/retry', [
+        'payload' => ['row' => ['id' => $stuck->id]],
+    ])->assertOk();
+
+    // Claimed and run (its page is gone, so it ends failed rather than stuck).
+    expect($stuck->refresh()->status)->toBe(SubmissionStatus::Failed)
+        ->and($sending->refresh()->status)->toBe(SubmissionStatus::Processing);
 });
 
 it('declares the retry row action hidden when the submission is not failed', function (): void {

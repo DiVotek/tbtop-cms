@@ -120,7 +120,7 @@ class FormSubmissionPage extends AdminPage
 
         return $s->section(['title' => $this->title(), 'variant' => 'card'], [
             $s->stack($rows),
-            ...($submission->status === SubmissionStatus::Failed ? [$this->retryAction($s)] : []),
+            ...(SubmissionRetrier::isRetryable($submission) ? [$this->retryAction($s)] : []),
         ]);
     }
 

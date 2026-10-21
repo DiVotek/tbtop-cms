@@ -198,6 +198,19 @@ it('shows the empty-comments placeholder when there are no comments', function (
 // Delete
 // -----------------------------------------------------------------------
 
+it('shows retry on the detail page for a stale pending submission, not for a fresh one', function (): void {
+    actingAsDetailAdmin();
+    $stale = detailSubmission(['status' => SubmissionStatus::Pending]);
+    $this->travel(SubmissionRetrier::STALE_AFTER_MINUTES + 1)->minutes();
+    $fresh = detailSubmission(['status' => SubmissionStatus::Pending]);
+
+    $staleJson = json_encode($this->get("/admin/form-submissions/{$stale->id}", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'));
+    $freshJson = json_encode($this->get("/admin/form-submissions/{$fresh->id}", ['X-Inertia' => 'true'])->assertOk()->json('props.structure'));
+
+    expect($staleJson)->toContain('"name":"retry"')
+        ->and($freshJson)->not->toContain('"name":"retry"');
+});
+
 it('deletes the submission from the detail page and redirects to the list', function (): void {
     actingAsDetailAdmin();
     $submission = detailSubmission();
