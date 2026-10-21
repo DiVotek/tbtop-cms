@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Settings\Settings;
 
 /**
@@ -18,7 +17,6 @@ use Tbtop\Cms\Settings\Settings;
 class SitemapEntryBuilder
 {
     public function __construct(
-        private readonly PageUrl $url,
         private readonly Languages $languages,
         private readonly SeoResolver $seo,
         private readonly Settings $settings,
