@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Page\Support;
 
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Support\BlankValue;
 
 /**
  * Reads a page's translatable field for the active locale, falling back to
@@ -57,38 +58,6 @@ final class PageTranslation
 
     private static function isBlank(mixed $value): bool
     {
-        if (is_array($value)) {
-            // A richtext field saves the editor's empty document, not null.
-            return $value === [] || self::isBlankDocument($value['root']['children'] ?? null);
-        }
-
-        return $value === null || (is_string($value) && trim($value) === '');
-    }
-
-    /**
-     * Lexical keeps one empty paragraph once its text is erased. Blank means
-     * paragraphs holding only whitespace text and line breaks: any other node
-     * (an image, a list, a heading) is content even with no text.
-     */
-    private static function isBlankDocument(mixed $children): bool
-    {
-        if (! is_array($children)) {
-            return false;
-        }
-
-        foreach ($children as $paragraph) {
-            if (! is_array($paragraph) || ($paragraph['type'] ?? null) !== 'paragraph') {
-                return false;
-            }
-            foreach (is_array($paragraph['children'] ?? null) ? $paragraph['children'] : [] as $inline) {
-                $isBlankText = is_array($inline) && ($inline['type'] ?? null) === 'text' && preg_match('/^[\s\x{00A0}]*$/u', (string) ($inline['text'] ?? '')) === 1;
-                $isLineBreak = is_array($inline) && ($inline['type'] ?? null) === 'linebreak';
-                if (! $isBlankText && ! $isLineBreak) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
+        return BlankValue::is($value);
     }
 }

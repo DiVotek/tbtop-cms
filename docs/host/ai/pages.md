@@ -407,7 +407,10 @@ skips writing `content`/`starter_blocks` entirely rather than writing null
 — the stored value (template fallback trigger, or a host-written override)
 survives untouched. Creating a page of a source-backed type, or retyping an
 existing page into one, is rejected **server-side** in `PageForm`, not just
-hidden in the UI.
+hidden in the UI. Duplicating one is refused the same way:
+`PageDuplicator::duplicate()` throws a `DomainException`
+(`tbtop-cms::pages.validation.type_source_backed`), and the pages list hides
+the Duplicate row action for those rows.
 
 `tbtop-ecom/docs/storefront-cms-contract.md` documents the intended host
 usage pattern — a storefront package registering `ProductType`,

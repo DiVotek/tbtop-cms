@@ -22,6 +22,7 @@ return [
         'updated_by' => 'Updated by',
         'deleted_at' => 'Deleted',
         'path' => 'Path',
+        'source_backed' => 'Source-backed',
     ],
     'status' => [
         'published' => 'Published',
@@ -212,6 +213,8 @@ return [
         'expired_at' => 'Expired :datetime',
     ],
     'preview' => [
+        // The sticky banner the frontend CmsPage shows over a draft opened by its preview link (cms.strings.previewBanner).
+        'banner' => 'Draft preview — this page is not published.',
         'field_label' => 'Link',
         'helper' => 'Link is valid for :hours hours.',
         'copy' => 'Copy',

@@ -46,6 +46,10 @@ class ShareCmsProps
             'layout' => $this->resolveLayout(),
             // What CmsRenderer's showErrors is wired to: a developer console line, never anything on the page.
             'debug' => (bool) config('app.debug'),
+            // Fixed UI text the stock CmsPage renders, translated for the request locale.
+            'strings' => [
+                'previewBanner' => __('tbtop-cms::pages.preview.banner'),
+            ],
         ]);
 
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));

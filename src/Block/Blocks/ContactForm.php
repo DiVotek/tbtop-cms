@@ -24,11 +24,11 @@ use Tbtop\Cms\Block\SubmitContext;
  */
 class ContactForm extends Block implements HandlesFormSubmission
 {
-    /** @var list<array{name: string, label: string, type: string, required: bool}> */
+    /** @var list<array{name: string, type: string, required: bool}> Labels come from tbtop-cms::forms.contact.fields.<name>. */
     private const array FIELDS = [
-        ['name' => 'name', 'label' => 'Name', 'type' => 'text', 'required' => true],
-        ['name' => 'email', 'label' => 'Email', 'type' => 'email', 'required' => true],
-        ['name' => 'message', 'label' => 'Message', 'type' => 'textarea', 'required' => true],
+        ['name' => 'name', 'type' => 'text', 'required' => true],
+        ['name' => 'email', 'type' => 'email', 'required' => true],
+        ['name' => 'message', 'type' => 'textarea', 'required' => true],
     ];
 
     public function kind(): string
@@ -72,11 +72,29 @@ class ContactForm extends Block implements HandlesFormSubmission
     public function resolve(array $input, ResolveContext $ctx): array
     {
         return [
-            'heading' => (string) ($input['heading'] ?? 'Contact us'),
-            'submitLabel' => (string) ($input['submitLabel'] ?? 'Send'),
-            'successMessage' => (string) ($input['successMessage'] ?? 'Thanks, we will be in touch.'),
-            'fields' => self::FIELDS,
+            'heading' => self::copy($input['heading'] ?? null, 'heading', $ctx),
+            'submitLabel' => self::copy($input['submitLabel'] ?? null, 'submit', $ctx),
+            'successMessage' => self::copy($input['successMessage'] ?? null, 'success', $ctx),
+            'fields' => array_map(static fn (array $field): array => [
+                'name' => $field['name'],
+                'label' => self::lang('fields.' . $field['name'], $ctx),
+                'type' => $field['type'],
+                'required' => $field['required'],
+            ], self::FIELDS),
         ];
+    }
+
+    /** The editor's copy, or the default in the page locale when it is blank. */
+    private static function copy(mixed $value, string $key, ResolveContext $ctx): string
+    {
+        return is_scalar($value) && trim((string) $value) !== '' ? (string) $value : self::lang($key, $ctx);
+    }
+
+    private static function lang(string $key, ResolveContext $ctx): string
+    {
+        $text = __('tbtop-cms::forms.contact.' . $key, [], $ctx->locale);
+
+        return is_string($text) ? $text : '';
     }
 
     /**

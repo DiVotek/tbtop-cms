@@ -150,6 +150,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
 | `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, which only gates a developer `console.error` line for a block the client could not draw — the page looks the same either way |
+| `strings` | `{previewBanner:string}` | UI text the stock `CmsPage` renders, translated for the request locale; `previewBanner` = `tbtop-cms::pages.preview.banner`, shown when `isPreview` |
 | `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::rememberLive` (TTL capped at the next page schedule transition, since layout page links resolve against the live scope); `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
@@ -355,7 +356,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `resolve(string $path, ?string $locale = null): ?Page` | Resolves a path to a `Page` for the given/current locale |
 | | `url(Page $page, ?string $locale = null): string` | Builds the root-relative frontend path for a page in a locale (`/about`, `/uk/about`); wrap in `url()` for an absolute URL |
 | | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, non-live ancestors and a non-live home left out, `[]` for home or when fewer than two crumbs remain |
-| | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
+| | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (empty `render` spec) → (5xx only) static Blade view if rendering throws |
 | | `forms(): Forms` | The `HasForm` forms by name (blocks.md "Forms reachable from any page") |
 | | `referencedBy(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<Page>` | Live pages whose page-type `pages` field `$field` picks `$page` (only type/subtype `$from` when given), by `sort_order` then name; `[]` for a null page (pages.md "Page references") |
 | | `referencedByLinks(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<{id, name, url}>` | `referencedBy()` as the `{id, name, url}` list a `pages` field resolves to |

@@ -13,6 +13,8 @@ return [
     'anchor' => 'Anchor',
     'anchor_placeholder' => 'section-id',
     'page_placeholder' => 'Search pages…',
+    'page_search' => 'Search pages',
+    'page_empty' => 'No pages found.',
     'placeholders' => [
         'external' => 'https://example.com',
         'email' => 'name@example.com',

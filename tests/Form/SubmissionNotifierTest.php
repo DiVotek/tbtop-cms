@@ -561,3 +561,20 @@ it('marks a submission failed, not processing, when anything else in the fan-out
     expect($reported)->toBe([[RuntimeException::class, 'listener boom', $submission->id]])
         ->and(Context::has('submission_id'))->toBeFalse();
 });
+
+it('leaves the title and the action URL out of the bell body', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $data = $admin->notifications()->sole()->data;
+    $lines = array_map(trim(...), explode("\n", $data['body']));
+
+    // The short template repeats the title and prints the URL for Telegram; the bell has its own title and button.
+    expect($lines)->not->toContain($data['title'])
+        ->and($data['body'])->not->toContain($data['actions'][0]['url'])
+        ->and($data['body'])->toContain('Ada');
+});

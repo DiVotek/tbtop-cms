@@ -18,6 +18,11 @@ export interface DroppedBlock {
     message: string;
 }
 
+/** A spec the renderer can walk. A server-side fallback that sends `[]` (or nothing) is an empty page, not a crash. */
+export function hasElements(spec: unknown): spec is RenderSpec {
+    return typeof spec === "object" && spec !== null && "elements" in spec && typeof spec.elements === "object" && spec.elements !== null;
+}
+
 /**
  * Removes every element the client cannot draw — its kind has no component in the registry, or its props fail
  * the catalog's schema — together with its id in any `children` list. Both are developer bugs (a component
@@ -26,6 +31,9 @@ export interface DroppedBlock {
  */
 export function dropBrokenBlocks(spec: RenderSpec, catalog: CatalogLike, registry: Record<string, unknown>): { spec: Spec; dropped: DroppedBlock[] } {
     const dropped: DroppedBlock[] = [];
+    if (!hasElements(spec)) {
+        return { spec, dropped };
+    }
     for (const [id, element] of Object.entries(spec.elements)) {
         const message = id === spec.root ? null : brokenReason(element.type, element.props, catalog, registry);
         if (message !== null) {

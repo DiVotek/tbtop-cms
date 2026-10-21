@@ -174,6 +174,7 @@ function PageTarget({ id, link, onChange, disabled, invalid, describedBy, option
 						type="text"
 						value={term}
 						placeholder={options?.pagePlaceholder}
+						aria-label={options?.pageSearchLabel ?? "Search pages"}
 						onChange={(e) => {
 							setTerm(e.target.value);
 							remote.search(e.target.value);
@@ -183,6 +184,8 @@ function PageTarget({ id, link, onChange, disabled, invalid, describedBy, option
 						<div className="flex justify-center py-3">
 							<Spinner />
 						</div>
+					) : remote.options.length === 0 ? (
+						<p className="px-2 py-3 text-center text-sm text-muted-foreground">{options?.pageEmpty ?? "No pages found."}</p>
 					) : (
 						<ul className="mt-1 max-h-64 overflow-y-auto">
 							{remote.options.map((option) => (

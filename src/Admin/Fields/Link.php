@@ -104,6 +104,8 @@ final class Link extends Field
         $this->set('anchorLabel', (string) __('tbtop-cms::link.anchor'));
         $this->set('anchorPlaceholder', (string) __('tbtop-cms::link.anchor_placeholder'));
         $this->set('pagePlaceholder', (string) __('tbtop-cms::link.page_placeholder'));
+        $this->set('pageSearchLabel', (string) __('tbtop-cms::link.page_search'));
+        $this->set('pageEmpty', (string) __('tbtop-cms::link.page_empty'));
         $this->set('textLabel', (string) __('tbtop-cms::link.text'));
 
         return parent::toNode();

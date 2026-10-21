@@ -22,6 +22,7 @@ return [
         'updated_by' => 'Оновив(-ла)',
         'deleted_at' => 'Видалено',
         'path' => 'Шлях',
+        'source_backed' => 'З джерела',
     ],
     'status' => [
         'published' => 'Опубліковано',
@@ -208,6 +209,8 @@ return [
         'expired_at' => 'Термін минув :datetime',
     ],
     'preview' => [
+        // The sticky banner the frontend CmsPage shows over a draft opened by its preview link (cms.strings.previewBanner).
+        'banner' => 'Попередній перегляд чернетки — сторінку не опубліковано.',
         'field_label' => 'Посилання',
         'helper' => 'Посилання дійсне протягом :hours год.',
         'copy' => 'Копіювати',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Errors\Support;
 
+use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Settings\Settings;
 
@@ -40,7 +41,8 @@ final class FallbackProps
                 'image' => null,
                 'fields' => (object) [],
             ],
-            'render' => [],
+            // An empty spec, not []: the client walks `render.elements`.
+            'render' => app(PageSpecAssembler::class)->assemble([]),
             'seo' => [
                 'title' => __("tbtop-cms::errors.{$key}.heading"),
                 'description' => '',

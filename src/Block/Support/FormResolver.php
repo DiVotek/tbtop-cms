@@ -10,6 +10,7 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Page\Refs\PageRefList;
+use Tbtop\Cms\Support\BlankValue;
 
 /**
  * Resolves block input by the form's field kinds, so a block without its own
@@ -106,7 +107,8 @@ final class FormResolver
             ],
             $kind === 'richtext' => [
                 'type' => 'string|null',
-                'resolve' => static fn (mixed $v, ResolveContext $ctx): ?string => self::blankToNull($ctx->richtextHtml($v)),
+                // An emptied editor saves one empty paragraph, which would render as "<p></p>".
+                'resolve' => static fn (mixed $v, ResolveContext $ctx): ?string => BlankValue::is($v) ? null : self::blankToNull($ctx->richtextHtml($v)),
             ],
             $kind === 'media' && $isMultiple => [
                 'type' => 'list<string>',
@@ -179,12 +181,22 @@ final class FormResolver
                 continue;
             }
             $resolved = $this->resolve($fields, $row, $ctx);
-            if (array_filter($resolved, static fn (mixed $v): bool => $v !== null && $v !== [] && $v !== false) !== []) {
+            if (! array_all($resolved, self::isEmpty(...))) {
                 $rows[] = $resolved;
             }
         }
 
         return $rows;
+    }
+
+    /** A resolved value a blank row holds: a daterange resolves to all-null keys, not null. */
+    private static function isEmpty(mixed $value): bool
+    {
+        if (is_array($value) && $value !== []) {
+            return ! array_is_list($value) && array_all($value, static fn (mixed $v): bool => $v === null);
+        }
+
+        return $value === null || $value === [] || $value === false;
     }
 
     private static function blankToNull(string $value): ?string
