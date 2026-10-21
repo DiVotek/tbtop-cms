@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Cache\CmsCache;
 
 beforeEach(function (): void {
@@ -74,7 +75,7 @@ it('serves a fresh closure result for the same key after bump()', function (): v
 it('retries an atomic increment when another writer initializes the version', function (): void {
     $store = Mockery::mock(Repository::class);
     $store->shouldReceive('increment')->once()->with('tbtop-cms:content-version')->andReturnFalse();
-    $store->shouldReceive('add')->once()->with('tbtop-cms:content-version', 0, PHP_INT_MAX)->andReturnFalse();
+    $store->shouldReceive('add')->once()->with('tbtop-cms:content-version', 0, 315360000)->andReturnFalse();
     $store->shouldReceive('increment')->once()->with('tbtop-cms:content-version')->andReturn(2);
     Cache::shouldReceive('store')->once()->withNoArgs()->andReturn($store);
 
@@ -97,4 +98,20 @@ it('memoizes the version for the lifetime of one instance, ignoring a bump from 
 
     expect($requestOne->remember('a', fn (): string => 'a-changed'))->toBe('a-value')
         ->and($requestTwo->remember('a', fn (): string => 'a-fresh'))->toBe('a-fresh');
+});
+
+it('seeds the version on a database store with an expiration the column can hold', function (): void {
+    config([
+        'cache.stores.database' => ['driver' => 'database', 'table' => 'cache', 'connection' => null, 'lock_connection' => null],
+        'tbtop-cms.cache.store' => 'database',
+    ]);
+
+    app(CmsCache::class)->bump();
+
+    $row = DB::table('cache')->where('key', 'like', '%tbtop-cms:content-version')->first();
+
+    expect($row)->not->toBeNull()
+        ->and((string) $row->expiration)->toMatch('/^\d+$/')
+        ->and((int) $row->expiration)->toBeLessThan(2 ** 32)
+        ->and(Cache::store('database')->get('tbtop-cms:content-version'))->toBe(1);
 });

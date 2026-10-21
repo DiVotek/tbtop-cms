@@ -41,6 +41,18 @@ it('lists pages for an empty search', function (): void {
     expect(array_column($response->json('options'), 'label'))->toContain('About');
 });
 
+it('answers an array search with no options instead of erroring', function (): void {
+    Page::factory()->create(['name' => ['en' => 'About']]);
+
+    pageSearch(['search' => ['x']])->assertOk()->assertExactJson(['options' => []]);
+});
+
+it('answers an array value with no option instead of erroring', function (): void {
+    Page::factory()->create(['name' => ['en' => 'About']]);
+
+    pageSearch(['value' => ['1']])->assertOk()->assertExactJson(['option' => null]);
+});
+
 it('narrows results by name', function (): void {
     Page::factory()->create(['name' => ['en' => 'About']]);
     Page::factory()->create(['name' => ['en' => 'Contact']]);

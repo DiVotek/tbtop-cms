@@ -32,7 +32,9 @@ final class SeoAuditSnapshotWriter
 
         foreach ($issues as $issue) {
             $pageIds[$issue['pageId']] = true;
-            $issueCounts[$issue['issue']] = ($issueCounts[$issue['issue']] ?? 0) + 1;
+            // The stable key, not the translated label: the cron (app locale)
+            // and an admin in another locale must write the same keys.
+            $issueCounts[$issue['key']] = ($issueCounts[$issue['key']] ?? 0) + 1;
 
             if ($issue['severity'] === 'fail') {
                 $failCount++;

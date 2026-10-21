@@ -552,8 +552,8 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
   locale) — presence of the keyword in the **rendered** title, rendered
   description, `heading`, and slug. `focus_keyword` itself warns when empty.
 - **duplicate_title / duplicate_description** — compares this page's rendered
-  title/description against every other page's rendered title/description
-  (via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
+  title/description against every other non-error page's rendered
+  title/description (drafts included; via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
   lazily only if the template uses `{parent}`) — `warn` on a collision,
   including collisions a template that omits `{title}`/`{description}` can
   create even between pages with distinct own values. Empty short-circuits
@@ -582,7 +582,9 @@ issue count), each holding a list of that page's issues.
 
 **Daily snapshots** (`tbtop_seo_audit_snapshots`, one row per calendar day,
 `Tbtop\Cms\Seo\Models\SeoAuditSnapshot`) back the Overview sparklines and
-history chart. `php artisan cms:seo:snapshot` runs the audit and
+history chart. `issue_counts` is keyed by the stable issue key
+(`missing_title`, `duplicate_description`, …), never the translated label, so
+rows written in different locales stay comparable. `php artisan cms:seo:snapshot` runs the audit and
 upserts/updates today's row via `SeoAuditSnapshotWriter` — it is **not**
 auto-scheduled by the package, so a host wanting daily history needs its own
 cron entry for it. As a fallback so history still accumulates without cron,
@@ -657,10 +659,14 @@ throws `NotFoundHttpException` like any other route, so it goes through this
 same registration and obeys every gate above — `errors.handle = false` leaves
 the CMS's own not-found handling to stock Laravel too.
 
-**Maintenance mode**: a `503` served by Laravel's maintenance screen (`php
-artisan down`) happens before the framework boots the request pipeline —
-this package's exception handler registration is never reached, so a
-maintenance page is unaffected by any of the above.
+**Maintenance mode**: a plain `php artisan down` is enforced by Laravel's
+`PreventRequestsDuringMaintenance` middleware, which throws a `503`
+`HttpException` through the exception handler — so, with `503` in
+`tbtop-cms.errors.statuses` (the default) and `app.debug` off, frontend
+requests get the seeded 5xx error page above. Only `--render=<view>`
+(answered from `public/index.php` before the framework boots) and
+`--redirect` (a redirect, not an exception) bypass this package. To keep Laravel's own maintenance
+screen without `--render`, drop `503` from `tbtop-cms.errors.statuses`.
 
 ## Redirects, briefly
 
