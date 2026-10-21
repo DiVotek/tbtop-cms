@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Seo\Models\SeoAuditSnapshot;
@@ -304,4 +305,31 @@ it('writes/updates today\'s snapshot via the artisan command, which is not auto-
     );
 
     expect($summaries)->not->toContain('cms:seo:snapshot');
+});
+
+it('leaves the seeded error pages out of the audit and the pages-scanned counts', function (): void {
+    // Error pages are never served at a URL (the sitemap skips them too), so
+    // their noindex flag and missing description are not issues to report.
+    foreach ([ErrorClass::ClientError, ErrorClass::ServerError] as $class) {
+        Page::factory()->create([
+            'status' => PageStatus::Published,
+            'is_system' => true,
+            'is_indexable' => false,
+            'error_class' => $class,
+            'name' => ['en' => 'Error'],
+            'seo' => [],
+        ]);
+    }
+
+    $overviewTab = seoReportStructure()['options']['tabs'][0]['body'];
+    $stats = [];
+    collectNodesByKind($overviewTab, 'stat', $stats);
+    $byLabel = array_column(array_column($stats, 'options'), 'value', 'label');
+
+    expect($byLabel[__('tbtop-cms::seo_report.stats.pages_scanned')])->toBe(0)
+        ->and($byLabel[__('tbtop-cms::seo_report.stats.pages_with_issues')])->toBe(0);
+
+    test()->artisan('cms:seo:snapshot')->assertExitCode(0);
+
+    expect(SeoAuditSnapshot::query()->first()->pages_scanned)->toBe(0);
 });

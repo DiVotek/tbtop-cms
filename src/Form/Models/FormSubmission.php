@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Tbtop\Cms\Form\Casts\OrderedPayload;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -54,9 +55,16 @@ class FormSubmission extends Model
 
     protected $table = 'tbtop_form_submissions';
 
+    /**
+     * Written and read only through the payload cast.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [OrderedPayload::ORDER_COLUMN];
+
     /** @var array<string, string> */
     protected $casts = [
-        'payload' => 'array',
+        'payload' => OrderedPayload::class,
         'status' => SubmissionStatus::class,
         'lead_status' => LeadStatus::class,
         'handled_at' => 'datetime',

@@ -75,7 +75,7 @@ class SeoReportPage extends AdminPage
     public function view(S $s): Node
     {
         $issues = app(SeoAudit::class)->run();
-        $pagesScanned = Page::query()->live()->count();
+        $pagesScanned = Page::query()->live()->whereNull('error_class')->count();
 
         app(SeoAuditSnapshotWriter::class)->write($issues, $pagesScanned);
 

@@ -139,6 +139,22 @@ it('offers matching pages in the admin search, drafts included, the edited page 
         ->and(array_column($search($reviewer), 'label'))->toBe(['Divorce', 'Diversion']);
 });
 
+it('matches page names in the admin search regardless of case, Cyrillic included', function (): void {
+    $specialist = refsArticle('specialist', 'Anna');
+    refsArticle('legal_service', 'Divorce');
+    refsArticle('legal_service', 'Розлучення');
+
+    test()->actingAs(PageEditHelpers::admin(), 'web');
+    $search = fn (string $term): array => array_column(test()
+        ->postJson("/admin/pages/{$specialist->id}/edit/select-options/field_specialist__services", ['search' => $term])
+        ->assertOk()
+        ->json('options'), 'label');
+
+    expect($search('DIV'))->toBe(['Divorce'])
+        ->and($search('розл'))->toBe(['Розлучення'])
+        ->and($search('РОЗЛ'))->toBe(['Розлучення']);
+});
+
 it('rewrites the reverse index on save: a removed reference leaves the target\'s list', function (): void {
     $service = refsArticle('legal_service', 'Divorce');
     $specialist = refsArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id]]]);
@@ -214,4 +230,23 @@ it('rejects on save a reference to the page being edited', function (): void {
     ])->assertSessionHasErrors('field_reviewer__services.1');
 
     expect($reviewer->refresh()->fields['services'] ?? null)->toBeNull();
+});
+
+it('lets a type build its own entries from the referencing pages, next to the plain links', function (): void {
+    $service = refsArticle('legal_service', 'Divorce');
+    refsArticle('specialist', 'Anna', ['fields' => ['services' => [(string) $service->id], 'bio' => 'Family law'], 'sort_order' => 1]);
+    refsArticle('specialist', 'Bob', ['fields' => ['services' => [(string) $service->id]], 'sort_order' => 2]);
+
+    $fields = refsFields($service);
+
+    expect(refsNames($fields['specialists']))->toBe(['Anna', 'Bob'])
+        ->and($fields['specialistCards'])->toBe([
+            ['name' => 'Anna', 'bio' => 'Family law'],
+            ['name' => 'Bob', 'bio' => null],
+        ]);
+});
+
+it('returns no referencing pages for a null page', function (): void {
+    expect(app(Cms::class)->referencedBy(null, 'services'))->toBe([])
+        ->and(app(Cms::class)->referencedByLinks(null, 'services'))->toBe([]);
 });

@@ -82,6 +82,10 @@ when it's already current.
 path to the host's `.prettierignore` (and any other formatter's ignore list).
 A reformatted file keeps working at runtime but fails `--check`.
 
+The same run writes `pages.generated.ts` beside the blocks file — the `page`
+prop's schemas (pages.md, "Page prop types") — and `--check` covers it too;
+give it the same ignore-list entry.
+
 ### Generating the catalog and registry: `registry.generated.ts`
 
 When the component folder exists (`tbtop-cms.blocks.components_dir`,
@@ -237,7 +241,7 @@ Overridable, all with sane defaults:
 - **`translatableFields(): array`** — dotted paths (e.g. `'items.caption'`)
   the flattener treats as locale maps. Default: walks `form()`'s field tree
   and collects every field marked `->translatable()`, at any repeater
-  nesting depth (`Block::collectTranslatablePaths()`). Override only if a
+  nesting depth (`Tbtop\Cms\Block\Support\TranslatablePaths::of()`). Override only if a
   block's translatable set can't be read off its own form — the default is
   right for the overwhelming majority of blocks and is exercised directly by
   `tests/Block/TranslatableFieldsTest.php`.
@@ -438,8 +442,8 @@ here. Block-specific usage:
 
 - **Pages fields** (`$s->pages('related')->of('article')`) — a searchable
   multiple select of pages storing their ids; resolved to `{id, name, url}`
-  of the live ones. Inside a block it resolves forward only: reverse lists
-  (`backReferences()`) index page-type fields, not block data. See pages.md,
+  of the live ones. Inside a block it resolves forward only: reverse lookups
+  (`Cms::referencedBy()`) index page-type fields, not block data. See pages.md,
   "Page references".
 
 **Editor caveat** (`src/Admin/Fields/BlockContent.php` docblock): the admin block
@@ -473,7 +477,8 @@ to extending `Block`:
   Telegram) — see [./notifications.md](./notifications.md#submission-lifecycle)
   for that pipeline. `handleSubmit()` runs after `SubmissionReceived` has
   fired. A thrown exception here is logged (`form.submit.failed`), the
-  visitor is sent back with a `form` error, and a stored `FormSubmission`
+  visitor is sent back with a `form` error (lang key
+  `tbtop-cms::forms.submit_failed`, in the submit's locale), and a stored `FormSubmission`
   is set to `Failed` with the exception message (`handled_at` stays null);
   see `FormSubmitController::__invoke()`. The throw also **skips** the
   bell/mail/telegram fan-out: the row is no longer `Pending` by the time the
@@ -505,6 +510,31 @@ rendered the request) or, absent one, the home page — see
 to the current page's `{page}` id: `FormBlockLocator` looks in the page's
 own content first, then the active blocks of both layout slots, so the same
 block id resolves under whichever page happened to render it.
+
+**Forms reachable from any page (`HasForm`)**: a `HandlesFormSubmission`
+block that also uses the `Tbtop\Cms\Form\HasForm` trait registers its form
+by name (`formName()`, the block kind unless overridden) in the
+`Tbtop\Cms\Form\Forms` singleton. Use it for a form a page type template
+renders rather than an editor places (an order form on every service page):
+
+```php
+// ServiceType::resolveFields(), or anywhere a Page is in hand
+'orderForm' => Cms::forms()->props('ServiceForm', $page),
+// ['action' => '…/_cms/forms/en/12/ServiceForm', 'honeypotField' => 'website']
+```
+
+The action is the same `tbtop-cms.form.submit` route with the form name in
+the `{block}` segment, so it posts from any live page. `FormBlockLocator`
+tries a block row of that id on the page and in the layout slots first, then
+the name, so a placed block keeps its own id and editor data. A
+name-addressed submit runs `submitRules()` / `handleSubmit()` with empty
+`$blockData` (no placed row carries editor copy), so a `HasForm` block's
+rules and handler must not depend on it; the notification fan-out never
+reads it and is stored with
+`block_id` = the form name, which is also what an admin retry looks up. Two
+blocks declaring one name throw on first use of `Forms`. A block without
+`HasForm` is never reachable by its kind. `Forms` API: `all()`, `has()`,
+`get()`, `action($name, $page, ?$locale)`, `props($name, $page, ?$locale)`.
 
 **Honeypot**: `tbtop-cms.forms.honeypot_field` (default `'website'`) names a
 field the frontend must render hidden-but-focusable (not `display:none` or

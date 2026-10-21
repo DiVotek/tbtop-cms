@@ -42,6 +42,11 @@ interface PageTypeInterface
      * return null (an empty page). A source-backed type returns its kind's
      * template. Same envelope shape as Page::$content.
      *
+     * A page created in the admin starts with a copy of these blocks in its
+     * content (unless it inherits a category's starter blocks), each block with
+     * a fresh id; it may leave out active, sort and data. Called there on the
+     * unsaved page.
+     *
      * @return array<int, array<string, mixed>>|null
      */
     public function template(Page $page): ?array;
@@ -81,17 +86,6 @@ interface PageTypeInterface
      * @return array<string, mixed>
      */
     public function resolveFields(array $input, ResolveContext $ctx): array;
-
-    /**
-     * Reverse lists added to `page.fields`: key => the pages-kind field on
-     * other pages' types that points here (`field`), optionally only from
-     * pages whose type or subtype key is `from`. Each resolves to the live
-     * referencing pages as `list<{id, name, url}>`, by sort_order then name.
-     * A subtype's declarations merge over its base type's.
-     *
-     * @return array<string, array{field: string, from?: string}>
-     */
-    public function backReferences(): array;
 
     /**
      * The subtype a new article under a page of this type gets when none is

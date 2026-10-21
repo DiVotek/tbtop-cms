@@ -78,6 +78,8 @@ class ShareCmsProps
      * __PHP_Incomplete_Class on the next read. `action`
      * is bound after the cache read, per request, since it depends on the
      * current page rather than the (page-independent) layout content.
+     * rememberLive(): page links in layout blocks resolve against the live
+     * scope, so a cached entry must not outlive a schedule transition.
      *
      * @return array<string, list<ResolvedBlock>>
      */
@@ -86,7 +88,7 @@ class ShareCmsProps
         $locale = (string) app()->getLocale();
 
         /** @var array<string, list<array<string, mixed>>> $cached */
-        $cached = $this->cache->remember(
+        $cached = $this->cache->rememberLive(
             'layout:' . $locale,
             fn (): array => array_map(
                 static fn (array $blocks): array => array_map(static fn (ResolvedBlock $block): array => $block->toArray(), $blocks),

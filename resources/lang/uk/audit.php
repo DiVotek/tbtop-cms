@@ -20,7 +20,7 @@ return [
     'detail' => ['summary' => 'Зведення', 'before' => 'До', 'after' => 'Після', 'context' => 'Контекст', 'none' => 'Значень немає.'],
     'types' => [
         'page' => 'Сторінка', 'redirect' => 'Перенаправлення', 'language' => 'Мова',
-        'layout' => 'Макет', 'setting' => 'Налаштування', 'submission' => 'Заявка форми',
+        'layout' => 'Макет', 'shared_block' => 'Спільний блок', 'setting' => 'Налаштування', 'submission' => 'Заявка форми',
         'not_found' => 'Запис 404', 'user' => 'Користувач',
     ],
     'events' => [

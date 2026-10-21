@@ -90,9 +90,9 @@ class SharedBlocksPage extends AdminPage
             ]);
         }
 
-        $usage = SharedBlockUsage::index();
+        $usage = SharedBlockUsage::counts();
         $registry = app(BlockRegistry::class);
-        $card = fn (SharedBlock $block): Node => $this->card($s, $registry, $block, count($usage[(int) $block->getKey()] ?? []));
+        $card = fn (SharedBlock $block): Node => $this->card($s, $registry, $block, $usage[(int) $block->getKey()] ?? 0);
         $grid = fn (iterable $items): Node => $s->grid(['cols' => ['sm' => 2, 'md' => 3, 'lg' => 4], 'gap' => 4], array_map($card, [...$items]));
 
         // One tab per kind is the type filter: a site with two hundred FAQ

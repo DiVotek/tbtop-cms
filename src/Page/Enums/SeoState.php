@@ -6,7 +6,7 @@ namespace Tbtop\Cms\Page\Enums;
 
 /**
  * The SEO badge on the pages list: a coarse "is anything obviously missing"
- * hint, computed in SQL over the whole list (PagesPage::seoStateSql()). The
+ * hint, computed in SQL over the whole list (PageListState::seoStateSql()). The
  * authoritative per-page verdict lives in SeoChecklist::for().
  *
  * Backed by a number rather than a name so the column can be sorted. The badge

@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Admin\Pages;
 
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
 use Tbtop\Admin\Dsl\ActionBuilder;
@@ -155,8 +156,8 @@ class LanguagesPage extends AdminPage
         return EditAction::make(
             $s,
             $s->form('languageEdit', LanguageForm::editFields($s)),
-            static fn (ActionCtx $ctx): array => LanguageForm::load((int) ($ctx->row['id'] ?? 0)),
-            static fn (ActionCtx $ctx): Language => LanguageForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0)),
+            static fn (ActionCtx $ctx): array => LanguageForm::load((int) $ctx->key()),
+            static fn (ActionCtx $ctx): ?Effects => self::saveOrHalt($ctx->form, (int) $ctx->key()),
             name: 'languageEdit',
             title: __('tbtop-cms::languages.edit_title'),
         )->hiddenIf('deleted_at', 'not empty');
@@ -167,8 +168,11 @@ class LanguagesPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
-                $language = Language::query()->find($ctx->row['id'] ?? null);
-                $language?->delete();
+                try {
+                    Language::query()->find($ctx->key())?->delete();
+                } catch (DomainException $e) {
+                    return Effects::make()->notify($e->getMessage(), 'error');
+                }
 
                 return Effects::make()->notify(__('tbtop-cms::languages.actions.deleted'))->refreshTable();
             },
@@ -187,7 +191,7 @@ class LanguagesPage extends AdminPage
 
     private function restore(ActionCtx $ctx): Effects
     {
-        $language = Language::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $language = Language::withTrashed()->findOrFail((int) $ctx->key());
 
         try {
             $language->restore();
@@ -208,7 +212,7 @@ class LanguagesPage extends AdminPage
 
     private function forceDelete(ActionCtx $ctx): Effects
     {
-        $language = Language::withTrashed()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $language = Language::withTrashed()->findOrFail((int) $ctx->key());
 
         try {
             app(AuditContext::class)->during(
@@ -225,8 +229,30 @@ class LanguagesPage extends AdminPage
 
     private function create(ActionCtx $ctx): Effects
     {
-        LanguageForm::save($ctx->form);
+        return self::saveOrHalt($ctx->form)
+            ?? Effects::make()->notify(__('tbtop-cms::languages.actions.created'))->closeModal()->refreshTable();
+    }
 
-        return Effects::make()->notify(__('tbtop-cms::languages.actions.created'))->closeModal()->refreshTable();
+    /**
+     * Action endpoints have no field-error channel (a thrown
+     * ValidationException turns into a 422 the client ignores, a
+     * DomainException from LanguageObserver into a 500): surface the
+     * message inside the still-open modal instead. Null means saved.
+     *
+     * @param  array<string, mixed>  $form
+     */
+    private static function saveOrHalt(array $form, ?int $id = null): ?Effects
+    {
+        try {
+            LanguageForm::save($form, $id);
+        } catch (ValidationException $e) {
+            $first = collect($e->errors())->flatten()->first();
+
+            return Effects::make()->haltModal(is_string($first) ? $first : $e->getMessage());
+        } catch (DomainException $e) {
+            return Effects::make()->haltModal($e->getMessage());
+        }
+
+        return null;
     }
 }

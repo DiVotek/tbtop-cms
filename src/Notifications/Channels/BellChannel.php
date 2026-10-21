@@ -53,10 +53,14 @@ final class BellChannel implements Channel
     {
         $notification = BellNotification::make();
 
-        if ($message->subject !== '') {
-            $notification->title($message->subject)->body($message->body);
+        // The Short template is Telegram HTML; the bell client renders plain text.
+        $subject = self::plainText($message->subject);
+        $body = self::plainText($message->body);
+
+        if ($subject !== '') {
+            $notification->title($subject)->body($body);
         } else {
-            $notification->title($message->body);
+            $notification->title($body);
         }
 
         $actionUrl = $message->data['actionUrl'] ?? null;
@@ -67,5 +71,10 @@ final class BellChannel implements Channel
         }
 
         $notification->sendToDatabase($to->notifiable);
+    }
+
+    private static function plainText(string $html): string
+    {
+        return trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 }

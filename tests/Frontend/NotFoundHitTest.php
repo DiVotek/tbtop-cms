@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
+use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\NotFound\Models\NotFoundHit;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -96,4 +98,34 @@ it('keeps recording when the setting row holds a stored null', function (): void
     $this->get('/missing', ['X-Inertia' => 'true'])->assertNotFound();
 
     expect(NotFoundHit::query()->count())->toBe(1);
+});
+
+it('increments the hit count on a connection with a table prefix', function (): void {
+    // A host connection with `prefix` set: the raw `hits + 1` must name the
+    // prefixed table, or the upsert fails on its second hit.
+    config(['database.connections.prefixed' => [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => 'app_',
+        'foreign_key_constraints' => true,
+    ]]);
+    // Switch the default back before teardown: RefreshDatabase rolls back the
+    // default connection, and on MySQL the suite's open transaction would
+    // otherwise hold its locks until a later migrate blocks on them.
+    $default = config('database.default');
+    config(['database.default' => 'prefixed']);
+
+    try {
+        $this->artisan('migrate', ['--database' => 'prefixed'])->assertExitCode(0);
+
+        foreach ([1, 2] as $_) {
+            event(new PageNotFound('missing', 'en', null, null));
+            app()->terminate();
+            clearTerminatingCallbacks();
+        }
+
+        expect(DB::connection('prefixed')->table('tbtop_not_found_hits')->value('hits'))->toBe(2);
+    } finally {
+        config(['database.default' => $default]);
+    }
 });

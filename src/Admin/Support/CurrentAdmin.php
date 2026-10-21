@@ -53,6 +53,14 @@ final class CurrentAdmin
         return $user !== null && self::allows($user);
     }
 
+    /** Whether the currently signed-in guard user is the cms owner. */
+    public static function isOwner(): bool
+    {
+        $userId = auth()->guard(self::guard())->id();
+
+        return $userId !== null && AdminAccess::isOwner($userId);
+    }
+
     /**
      * The per-user admin-access rule shared by EnsureCmsAdmin (panel
      * routes) and draft preview (frontend): a CmsAdmin implementation

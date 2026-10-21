@@ -4,41 +4,25 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms;
 
-use Illuminate\Auth\Events\Login;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Route;
 use Inertia\Ssr\HttpGateway;
 use Spatie\Activitylog\ActivitylogServiceProvider;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tbtop\Admin\Dsl\S;
-use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Admin\Fields\Link;
 use Tbtop\Cms\Admin\Fields\Pages;
-use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
-use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
-use Tbtop\Cms\Admin\Listeners\SeedsLocaleFromProfile;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Cache\CmsCache;
-use Tbtop\Cms\Cache\InvalidatesContentCache;
 use Tbtop\Cms\Console\BlocksTypesCommand;
 use Tbtop\Cms\Console\DoctorCommand;
 use Tbtop\Cms\Console\InstallCommand;
-use Tbtop\Cms\Form\Events\SubmissionReceived;
-use Tbtop\Cms\Form\Listeners\NotifiesAdminsOfSubmission;
-use Tbtop\Cms\Form\Notifications\FormSubmissionPayload;
+use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Form\SubmissionNotifier;
 use Tbtop\Cms\Frontend\Errors\ErrorPageResolver;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
@@ -47,53 +31,29 @@ use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
 use Tbtop\Cms\Frontend\Support\CurrentPage;
-use Tbtop\Cms\Health\Checks\SchedulerHeartbeatCheck;
-use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
-use Tbtop\Cms\Language\Models\Language;
-use Tbtop\Cms\Layout\Events\LayoutSaved;
 use Tbtop\Cms\Layout\LayoutResolver;
-use Tbtop\Cms\Link\Http\LinkPageSearchController;
-use Tbtop\Cms\Link\LinkPageSearchRoute;
 use Tbtop\Cms\Link\LinkResolver;
 use Tbtop\Cms\Link\LinkShapeValidator;
 use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\NotFound\Commands\PruneNotFoundHitsCommand;
-use Tbtop\Cms\NotFound\Events\PageNotFound;
-use Tbtop\Cms\NotFound\Listeners\RecordsNotFoundHit;
-use Tbtop\Cms\Notifications\Audience;
-use Tbtop\Cms\Notifications\Channels\BellChannel;
-use Tbtop\Cms\Notifications\Channels\MailChannel;
-use Tbtop\Cms\Notifications\Channels\TelegramChannel;
 use Tbtop\Cms\Notifications\Contracts\TemplateStore;
 use Tbtop\Cms\Notifications\DeliveryRecorder;
-use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\NotificationRegistry;
-use Tbtop\Cms\Notifications\Notifications;
 use Tbtop\Cms\Notifications\Support\DatabaseTemplateStore;
 use Tbtop\Cms\Notifications\TemplateRenderer;
-use Tbtop\Cms\Notifications\TypeDefinition;
-use Tbtop\Cms\Page\Events\PageDeleted;
-use Tbtop\Cms\Page\Events\PagePublished;
-use Tbtop\Cms\Page\Events\PageRestored;
-use Tbtop\Cms\Page\Events\PageSaved;
-use Tbtop\Cms\Page\Events\PageUnpublished;
-use Tbtop\Cms\Page\Models\Page;
-use Tbtop\Cms\Page\Models\PageSlug;
-use Tbtop\Cms\Page\Observers\PageRefs;
-use Tbtop\Cms\Page\Observers\PageRevisions;
 use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Page\Refs\PageRefRule;
 use Tbtop\Cms\Page\Refs\RebuildPageRefsCommand;
-use Tbtop\Cms\Page\Support\PageSlugWriter;
-use Tbtop\Cms\Redirect\Observers\PageSlugRedirects;
 use Tbtop\Cms\Redirect\RedirectResolver;
 use Tbtop\Cms\Seo\Commands\SnapshotSeoAuditCommand;
-use Tbtop\Cms\Settings\Events\SettingsSaved;
 use Tbtop\Cms\Settings\Settings;
-use Tbtop\Cms\SharedBlock\Events\SharedBlockDeleted;
-use Tbtop\Cms\SharedBlock\Events\SharedBlockSaved;
 use Tbtop\Cms\SharedBlock\SharedBlocks;
+use Tbtop\Cms\Support\Wiring\AdminWiring;
+use Tbtop\Cms\Support\Wiring\ContentEventsWiring;
+use Tbtop\Cms\Support\Wiring\ErrorPagesWiring;
+use Tbtop\Cms\Support\Wiring\NotificationWiring;
+use Tbtop\Cms\Support\Wiring\ScheduleWiring;
 use Tbtop\Cms\Telegram\TelegramClient;
 use Tbtop\Cms\Telegram\TelegramInvites;
 
@@ -142,6 +102,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_10_07_000000_add_lock_version_to_shared_blocks_table')
             ->hasMigration('2026_10_07_000001_move_identity_contacts_to_site_contacts')
             ->hasMigration('2026_10_07_000002_create_page_refs_table')
+            ->hasMigration('2026_10_13_000000_add_payload_order_to_form_submissions_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -163,6 +124,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->singleton(BlockRegistry::class);
+        $this->app->singleton(Forms::class);
         $this->app->singleton(RobotsRegistry::class);
         $this->app->singleton(SchemaTypeRegistry::class);
         $this->app->scoped(BlockContentResolver::class);
@@ -187,31 +149,20 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->bind(TemplateStore::class, DatabaseTemplateStore::class);
         $this->app->scoped(LinkResolver::class);
         $this->registerLinkField();
-        $this->registerAdminPanel();
+        AdminWiring::registerPanel();
     }
 
     public function packageBooted(): void
     {
         $this->forceSsrOffByDefault();
         $this->gateSsrByRequest();
-        $this->wireAdminLoginRedirect();
-        $this->wireAdminLogout();
-        $this->wireLinkPageSearch();
+        AdminWiring::wire($this->app);
         LinkShapeValidator::register();
         PageRefRule::register();
-        $this->wireLocaleSlugBackfill();
-        $this->wireRedirectMaintenance();
-        $this->wirePageRevisions();
-        $this->wirePageRefs();
-        $this->wireContentCacheInvalidation();
-        $this->wireLocaleSeeding();
-        $this->wireNotificationRegistry();
-        $this->wireSubmissionNotifications();
-        $this->wireNotFoundLogging();
-        $this->wireErrorPages();
-        $this->wireNotFoundPruneSchedule();
-        $this->wireAuditPruneSchedule();
-        $this->wireSchedulerHeartbeat();
+        ContentEventsWiring::wire($this->app);
+        NotificationWiring::wire($this->app);
+        ErrorPagesWiring::wire($this->app);
+        ScheduleWiring::wire($this->app);
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -236,21 +187,6 @@ class CmsServiceProvider extends PackageServiceProvider
     {
         S::register('link', Link::class);
         S::register('pages', Pages::class);
-    }
-
-    private function registerAdminPanel(): void
-    {
-        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
-            return;
-        }
-
-        /** @var list<class-string> $panels */
-        $panels = (array) config('tbtop-admin.panels', []);
-
-        if (! in_array(CmsPanel::class, $panels, true)) {
-            $panels[] = CmsPanel::class;
-            config(['tbtop-admin.panels' => $panels]);
-        }
     }
 
     /**
@@ -286,311 +222,5 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->make(HttpGateway::class)->disable(
             static fn (): bool => ! (bool) request()->attributes->get(EnableSsr::REQUEST_ATTRIBUTE, false),
         );
-    }
-
-    /**
-     * Guarded admin routes rely on a named `login` route: `auth`'s
-     * unauthenticated handler redirects there. A bare host has none, so cms
-     * provides one pointing at the admin login page.
-     *
-     * A host that ships its own auth (a Laravel starter kit, Fortify,
-     * Breeze) already defines `login`, and registering a second route under
-     * that name is actively harmful: Laravel keeps the first binding for
-     * URL generation but the last matching route wins dispatch, so
-     * `route('login')` would still print the host's URL while GET /login
-     * bounced to the admin panel — the host's own login page unreachable.
-     * It also emits a duplicate export in Wayfinder's generated routes,
-     * breaking the host's frontend build. So it is only registered when
-     * nothing else claims the name.
-     *
-     * The collection is scanned directly rather than asked via Route::has():
-     * the name lookup it consults is a cache rebuilt by refreshNameLookups(),
-     * and during boot that cache still predates routes the host registered,
-     * so has() reports false for a name that is demonstrably present.
-     */
-    private function wireAdminLoginRedirect(): void
-    {
-        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
-            return;
-        }
-
-        if (config('tbtop-cms.admin.pages.login') === null) {
-            return;
-        }
-
-        foreach (Route::getRoutes()->getRoutes() as $route) {
-            if ($route->getName() === 'login') {
-                return;
-            }
-        }
-
-        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
-
-        Route::redirect('login', $prefix . '/login')->name('login');
-    }
-
-    /**
-     * Server half of the admin client's logout contract: ProfileDropdown
-     * (admin >=0.2.24) posts to `{prefix}/logout`. Registered by cms because
-     * auth is cms-owned — the admin package ships no auth controllers.
-     * Prefixed on purpose: a root `/logout` would occupy the host app's own
-     * route namespace. Guarded by `auth:{guard}` only: logging out must not
-     * require the CmsUserProfile row EnsureCmsAdmin checks for page access.
-     */
-    private function wireAdminLogout(): void
-    {
-        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
-            return;
-        }
-
-        $guard = (string) config('tbtop-cms.admin.guard', 'web');
-        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
-
-        Route::middleware(['web', 'auth:' . $guard])
-            ->post($prefix . '/logout', LogoutController::class)
-            ->name('tbtop.cms.logout');
-    }
-
-    /** One fixed route, not a per-field query() closure: PrefixedField::rename() cannot carry a closure. */
-    private function wireLinkPageSearch(): void
-    {
-        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
-            return;
-        }
-
-        $guard = (string) config('tbtop-cms.admin.guard', 'web');
-        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
-
-        Route::middleware(['web', 'auth:' . $guard, EnsureCmsAdmin::class])
-            ->post($prefix . '/' . LinkPageSearchRoute::RELATIVE_PATH, LinkPageSearchController::class)
-            ->name(LinkPageSearchRoute::NAME);
-    }
-
-    private function wireLocaleSlugBackfill(): void
-    {
-        Language::saved(function (Language $language): void {
-            $activated = $language->wasRecentlyCreated
-                ? $language->is_frontend_active
-                : ($language->wasChanged('is_frontend_active') && $language->is_frontend_active);
-
-            if (! $activated) {
-                return;
-            }
-
-            app(Languages::class)->refresh();
-            app(PageSlugWriter::class)->backfillLocale($language->locale);
-        });
-    }
-
-    private function wireRedirectMaintenance(): void
-    {
-        PageSlug::observe(PageSlugRedirects::class);
-    }
-
-    /**
-     * A second Page observer, registered independently of PageObserver's
-     * #[ObservedBy] attribute — see PageRevisions' class docblock for why.
-     */
-    private function wirePageRevisions(): void
-    {
-        Page::observe(PageRevisions::class);
-    }
-
-    /** A third Page observer, same reasoning: the references index is derived data. */
-    private function wirePageRefs(): void
-    {
-        Page::observe(PageRefs::class);
-    }
-
-    /**
-     * Every domain event that changes frontend-visible content bumps the
-     * content cache version — see InvalidatesContentCache's docblock for why
-     * one blanket bump instead of per-event targeted invalidation.
-     * SubmissionReceived is intentionally excluded: submissions aren't content.
-     */
-    private function wireContentCacheInvalidation(): void
-    {
-        // The per-request shared-block memo must not outlive a save in the same request (editor actions re-render).
-        foreach ([SharedBlockSaved::class, SharedBlockDeleted::class] as $event) {
-            Event::listen($event, fn () => $this->app->make(SharedBlocks::class)->forget());
-        }
-
-        foreach ([
-            PageSaved::class,
-            PagePublished::class,
-            PageUnpublished::class,
-            PageDeleted::class,
-            PageRestored::class,
-            LayoutSaved::class,
-            SharedBlockSaved::class,
-            SharedBlockDeleted::class,
-            SettingsSaved::class,
-            LanguagesChanged::class,
-        ] as $event) {
-            Event::listen($event, InvalidatesContentCache::class);
-        }
-    }
-
-    /**
-     * Seeds session('tbtop.locale') from the profile right after login —
-     * see SeedsLocaleFromProfile's docblock for why this is needed.
-     */
-    private function wireLocaleSeeding(): void
-    {
-        Event::listen(Login::class, SeedsLocaleFromProfile::class);
-    }
-
-    /**
-     * See NotifiesAdminsOfSubmission's docblock for why the actual fan-out
-     * is deferred to app()->terminating() rather than run here.
-     */
-    private function wireSubmissionNotifications(): void
-    {
-        Event::listen(SubmissionReceived::class, NotifiesAdminsOfSubmission::class);
-    }
-
-    /**
-     * Registers cms's own built-in channels and its one built-in type
-     * (form.submission) with Notifications, the same way a host or another
-     * package would from its own service provider — see Notifications'
-     * class docblock for the registry this feeds.
-     *
-     * defaultChannels(['bell']) is the fallback Notifications::enabledChannels()
-     * returns until a merchant sets notifications.form.submission.channels
-     * via the settings page (cms-4) — so every host that has never touched
-     * notification settings keeps bell-only delivery, no mail, no telegram.
-     */
-    private function wireNotificationRegistry(): void
-    {
-        Notifications::channel(MailChannel::class);
-        Notifications::channel(TelegramChannel::class);
-        Notifications::channel(BellChannel::class);
-
-        Notifications::type(
-            TypeDefinition::make('form.submission')
-                ->label(__('tbtop-cms::notifications.bell.title'))
-                ->group('forms')
-                ->payload(FormSubmissionPayload::class)
-                ->templates([
-                    Format::Html->value => 'tbtop-cms::notifications.form-submission.html',
-                    Format::Short->value => 'tbtop-cms::notifications.form-submission.short',
-                ])
-                ->audiences([Audience::Staff])
-                ->defaultChannels(['bell']),
-        );
-    }
-
-    private function wireNotFoundLogging(): void
-    {
-        Event::listen(PageNotFound::class, RecordsNotFoundHit::class);
-    }
-
-    /**
-     * Renders the matching error page for a whitelisted status instead of
-     * Laravel's stock error view — gated by config so a host can opt out
-     * entirely (errors.handle=false) and still call Cms::errorResponse()
-     * itself. Registered against HttpExceptionInterface, not Throwable: a
-     * non-HTTP exception only reaches here after Laravel's own handler has
-     * already converted it (see Handler::prepareException()), so this never
-     * duplicates that conversion.
-     */
-    private function wireErrorPages(): void
-    {
-        $this->app->afterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {
-            $handler->renderable(function (HttpExceptionInterface $e, Request $request): ?Response {
-                return $this->renderError($request, $e->getStatusCode());
-            });
-        });
-    }
-
-    private function renderError(Request $request, int $status): ?Response
-    {
-        if (! (bool) config('tbtop-cms.errors.handle', true)) {
-            return null;
-        }
-
-        /** @var list<int> $statuses */
-        $statuses = (array) config('tbtop-cms.errors.statuses', [404, 500, 503]);
-
-        if (! in_array($status, $statuses, true)) {
-            return null;
-        }
-
-        if ($status >= 500 && (bool) config('app.debug', false)) {
-            return null;
-        }
-
-        // API clients keep Laravel's JSON error body; Inertia XHRs send
-        // Accept: text/html, so they are not caught by this check.
-        if ($request->expectsJson()) {
-            return null;
-        }
-
-        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
-
-        if ($request->is($prefix) || $request->is($prefix . '/*')) {
-            return null;
-        }
-
-        return app(Cms::class)->errorResponse($request, $status);
-    }
-
-    /**
-     * Scheduled by the package, opt-out via config: unlike the scheduler
-     * heartbeat (which must exist unconditionally, see below), a host that
-     * prunes the 404 log some other way — or wants to keep every row — needs
-     * a way to turn this off. Read with an inline default (published host
-     * configs won't have the `not_found` key at all, see the config file's
-     * comments), so silence here means "keep the package default", not
-     * "disable it".
-     */
-    private function wireNotFoundPruneSchedule(): void
-    {
-        if (! config('tbtop-cms.not_found.auto_prune', true)) {
-            return;
-        }
-
-        $this->app->booted(function (): void {
-            $schedule = $this->app->make(Schedule::class);
-
-            $schedule->command(PruneNotFoundHitsCommand::class)->daily()
-                ->name('tbtop-cms:not-found:prune');
-        });
-    }
-
-    private function wireAuditPruneSchedule(): void
-    {
-        if (! config('tbtop-cms.audit.auto_prune', true)) {
-            return;
-        }
-
-        $this->app->booted(function (): void {
-            $days = max(1, (int) config('tbtop-cms.audit.retention_days', 365));
-            $this->app->make(Schedule::class)
-                ->command("activitylog:clean tbtop-cms --days={$days} --force")
-                ->daily()
-                ->name('tbtop-cms:audit:prune');
-        });
-    }
-
-    /**
-     * Writes a timestamp SchedulerHeartbeatCheck reads back — the only way
-     * to detect "the host's cron never calls schedule:run" from inside the
-     * app itself, since a dead scheduler produces no error, just silence
-     * (see PruneNotFoundHitsCommand and any future scheduled command never
-     * running). Registered directly on the Schedule singleton rather than
-     * requiring host wiring: unlike cms:not-found:prune (an opt-in cadence
-     * the host chooses), the heartbeat must exist unconditionally for the
-     * health check to have anything to read.
-     */
-    private function wireSchedulerHeartbeat(): void
-    {
-        $this->app->booted(function (): void {
-            $schedule = $this->app->make(Schedule::class);
-
-            $schedule->call(static function (): void {
-                Cache::forever(SchedulerHeartbeatCheck::CACHE_KEY, now()->toIso8601String());
-            })->everyMinute()->name('tbtop-cms:health:scheduler-heartbeat');
-        });
     }
 }

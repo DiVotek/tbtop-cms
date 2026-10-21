@@ -19,7 +19,7 @@ React component that reads `cms.layout.header`/`cms.layout.footer` off the
 shared Inertia prop and renders each slot's resolved blocks through the same
 `json-render` renderer as page content. `Tbtop\Cms\Frontend\Http\Middleware\
 ShareCmsProps::resolveLayout()` supplies that prop, cached per locale via
-`CmsCache::remember('layout:{locale}', ...)` — see "Custom cached frontend
+`CmsCache::rememberLive('layout:{locale}', ...)` — see "Custom cached frontend
 read" below for what that caching implies. Both real hosts hand-roll a chrome component rather than
 using anything the package ships (there is no package `SiteChrome`):
 `divotek_com_ua/resources/js/cms/SiteChrome.tsx`,
@@ -268,8 +268,8 @@ the block's `form()` paired with these two host-written helper methods; see
 `blocks.md` for the admin field DSL these methods plug into.
 
 **Caching implication**: `Tbtop\Cms\Cache\CmsCache` is a
-content-version-keyed cache (`CmsCache::remember()`/`bump()`), but in this package it wraps layout (`ShareCmsProps::resolveLayout()`), the
-sitemap (`SitemapController`, via `rememberLive()`), settings and languages —
+content-version-keyed cache (`CmsCache::remember()`/`bump()`), but in this package it wraps layout (`ShareCmsProps::resolveLayout()`) and the
+sitemap (`SitemapController`), both via `rememberLive()`, plus settings and languages —
 never block resolution. Page-content block resolution —
 `Tbtop\Cms\Frontend\Http\Controllers\PageController::props()` calling
 `BlockContentResolver::resolve($content, $page, $source)` — is **not**

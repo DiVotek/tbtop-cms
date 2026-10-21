@@ -7,6 +7,7 @@ use Tbtop\Cms\Block\BlockRegistry;
 beforeEach(function (): void {
     config()->set('tbtop-cms.blocks.types', []);
     $this->outputPath = sys_get_temp_dir() . '/tbtop-cms-discovery-check-' . uniqid() . '.ts';
+    config()->set('tbtop-cms.pages.types_path', false);
 });
 
 afterEach(function (): void {

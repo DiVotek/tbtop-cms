@@ -48,7 +48,7 @@ use Tbtop\Cms\Page\Support\StarterBlockSync;
  *   raw query-builder update(), which also sidesteps PageObserver's
  *   lock_version bump: a real Eloquent save() on any dirty attribute bumps
  *   lock_version, which would make the user's already-open edit form's next
- *   "Save" bounce off PageForm::guardLockVersion() as a false conflict even
+ *   "Save" bounce off PageFormGuards::lockVersion() as a false conflict even
  *   though nothing they were editing actually changed.
  *
  * Action names are suffixed by $type (article/category) so the two tabs'
@@ -238,7 +238,7 @@ final class PageEditStarterBlocks
      * an Eloquent save on this dirty attribute would fire PageObserver's
      * update path and bump lock_version, which the user's already-open edit
      * form has no way to know about — its next "Save" would then bounce off
-     * PageForm::guardLockVersion() as a false conflict, even though nothing
+     * PageFormGuards::lockVersion() as a false conflict, even though nothing
      * IT was editing changed. json_encode() is manual because the base query
      * builder bypasses the model's 'array' cast.
      *

@@ -155,3 +155,21 @@ it('preselects all locales and a permanent redirect in the create modal', functi
     expect($data['locale'] ?? null)->toBe(RedirectFormOptions::ALL_LOCALES)
         ->and($data['status_code'] ?? null)->toBe('301');
 });
+
+it('deletes the record the row key names, not the id column', function (): void {
+    $make = static fn (string $from): Redirect => RedirectForm::save([
+        'from_path' => $from,
+        'to_path' => 'new',
+        'locale' => RedirectFormOptions::ALL_LOCALES,
+        'status_code' => '301',
+    ]);
+    $target = $make('old-a');
+    $other = $make('old-b');
+
+    $this->postJson('/admin/redirects/actions/redirectDelete', [
+        'payload' => ['row' => ['_key' => $target->id, 'id' => $other->id]],
+    ])->assertOk();
+
+    expect(Redirect::find($target->id))->toBeNull()
+        ->and(Redirect::find($other->id))->not->toBeNull();
+});

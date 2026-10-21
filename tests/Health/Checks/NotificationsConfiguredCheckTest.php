@@ -44,3 +44,18 @@ it('warns when telegram is in the channel list without a bot token or chat ids',
         ->toContain(__('tbtop-cms::health.checks.notifications_configured.hints.telegram_no_token'))
         ->toContain(__('tbtop-cms::health.checks.notifications_configured.hints.telegram_no_chat_ids'));
 });
+
+it('warns when the stored recipients and chat ids hold nothing delivery can use', function (): void {
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'mail', 'telegram']);
+    app(Settings::class)->set('notifications.mail.recipients', 'not-an-email');
+    app(Settings::class)->set('mail.from_address', 'noreply@example.com');
+    app(Settings::class)->set('notifications.telegram.bot_token', 'a-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '@channel # Sales');
+
+    $result = app(NotificationsConfiguredCheck::class)->run();
+
+    expect($result->status)->toBe(HealthStatus::Warning)
+        ->and($result->hint())
+        ->toContain(__('tbtop-cms::health.checks.notifications_configured.hints.mail_no_recipients'))
+        ->toContain(__('tbtop-cms::health.checks.notifications_configured.hints.telegram_no_chat_ids'));
+});

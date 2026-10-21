@@ -1,0 +1,291 @@
+{
+    "page": {
+        "full": {
+            "id": 1,
+            "type": "page",
+            "subtype": null,
+            "status": "published",
+            "name": "Full page",
+            "title": "Title",
+            "heading": "Heading",
+            "summary": "Summary",
+            "body": "<p>Body</p>",
+            "image": "/storage/media/photo.png",
+            "fields": {}
+        },
+        "empty": {
+            "id": 2,
+            "type": "page",
+            "subtype": null,
+            "status": "published",
+            "name": "Empty page",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {}
+        }
+    },
+    "category": {
+        "empty": {
+            "id": 10,
+            "type": "category",
+            "subtype": null,
+            "status": "published",
+            "name": "Team",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {}
+        }
+    },
+    "article": {
+        "empty": {
+            "id": 11,
+            "type": "article",
+            "subtype": null,
+            "status": "published",
+            "name": "Plain article",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {}
+        }
+    },
+    "event": {
+        "full": {
+            "id": 20,
+            "type": "event",
+            "subtype": null,
+            "status": "published",
+            "name": "Full event",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": "Arena",
+                "capacity": 500
+            }
+        },
+        "empty": {
+            "id": 21,
+            "type": "event",
+            "subtype": null,
+            "status": "published",
+            "name": "Empty event",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": null,
+                "capacity": null
+            }
+        }
+    },
+    "concert": {
+        "full": {
+            "id": 30,
+            "type": "event",
+            "subtype": "concert",
+            "status": "published",
+            "name": "Full concert",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": "Hall",
+                "capacity": 80,
+                "artist": "Muse",
+                "billing": "MUSE LIVE"
+            }
+        },
+        "empty": {
+            "id": 31,
+            "type": "event",
+            "subtype": "concert",
+            "status": "published",
+            "name": "Empty concert",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": null,
+                "capacity": null,
+                "artist": null,
+                "billing": null
+            }
+        }
+    },
+    "festival": {
+        "full": {
+            "id": 40,
+            "type": "event",
+            "subtype": "festival",
+            "status": "published",
+            "name": "Full festival",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": "Field",
+                "capacity": 9000,
+                "headliner": "Blur"
+            }
+        },
+        "empty": {
+            "id": 41,
+            "type": "event",
+            "subtype": "festival",
+            "status": "published",
+            "name": "Empty festival",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": null,
+                "capacity": null,
+                "headliner": null
+            }
+        }
+    },
+    "gig": {
+        "full": {
+            "id": 50,
+            "type": "event",
+            "subtype": "gig",
+            "status": "published",
+            "name": "Full gig",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": "Pub",
+                "capacity": 40,
+                "band": "Pulp",
+                "soldOut": false
+            }
+        },
+        "empty": {
+            "id": 51,
+            "type": "event",
+            "subtype": "gig",
+            "status": "published",
+            "name": "Empty gig",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "venue": null,
+                "capacity": null,
+                "band": null,
+                "soldOut": true
+            }
+        }
+    },
+    "specialist": {
+        "full": {
+            "id": 70,
+            "type": "article",
+            "subtype": "specialist",
+            "status": "published",
+            "name": "Anna",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "services": [
+                    {
+                        "id": "80",
+                        "name": "Divorce",
+                        "url": "/team/divorce"
+                    }
+                ],
+                "bio": "Family law"
+            }
+        },
+        "empty": {
+            "id": 71,
+            "type": "article",
+            "subtype": "specialist",
+            "status": "published",
+            "name": "Bob",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "services": [],
+                "bio": null
+            }
+        }
+    },
+    "legal_service": {
+        "full": {
+            "id": 80,
+            "type": "article",
+            "subtype": "legal_service",
+            "status": "published",
+            "name": "Divorce",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "specialists": [
+                    {
+                        "id": "70",
+                        "name": "Anna",
+                        "url": "/team/anna"
+                    }
+                ],
+                "specialistCards": [
+                    {
+                        "name": "Anna",
+                        "bio": "Family law"
+                    }
+                ]
+            }
+        },
+        "empty": {
+            "id": 81,
+            "type": "article",
+            "subtype": "legal_service",
+            "status": "published",
+            "name": "Contracts",
+            "title": null,
+            "heading": null,
+            "summary": null,
+            "body": "",
+            "image": null,
+            "fields": {
+                "specialists": [],
+                "specialistCards": []
+            }
+        }
+    }
+}

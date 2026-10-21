@@ -150,7 +150,7 @@ export function SerpPreviewBlock({ options }: RenderProps<SerpPreviewOptions>) {
 	// Reported as the budget the wrapped title consumes: every line but the
 	// last one fills the column, the last one takes what it needs. An
 	// overflowing title reports past the limit, which is what the bar shows.
-	const titleWidth = layout === null ? null : column * (layout.lines - 1) + layout.width;
+	const titleWidth = layout === null ? null : column * (layout.lines - 1) + layout.lastWidth;
 
 	const titleText = titleWidth === null ? "—" : Math.round(titleWidth);
 	const descriptionLength = countCharacters(description);

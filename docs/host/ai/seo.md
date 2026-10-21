@@ -35,14 +35,14 @@ Field-by-field:
 - **title** — `SeoTemplates::title($page->type, $locale)` picks a template:
   per-subtype, then per-type (`seo.type_templates.{type}.title`), else site-wide
   (`seo.title_template`). An empty template falls back to the legacy
-  `{title} {seo.title_suffix}` behavior (`SeoResolver::titleWithSuffix()`) —
+  `{title} {seo.title_suffix}` behavior (`SeoTextRenderer::titleWithSuffix()`) —
   existing sites with no template configured render byte-identical titles.
   The `{title}` placeholder is the *own* title cascade: `seo.title` →
   `page.title` → `page.name` (`PageOwnSeo::title()`). Templates also support
   `{site_name}`, `{sep}` (`seo.title_separator`, default `—`), `{parent}`
   (nearest live ancestor, labelled `name` → `title`; empty when none), `{date}`
   (published date, only when the page `isLive()`).
-  `SeoResolver::cleanupRendered()` collapses whitespace and strips dangling
+  `SeoTextRenderer::cleanupRendered()` collapses whitespace and strips dangling
   separators left by an empty placeholder — one template can serve both a
   top-level and a nested page.
 - **description** — same two-rung template lookup
@@ -99,9 +99,10 @@ Field-by-field:
 | OG title/description/image | `page.seo.og_title` / `og_description` / `og_image` | SEO tab → *Social* section (`og_image` is a plain scalar, not translatable — an image isn't per-locale) |
 | Canonical override | `page.seo.canonical` (translatable) | SEO tab: *Canonical URL* (validated `url:http,https`) |
 | Schema.org node type | `page.seo.schema.type` | SEO tab → *Schema* section, only present when the page type's `schemaTypes()` offers more than one key |
-| Article author / publisher | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab — same entity (same `@id`) as the site-wide identity node |
+| Article author / publisher | `Settings` (`seo.identity.type` / `.name`) | SEO settings → *Identity* tab for the type; the name falls back to `site.name` (Site settings) unless a legacy `seo.identity.name` value exists — same entity (same `@id`) as the site-wide identity node |
 | `is_indexable` | `page.is_indexable` column | Page edit sidebar → *Publication* card, not the SEO tab |
-| Site title/description templates, separator, suffix | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`, `seo.title_suffix`) | Admin → SEO settings → *Titles* tab |
+| Site title/description templates, separator | `Settings` (`seo.title_template`, `seo.description_template`, `seo.title_separator`) | Admin → SEO settings → *Titles* tab |
+| Legacy title suffix | `Settings` (`seo.title_suffix`) | No field: still mapped by `SeoSettingsPage` and honoured by `SeoTextRenderer` when a value already exists in the database (legacy/scripted); `seo.title_template` replaces it in the UI |
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type and subtype; a page reads its subtype's pair first, then its type's |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
@@ -529,7 +530,7 @@ route group and are never rewritten.
 ## SEO audit and per-page checklist
 
 **`SeoChecklist::for(Page $page, string $locale)`** — rendered beside the
-page editor's SEO tab (`PageForm::seoFields()` → `seoChecklistSection()`,
+page editor's SEO tab (`PageForm::seoFields()` → `PageSeoFields::seoChecklistSection()`,
 client component `resources/js/cms/admin/seoChecklist.tsx`, needs
 `@cms/admin/blocks` imported — see wiring.md). Checks, each `pass`/`warn`/
 `fail`, `required` ones affecting result-list appearance
@@ -560,8 +561,10 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
   pass over the other pages rather than scanning twice.
 
 **`SeoAudit::run()`** — the site-wide report (`SeoReportPage`, admin nav
-group "content", gated behind the `tbtop-cms.redirects` ability). One query for every *live* page (`Page::query()->live()` — a scheduled or
-expired page is excluded), then plain PHP, deliberately never calling
+group "content", gated behind the `tbtop-cms.redirects` ability). One query for every *live* page except the error pages
+(`Page::query()->live()->whereNull('error_class')` — a scheduled or expired
+page is excluded, and so are the error pages, as in the sitemap; the
+pages-scanned count uses the same filter), then plain PHP, deliberately never calling
 `SeoResolver::resolve()` per page (would build alternates/JSON-LD/every OG
 field × pages × locales). Issues: `missing_title`/`missing_description`
 (fail), `missing_translation` (warn — no own `title`/`name` in a locale,
@@ -640,7 +643,7 @@ Response` always returns a response, in three fallback layers:
    dependency, so a broken database or a broken block cannot take down the
    error page meant to report it.
 
-**Auto-registration** (`CmsServiceProvider::wireErrorPages()`), gated by
+**Auto-registration** (`ErrorPagesWiring::wireErrorPages()`), gated by
 `config('tbtop-cms.errors.handle')` (default `true`): registers a
 `renderable()` on the host's exception handler for
 `Symfony\Component\HttpKernel\Exception\HttpExceptionInterface`, whitelisted

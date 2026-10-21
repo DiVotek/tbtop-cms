@@ -30,6 +30,10 @@ class SeoResolver
 
     private readonly SchemaContextFactory $factory;
 
+    private readonly SeoTextRenderer $text;
+
+    private readonly SeoAlternates $alternates;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly PageUrl $url,
@@ -50,6 +54,8 @@ class SeoResolver
         $this->indexing = $indexing ?? new IndexingSetting($settings);
         $this->templates = $templates ?? new SeoTemplates($settings);
         $this->factory = $factory ?? new SchemaContextFactory($settings, $url, $pageTypes, $mediaUrlResolver);
+        $this->text = new SeoTextRenderer($settings, $this->templates, $this->factory);
+        $this->alternates = new SeoAlternates($url, $languages);
     }
 
     /**
@@ -95,14 +101,14 @@ class SeoResolver
         $metaDescription = $this->description($page, $seo, $locale);
         $ogTitle = LocalizedSeo::value($seo['og_title'] ?? null, $locale) ?: $metaTitle;
         $siteName = (string) $this->settings->get('site.name', '');
-        $alternates = $this->alternates($page);
+        $alternates = $this->alternates->forPage($page);
         $schema = $this->schemaSelector->selectFor($page);
         $context = $ctx ?? $this->factory->make($page, $locale);
         $og = $schema->openGraph($context);
 
         return [
-            'title' => $this->title($page, $metaTitle, $locale, $breadcrumbs),
-            'description' => $this->descriptionWithTemplate($page, $metaDescription, $locale, $breadcrumbs),
+            'title' => $this->text->title($page, $metaTitle, $locale, $breadcrumbs),
+            'description' => $this->text->description($page, $metaDescription, $locale, $breadcrumbs),
             'canonical' => $context->url,
             'ogImage' => $context->image,
             'ogImageAlt' => $context->imageAlt,
@@ -116,13 +122,13 @@ class SeoResolver
             'ogType' => $og->type,
             'ogUrl' => $context->url,
             'ogLocale' => $this->languages->ogLocale($locale),
-            'ogLocaleAlternates' => $this->ogLocaleAlternates($locale, $alternates),
+            'ogLocaleAlternates' => $this->alternates->ogLocales($locale, $alternates),
             'articlePublishedTime' => $og->publishedTime,
             'articleModifiedTime' => $og->modifiedTime,
             'articleAuthor' => $og->author,
             'twitterCard' => $this->twitterCard($context->image),
             'alternates' => $alternates,
-            'xDefault' => $this->xDefault($alternates),
+            'xDefault' => $this->alternates->xDefault($alternates),
             // metaTitle is already the page's own cascade (seo.title → title →
             // name) with no site-wide filler in it; the description cascade
             // has one more rung, so it is asked for separately below.
@@ -152,66 +158,6 @@ class SeoResolver
             'summary', 'summary_large_image' => $choice,
             default => $ogImage !== null ? 'summary_large_image' : 'summary',
         };
-    }
-
-    /**
-     * Derived from the hreflang alternates (locales the page actually exists
-     * in), not from every frontend-active locale: og:locale:alternate is a
-     * claim that this content is available in that locale. A language with
-     * no og_locale is left out rather than published as a bare `en`.
-     *
-     * @param  list<Alternate>  $alternates
-     * @return list<string>
-     */
-    private function ogLocaleAlternates(string $locale, array $alternates): array
-    {
-        $ogLocales = [];
-
-        foreach (array_column($alternates, 'locale') as $code) {
-            $ogLocale = $code !== $locale ? $this->languages->ogLocale($code) : null;
-
-            if ($ogLocale !== null) {
-                $ogLocales[] = $ogLocale;
-            }
-        }
-
-        return $ogLocales;
-    }
-
-    /**
-     * Same rule as SitemapEntryBuilder::alternates(): one absolute URL per
-     * frontend-active locale for which the page has a slug, kept consistent
-     * with what the sitemap emits for hreflang.
-     *
-     * @return list<Alternate>
-     */
-    private function alternates(Page $page): array
-    {
-        $alternates = [];
-
-        foreach ($this->localeCodes() as $code) {
-            $path = $page->pathFor($code);
-
-            if ($path !== null) {
-                $alternates[] = ['locale' => $code, 'url' => url($this->url->build($path, $code))];
-            }
-        }
-
-        return $alternates;
-    }
-
-    /** @param  list<Alternate>  $alternates */
-    private function xDefault(array $alternates): ?string
-    {
-        $default = $this->languages->defaultLocale();
-
-        foreach ($alternates as $alternate) {
-            if ($alternate['locale'] === $default) {
-                return $alternate['url'];
-            }
-        }
-
-        return null;
     }
 
     private function favicon(): ?string
@@ -319,15 +265,6 @@ class SeoResolver
         ));
     }
 
-    /** @return list<string> */
-    private function localeCodes(): array
-    {
-        return array_map(
-            static fn (array $row): string => $row['locale'],
-            $this->languages->frontendActive(),
-        );
-    }
-
     /**
      * The meta title before the template/suffix is applied — also the base
      * that og:title falls back to when no og_title override is set.
@@ -345,201 +282,26 @@ class SeoResolver
     }
 
     /**
-     * The template comes from SeoTemplates: the page type's own template if
-     * one is set for this locale, otherwise the site-wide `seo.title_template`
-     * (translatable). Either one supersedes the legacy single-space suffix —
-     * existing sites that never touch these settings must see byte-identical
-     * titles, so an empty template falls straight back to append-suffix.
-     *
-     * @param  list<Breadcrumb>  $breadcrumbs
-     */
-    private function title(Page $page, string $base, string $locale, array $breadcrumbs): string
-    {
-        $template = $this->templates->title($page->type, $locale, $page->subtype);
-
-        if ($template === '') {
-            return $this->titleWithSuffix($base);
-        }
-
-        return $this->renderTemplate($template, ['{title}' => $base], $locale, $page, $breadcrumbs);
-    }
-
-    /**
      * Renders only the title, for duplicate checks that must follow the same
-     * template rules without paying for a full SEO resolution. Derives its
-     * own base the same way resolve() does, so callers don't re-derive it.
-     *
-     * Breadcrumbs arrive as a closure because these callers render one title
-     * per page across the whole site, and resolving a page's ancestors costs
-     * a recursive CTE plus a page_slugs read. Only {parent} needs them, and
-     * most templates do not use it — so the closure runs only when the
-     * template actually references it.
+     * template rules without paying for a full SEO resolution — see
+     * SeoTextRenderer::renderedTitle().
      *
      * @param  Closure(): list<Breadcrumb>  $breadcrumbs
      */
     public function renderedTitle(Page $page, string $locale, Closure $breadcrumbs): string
     {
-        $base = PageOwnSeo::title($page, PageOwnSeo::blob($page), $locale);
-        $template = $this->templates->title($page->type, $locale, $page->subtype);
-
-        if ($template === '') {
-            return $this->titleWithSuffix($base);
-        }
-
-        return $this->renderTemplate(
-            $template,
-            ['{title}' => $base],
-            $locale,
-            $page,
-            str_contains($template, '{parent}') ? $breadcrumbs() : [],
-        );
+        return $this->text->renderedTitle($page, $locale, $breadcrumbs);
     }
 
     /**
-     * Mirrors the title template, per-type fallback included: applied on top
-     * of whatever the description cascade resolved to, with an empty template
-     * meaning "use the description as is" — existing sites keep
-     * byte-identical descriptions until they opt in. Shares
-     * `seo.title_separator` for {sep}.
-     *
-     * @param  list<Breadcrumb>  $breadcrumbs
-     */
-    private function descriptionWithTemplate(Page $page, string $base, string $locale, array $breadcrumbs): string
-    {
-        $template = $this->templates->description($page->type, $locale, $page->subtype);
-
-        if ($template === '') {
-            return $base;
-        }
-
-        return $this->renderTemplate($template, ['{description}' => $base], $locale, $page, $breadcrumbs);
-    }
-
-    /**
-     * Renders only the description, mirroring renderedTitle() for duplicate
-     * checks that must follow the same template rules without paying for a
-     * full SEO resolution. Derives its own base through the same private
-     * description() cascade resolve() uses, so this and resolve() share one
-     * implementation of the base rather than two copies drifting apart; the
-     * template step below is descriptionWithTemplate()'s logic with lazy
-     * breadcrumbs, same relationship renderedTitle() has to title().
-     *
-     * Breadcrumbs arrive lazily for the same reason as renderedTitle(): only
-     * a template referencing {parent} needs the ancestor query.
+     * Renders only the description, mirroring renderedTitle() — see
+     * SeoTextRenderer::renderedDescription().
      *
      * @param  Closure(): list<Breadcrumb>  $breadcrumbs
      */
     public function renderedDescription(Page $page, string $locale, Closure $breadcrumbs): string
     {
-        $seo = PageOwnSeo::blob($page);
-        $base = $this->description($page, $seo, $locale);
-        $template = $this->templates->description($page->type, $locale, $page->subtype);
-
-        if ($template === '') {
-            return $base;
-        }
-
-        return $this->renderTemplate(
-            $template,
-            ['{description}' => $base],
-            $locale,
-            $page,
-            str_contains($template, '{parent}') ? $breadcrumbs() : [],
-        );
-    }
-
-    private function titleWithSuffix(string $base): string
-    {
-        $suffix = (string) $this->settings->get('seo.title_suffix', '');
-
-        if ($suffix === '') {
-            return $base;
-        }
-
-        return $base === '' ? $suffix : $base . ' ' . $suffix;
-    }
-
-    /**
-     * {parent} and {date} exist for the per-type templates: an article title
-     * reads better as "Post — Blog — Site" than as the site-wide shape, and
-     * only a template that knows it is rendering an article can say so.
-     *
-     * Both resolve to an empty string when the page has no parent or no
-     * publication date — cleanupRendered() then removes the separator that
-     * would have been left stranded, so one template serves both a nested
-     * page and a top-level one.
-     *
-     * @param  array<string, string>  $vars  Template-specific substitutions ({title} or {description}).
-     * @param  list<Breadcrumb>  $breadcrumbs
-     */
-    private function renderTemplate(string $template, array $vars, string $locale, Page $page, array $breadcrumbs): string
-    {
-        $siteName = (string) $this->settings->get('site.name', '');
-        $separator = LocalizedSeo::value($this->settings->get('seo.title_separator', '—'), $locale) ?: '—';
-
-        $rendered = strtr($template, $vars + [
-            '{site_name}' => $siteName,
-            '{sep}' => $separator,
-            '{parent}' => self::parentLabel($breadcrumbs),
-            '{date}' => self::publishedDate($page, $locale),
-        ]);
-
-        return $this->cleanupRendered($rendered, $separator);
-    }
-
-    /**
-     * The direct parent's label — the last ancestor in the trail, which the
-     * caller already built for the breadcrumbs prop, so this costs no query.
-     *
-     * @param  list<Breadcrumb>  $breadcrumbs
-     */
-    private static function parentLabel(array $breadcrumbs): string
-    {
-        if ($breadcrumbs === []) {
-            return '';
-        }
-
-        return $breadcrumbs[count($breadcrumbs) - 1]['label'];
-    }
-
-    /**
-     * Gated on isLive() rather than on published_at alone, same rule
-     * SchemaContext::baseNode() applies: a draft or expired page reached through
-     * admin preview must not stamp a publication date into its title.
-     *
-     * Formatted through ->locale($locale) rather than Carbon's ambient locale.
-     * On the frontend the two agree, but SerpPreview resolves every locale
-     * inside ONE request with a single app locale — leaving it ambient made
-     * the Ukrainian preview card carry an English date. The locale being
-     * resolved is the only one that describes the string being built.
-     */
-    private static function publishedDate(Page $page, string $locale): string
-    {
-        return $page->published_at !== null && $page->isLive()
-            ? $page->published_at->locale($locale)->isoFormat('LL')
-            : '';
-    }
-
-    /**
-     * An empty substitution leaves a dangling separator and/or a run of
-     * whitespace behind (e.g. "{title} {sep} {site_name}" with an empty
-     * site_name renders "My Page — ").
-     *
-     * Three passes: collapse whitespace runs, collapse a run of separators
-     * left adjacent in the MIDDLE down to one, then strip any separator
-     * stranded at either edge. The middle pass is what lets {parent} and
-     * {date} sit between two other placeholders — a top-level page rendering
-     * "{title} {sep} {parent} {sep} {site_name}" would otherwise read
-     * "About — — Acme", which is worse than either edge case.
-     */
-    private function cleanupRendered(string $rendered, string $separator): string
-    {
-        $collapsed = trim((string) preg_replace('/\s+/u', ' ', $rendered));
-        $quotedSep = preg_quote($separator, '/');
-        $deduped = preg_replace("/{$quotedSep}(?:\\s*{$quotedSep})+/u", $separator, $collapsed);
-        $trimmed = preg_replace("/^(?:{$quotedSep}\\s*)+|(?:\\s*{$quotedSep})+\$/u", '', (string) $deduped);
-
-        return trim((string) $trimmed);
+        return $this->text->renderedDescription($page, $locale, $breadcrumbs);
     }
 
     /**

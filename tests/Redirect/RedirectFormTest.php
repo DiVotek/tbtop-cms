@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Cms\Admin\Pages\Support\RedirectForm;
+use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Redirect\Models\Redirect;
@@ -171,3 +172,43 @@ it('rejects an external to path that parse_url cannot parse', function (): void 
 
     RedirectForm::save(['from_path' => 'gone', 'to_path' => 'https:///example.com', 'locale' => '', 'status_code' => '301']);
 })->throws(ValidationException::class);
+
+it('accepts the homepage as a redirect target', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    $redirect = RedirectForm::save(['from_path' => 'old-landing', 'to_path' => '/', 'locale' => '', 'status_code' => '301']);
+
+    expect($redirect->to_path)->toBe('');
+    $this->get('/old-landing')->assertRedirect('/')->assertStatus(301);
+});
+
+it('rejects a blank target with the error on the target field', function (): void {
+    try {
+        RedirectForm::save(['from_path' => 'old', 'to_path' => '  ', 'locale' => '', 'status_code' => '301']);
+        $this->fail('Expected a ValidationException.');
+    } catch (ValidationException $e) {
+        expect(array_keys($e->errors()))->toBe(['to_path']);
+    }
+});
+
+it('localizes the loop and chain-length errors', function (): void {
+    app()->setLocale('uk');
+    $firstError = static function (array $form): ?string {
+        try {
+            RedirectForm::save([...$form, 'locale' => 'en', 'status_code' => '301']);
+        } catch (ValidationException $e) {
+            return $e->errors()['to_path'][0] ?? null;
+        }
+
+        return null;
+    };
+
+    Redirect::create(['locale' => 'en', 'from_path' => 'b', 'to_path' => 'a', 'status_code' => 301]);
+    foreach (range(1, 21) as $i) {
+        Redirect::create(['locale' => 'en', 'from_path' => "hop{$i}", 'to_path' => 'hop' . ($i + 1), 'status_code' => 301]);
+    }
+
+    expect($firstError(['from_path' => 'a', 'to_path' => 'b']))->toBe(__('tbtop-cms::redirects.validation.loop'))
+        ->and($firstError(['from_path' => 'start', 'to_path' => 'hop1']))->toBe(__('tbtop-cms::redirects.validation.chain_too_long'))
+        ->and(__('tbtop-cms::redirects.validation.loop'))->not->toBe(__('tbtop-cms::redirects.validation.loop', [], 'en'));
+});

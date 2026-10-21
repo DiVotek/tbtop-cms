@@ -36,7 +36,7 @@ frame, block, layout slot.
 
 | You're adding… | It goes in… | Read |
 |---|---|---|
-| A block | **all three**: PHP class + zod entry in `catalog.ts` + component in `registry.tsx`, same change; two of three renders nothing, silently | [blocks.md](./blocks.md) |
+| A block | **all three**: PHP class + its zod schema + a component in `components_dir`, same change; `cms:blocks:types` generates the schema and the catalog/registry wiring, and a missing component fails it; a props mismatch renders nothing, silently | [blocks.md](./blocks.md) |
 | A page's text, picture, typed data or fixed parts | the standard page fields first, then type fields, `resolveFields()`, a host frame by `page.subtype` — blocks only for optional sections | [placement.md](./placement.md) |
 | A section that holds pages other than `category`/`article` | a host page type extending `BasePageType` (`CategoryType` is not configurable) | [pages.md](./pages.md) |
 | Site content | idempotent seeders per section, keyed by slug — never admin clicks | [pages.md](./pages.md#seeding-content) |
@@ -64,7 +64,7 @@ If the table can't place it, ask.
 
 ## Ground rules
 
-- **Three layers, one change.** A block's PHP `resolve()` shape and its zod schema are kept in sync by hand; the renderer validates and drops mismatches with only a console warning.
+- **Three layers, one change.** A block's zod schema is generated from its PHP class by `cms:blocks:types` (`--check` in CI catches a stale file); the renderer validates props and drops a mismatching block, logging `console.error` only with `showErrors` (preview or `app.debug`) — in production it vanishes silently.
 - **The host owns `CmsPage.tsx`.** Copy the package's `resources/js/cms/CmsPage.tsx` the moment you need chrome, a provider, or an extra `<head>` tag; the vendor file has no slots. Keep the SEO tags by rendering `<CmsHead seo={seo} />` from `@cms/CmsHead`, not by copying the `<Head>` block.
 - **`Cms::frontendRoutes()` is the last line of `routes/web.php`.** It ends in a catch-all.
 - **Content is seeded, not clicked.** Seeders are idempotent by slug and split per section.
