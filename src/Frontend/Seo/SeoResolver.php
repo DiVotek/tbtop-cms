@@ -55,7 +55,7 @@ class SeoResolver
         $this->templates = $templates ?? new SeoTemplates($settings);
         $this->factory = $factory ?? new SchemaContextFactory($settings, $url, $pageTypes, $mediaUrlResolver);
         $this->text = new SeoTextRenderer($settings, $this->templates, $this->factory);
-        $this->alternates = new SeoAlternates($url, $languages);
+        $this->alternates = new SeoAlternates($url, $languages, $this->factory);
     }
 
     /**
@@ -315,6 +315,18 @@ class SeoResolver
     public function validCanonicalOverride(array $seo, string $locale): ?string
     {
         return $this->factory->validCanonicalOverride($seo, $locale);
+    }
+
+    /**
+     * The page's hreflang alternates (SeoAlternates::forPage()). Public so
+     * the sitemap publishes exactly the list the page head does.
+     *
+     * @param  list<string>|null  $locales
+     * @return list<Alternate>
+     */
+    public function alternates(Page $page, ?array $locales = null): array
+    {
+        return $this->alternates->forPage($page, $locales);
     }
 
     /**
