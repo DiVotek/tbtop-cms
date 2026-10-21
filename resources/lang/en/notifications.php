@@ -17,6 +17,7 @@ return [
     'bell' => [
         'title' => 'New form submission',
         'view' => 'View submission',
+        'open' => 'Open',
     ],
     'telegram' => [
         'message_title' => 'New form submission',

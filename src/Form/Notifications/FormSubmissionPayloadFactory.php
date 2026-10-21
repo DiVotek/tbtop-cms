@@ -20,6 +20,7 @@ final class FormSubmissionPayloadFactory
             submittedAt: self::submittedAt($submission),
             fields: SubmissionFieldFormatter::formatAll($submission->payload),
             actionUrl: route('tbtop.cms.form-submission-page', ['submission' => $submission->id]),
+            actionLabel: __('tbtop-cms::notifications.bell.view'),
         );
     }
 

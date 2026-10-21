@@ -66,7 +66,8 @@ final class BellChannel implements Channel
 
         if (is_string($actionUrl) && $actionUrl !== '') {
             $label = $message->data['actionLabel'] ?? null;
-            $notification->actions([NotificationAction::make(is_string($label) ? $label : $actionUrl)->url($actionUrl)]);
+            $label = is_string($label) && $label !== '' ? $label : __('tbtop-cms::notifications.bell.open', [], $to->locale);
+            $notification->actions([NotificationAction::make($label)->url($actionUrl)]);
         }
 
         $notification->sendToDatabase($to->notifiable);

@@ -20,5 +20,6 @@ final readonly class FormSubmissionPayload
         public string $submittedAt,
         public array $fields,
         public string $actionUrl,
+        public string $actionLabel = '',
     ) {}
 }
