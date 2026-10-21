@@ -149,3 +149,12 @@ it('raises PageSaved with wasCreated=true for the copy', function (): void {
 
     Event::assertDispatched(PageSaved::class, fn (PageSaved $e): bool => $e->page->is($copy) && $e->wasCreated === true);
 });
+
+it('starts the copy at the default lock_version rather than the source\'s', function (): void {
+    $source = Page::factory()->create(['name' => ['en' => 'About']]);
+    Page::query()->whereKey($source->id)->toBase()->update(['lock_version' => 5]);
+
+    $copy = (new PageDuplicator)->duplicate($source->fresh());
+
+    expect($copy->fresh()->lock_version)->toBe(0);
+});

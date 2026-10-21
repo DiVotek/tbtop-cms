@@ -77,3 +77,17 @@ it('allows restoring a root page (no parent) unconditionally', function (): void
 
     expect($page->fresh()->trashed())->toBeFalse();
 });
+
+it('does not re-create slugs when a trashed page is saved', function (): void {
+    $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $page->delete();
+
+    $page->content = [['id' => 'b1', 'kind' => 'Hero', 'data' => ['title' => 'Hi']]];
+    $page->save();
+
+    expect(PageSlug::query()->where('page_id', $page->id)->count())->toBe(0);
+
+    $other = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+
+    expect($other->pathFor('en'))->toBe('about');
+});

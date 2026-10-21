@@ -111,7 +111,7 @@ class Page extends Model
     /**
      * Transient marker set by PageRevisionWriter::restore() immediately
      * before save() (and cleared by it in a finally), read by the
-     * PageRevisions observer's saved() hook to label the resulting snapshot
+     * PageRevisions observer to label the resulting snapshot
      * kind='restore' instead of 'save'. Lives on the model instance rather
      * than on the writer service:
      * the writer has no container binding forcing it to be shared, so the
@@ -129,6 +129,17 @@ class Page extends Model
      * against it; null, a write bumps the version with no compare.
      */
     public ?int $expectedLockVersion = null;
+
+    /**
+     * Mirrors the column default so a page created without a status has one
+     * in memory too: create() does not read column defaults back, and the
+     * observers (revision snapshot, publish transition) read $page->status.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'draft',
+    ];
 
     /** @var array<string, string> */
     protected $casts = [

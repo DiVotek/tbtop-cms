@@ -30,6 +30,13 @@ class PageObserver
         $overrides = $page->pendingSlugOverrides;
         $page->pendingSlugOverrides = [];
 
+        // deleting() removed a trashed page's slugs and restored() brings
+        // them back; a save in between (e.g. SharedBlockDetacher on a trashed
+        // container) must not re-claim the path while the page 404s.
+        if ($page->trashed()) {
+            return;
+        }
+
         $this->slugs->sync($page, $overrides);
     }
 

@@ -90,7 +90,9 @@ class PageRevisionWriter
 
         foreach (self::TRANSLATABLE_FIELDS as $field) {
             if (array_key_exists($field, $payload) && is_array($payload[$field])) {
-                $page->setTranslations($field, $payload[$field]);
+                // Forget first: setTranslations() merges per locale, so a
+                // locale added after the snapshot would survive the restore.
+                $page->forgetTranslations($field)->setTranslations($field, $payload[$field]);
             }
         }
 

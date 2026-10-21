@@ -41,6 +41,9 @@ final class PageDuplicator
         $copy->is_system = false;
         $copy->error_class = null;
         $copy->sort_order = $this->nextSortOrder($source->parent_id);
+        // A new row starts at the column default, like any created page;
+        // the source's version says nothing about the copy's edit forms.
+        $copy->lock_version = 0;
 
         // replicate() copied translation JSON verbatim; overwrite just the
         // name map with the suffixed version (title/heading/summary/body

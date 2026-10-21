@@ -11,7 +11,7 @@ use Tbtop\Cms\Page\Support\PageRevisionWriter;
  * Snapshots a Page's editorial content into page_revisions on every write
  * that reaches PageForm::save() — the edit-page save, the create modal, and
  * the instant block add/remove saves (PageEditBlockTabs) all funnel through
- * Page::save(), so this single saved() hook covers every entry point without
+ * Page::save(), so these created()/updated() hooks cover every entry point without
  * each caller remembering to snapshot itself.
  *
  * A second, separate observer from PageObserver (wired in
@@ -25,21 +25,30 @@ class PageRevisions
 {
     public function __construct(private readonly PageRevisionWriter $revisions) {}
 
+    /**
+     * 'create' from created() and 'save' from updated() rather than both
+     * from saved(): wasRecentlyCreated stays true for the rest of the
+     * request, so a later save of the same instance would be recorded as a
+     * second 'create'. A revision restore stays in saved() so it is recorded
+     * even when the restored content equals the current one (no update).
+     */
+    public function created(Page $page): void
+    {
+        if ($this->featureOn()) {
+            $this->revisions->snapshot($page, 'create');
+        }
+    }
+
     public function saved(Page $page): void
     {
-        if (! $this->featureOn()) {
-            return;
-        }
-
-        if ($page->wasRecentlyCreated) {
-            $this->revisions->snapshot($page, 'create');
-
-            return;
-        }
-
-        if ($page->pendingRestore) {
+        if ($page->pendingRestore && $this->featureOn()) {
             $this->revisions->snapshot($page, 'restore');
+        }
+    }
 
+    public function updated(Page $page): void
+    {
+        if ($page->pendingRestore || ! $this->featureOn()) {
             return;
         }
 
