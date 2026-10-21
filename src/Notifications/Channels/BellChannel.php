@@ -53,8 +53,9 @@ final class BellChannel implements Channel
     {
         $notification = BellNotification::make();
 
-        // The Short template is Telegram HTML; the bell client renders plain text.
-        $subject = self::plainText($message->subject);
+        // The Short template is Telegram HTML; the bell client renders plain
+        // text. The subject already is (TemplateRenderer decodes it).
+        $subject = trim($message->subject);
         $actionUrl = $message->data['actionUrl'] ?? null;
         $body = self::bellBody(self::plainText($message->body), [$subject, is_string($actionUrl) ? $actionUrl : '']);
 

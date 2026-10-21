@@ -495,6 +495,15 @@ that ignores the result needs no change; a subclass that overrides `sync()`
 must declare `: bool`. A save that changes only a slug (no column) now raises
 `PageSaved`, so the content cache and sitemap pick up the new path.
 
+## A notification's rendered subject is plain text
+
+`TemplateRenderer::render()` now decodes HTML entities in the subject once,
+so `Rendered::$subject` reaches every channel as plain text (`Tom & "Jerry's"`,
+not `Tom &amp; &quot;Jerry&#039;s&quot;`). A host channel that decoded the
+subject itself drops that step, or a literal `&amp;` in the payload would be
+decoded twice; one that puts the subject into HTML escapes it. The body is
+unchanged.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
