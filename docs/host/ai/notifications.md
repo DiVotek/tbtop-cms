@@ -84,7 +84,7 @@ Built with `TypeDefinition::make($key)` and its fluent setters, then handed to `
 `Tbtop\Cms\Notifications\Contracts\Channel`:
 
 - `key(): string` — stable key, also the value stored in a `notifications.{type}.channels` array.
-- `label(): string`
+- `label(): string` — the option label in `NotificationSettingsPage`'s per-type channel checkboxes (built-ins return `tbtop-cms::notifications.channels.{key}`).
 - `format(): Format` — which of `TypeDefinition::templates()` this channel reads.
 - `settings(S $s): list<Field|Node|TextBlock>` — fields meant for rendering on a notification settings page; a secret field's key (e.g. `notification_telegram_bot_token`) must also be listed in `tbtop-cms.settings.secret` for `Settings` to encrypt it via `SettingCodec`. **Still not consumed**: `NotificationSettingsPage` generates its per-type channel checkboxes and template editors from the registry (see below), but it never calls a `Channel`'s own `settings()` — a third-party channel's `settings()` fields still do not automatically appear in the admin. A host channel must add its own settings fields, e.g. via a custom settings page or by extending `NotificationSettingsPage`.
 - `supports(Recipient $to): bool`

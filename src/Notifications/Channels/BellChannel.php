@@ -30,7 +30,7 @@ final class BellChannel implements Channel
 
     public function label(): string
     {
-        return __('tbtop-cms::nav.items.notification_settings');
+        return __('tbtop-cms::notifications.channels.bell');
     }
 
     public function format(): Format

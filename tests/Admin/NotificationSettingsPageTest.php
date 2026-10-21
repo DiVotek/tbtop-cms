@@ -87,6 +87,17 @@ it('groups form.submission under the forms tab with a channel toggle offering ev
     expect($values)->toBe(['mail', 'telegram', 'bell']);
 });
 
+it('labels the channel toggle options with the short channel names', function (): void {
+    actingAsOwner();
+
+    $structure = test()->get('/admin/notification-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    $channelsField = findFieldNode($structure, 'channels__form__submission');
+
+    expect(array_column($channelsField['options']['options'], 'label'))->toBe(['Email', 'Telegram', 'Bell']);
+});
+
 it('saves channel toggles and a template body as the owner, and probes the template before persisting it', function (): void {
     actingAsOwner();
 
