@@ -17,6 +17,7 @@ use Tbtop\Cms\Page\Support\PageHierarchy;
 use Tbtop\Cms\Page\Support\PageSlugWriter;
 use Tbtop\Cms\Page\Support\PageTypePairProblem;
 use Tbtop\Cms\Support\LockVersion;
+use WeakMap;
 
 class PageObserver
 {
@@ -25,10 +26,22 @@ class PageObserver
         private readonly PageSlugWriter $slugs,
     ) {}
 
+    /**
+     * Saves in flight that write no column: Eloquent fires no `updated` for
+     * them, so saved() raises PageSaved itself when their slug sync changes
+     * a row (a slug-only form save). Static: observer methods resolve a new
+     * instance per call.
+     *
+     * @var WeakMap<Page, true>|null
+     */
+    private static ?WeakMap $columnlessSaves = null;
+
     public function saved(Page $page): void
     {
         $overrides = $page->pendingSlugOverrides;
         $page->pendingSlugOverrides = [];
+        $columnless = self::$columnlessSaves?->offsetExists($page) ?? false;
+        self::$columnlessSaves?->offsetUnset($page);
 
         // deleting() removed a trashed page's slugs and restored() brings
         // them back; a save in between (e.g. SharedBlockDetacher on a trashed
@@ -37,7 +50,9 @@ class PageObserver
             return;
         }
 
-        $this->slugs->sync($page, $overrides);
+        if ($this->slugs->sync($page, $overrides) && $columnless) {
+            self::dispatch($page, wasCreated: false, statusBefore: null);
+        }
     }
 
     /**
@@ -159,6 +174,15 @@ class PageObserver
     {
         if ($page->isDirty(['type', 'subtype'])) {
             $this->guardTypeAndSubtype($page);
+        }
+
+        // Recomputed on every save, so a save that threw before saved()
+        // leaves no stale mark for the next one.
+        self::$columnlessSaves ??= new WeakMap;
+        if ($page->exists && ! self::changesColumns($page)) {
+            self::$columnlessSaves[$page] = true;
+        } else {
+            self::$columnlessSaves->offsetUnset($page);
         }
 
         if (! $page->exists || $page->expectedLockVersion === null || self::changesColumns($page)) {

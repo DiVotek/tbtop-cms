@@ -487,6 +487,14 @@ unchanged. `cms:doctor` drops the `page_field_collisions` check: remove its
 Add the `@return` shape above, or `cms:blocks:types` types the variant's
 `fields` as a `z.looseObject`.
 
+## `PageSlugWriter::sync()` returns `bool`
+
+`PageSlugWriter::sync(Page $page, array $slugOverrides = [])` now returns
+whether any of the page's own slug rows changed, instead of `void`. A caller
+that ignores the result needs no change; a subclass that overrides `sync()`
+must declare `: bool`. A save that changes only a slug (no column) now raises
+`PageSaved`, so the content cache and sitemap pick up the new path.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
