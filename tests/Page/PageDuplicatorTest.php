@@ -162,7 +162,7 @@ it('starts the copy at the default lock_version rather than the source\'s', func
 
 it('refuses to duplicate a page of a source-backed type', function (): void {
     config()->set('tbtop-cms.pages.types', [SourcedType::class]);
-    $source = Page::create(['type' => 'sourced', 'source_id' => 'thing-1', 'name' => ['en' => 'Thing']]);
+    $source = Page::create(['type' => 'sourced', 'source_id' => 'thing-1', 'status' => 'draft', 'name' => ['en' => 'Thing']]);
 
     expect(fn () => (new PageDuplicator)->duplicate($source))
         ->toThrow(DomainException::class, 'Pages of type sourced are created by their source, not by hand.')
