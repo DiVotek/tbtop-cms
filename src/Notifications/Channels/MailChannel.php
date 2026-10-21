@@ -30,7 +30,7 @@ final readonly class MailChannel implements Channel
 
     public function label(): string
     {
-        return __('tbtop-cms::settings.notifications.sections.mail_transport');
+        return __('tbtop-cms::notifications.channels.mail');
     }
 
     public function format(): Format

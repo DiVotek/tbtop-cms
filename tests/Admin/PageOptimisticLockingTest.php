@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageRevision;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -270,4 +272,27 @@ it('conflicts a block-add action carrying a stale lock_version, persisting no ne
     expect($notify)->not->toBeNull()
         ->and($notify['level'])->toBe('error')
         ->and($notify['message'])->toBe(__('tbtop-cms::pages.conflict.message'));
+});
+
+it('dispatches PageSaved when a form save changes only the slug', function (): void {
+    // The slug claim bumps lock_version in SQL and leaves no dirty column, so
+    // Eloquent fires no `updated`; the slug change is still a finished save
+    // the content cache has to hear about.
+    $page = Page::create(['type' => 'page', 'status' => PageStatus::Published, 'name' => ['en' => 'About Us']]);
+    $admin = makeLockingAdmin();
+
+    // A first save settles every column the form writes.
+    test()->actingAs($admin, 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...lockingBaseEditPayload(), 'lock_version' => 0],
+    )->assertRedirect();
+    Event::fake([PageSaved::class]);
+
+    test()->actingAs($admin, 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...lockingBaseEditPayload(), 'lock_version' => $page->fresh()->lock_version, 'slug' => ['en' => 'renamed']],
+    )->assertRedirect();
+
+    expect($page->fresh()->pathFor('en'))->toBe('renamed');
+    Event::assertDispatchedTimes(PageSaved::class, 1);
 });

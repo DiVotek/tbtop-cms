@@ -59,7 +59,8 @@ it('labels every column from translations, mirroring the Pages table shape', fun
     $labels = array_column(formSubmissionsTableNode()['options']['columns'] ?? [], 'label');
 
     // Identity -> attributes -> status -> date; locale lives on the detail
-    // page only, delivery ships as a hidden helper for retry's hiddenIf.
+    // page only; delivery ships hidden by default, retryable is a never-shown
+    // helper for retry's hiddenIf.
     expect($labels)->toBe([
         __('tbtop-cms::form-submissions.columns.lead'),
         __('tbtop-cms::form-submissions.columns.form'),
@@ -67,6 +68,7 @@ it('labels every column from translations, mirroring the Pages table shape', fun
         __('tbtop-cms::form-submissions.columns.status'),
         __('tbtop-cms::form-submissions.columns.submitted'),
         __('tbtop-cms::form-submissions.columns.delivery'),
+        __('tbtop-cms::form-submissions.actions.retry'),
     ]);
 });
 
@@ -77,16 +79,17 @@ it('formats the submitted column with the translated datetime format', function 
     expect($submitted['format'] ?? null)->toBe(__('tbtop-cms::form-submissions.date_format'));
 });
 
-// With no delivery column formatting the projection, status reaches the
-// client raw — the retry visibility condition compares against the enum
-// value directly (no coupling to translations).
-it('keys the retry hiddenIf on the raw failed delivery value', function (): void {
+// Retryable is not a stored status: a stale Pending/Processing row counts
+// too, so the server projects a flag and the action keys on it (no coupling
+// to translations or to the delivery enum).
+it('keys the retry hiddenIf on the server-projected retryable flag', function (): void {
     $rowActions = formSubmissionsTableNode()['options']['rowActions'] ?? [];
     $retry = collect($rowActions)->firstWhere('name', 'retry');
+    $column = collect(formSubmissionsTableNode()['options']['columns'] ?? [])->firstWhere('name', 'retryable');
 
     expect($retry)->not->toBeNull()
-        ->and(json_encode($retry['meta']['hiddenIf'] ?? null))
-        ->toContain(SubmissionStatus::Failed->value);
+        ->and(json_encode($retry['meta']['hiddenIf'] ?? null))->toContain('"retryable"')->toContain('"yes"')
+        ->and($column)->toMatchArray(['toggleable' => false, 'hiddenByDefault' => true]);
 });
 
 it('projects the translated lead status and a raw delivery value through the table endpoint', function (): void {

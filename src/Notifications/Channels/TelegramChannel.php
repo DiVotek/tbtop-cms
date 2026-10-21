@@ -35,7 +35,7 @@ final readonly class TelegramChannel implements Channel
 
     public function label(): string
     {
-        return __('tbtop-cms::settings.notifications.sections.telegram');
+        return __('tbtop-cms::notifications.channels.telegram');
     }
 
     public function format(): Format

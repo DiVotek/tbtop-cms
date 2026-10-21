@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form;
 
+use Carbon\CarbonInterface;
 use Tbtop\Cms\Form\Models\FormSubmission;
 
 /**
@@ -17,12 +18,19 @@ use Tbtop\Cms\Form\Models\FormSubmission;
  */
 final class SubmissionClaim
 {
-    /** True only for the caller that moved the row out of $from. */
-    public static function take(FormSubmission $submission, SubmissionStatus $from): bool
+    /**
+     * True only for the caller that moved the row out of $from. With
+     * $untouchedSince, the row must also be last updated before it: a
+     * Pending/Processing row a dead worker left behind, never one a live
+     * send just claimed. The claim bumps updated_at, so a second caller with
+     * the same cutoff finds the row no longer stale.
+     */
+    public static function take(FormSubmission $submission, SubmissionStatus $from, ?CarbonInterface $untouchedSince = null): bool
     {
         $claimed = FormSubmission::query()
             ->whereKey($submission->getKey())
             ->where('status', $from->value)
+            ->when($untouchedSince !== null, static fn ($query) => $query->where('updated_at', '<', $untouchedSince))
             ->update(['status' => SubmissionStatus::Processing->value]);
 
         if ($claimed !== 1) {

@@ -302,6 +302,40 @@ it('excludes a locale from alternates when the page has no slug there, and nulls
         ->assertJsonPath('props.seo.xDefault', null);
 });
 
+it('leaves a locale canonicalized away out of alternates, xDefault and og:locale:alternate, like the sitemap', function (): void {
+    Language::query()->where('locale', 'en')->update(['og_locale' => 'en_US']);
+    Language::factory()->create(['locale' => 'uk', 'og_locale' => 'uk_UA']);
+    Language::factory()->create(['locale' => 'de', 'og_locale' => 'de_DE']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas', 'de' => 'Uber uns'],
+        'seo' => ['canonical' => ['en' => 'https://elsewhere.example/original', 'uk' => '', 'de' => '']],
+    ]);
+
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.seo.alternates', [
+            ['locale' => 'uk', 'url' => url('uk/' . $page->pathFor('uk'))],
+            ['locale' => 'de', 'url' => url('de/' . $page->pathFor('de'))],
+        ])
+        ->assertJsonPath('props.seo.xDefault', null)
+        ->assertJsonPath('props.seo.ogLocaleAlternates', ['de_DE']);
+});
+
+it('keeps a self-canonical locale in alternates', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+    ]);
+    $page->forceFill(['seo' => ['canonical' => ['en' => url('/about/'), 'uk' => '']]])->save();
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonCount(2, 'props.seo.alternates')
+        ->assertJsonPath('props.seo.xDefault', url('/about'));
+});
+
 it('resolves favicon from site.favicon, null when unset', function (): void {
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 

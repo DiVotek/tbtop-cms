@@ -120,7 +120,7 @@ class FormSubmissionPage extends AdminPage
 
         return $s->section(['title' => $this->title(), 'variant' => 'card'], [
             $s->stack($rows),
-            ...($submission->status === SubmissionStatus::Failed ? [$this->retryAction($s)] : []),
+            ...(SubmissionRetrier::isRetryable($submission) ? [$this->retryAction($s)] : []),
         ]);
     }
 
@@ -283,7 +283,7 @@ class FormSubmissionPage extends AdminPage
         app(SubmissionRetrier::class)->retry($submission);
         $submission->refresh();
 
-        // The action is only offered on a Failed row, but retry() still
+        // The action is only offered on a retryable row, but retry() still
         // no-ops when a concurrent retry (a double click) won the claim:
         // nothing ran, so nothing to audit.
         if (in_array($submission->status, [SubmissionStatus::Pending, SubmissionStatus::Processing], true)) {

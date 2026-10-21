@@ -28,12 +28,13 @@ class PageSlugWriter
      *                                                existing slug untouched (or falls
      *                                                back to the name-derived base when
      *                                                there is no row yet).
+     * @return bool Whether any of the page's own slug rows changed.
      */
-    public function sync(Page $page, array $slugOverrides = []): void
+    public function sync(Page $page, array $slugOverrides = []): bool
     {
         // Error pages resolve by error_class, never by path.
         if ($page->isErrorPage()) {
-            return;
+            return false;
         }
 
         $changed = false;
@@ -49,6 +50,8 @@ class PageSlugWriter
         }
 
         $page->unsetRelation('slugs');
+
+        return $changed;
     }
 
     /**

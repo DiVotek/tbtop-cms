@@ -113,7 +113,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|
 | DashboardPage | `dashboard` |
 | ProfilePage | `profile` |
-| LoginPage | `login` |
+| LoginPage | `login` — after sign-in redirects to the session's `url.intended` when it is an admin URL on this host, else `dashboard` (wiring.md) |
 | LanguagesPage | `languages` |
 | PagesPage | `pages` |
 | PageEditPage | `pages/{page}/edit` |
@@ -167,11 +167,11 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.title` | `string\|null` | translated title, same fallback |
 | `page.heading` | `string\|null` | translated heading, same fallback |
 | `page.summary` | `string\|null` | translated summary, same fallback |
-| `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
+| `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty. A DB error page (`ErrorResponse`) carries its Body the same way; the fallback error page sends `''` |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none; typed per type and subtype in `pages.generated.ts` (pages.md, "Page prop types") |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
-| `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
+| `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. `alternates` leaves out a locale canonicalized away, same as the sitemap. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; a non-live ancestor or site root is left out (the page itself never is); `[]` when fewer than two crumbs remain (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
@@ -205,7 +205,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
 | `HasForm` (trait, opt-in on a `HandlesFormSubmission` block) | `src/Form/HasForm.php` | `formName(): string` (default `kind()`) | Registers the form by name in `Forms` (`Cms::forms()`), so a template posts to it from any page |
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
-| `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms) |
+| `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms). `label()` is the option label in the settings channel picker (built-ins: `tbtop-cms::notifications.channels.{key}`, Email/Telegram/Bell); `send()` gets `Rendered::$subject` as plain text (entities decoded once by `TemplateRenderer`) |
 | `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `DatabaseTemplateStore` (backed by `tbtop_notification_templates`, strict locale match, no fallback) |
 | `HealthCheck` | `src/Health/HealthCheck.php` | `id(): string`, `run(): HealthCheckResult` | One diagnostic check; must not throw |
 | `LogsCmsActivity` (trait) | `src/Audit/Concerns/LogsCmsActivity.php` | Required: `auditFields(): list<string>`, `auditLabel(): string`. Overridable: `auditMarkerFields()`, `auditBlockFields()` (default `[]`) | Wires Spatie `LogsActivity` plus CMS audit enrichment onto a model |

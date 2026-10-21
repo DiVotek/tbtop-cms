@@ -79,10 +79,13 @@ Field-by-field:
   (routing, not `noindex`) — this flag only covers a *live* page an editor
   marked non-indexable, or a site-wide indexing kill switch.
 - **hreflang alternates** — one absolute URL per frontend-active locale for
-  which the page has a slug (`Page::pathFor()`), built the same way the
-  sitemap builds its per-locale `loc` (`SitemapEntryBuilder::alternates()`
-  mirrors this exactly, including the canonical-override exclusion below).
-  `xDefault` points at the default locale's alternate, if present.
+  which the page has a slug (`Page::pathFor()`), minus any locale
+  canonicalized away (its `seo.canonical` override names a different URL —
+  the sitemap's exclusion rule below). `SeoAlternates::forPage()` owns the
+  list; the sitemap reads the same one (`SeoResolver::alternates()`), so head
+  and sitemap always agree. `xDefault` points at the default locale's
+  alternate, if present (`null` when that locale is canonicalized away), and
+  `ogLocaleAlternates` is derived from the same filtered list.
 - **robots (meta)** — driven by `noindex` only; there is no separate
   `robots` field beyond that boolean (rendered as `<meta name="robots"
   content="noindex">` when true, omitted otherwise). The same verdict also
@@ -455,7 +458,9 @@ per locale — any locale whose `seo.canonical` override resolves to a
 different URL than that locale's own sitemap address
 (`SeoResolver::validCanonicalOverride()`, same check `canonical` uses). A
 canonical that merely restates the same URL (trailing-slash/case cosmetic
-differences only) does **not** exclude the locale.
+differences only) does **not** exclude the locale. The rule lives in
+`SeoAlternates`; the page head's `alternates`/`xDefault`/`ogLocaleAlternates`
+leave out the same locales.
 
 ## robots.txt
 

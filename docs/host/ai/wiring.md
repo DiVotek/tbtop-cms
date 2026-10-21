@@ -114,9 +114,12 @@ route — Fortify, Breeze, Jetstream, most starter kits — keeps it: a second
 route under the same name would still lose `route('login')`'s URL generation
 to whichever registered first while `GET /login` dispatches to whichever
 registered last, and doubles a Wayfinder export, breaking the build. Nothing
-is actually broken by this — `admin/login` still works visited directly, and
-`redirect()->intended(...)` still lands the user on `/admin/dashboard` after
-authenticating there. The only symptom is cosmetic: `/admin` shows the host's
+is actually broken by this — `admin/login` still works visited directly.
+After sign-in there, `LoginPage` pulls the session's `url.intended` (set by
+the `auth` redirect) and goes there when it is an admin URL on this host
+(`{prefix}` itself or anything below it); any other target — a frontend
+page, another host — is dropped and the user lands on `/{prefix}/dashboard`.
+The only symptom is cosmetic: `/admin` shows the host's
 login page, not the CMS's. Fix it (optional) by pointing the host's `login`
 handler at a redirect to `admin/login`, or just link there directly.
 `cms:doctor` does not catch this — its route check only confirms

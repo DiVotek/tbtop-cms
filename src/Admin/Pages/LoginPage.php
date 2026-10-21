@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Pages;
 
 use Composer\InstalledVersions;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -186,8 +187,36 @@ class LoginPage extends Page
 
         RateLimiter::clear($throttleKey);
         $ctx->request->session()->regenerate();
-        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
 
-        return url($prefix . '/dashboard');
+        return $this->redirectTarget($ctx->request);
+    }
+
+    /**
+     * Where the auth guard sent the guest from (session `url.intended`) when
+     * that is an admin URL on this host, else the dashboard. Pulled, so a
+     * stale target never outlives this sign-in.
+     */
+    private function redirectTarget(Request $request): string
+    {
+        $admin = url((string) config('tbtop-cms.admin.prefix', 'admin'));
+        $intended = $request->session()->pull('url.intended');
+
+        if (is_string($intended) && self::isUnder($intended, $admin)) {
+            return $intended;
+        }
+
+        return $admin . '/dashboard';
+    }
+
+    /** `$url` is `$base` itself or a path, query or fragment below it — `/administrator` is not under `/admin`. */
+    private static function isUnder(string $url, string $base): bool
+    {
+        if (! str_starts_with($url, $base)) {
+            return false;
+        }
+
+        $next = substr($url, strlen($base), 1);
+
+        return in_array($next, ['', '/', '?', '#'], true);
     }
 }

@@ -30,7 +30,7 @@ final class BellChannel implements Channel
 
     public function label(): string
     {
-        return __('tbtop-cms::nav.items.notification_settings');
+        return __('tbtop-cms::notifications.channels.bell');
     }
 
     public function format(): Format
@@ -53,8 +53,9 @@ final class BellChannel implements Channel
     {
         $notification = BellNotification::make();
 
-        // The Short template is Telegram HTML; the bell client renders plain text.
-        $subject = self::plainText($message->subject);
+        // The Short template is Telegram HTML; the bell client renders plain
+        // text. The subject already is (TemplateRenderer decodes it).
+        $subject = trim($message->subject);
         $actionUrl = $message->data['actionUrl'] ?? null;
         $body = self::bellBody(self::plainText($message->body), [$subject, is_string($actionUrl) ? $actionUrl : '']);
 
@@ -66,7 +67,8 @@ final class BellChannel implements Channel
 
         if (is_string($actionUrl) && $actionUrl !== '') {
             $label = $message->data['actionLabel'] ?? null;
-            $notification->actions([NotificationAction::make(is_string($label) ? $label : $actionUrl)->url($actionUrl)]);
+            $label = is_string($label) && $label !== '' ? $label : __('tbtop-cms::notifications.bell.open', [], $to->locale);
+            $notification->actions([NotificationAction::make($label)->url($actionUrl)]);
         }
 
         $notification->sendToDatabase($to->notifiable);

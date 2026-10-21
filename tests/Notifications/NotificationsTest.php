@@ -71,6 +71,29 @@ it('renders the type template for each registered channel and delivers to a supp
         ->and($shortDeliveries[0]['message']->body)->toContain('Short: hi');
 });
 
+it('hands a host channel the rendered subject as plain text, not HTML-escaped', function (): void {
+    $recipient = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+
+    Notifications::send('test.recorded', new TestNotificationPayload('Tom & "Jerry\'s" <shop>'), [$recipient]);
+
+    expect(RecordingChannel::deliveries()[0]['message']->subject)->toBe('Hello Tom & "Jerry\'s" <shop>');
+});
+
+it('hands a host channel a stored override subject as plain text', function (): void {
+    $recipient = new Recipient(Audience::Customer, 'en', email: 'ana@example.test');
+    NotificationTemplate::query()->create([
+        'type' => 'test.recorded',
+        'format' => Format::Text,
+        'locale' => 'en',
+        'subject' => 'Q&A for {{ $message }}',
+        'body' => 'Body',
+    ]);
+
+    Notifications::send('test.recorded', new TestNotificationPayload('"x"'), [$recipient]);
+
+    expect(RecordingChannel::deliveries()[0]['message']->subject)->toBe('Q&A for "x"');
+});
+
 it('skips a channel a recipient does not support', function (): void {
     $noEmail = new Recipient(Audience::Customer, 'en', notifiable: null);
 

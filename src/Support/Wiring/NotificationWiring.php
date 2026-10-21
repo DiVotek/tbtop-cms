@@ -50,7 +50,7 @@ final class NotificationWiring
 
         Notifications::type(
             TypeDefinition::make('form.submission')
-                ->label(__('tbtop-cms::notifications.bell.title'))
+                ->label(fn (): string => __('tbtop-cms::notifications.bell.title'))
                 ->group('forms')
                 ->payload(FormSubmissionPayload::class)
                 ->templates([

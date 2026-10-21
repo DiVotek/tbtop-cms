@@ -18,6 +18,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Support\PageTranslation;
+use Tbtop\Cms\Richtext\RichtextHtmlRenderer;
 use Throwable;
 
 /**
@@ -39,6 +40,7 @@ class ErrorResponse
         private readonly FormActionBinder $forms,
         private readonly CurrentPage $currentPage,
         private readonly Languages $languages,
+        private readonly RichtextHtmlRenderer $richtext,
     ) {}
 
     public function render(Request $request, int $status): Response
@@ -106,6 +108,7 @@ class ErrorResponse
                 'title' => PageTranslation::text($page, 'title', $locale, $fallback),
                 'heading' => PageTranslation::text($page, 'heading', $locale, $fallback),
                 'summary' => PageTranslation::text($page, 'summary', $locale, $fallback),
+                'body' => $this->richtext->render(PageTranslation::get($page, 'body', $locale, $fallback)),
                 'image' => null,
                 'fields' => (object) $fields,
             ],
