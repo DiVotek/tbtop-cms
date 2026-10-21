@@ -167,7 +167,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.title` | `string\|null` | translated title, same fallback |
 | `page.heading` | `string\|null` | translated heading, same fallback |
 | `page.summary` | `string\|null` | translated summary, same fallback |
-| `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
+| `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty. A DB error page (`ErrorResponse`) carries its Body the same way; the fallback error page sends `''` |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none; typed per type and subtype in `pages.generated.ts` (pages.md, "Page prop types") |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |

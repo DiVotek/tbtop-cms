@@ -77,6 +77,27 @@ it('renders the 404 page from the DB through the normal Cms/Page pipeline, noind
         ->assertJsonPath('props.seo.canonical', null);
 });
 
+it('gives the DB 404 page its Body as page.body, like a normal page', function (): void {
+    $page = seedErrorPage(ErrorClass::ClientError);
+    $page->forceFill(['body' => ['en' => ['root' => ['type' => 'root', 'children' => [
+        ['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => 'Try the search', 'format' => 0]]],
+    ]]]]])->save();
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/nonexistent', ['X-Inertia' => 'true'])
+        ->assertNotFound()
+        ->assertJsonPath('props.page.body', '<p>Try the search</p>');
+});
+
+it('gives the DB 404 page an empty page.body when it has no Body', function (): void {
+    seedErrorPage(ErrorClass::ClientError);
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/nonexistent', ['X-Inertia' => 'true'])
+        ->assertNotFound()
+        ->assertJsonPath('props.page.body', '');
+});
+
 it('renders the 404 page in a non-default locale', function (): void {
     Language::factory()->create(['locale' => 'ru', 'is_frontend_active' => true]);
     seedErrorPage(ErrorClass::ClientError, [
