@@ -215,6 +215,26 @@ describe("R3-blocks-6: shared blocks can be placed and made", () => {
 	});
 });
 
+describe("R3-blocks-7: admin strings are stored trimmed", () => {
+	test("site settings and page fields drop surrounding spaces; whitespace-only becomes blank", async () => {
+		const { cms, record, post, ids } = await panel();
+		await post("/admin/settings/site/forms/settings_site", { site_name: "  Acme  " }, "/admin/settings/site");
+		expect(await cms.site().settings.get("site.name")).toBe("Acme");
+
+		const url = `/admin/pages/${ids.about}/edit`;
+		const body = { root: { type: "root", children: [{ type: "paragraph", children: [{ type: "text", text: "Hello " }, { type: "text", format: 1, text: "world" }] }] } };
+		await post(
+			`${url}/forms/pageEditor`,
+			{ ...(await record(url, "pageEditor")), name: { en: "  Spaced  ", uk: "Про нас" }, seo_title: { en: "  T  ", uk: "   " }, body: { en: body } },
+			url,
+		);
+		const page = await cms.site().pages.find(ids.about as number);
+		expect([(page?.name as Record<string, string>).en, page?.seo.title]).toEqual(["Spaced", { en: "T", uk: "" }]);
+		// A richtext state keeps its text runs as typed.
+		expect((page?.body as Record<string, unknown>).en).toEqual(body);
+	});
+});
+
 describe("R3-blocks-10: FormResolver converts scalars the PHP way", () => {
 	test("booleans become '1'/null strings, hex is not a number, a padded yes is true", async () => {
 		const { S } = await import("@tbtop/admin");
