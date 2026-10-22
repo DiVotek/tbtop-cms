@@ -75,7 +75,7 @@ export class Site {
 
 	/** url(): an absolute URL on the site origin. */
 	absolute(path: string): string {
-		if (/^https?:\/\//.test(path)) {
+		if (/^(?:https?:)?\/\//.test(path)) {
 			return path;
 		}
 		const trimmed = path.replace(/^\/+/, "");

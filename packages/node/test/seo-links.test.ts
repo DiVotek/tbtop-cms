@@ -62,3 +62,13 @@ describe("routing", () => {
 		expect(await cms.loadPage(get("/blog/%ZZ"))).toMatchObject({ type: "notFound", status: 404 });
 	});
 });
+
+describe("absolute urls", () => {
+	test("a protocol-relative URL is kept as is, like Laravel url() (F18)", async () => {
+		const { cms } = await makeCms();
+		const site = cms.site();
+		expect(site.absolute("//cdn.example/og.jpg")).toBe("//cdn.example/og.jpg");
+		expect(site.absolute("https://cdn.example/og.jpg")).toBe("https://cdn.example/og.jpg");
+		expect(site.absolute("/storage/og.jpg")).toBe("https://site.test/storage/og.jpg");
+	});
+});
