@@ -110,6 +110,19 @@ export function rowsFromForm(blocks: BlockRegistry, rows: Dict[], form: Dict): D
 		.sort((a, b) => (a.sort as number) - (b.sort as number));
 }
 
+export type BlockTabsOptions = {
+	placement: Placement;
+	/** Persists a structural change (add, remove) outside the editor's Save. */
+	save: (ctx: ActionCtx, rows: Dict[]) => Promise<void>;
+	back: string;
+	/**
+	 * Structural actions skip the form rules (PageEditBlockTabs::skipsGate): only
+	 * on a draft page, which cannot leak. A published page or a layout validates first.
+	 */
+	skipsValidation: boolean;
+	sharedNames?: Map<number, string>;
+};
+
 /**
  * The editor tabs of a block list: one per row (its fields, active, sort,
  * remove) plus an "Add block" tab. `save(rows)` persists a structural change.
@@ -118,12 +131,7 @@ export function blockTabs(
 	s: S,
 	cms: Cms,
 	rows: Dict[],
-	options: {
-		placement: Placement;
-		save: (ctx: ActionCtx, rows: Dict[]) => Promise<void>;
-		back: string;
-		sharedNames?: Map<number, string>;
-	},
+	options: BlockTabsOptions,
 ): { label: string; badge?: string; body: unknown }[] {
 	const blocks = cms.config.blocks;
 	const tabs: { label: string; badge?: string; body: unknown }[] = [];
@@ -153,7 +161,7 @@ export function blockTabs(
 					.label("Remove block")
 					.color("danger")
 					.confirm("Remove this block?", "Its content is deleted when you confirm.")
-					.withoutValidation()
+					.withoutValidation(options.skipsValidation)
 					.handle(async (ctx) => {
 						await options.save(ctx, rowsFromForm(blocks, rows, ctx.form as Dict).filter((r) => r.id !== id));
 						return options.back;
@@ -170,7 +178,7 @@ function addBlockBody(
 	s: S,
 	cms: Cms,
 	rows: Dict[],
-	options: { placement: Placement; save: (ctx: ActionCtx, rows: Dict[]) => Promise<void>; back: string },
+	options: BlockTabsOptions,
 ): unknown {
 	const blocks = cms.config.blocks;
 	const kinds = blocks.forPlacement(options.placement);
@@ -184,7 +192,7 @@ function addBlockBody(
 				.action("blockAdd")
 				.label("Add block")
 				.color("primary")
-				.withoutValidation()
+				.withoutValidation(options.skipsValidation)
 				.handle(async (ctx) => {
 					const form = ctx.form as Dict;
 					const kind = typeof form.new_block_kind === "string" ? form.new_block_kind : "";

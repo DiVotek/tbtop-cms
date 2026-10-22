@@ -90,14 +90,17 @@ describe("admin pages", () => {
 	});
 
 	test("adding a block appends a row of that kind; removing it drops it", async () => {
-		const { cms, post, ids } = await panel();
+		const { cms, post, page: open, ids } = await panel();
 		const url = `/admin/pages/${ids.about}/edit`;
-		const added = await post(`${url}/actions/blockAdd`, { payload: { form: { new_block_kind: "Hero", lock_version: 0 } } }, url);
+		// A published page validates the editor form before a structural action, so the action carries it.
+		const record = ((await open(url)).props.data as Record<string, Record<string, unknown>>).pageEditor ?? {};
+		const added = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "Hero" } } }, url);
 		expect(added.status).toBeLessThan(400);
 		const page = await cms.site().pages.find(ids.about as number);
 		expect(page?.content?.map((row) => (row as { kind: string }).kind)).toEqual(["Hero"]);
 		const id = (page?.content?.[0] as { id: string }).id;
-		await post(`${url}/actions/blockRemove_${id}`, { payload: { form: { lock_version: page?.lockVersion } } }, url);
+		const reloaded = ((await open(url)).props.data as Record<string, Record<string, unknown>>).pageEditor ?? {};
+		await post(`${url}/actions/blockRemove_${id}`, { payload: { form: reloaded } }, url);
 		expect((await cms.site().pages.find(ids.about as number))?.content).toEqual([]);
 	});
 

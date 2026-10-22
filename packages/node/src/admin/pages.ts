@@ -257,8 +257,9 @@ export function pageEdit(cms: Cms) {
 				(row) => !own.has(Number(row.id)) && (row.type === "category" || allowsChild(cms.pageTypes, row.type, page.type)),
 			);
 			const defaultLocale = await site.languages.defaultLocale();
+			// A structural save keeps the stored status: a status change waits for the validated Save (structuralForm).
 			const save = async (ctx: ActionCtx, content: Dict[]) => {
-				await savePage(cms, ctx, page, content);
+				await savePage(cms, ctx, page, content, { structural: true });
 			};
 			return s.stack([
 				s.displayText(firstText(page, ["name", "title"], defaultLocale, defaultLocale) || `#${page.id}`).variant("heading"),
@@ -269,7 +270,7 @@ export function pageEdit(cms: Cms) {
 						s.tabs([
 							{ label: "General", body: s.stack(generalFields(s, page)) },
 							{ label: "SEO", body: s.stack(seoFields(s, cms, page)) },
-							...blockTabs(s, cms, rows, { placement: "pages", save, back, sharedNames: shared }),
+							...blockTabs(s, cms, rows, { placement: "pages", save, back, sharedNames: shared, skipsValidation: page.status !== "published" }),
 							{
 								label: "Publishing",
 								body: s.stack([
@@ -440,8 +441,11 @@ const SEO_MAPS: [string, string][] = [
 const stringMap = (value: unknown): Record<string, string> =>
 	isDict(value) ? Object.fromEntries(Object.entries(value).map(([locale, entry]) => [locale, entry === null || entry === undefined ? "" : String(entry)])) : {};
 
-/** PageFormWriter::save for the editor: columns, seo blob, block rows, slugs; optimistic lock on lock_version. */
-async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): Promise<void> {
+/**
+ * PageFormWriter::save for the editor: columns, seo blob, block rows, slugs; optimistic lock on lock_version.
+ * A `structural` save (add or remove a block) writes the stored status, never the form's.
+ */
+async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[], options: { structural?: boolean } = {}): Promise<void> {
 	const site = siteOf(cms, ctx);
 	const form = ctx.form as Dict;
 	const seo: Dict = { ...page.seo };
@@ -462,7 +466,7 @@ async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): 
 		page.id,
 		{
 			...Object.fromEntries(TRANSLATABLE.filter((field) => field in form).map((field) => [field, isDict(form[field]) ? form[field] : {}])),
-			...("status" in form ? { status: form.status === "published" ? "published" : "draft" } : {}),
+			...("status" in form && options.structural !== true ? { status: form.status === "published" ? "published" : "draft" } : {}),
 			...("published_at" in form ? { publishedAt: date(form.published_at) } : {}),
 			...("unpublish_at" in form ? { unpublishAt: date(form.unpublish_at) } : {}),
 			...("is_indexable" in form ? { isIndexable: Boolean(form.is_indexable) } : {}),
