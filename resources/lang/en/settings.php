@@ -6,6 +6,8 @@ return [
     'common' => [
         'save' => 'Save',
         'saved' => 'Saved',
+        'secret_set' => 'A value is saved. Type a new one to replace it, or leave blank to keep it.',
+        'secret_clear' => 'Clear the saved value',
     ],
     'site' => [
         'title' => 'Site settings',
@@ -182,7 +184,8 @@ return [
         ],
         'helpers' => [
             'recipients' => 'Type an address and press Enter to add it.',
-            'mail_password' => 'Leave blank to keep the current value.',
+            'mail_password' => 'Password for the SMTP account.',
+            'telegram_bot_token' => 'Token from @BotFather.',
             'telegram_chat_ids' => 'Type a chat ID and press Enter to add it; a label after # ("123456789 # Dima") is kept. "Create invite" below adds a chat with its name filled in automatically.',
             'template' => 'Blade template source. Leave empty to use the built-in template. Available variables: :variables',
         ],

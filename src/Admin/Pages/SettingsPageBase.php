@@ -19,11 +19,38 @@ use Tbtop\Cms\Settings\Settings;
 
 abstract class SettingsPageBase extends Page
 {
+    private const string SECRET_MASK = '••••••••';
+
     /** @return array<string, string> */
     abstract protected function map(): array;
 
     /** @return list<Field|Node|TextBlock> */
     abstract protected function fields(S $s): array;
+
+    /**
+     * A write-only secret input: the stored value is never sent. Set, the
+     * input shows a mask and a Clear tick; unset, it shows $unsetHint.
+     *
+     * @return list<Field|Node|TextBlock>
+     */
+    protected function secretFields(S $s, string $field, string $key, string $label, string $unsetHint): array
+    {
+        $isSet = SettingsForm::isSecretSet($key);
+
+        $input = $s->password($field)->label($label)->rules('nullable|max:255')
+            ->helperText($isSet ? __('tbtop-cms::settings.common.secret_set') : $unsetHint);
+
+        if ($isSet) {
+            $input->set('placeholder', self::SECRET_MASK);
+        }
+
+        return [
+            $input,
+            $s->checkbox(SettingsForm::clearField($field))
+                ->label(__('tbtop-cms::settings.common.secret_clear'))
+                ->when($isSet),
+        ];
+    }
 
     #[\Override]
     public static function can(): ?string
