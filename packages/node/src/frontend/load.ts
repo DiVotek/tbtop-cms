@@ -52,13 +52,19 @@ export type LoadResult =
 	| { type: "redirect"; status: number; location: string }
 	| { type: "notFound"; status: 404; locale: string; path: string; cms: SharedProps };
 
-/** rawurldecode never throws: a malformed escape stays as written, so it matches no slug. */
-function decodeSegment(segment: string): string {
-	try {
-		return decodeURIComponent(segment);
-	} catch {
-		return segment;
-	}
+/**
+ * rawurldecode over the whole path, as Laravel's decodedPath(): `%2F` becomes a
+ * segment separator. It never throws: an escape that is not UTF-8 stays as
+ * written, so it matches no slug.
+ */
+function decodePath(path: string): string {
+	return path.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
+		try {
+			return decodeURIComponent(run);
+		} catch {
+			return run;
+		}
+	});
 }
 
 /**
@@ -69,21 +75,29 @@ export async function routeLocale(
 	site: Site,
 	url: URL,
 ): Promise<{ type: "redirect"; location: string } | { type: "route"; locale: string; path: string }> {
-	const segments = url.pathname
-		.replace(/^\/+|\/+$/g, "")
-		.split("/")
-		.filter((segment) => segment !== "")
-		.map(decodeSegment);
+	const path = decodePath(url.pathname).replace(/^\/+|\/+$/g, "");
+	const segments = path.split("/").filter((segment) => segment !== "");
 	const first = segments[0] ?? "";
 	const defaultLocale = await site.languages.defaultLocale();
 	if (first !== "" && first === defaultLocale) {
-		const rest = `/${segments.slice(1).join("/")}`;
-		return { type: "redirect", location: url.search === "" ? rest : `${rest}${url.search}` };
+		return { type: "redirect", location: canonical(segments.slice(1), url.search) };
 	}
 	if (first !== "" && (await site.languages.frontendActive()).some((row) => row.locale === first)) {
 		return { type: "route", locale: first, path: segments.slice(1).join("/") };
 	}
 	return { type: "route", locale: defaultLocale, path: segments.join("/") };
+}
+
+/**
+ * SetLanguage::canonical: empty segments drop and each one is encoded again,
+ * so a decoded `/` or `\` can never make the Location protocol-relative.
+ */
+function canonical(segments: string[], search: string): string {
+	const rest = `/${segments
+		.filter((segment) => segment !== "")
+		.map(encodeURIComponent)
+		.join("/")}`;
+	return search === "" ? rest : `${rest}${search}`;
 }
 
 /** PageController: the page at the request URL, a redirect, or not found. */
