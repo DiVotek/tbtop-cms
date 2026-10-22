@@ -21,7 +21,7 @@ async function perChunk(site: Site): Promise<number> {
 }
 
 function query(site: Site) {
-	return whereLive(site.pages.query()).where("is_indexable", "=", true).where("error_class", "is", null);
+	return whereLive(site.pages.query()).where("is_indexable", "=", 1).where("error_class", "is", null);
 }
 
 async function pagesPerChunk(site: Site): Promise<{ locales: string[]; size: number }> {

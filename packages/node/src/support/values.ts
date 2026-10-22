@@ -2,6 +2,18 @@
 
 export type Dict = Record<string, unknown>;
 
+/** A JSON value: what a host framework can serialize into a page (TanStack Start checks it). */
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+/** `T` with every `unknown` read as `Json`: the public shape of props built from JSON columns. */
+export type Jsonify<T> = unknown extends T
+	? Json
+	: T extends (infer U)[]
+		? Jsonify<U>[]
+		: T extends object
+			? { [K in keyof T]: Jsonify<T[K]> }
+			: T;
+
 export const isDict = (value: unknown): value is Dict =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -90,3 +102,6 @@ export function parseDate(value: unknown): Date | null {
 export const atom = (date: Date): string => `${date.toISOString().slice(0, 19)}+00:00`;
 
 export const bool = (value: unknown): boolean => value === true || value === 1 || value === "1";
+
+/** A boolean column's write value: 0/1 binds on every driver (better-sqlite3 rejects booleans). */
+export const flag = (value: boolean): 0 | 1 => (value ? 1 : 0);

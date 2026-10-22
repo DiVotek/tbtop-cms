@@ -10,12 +10,19 @@
 		"node": ">=20"
 	},
 	"exports": {
-		".": "./src/index.ts",
-		"./catalog": "./src/blocks/catalog.ts",
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./catalog": {
+			"types": "./dist/catalog.d.ts",
+			"import": "./dist/catalog.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"scripts": {
 		"setup:admin": "./scripts/fetch-admin.sh",
+		"build": "tsup",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
@@ -31,6 +38,11 @@
 		"@types/bun": "^1.3.11",
 		"kysely": "^0.28.2",
 		"kysely-bun-sqlite": "^0.4.0",
-		"typescript": "^5.9.0"
-	}
+		"typescript": "^5.9.0",
+		"tsup": "^8.5.0"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	]
 }

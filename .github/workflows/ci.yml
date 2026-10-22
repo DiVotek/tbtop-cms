@@ -199,3 +199,57 @@ jobs:
 
       - name: Run tests
         run: bun run test
+
+  node-e2e:
+    name: Node E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/node
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # vite preview and better-sqlite3 run on Node.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build @tbtop/admin
+        run: ./scripts/fetch-admin.sh
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The workbench installs both packages from tarballs, as a host would.
+      - name: Pack @tbtop/cms and @tbtop/admin
+        run: ./scripts/pack-workbench.sh
+
+      - name: Install the workbench
+        working-directory: packages/node/workbench
+        run: bun install --frozen-lockfile
+
+      - name: Type check the workbench
+        working-directory: packages/node/workbench
+        run: bun run typecheck
+
+      - name: Install Chromium
+        working-directory: packages/node/workbench
+        run: bunx playwright install --with-deps chromium
+
+      - name: E2E (TanStack Start host)
+        working-directory: packages/node/workbench
+        run: bun run e2e
+
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-e2e-traces
+          path: packages/node/workbench/test-results
+          retention-days: 7

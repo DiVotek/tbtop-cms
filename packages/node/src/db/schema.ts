@@ -7,7 +7,11 @@ import type { ColumnType, Generated } from "kysely";
  */
 type Json = string;
 type Timestamp = string;
-type Bool = ColumnType<number | boolean, number | boolean, number | boolean>;
+/**
+ * Reads as 0/1 (SQLite, MySQL) or a boolean (Postgres); writes as 0/1, which
+ * every driver binds (better-sqlite3 rejects booleans) and Postgres casts.
+ */
+type Bool = ColumnType<number | boolean, 0 | 1, 0 | 1>;
 type Stamps = {
 	created_at: Timestamp | null;
 	updated_at: Timestamp | null;

@@ -19,6 +19,24 @@ bun test && bun run typecheck
 bun example/server.ts      # demo site on :3100, admin JSON under /admin
 ```
 
+## Workbench (TanStack Start)
+
+`workbench/` is a TanStack Start host with the package installed from a
+tarball, the way an app would install it. It renders pages on the server
+(SEO head and JSON-LD in the HTML), serves the admin under `/admin` and runs
+the Playwright E2E suite.
+
+```bash
+cd packages/node/workbench
+bun install && bun run setup   # pack @tbtop/cms + @tbtop/admin, reinstall them
+bun run dev                    # http://localhost:3200, admin at /admin/pages
+bun run e2e                    # production build + vite preview + Playwright
+```
+
+Rerun `bun run setup` after a change to the package. Drafts preview with
+`?preview`. Locally, point Playwright at an installed Chromium with
+`PW_CHROMIUM=/path/to/chrome`.
+
 ## Host API
 
 ```ts
@@ -51,8 +69,14 @@ createAdmin({
 	driver: kyselyDriver(db),
 	hostRules: kyselyRules(db),
 	context: cms.admin.context, // content locales = admin-active languages
+	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
 });
 ```
+
+`PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
+loader as it is: in TanStack Start, return it from a `createServerFn` handler.
+A server function answers on its own URL during client navigation, so build
+the page request from the route path (see `workbench/src/server/page.ts`).
 
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
@@ -85,5 +109,6 @@ Form submissions and notifications (the ContactForm action URL is bound but
 `/_cms/forms/...` has no handler), secret settings (Laravel Crypt), legacy
 HTML richtext conversion (escaped instead), auto-redirects on slug change,
 page revisions, page refs, audit log, 404 log, roles/abilities, caching, the
-React client entry (`@tbtop/cms/react`), source-backed page types, the
+React client entry (`@tbtop/cms/react`: the workbench keeps its json-render
+registry and SEO head mapping locally for now), source-backed page types, the
 remaining admin pages (dashboard, users, inbox, health, SEO report).

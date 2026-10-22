@@ -6,10 +6,16 @@ import { richtextHtml } from "../content/richtext";
 import { resolveSeo, type Seo } from "../seo/resolver";
 import { schemaContext } from "../seo/schemaContext";
 import type { Site } from "../site";
+import type { Jsonify } from "../support/values";
 import { ancestorCrumbs, breadcrumbs, type Crumb } from "./breadcrumbs";
 
 /** The shared `cms` prop (ShareCmsProps): site settings, locales, the resolved header and footer. */
-export type SharedProps = {
+export type SharedProps = Jsonify<SharedShape>;
+
+/** The props of a CMS page, all JSON: a host passes them through its loader as they are. */
+export type PageProps = Jsonify<PageShape>;
+
+type SharedShape = {
 	settings: Record<string, unknown>;
 	locale: string;
 	defaultLocale: string;
@@ -19,7 +25,7 @@ export type SharedProps = {
 	strings: { previewBanner: string };
 };
 
-export type PageProps = {
+type PageShape = {
 	page: {
 		id: number;
 		type: string;
@@ -38,7 +44,7 @@ export type PageProps = {
 	breadcrumbs: Crumb[];
 	path: string;
 	isPreview: boolean;
-	cms: SharedProps;
+	cms: SharedShape;
 };
 
 export type LoadResult =
@@ -86,10 +92,10 @@ export async function loadPage(site: Site, request: Request, options: { preview:
 			const target = isExternal(redirect.target) ? redirect.target : await site.url(redirect.target, locale);
 			return { type: "redirect", status: redirect.status, location: withQuery(target, url.search) };
 		}
-		return { type: "notFound", status: 404, locale, path, cms: await sharedProps(site, locale, null) };
+		return { type: "notFound", status: 404, locale, path, cms: asJson(await sharedProps(site, locale, null)) };
 	}
 	const props = await pageProps(site, page, locale, path);
-	return { type: "page", status: 200, headers: props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}, props };
+	return { type: "page", status: 200, headers: props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}, props: asJson(props) };
 }
 
 /** PageResolver: the page at a path in a locale, live only unless previewing. */
@@ -98,7 +104,7 @@ export async function resolvePage(site: Site, path: string, locale: string, prev
 	return id === null ? null : site.pages.find(id, { live: !preview });
 }
 
-export async function pageProps(site: Site, page: Page, locale: string, path: string): Promise<PageProps> {
+export async function pageProps(site: Site, page: Page, locale: string, path: string): Promise<PageShape> {
 	const type = site.pageTypes.has(page.type) ? site.pageTypes.get(page.type) : null;
 	const content = page.content ?? type?.template(page) ?? [];
 	const { blocks, fields } = await resolveBlocks(site, content, locale, page);
@@ -136,7 +142,7 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 	};
 }
 
-export async function sharedProps(site: Site, locale: string, page: Page | null): Promise<SharedProps> {
+export async function sharedProps(site: Site, locale: string, page: Page | null): Promise<SharedShape> {
 	const languages = await site.languages.frontendActive();
 	return {
 		settings: await site.settings.forFrontend(),
@@ -158,6 +164,12 @@ async function layout(site: Site, locale: string, page: Page | null): Promise<Re
 	}
 	return out;
 }
+
+/**
+ * Every `unknown` in the props is already JSON: it comes from a JSON column,
+ * a zod-checked block prop or a JSON-LD node. The type says so for the host.
+ */
+const asJson = <T>(value: T): Jsonify<T> => value as Jsonify<T>;
 
 function withQuery(url: string, search: string): string {
 	if (search === "" || search === "?" || url.includes("?")) {

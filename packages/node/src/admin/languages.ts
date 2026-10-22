@@ -1,7 +1,7 @@
 import { Column, definePage, Effects, HttpError, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { insertId } from "../support/db";
-import { type Dict, sqlDate } from "../support/values";
+import { type Dict, flag, sqlDate } from "../support/values";
 import { adminPrefix, NAV, siteOf } from "./support";
 
 /** Languages (LanguagesPage): the list, add, edit, make default. */
@@ -59,8 +59,8 @@ const values = (form: Dict) => ({
 	locale: String(form.locale ?? ""),
 	og_locale: typeof form.og_locale === "string" && form.og_locale !== "" ? form.og_locale : null,
 	sort_order: Number(form.sort_order ?? 0) || 0,
-	is_admin_active: Boolean(form.is_admin_active),
-	is_frontend_active: Boolean(form.is_frontend_active),
+	is_admin_active: flag(Boolean(form.is_admin_active)),
+	is_frontend_active: flag(Boolean(form.is_frontend_active)),
 });
 
 export function languageNew(cms: Cms) {
@@ -85,7 +85,7 @@ export function languageNew(cms: Cms) {
 					const isFirst = (await site.languages.all()).length === 0;
 					await insertId(
 						site.config.db,
-						site.config.db.insertInto("tbtop_languages").values({ ...row, is_default: isFirst, created_at: now, updated_at: now }),
+						site.config.db.insertInto("tbtop_languages").values({ ...row, is_default: flag(isFirst), created_at: now, updated_at: now }),
 					);
 					site.languages.forget();
 					if (row.is_frontend_active) {
@@ -125,13 +125,13 @@ export function languageEdit(cms: Cms) {
 						.set({
 							...next,
 							locale: row.locale,
-							...(isDefault ? { is_admin_active: true, is_frontend_active: true } : {}),
+							...(isDefault ? { is_admin_active: 1 as const, is_frontend_active: 1 as const } : {}),
 							updated_at: sqlDate(new Date()),
 						})
 						.where("id", "=", id)
 						.execute();
 					site.languages.forget();
-					if (!wasFrontend && (next.is_frontend_active || isDefault)) {
+					if (!wasFrontend && (next.is_frontend_active === 1 || isDefault)) {
 						await site.pages.slugs.backfillLocale(row.locale);
 					}
 					return Effects.make().notify("Saved").redirect(`${prefix}/languages`);

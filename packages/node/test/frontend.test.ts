@@ -126,8 +126,8 @@ describe("loadPage", () => {
 
 	test("a missing path follows its redirect with the query string, else 404s", async () => {
 		const { cms } = await makeCms();
-		expect(await cms.loadPage(get("/old-about?ref=1"))).toEqual({ type: "redirect", status: 301, location: "/about?ref=1" });
-		expect(await cms.loadPage(get("/uk/old-about"))).toEqual({ type: "redirect", status: 301, location: "/uk/about" });
+		expect(await cms.loadPage(get("/old-about?ref=1"))).toEqual({ type: "redirect", status: 301, location: "/about-us?ref=1" });
+		expect(await cms.loadPage(get("/uk/old-about"))).toEqual({ type: "redirect", status: 301, location: "/uk/about-us" });
 		const missing = await cms.loadPage(get("/nope"));
 		expect(missing).toMatchObject({ type: "notFound", status: 404, locale: "en", path: "nope" });
 	});

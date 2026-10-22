@@ -80,5 +80,5 @@ export const demoFixture: Fixture = {
 		},
 		{ key: "draft", name: { en: "Work in progress" }, status: "draft" },
 	],
-	redirects: [{ from: "old-about", to: "about" }],
+	redirects: [{ from: "old-about", to: "about-us" }],
 };

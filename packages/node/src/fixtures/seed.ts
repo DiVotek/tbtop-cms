@@ -1,7 +1,7 @@
 import type { Cms } from "../cms";
 import type { Translations } from "../content/page";
 import { insertId } from "../support/db";
-import { sqlDate } from "../support/values";
+import { flag, sqlDate } from "../support/values";
 
 export type FixtureBlock = {
 	kind: string;
@@ -84,9 +84,9 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 				name: language.name,
 				locale: language.locale,
 				og_locale: language.ogLocale ?? null,
-				is_default: isDefault,
-				is_admin_active: isDefault || language.admin !== false,
-				is_frontend_active: isDefault || language.frontend !== false,
+				is_default: flag(isDefault),
+				is_admin_active: flag(isDefault || language.admin !== false),
+				is_frontend_active: flag(isDefault || language.frontend !== false),
 				sort_order: index,
 				created_at: now,
 				updated_at: now,

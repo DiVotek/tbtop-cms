@@ -74,10 +74,10 @@ export class Languages {
 				throw new Error(`Language '${locale}' does not exist.`);
 			}
 			const now = sqlDate(new Date());
-			await trx.updateTable("tbtop_languages").set({ is_default: false, updated_at: now }).where("is_default", "=", true).execute();
+			await trx.updateTable("tbtop_languages").set({ is_default: 0, updated_at: now }).where("is_default", "=", 1).execute();
 			await trx
 				.updateTable("tbtop_languages")
-				.set({ is_default: true, is_admin_active: true, is_frontend_active: true, updated_at: now })
+				.set({ is_default: 1, is_admin_active: 1, is_frontend_active: 1, updated_at: now })
 				.where("id", "=", target.id)
 				.execute();
 		});

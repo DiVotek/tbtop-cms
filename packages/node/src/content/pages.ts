@@ -1,7 +1,7 @@
 import { type Kysely, type SelectQueryBuilder, sql } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
-import { encodeJson, sqlDate } from "../support/values";
+import { encodeJson, flag, sqlDate } from "../support/values";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
 import { PageSlugs } from "./slugs";
 
@@ -57,7 +57,7 @@ export class Pages {
 	async home(): Promise<Page | null> {
 		const row = await this.query()
 			.selectAll("tbtop_pages")
-			.where("is_system", "=", true)
+			.where("is_system", "=", 1)
 			.where("parent_id", "is", null)
 			.where("error_class", "is", null)
 			.executeTakeFirst();
@@ -70,7 +70,7 @@ export class Pages {
 			qb = whereLive(qb);
 		}
 		if (options.indexable === true) {
-			qb = qb.where("is_indexable", "=", true);
+			qb = qb.where("is_indexable", "=", 1);
 		}
 		if (options.limit !== undefined) {
 			qb = qb.limit(options.limit);
@@ -109,8 +109,8 @@ export class Pages {
 				...this.columns(input),
 				type: input.type,
 				status: input.status ?? "draft",
-				is_indexable: input.isIndexable ?? true,
-				is_system: input.isSystem ?? false,
+				is_indexable: flag(input.isIndexable ?? true),
+				is_system: flag(input.isSystem ?? false),
 				created_by: options.by ?? null,
 				updated_by: options.by ?? null,
 				created_at: now,
@@ -137,8 +137,8 @@ export class Pages {
 				...this.columns(input),
 				...(input.type !== undefined ? { type: input.type } : {}),
 				...(input.status !== undefined ? { status: input.status } : {}),
-				...(input.isIndexable !== undefined ? { is_indexable: input.isIndexable } : {}),
-				...(input.isSystem !== undefined ? { is_system: input.isSystem } : {}),
+				...(input.isIndexable !== undefined ? { is_indexable: flag(input.isIndexable) } : {}),
+				...(input.isSystem !== undefined ? { is_system: flag(input.isSystem) } : {}),
 				...(options.by !== undefined ? { updated_by: options.by } : {}),
 				lock_version: sql<number>`lock_version + 1`,
 				updated_at: sqlDate(new Date()),

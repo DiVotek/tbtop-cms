@@ -1,7 +1,7 @@
 import type { Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
-import { sqlDate } from "../support/values";
+import { flag, sqlDate } from "../support/values";
 
 const MAX_HOPS = 10;
 
@@ -54,7 +54,7 @@ export class Redirects {
 				from_path: normalizePath(input.fromPath),
 				to_path: isExternal(input.toPath) ? input.toPath : normalizePath(input.toPath),
 				status_code: input.statusCode ?? 301,
-				is_auto: input.isAuto ?? false,
+				is_auto: flag(input.isAuto ?? false),
 				created_at: now,
 				updated_at: now,
 			}),
