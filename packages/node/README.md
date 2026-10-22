@@ -15,7 +15,7 @@ json-render's `Renderer` over the block catalog.
 cd packages/node
 ./scripts/fetch-admin.sh   # builds @tbtop/admin from DiVotek/tbtop at ADMIN_SHA
 bun install
-bun test && bun run typecheck
+bun run test && bun run typecheck   # `bun test` alone also runs the workbench specs
 bun example/server.ts      # demo site on :3100, admin JSON under /admin
 ```
 
@@ -28,21 +28,26 @@ the Playwright E2E suite.
 
 ```bash
 cd packages/node/workbench
-bun install && bun run setup   # pack @tbtop/cms + @tbtop/admin, reinstall them
+bun run setup                  # pack @tbtop/cms + @tbtop/admin, then install (needs the install above)
 bun run dev                    # http://localhost:3200, admin at /admin/pages
 bun run e2e                    # production build + vite preview + Playwright
 ```
 
-Rerun `bun run setup` after a change to the package. Drafts preview with
-`?preview`. Locally, point Playwright at an installed Chromium with
-`PW_CHROMIUM=/path/to/chrome`.
+Rerun `bun run setup` after a change to the package. Locally, point
+Playwright at an installed Chromium with `PW_CHROMIUM=/path/to/chrome`.
+
+The workbench is a demo, not a host to copy: it signs every visitor in as an
+admin and opens drafts and scheduled pages to anyone who adds `?preview`.
+The package has no access control of its own yet: the admin `user()`
+callback decides who edits and `canPreview` decides who sees unpublished
+pages, so a real host must check its own users in both.
 
 ## Host API
 
 ```ts
 import { cmsBlockImpls, cmsBlocks, createCms, defineBlocks, implementBlocks, migrateCms } from "@tbtop/cms";
 
-await migrateCms(db, { dialect: "sqlite" }); // or merge cmsMigrations(...) into your Migrator
+await migrateCms(db, { dialect: "sqlite" }); // fresh database only; or merge cmsMigrations(...) into your Migrator
 
 // Shared with the client bundle (@tbtop/cms/catalog has only zod):
 export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, placements: ["pages", "layout"] } });
@@ -72,6 +77,11 @@ createAdmin({
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
 });
 ```
+
+`migrateCms` creates the tables from scratch: run it on a fresh database, not
+on one the Laravel package already migrated (its tables exist and the
+migration fails). A database Laravel migrated is read as it is, without
+`migrateCms`.
 
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.

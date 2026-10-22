@@ -49,6 +49,7 @@ export class Site {
 			db,
 			async () => (await this.languages.frontendActive()).map((row) => row.locale),
 			() => this.languages.defaultLocale(),
+			pageTypes,
 		);
 		this.layouts = new Layouts(db);
 		this.sharedBlocks = new SharedBlocks(db);
@@ -80,7 +81,7 @@ export class Site {
 
 	/** url(): an absolute URL on the site origin. */
 	absolute(path: string): string {
-		if (/^https?:\/\//.test(path)) {
+		if (/^(?:https?:)?\/\//.test(path)) {
 			return path;
 		}
 		const trimmed = path.replace(/^\/+/, "");

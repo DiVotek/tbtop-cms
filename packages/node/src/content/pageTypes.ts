@@ -39,7 +39,8 @@ export const builtInPageTypes: PageTypeDef[] = [
 	{ key: "article", requiresParent: true, schemaTypes: ["Article", "NewsArticle", "BlogPosting"] },
 ];
 
-function normalize(def: PageTypeDef): PageType {
+/** A subtype without its own schemaTypes inherits its base's, as a PHP subtype class inherits the method. */
+function normalize(def: PageTypeDef, baseDef: PageTypeDef | undefined): PageType {
 	const fields = def.fields ?? (() => []);
 	return {
 		key: def.key,
@@ -47,7 +48,7 @@ function normalize(def: PageTypeDef): PageType {
 		allowedChildren: def.allowedChildren ?? [],
 		requiresParent: def.requiresParent ?? false,
 		maxDepth: def.maxDepth ?? 1,
-		schemaTypes: def.schemaTypes ?? WEB_PAGE_FAMILY,
+		schemaTypes: def.schemaTypes ?? baseDef?.schemaTypes ?? WEB_PAGE_FAMILY,
 		base: def.base ?? def.key,
 		fields,
 		template: def.template ?? (() => null),
@@ -61,14 +62,15 @@ export class PageTypes {
 	private readonly types = new Map<string, PageType>();
 
 	constructor(extra: PageTypeDef[] = []) {
-		for (const def of [...builtInPageTypes, ...extra]) {
+		const defs = [...builtInPageTypes, ...extra];
+		for (const def of defs) {
 			if (def.key === "") {
 				throw new Error("A page type needs a non-empty key.");
 			}
 			if (this.types.has(def.key)) {
 				throw new Error(`Page type [${def.key}] is already registered.`);
 			}
-			this.types.set(def.key, normalize(def));
+			this.types.set(def.key, normalize(def, defs.find((other) => other.key === def.base)));
 		}
 	}
 

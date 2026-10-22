@@ -65,10 +65,12 @@ export class PageSlugs {
 		return row === undefined ? null : Number(row.page_id);
 	}
 
-	async sync(page: Page, overrides: Record<string, string> = {}): Promise<boolean> {
-		if (page.errorClass !== null) {
+	/** `visited` cuts a parent cycle already in the data, so the cascade ends. */
+	async sync(page: Page, overrides: Record<string, string> = {}, visited: Set<number> = new Set()): Promise<boolean> {
+		if (page.errorClass !== null || visited.has(page.id)) {
 			return false;
 		}
+		visited.add(page.id);
 		let changed = false;
 		for (const locale of await this.locales()) {
 			if (await this.writeRow(page, locale, overrides[locale] ?? "")) {
@@ -76,7 +78,7 @@ export class PageSlugs {
 			}
 		}
 		if (changed) {
-			await this.cascade(page.id);
+			await this.cascade(page.id, visited);
 		}
 		return changed;
 	}
@@ -102,9 +104,9 @@ export class PageSlugs {
 		await this.db.deleteFrom("tbtop_page_slugs").where("page_id", "=", pageId).execute();
 	}
 
-	private async cascade(parentId: number): Promise<void> {
+	private async cascade(parentId: number, visited: Set<number>): Promise<void> {
 		for (const child of await this.pagesWhere(parentId)) {
-			await this.sync(child);
+			await this.sync(child, {}, visited);
 		}
 	}
 

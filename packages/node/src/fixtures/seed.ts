@@ -1,5 +1,6 @@
 import type { Cms } from "../cms";
 import type { Translations } from "../content/page";
+import { defaultOgLocale } from "../content/localeCatalog";
 import { insertId } from "../support/db";
 import { flag, sqlDate } from "../support/values";
 
@@ -83,7 +84,7 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 			db.insertInto("tbtop_languages").values({
 				name: language.name,
 				locale: language.locale,
-				og_locale: language.ogLocale ?? null,
+				og_locale: language.ogLocale ?? defaultOgLocale(language.locale),
 				is_default: flag(isDefault),
 				is_admin_active: flag(isDefault || language.admin !== false),
 				is_frontend_active: flag(isDefault || language.frontend !== false),

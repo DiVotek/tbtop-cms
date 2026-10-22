@@ -1,7 +1,7 @@
 import { Column, definePage, Effects, HttpError, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
-import { insertId } from "../support/db";
-import { type Dict, flag, sqlDate } from "../support/values";
+import { LanguageError } from "../content/languages";
+import type { Dict } from "../support/values";
 import { adminPrefix, NAV, siteOf } from "./support";
 
 /** Languages (LanguagesPage): the list, add, edit, make default. */
@@ -56,12 +56,23 @@ function languageForm(s: S) {
 
 const values = (form: Dict) => ({
 	name: String(form.name ?? ""),
-	locale: String(form.locale ?? ""),
-	og_locale: typeof form.og_locale === "string" && form.og_locale !== "" ? form.og_locale : null,
-	sort_order: Number(form.sort_order ?? 0) || 0,
-	is_admin_active: flag(Boolean(form.is_admin_active)),
-	is_frontend_active: flag(Boolean(form.is_frontend_active)),
+	ogLocale: typeof form.og_locale === "string" ? form.og_locale : null,
+	sortOrder: Number(form.sort_order ?? 0) || 0,
+	isAdminActive: Boolean(form.is_admin_active),
+	isFrontendActive: Boolean(form.is_frontend_active),
 });
+
+/** Runs a language write, turning a refused one into an error notice. */
+async function refusing<T>(write: () => Promise<T>): Promise<T | ReturnType<typeof Effects.make>> {
+	try {
+		return await write();
+	} catch (error) {
+		if (error instanceof LanguageError) {
+			return Effects.make().notify(error.message, "error");
+		}
+		throw error;
+	}
+}
 
 export function languageNew(cms: Cms) {
 	const prefix = adminPrefix(cms);
@@ -77,19 +88,13 @@ export function languageNew(cms: Cms) {
 				.record({ is_admin_active: true, is_frontend_active: false, sort_order: 0 })
 				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
-					const row = values(ctx.form as Dict);
-					if ((await site.languages.find(row.locale)) !== null) {
-						return Effects.make().notify(`Language ${row.locale} already exists.`, "error");
+					const form = ctx.form as Dict;
+					const added = await refusing(() => site.languages.create({ ...values(form), locale: String(form.locale ?? "") }));
+					if (added instanceof Effects) {
+						return added;
 					}
-					const now = sqlDate(new Date());
-					const isFirst = (await site.languages.all()).length === 0;
-					await insertId(
-						site.config.db,
-						site.config.db.insertInto("tbtop_languages").values({ ...row, is_default: flag(isFirst), created_at: now, updated_at: now }),
-					);
-					site.languages.forget();
-					if (row.is_frontend_active) {
-						await site.pages.slugs.backfillLocale(row.locale);
+					if (added.is_frontend_active) {
+						await site.pages.slugs.backfillLocale(added.locale);
 					}
 					return `${prefix}/languages`;
 				}),
@@ -104,7 +109,7 @@ export function languageEdit(cms: Cms) {
 		view: async (s, { params, request }) => {
 			const db = cms.site(request).config.db;
 			const id = Number(params.language);
-			const row = await db.selectFrom("tbtop_languages").selectAll().where("id", "=", id).executeTakeFirst();
+			const row = await db.selectFrom("tbtop_languages").selectAll().where("id", "=", id).where("deleted_at", "is", null).executeTakeFirst();
 			if (row === undefined) {
 				throw new HttpError(404, "Language not found.");
 			}
@@ -117,21 +122,12 @@ export function languageEdit(cms: Cms) {
 				.record({ ...row, is_default: isDefault, is_admin_active: Boolean(row.is_admin_active), is_frontend_active: Boolean(row.is_frontend_active) })
 				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
-					const next = values(ctx.form as Dict);
 					const wasFrontend = Boolean(row.is_frontend_active);
-					// The default language is always admin- and frontend-active.
-					await db
-						.updateTable("tbtop_languages")
-						.set({
-							...next,
-							locale: row.locale,
-							...(isDefault ? { is_admin_active: 1 as const, is_frontend_active: 1 as const } : {}),
-							updated_at: sqlDate(new Date()),
-						})
-						.where("id", "=", id)
-						.execute();
-					site.languages.forget();
-					if (!wasFrontend && (next.is_frontend_active === 1 || isDefault)) {
+					const saved = await refusing(() => site.languages.update(id, values(ctx.form as Dict)));
+					if (saved instanceof Effects) {
+						return saved;
+					}
+					if (!wasFrontend && saved.is_frontend_active) {
 						await site.pages.slugs.backfillLocale(row.locale);
 					}
 					return Effects.make().notify("Saved").redirect(`${prefix}/languages`);

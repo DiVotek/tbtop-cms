@@ -230,14 +230,19 @@ async function render(
 		"{parent}": ancestors.at(-1)?.label ?? "",
 		"{date}": page.publishedAt !== null && isLive(page) ? longDate(page.publishedAt, locale) : "",
 	};
-	let out = tpl;
-	for (const [key, value] of Object.entries(all)) {
-		out = out.replaceAll(key, value);
-	}
-	const sep = separator.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const out = strtr(tpl, all);
+	const sep = escapeRegExp(separator);
 	const collapsed = out.replace(/\s+/gu, " ").trim();
 	const deduped = collapsed.replace(new RegExp(`${sep}(?:\\s*${sep})+`, "gu"), separator);
 	return deduped.replace(new RegExp(`^(?:${sep}\\s*)+|(?:\\s*${sep})+$`, "gu"), "").trim();
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** PHP strtr: one pass, longest key first, so a substituted value is never scanned again. */
+function strtr(text: string, pairs: Record<string, string>): string {
+	const keys = Object.keys(pairs).filter((key) => key !== "").sort((a, b) => b.length - a.length);
+	return keys.length === 0 ? text : text.replace(new RegExp(keys.map(escapeRegExp).join("|"), "g"), (key) => pairs[key] ?? key);
 }
 
 /** Carbon isoFormat('LL'): the locale's long date. */

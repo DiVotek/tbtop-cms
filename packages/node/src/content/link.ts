@@ -1,3 +1,4 @@
+import { isPhpEmail, isPhpHttpUrl } from "../support/phpFilters";
 import { isDict } from "../support/values";
 
 export type LinkType = "page" | "external" | "email" | "phone";
@@ -84,7 +85,7 @@ export function isWellFormed(link: LinkValue): boolean {
 		case "external":
 			return link.value !== null && externalIsValid(link.value);
 		case "email":
-			return link.value !== null && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(link.value);
+			return link.value !== null && isPhpEmail(link.value);
 		case "phone": {
 			if (link.value === null || !/^\+?[0-9 ()-]{5,40}$/.test(link.value)) {
 				return false;
@@ -95,14 +96,7 @@ export function isWellFormed(link: LinkValue): boolean {
 	}
 }
 
+/** An http(s) URL by FILTER_VALIDATE_URL, or a messenger deep link (ExternalSchemes). */
 function externalIsValid(value: string): boolean {
-	try {
-		const url = new URL(value);
-		if ((url.protocol === "http:" || url.protocol === "https:") && url.hostname !== "") {
-			return true;
-		}
-	} catch {
-		// not a URL: try the app schemes
-	}
-	return new RegExp(`^(?:${EXTERNAL_SCHEMES.join("|")}):(?://)?\\S+$`, "i").test(value);
+	return isPhpHttpUrl(value) || new RegExp(`^(?:${EXTERNAL_SCHEMES.join("|")}):(?://)?\\S+$`, "i").test(value);
 }

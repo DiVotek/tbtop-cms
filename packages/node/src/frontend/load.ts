@@ -52,6 +52,15 @@ export type LoadResult =
 	| { type: "redirect"; status: number; location: string }
 	| { type: "notFound"; status: 404; locale: string; path: string; cms: SharedProps };
 
+/** rawurldecode never throws: a malformed escape stays as written, so it matches no slug. */
+function decodeSegment(segment: string): string {
+	try {
+		return decodeURIComponent(segment);
+	} catch {
+		return segment;
+	}
+}
+
 /**
  * SetLanguage: a default-locale prefix 301s to the bare path; a frontend
  * locale prefix is stripped and picked; anything else is the default locale.
@@ -64,7 +73,7 @@ export async function routeLocale(
 		.replace(/^\/+|\/+$/g, "")
 		.split("/")
 		.filter((segment) => segment !== "")
-		.map((segment) => decodeURIComponent(segment));
+		.map(decodeSegment);
 	const first = segments[0] ?? "";
 	const defaultLocale = await site.languages.defaultLocale();
 	if (first !== "" && first === defaultLocale) {

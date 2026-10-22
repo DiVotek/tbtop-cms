@@ -45,8 +45,12 @@ export class SharedBlocks {
 		return id;
 	}
 
-	async update(id: number, input: { name?: string; data?: Dict }): Promise<void> {
-		await this.db
+	/**
+	 * Updates a shared block. With `lockVersion` the write only lands when the
+	 * row still has it (SharedBlockForm::update); a stale one throws SharedBlockConflictError.
+	 */
+	async update(id: number, input: { name?: string; data?: Dict }, options: { lockVersion?: number } = {}): Promise<void> {
+		let qb = this.db
 			.updateTable("tbtop_shared_blocks")
 			.set({
 				...(input.name !== undefined ? { name: input.name } : {}),
@@ -54,14 +58,37 @@ export class SharedBlocks {
 				lock_version: sql<number>`lock_version + 1`,
 				updated_at: sqlDate(new Date()),
 			})
-			.where("id", "=", id)
-			.execute();
+			.where("id", "=", id);
+		if (options.lockVersion !== undefined) {
+			qb = qb.where("lock_version", "=", options.lockVersion);
+		}
+		const result = await qb.executeTakeFirst();
+		this.byId = null;
+		if (options.lockVersion !== undefined && Number(result.numUpdatedRows) === 0) {
+			throw new SharedBlockConflictError(id);
+		}
+	}
+
+	/** Deletes an unplaced block; one still placed anywhere throws SharedBlockInUseError (SharedBlocksPage::deleteAction). */
+	async delete(id: number): Promise<void> {
+		await this.db.transaction().execute(async (trx) => {
+			const inUse = (await placements(trx)).get(id) ?? 0;
+			if (inUse > 0) {
+				throw new SharedBlockInUseError(id, inUse);
+			}
+			await trx.deleteFrom("tbtop_shared_blocks").where("id", "=", id).execute();
+		});
 		this.byId = null;
 	}
 
-	async delete(id: number): Promise<void> {
-		await this.db.deleteFrom("tbtop_shared_blocks").where("id", "=", id).execute();
-		this.byId = null;
+	/** How many pages (trashed included) and layout slots place this block (SharedBlockUsage::using). */
+	async usage(id: number): Promise<number> {
+		return (await placements(this.db)).get(id) ?? 0;
+	}
+
+	/** Placement counts by shared block id (SharedBlockUsage::counts). */
+	async usageCounts(): Promise<Map<number, number>> {
+		return placements(this.db);
 	}
 
 	private async load(): Promise<Map<number, SharedBlock>> {
@@ -84,6 +111,39 @@ export class SharedBlocks {
 			);
 		}
 		return this.byId;
+	}
+}
+
+/**
+ * Containers per shared block id, read from each page's and layout's top-level
+ * rows. Trashed pages count: a restore brings their pointers back.
+ */
+async function placements(db: Kysely<CmsDatabase>): Promise<Map<number, number>> {
+	const pages = await db.selectFrom("tbtop_pages").select("content").execute();
+	const layouts = await db.selectFrom("tbtop_layouts").select("content").execute();
+	const counts = new Map<number, number>();
+	for (const row of [...pages, ...layouts]) {
+		const content = decodeJson(row.content);
+		const refs = new Set((Array.isArray(content) ? content : []).map(refOf).filter((ref): ref is number => ref !== null));
+		for (const ref of refs) {
+			counts.set(ref, (counts.get(ref) ?? 0) + 1);
+		}
+	}
+	return counts;
+}
+
+export class SharedBlockConflictError extends Error {
+	constructor(readonly sharedBlockId: number) {
+		super(`Shared block #${sharedBlockId} was changed by someone else.`);
+	}
+}
+
+export class SharedBlockInUseError extends Error {
+	constructor(
+		readonly sharedBlockId: number,
+		readonly places: number,
+	) {
+		super(`Still placed in ${places} ${places === 1 ? "place" : "places"} — remove it there first.`);
 	}
 }
 
