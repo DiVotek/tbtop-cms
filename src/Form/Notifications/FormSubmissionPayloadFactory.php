@@ -21,6 +21,8 @@ final class FormSubmissionPayloadFactory
             fields: SubmissionFieldFormatter::formatAll($submission->payload),
             actionUrl: route('tbtop.cms.form-submission-page', ['submission' => $submission->id]),
             actionLabel: __('tbtop-cms::notifications.bell.view'),
+            leadName: LeadIdentity::name($submission->payload) ?? '',
+            leadContact: LeadIdentity::contact($submission->payload) ?? '',
         );
     }
 

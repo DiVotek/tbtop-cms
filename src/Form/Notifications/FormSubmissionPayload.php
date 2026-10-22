@@ -21,5 +21,9 @@ final readonly class FormSubmissionPayload
         public array $fields,
         public string $actionUrl,
         public string $actionLabel = '',
+        // Name and contact apart, for a template that puts each on its own
+        // line; '' when the payload has none ($leadIdentity still covers it).
+        public string $leadName = '',
+        public string $leadContact = '',
     ) {}
 }

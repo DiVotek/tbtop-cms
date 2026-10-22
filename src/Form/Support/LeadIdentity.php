@@ -44,6 +44,22 @@ final class LeadIdentity
         return self::firstScalarFallback($payload);
     }
 
+    /** @param  array<string, mixed>  $payload */
+    public static function name(array $payload): ?string
+    {
+        return self::nonEmptyString($payload['name'] ?? null);
+    }
+
+    /**
+     * How to reach the lead: the email, else a phone a custom form collects.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function contact(array $payload): ?string
+    {
+        return self::nonEmptyString($payload['email'] ?? null) ?? self::nonEmptyString($payload['phone'] ?? null);
+    }
+
     /**
      * Scans in payload order (whatever order the form block's fields were
      * submitted in) rather than sorting by key — a custom block's first

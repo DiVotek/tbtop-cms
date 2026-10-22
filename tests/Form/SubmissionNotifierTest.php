@@ -114,6 +114,33 @@ it('writes the bell body as plain text', function (): void {
         ->and($data['body'])->toContain("Ada O'Brien");
 });
 
+it('puts the lead name, contact and page on their own bell lines', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    expect($admin->notifications()->sole()->data['body'])->toBe("Ada\nada@example.test\nPage: Contact");
+});
+
+it('keeps the telegram message as HTML with the title, lead lines, page and link', function (): void {
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    app(Settings::class)->set('notifications.form.submission.channels', ['telegram']);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada & Co', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $url = route('tbtop.cms.form-submission-page', ['submission' => FormSubmission::query()->sole()->id]);
+    Http::assertSent(fn ($request): bool => trim((string) $request['text'])
+        === "<b>New form submission</b>\nAda &amp; Co\nada@example.test\nPage: Contact\n{$url}");
+});
+
 it('labels the bell action instead of showing the raw URL', function (): void {
     $admin = notifierAdmin();
     $page = notifierContactPage();
