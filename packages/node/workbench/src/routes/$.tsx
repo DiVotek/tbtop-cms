@@ -36,9 +36,12 @@ function seoHead(seo: PageProps["seo"]) {
 			...seo.alternates.map((alternate) => ({ rel: "alternate", hrefLang: alternate.locale, href: alternate.url })),
 			...(seo.xDefault === null ? [] : [{ rel: "alternate", hrefLang: "x-default", href: seo.xDefault }]),
 		],
-		scripts: seo.jsonLd.map((node) => ({ type: "application/ld+json", children: JSON.stringify(node) })),
+		scripts: seo.jsonLd.map((node) => ({ type: "application/ld+json", children: jsonLd(node) })),
 	};
 }
+
+/** The JSON with `<`, `>`, `&` escaped (JSON_HEX_TAG | JSON_HEX_AMP): the router writes it as raw HTML. */
+const jsonLd = (node: unknown) => JSON.stringify(node).replace(/[<>&]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 function CmsPage() {
 	const { page, render, breadcrumbs, isPreview, cms: shared }: PageProps = Route.useLoaderData();
