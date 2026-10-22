@@ -112,8 +112,8 @@ export function rowsFromForm(blocks: BlockRegistry, rows: Dict[], form: Dict): D
 
 export type BlockTabsOptions = {
 	placement: Placement;
-	/** Persists a structural change (add, remove) outside the editor's Save. */
-	save: (ctx: ActionCtx, rows: Dict[]) => Promise<void>;
+	/** Persists a structural change (add, remove) outside the editor's Save; an Effects (an error notice) answers instead of `back`. */
+	save: (ctx: ActionCtx, rows: Dict[]) => Promise<Effects | void>;
 	back: string;
 	/**
 	 * Structural actions skip the form rules (PageEditBlockTabs::skipsGate): only
@@ -163,8 +163,7 @@ export function blockTabs(
 					.confirm("Remove this block?", "Its content is deleted when you confirm.")
 					.withoutValidation(options.skipsValidation)
 					.handle(async (ctx) => {
-						await options.save(ctx, rowsFromForm(blocks, rows, ctx.form as Dict).filter((r) => r.id !== id));
-						return options.back;
+						return (await options.save(ctx, rowsFromForm(blocks, rows, ctx.form as Dict).filter((r) => r.id !== id))) ?? options.back;
 					}, ["form"]),
 			]),
 		]);
@@ -203,8 +202,7 @@ function addBlockBody(
 					const sort = Math.max(-1, ...current.map((row) => row.sort as number)) + 1;
 					// Saved inactive (PageEditBlockTabs::handleAdd): the action writes outside Save and a layout has no draft,
 					// so an empty block would go live at once. The editor turns it on once it is filled in.
-					await options.save(ctx, [...current, { id: blockId(), kind, active: false, sort, data: {} }]);
-					return options.back;
+					return (await options.save(ctx, [...current, { id: blockId(), kind, active: false, sort, data: {} }])) ?? options.back;
 				}, ["form"]),
 		]),
 	]);

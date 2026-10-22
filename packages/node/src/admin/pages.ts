@@ -259,7 +259,11 @@ export function pageEdit(cms: Cms) {
 			const defaultLocale = await site.languages.defaultLocale();
 			// A structural save keeps the stored status: a status change waits for the validated Save (structuralForm).
 			const save = async (ctx: ActionCtx, content: Dict[]) => {
-				await savePage(cms, ctx, page, content, { structural: true });
+				try {
+					await savePage(cms, ctx, page, content, { structural: true });
+				} catch (error) {
+					return saveRefusal(error);
+				}
 			};
 			return s.stack([
 				s.displayText(firstText(page, ["name", "title"], defaultLocale, defaultLocale) || `#${page.id}`).variant("heading"),
@@ -309,19 +313,24 @@ export function pageEdit(cms: Cms) {
 						try {
 							await savePage(cms, ctx, page, rowsFromForm(cms.config.blocks, rows, ctx.form as Dict));
 						} catch (error) {
-							if (error instanceof PageConflictError) {
-								return Effects.make().notify("Someone else saved this page meanwhile. Reload to see their changes.", "error");
-							}
-							if (error instanceof PageRuleError) {
-								return Effects.make().notify(error.message, "error");
-							}
-							throw error;
+							return saveRefusal(error);
 						}
 						return Effects.make().notify("Saved").redirect(back);
 					}),
 			]);
 		},
 	});
+}
+
+/** A stale form or a broken page rule as an error notice (PageConflictException → pages.conflict.message); anything else rethrows. */
+function saveRefusal(error: unknown): Effects {
+	if (error instanceof PageConflictError) {
+		return Effects.make().notify("Someone else saved this page meanwhile. Reload to see their changes.", "error");
+	}
+	if (error instanceof PageRuleError) {
+		return Effects.make().notify(error.message, "error");
+	}
+	throw error;
 }
 
 const pageLabel = (row: { name: string | null }): Page => ({ name: safeJson(row.name) }) as unknown as Page;

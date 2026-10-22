@@ -138,6 +138,31 @@ describe("R3-blocks-3: an inactive block's required fields do not block Save", (
 	});
 });
 
+describe("R3-blocks-4: a stale form or a bad schedule is a notice, not a 500", () => {
+	test("blockAdd with a stale lock_version answers an error notice", async () => {
+		const { record, action, rows, ids } = await panel();
+		const url = `/admin/pages/${ids.about}/edit`;
+		const res = await action(url, "blockAdd", { ...(await record(url, "pageEditor")), lock_version: 99, new_block_kind: "Hero" });
+		expect(res.status).toBe(200);
+		expect((await effects(res)).find((effect) => effect.kind === "notify")?.level).toBe("error");
+		expect(await rows(ids.about as number)).toEqual([]);
+	});
+
+	test("blockRemove with an inverted schedule answers an error notice", async () => {
+		const { record, action, setRows, rows, ids } = await panel();
+		await setRows(ids.draft as number, [{ id: "aaaa1111", kind: "Hero", active: false, sort: 0, data: {} }]);
+		const url = `/admin/pages/${ids.draft}/edit`;
+		const res = await action(url, "blockRemove_aaaa1111", {
+			...(await record(url, "pageEditor")),
+			published_at: "2021-01-01T00:00:00Z",
+			unpublish_at: "2020-01-01T00:00:00Z",
+		});
+		expect(res.status).toBe(200);
+		expect((await effects(res)).find((effect) => effect.kind === "notify")?.message).toContain("unpublish");
+		expect((await rows(ids.draft as number)).length).toBe(1);
+	});
+});
+
 describe("R3-blocks-5: SEO fields are stored as locale maps", () => {
 	test("saving the editor unchanged stores maps and a blank og_image, and the editor opens again", async () => {
 		const { cms, page, record, post, ids } = await panel();
