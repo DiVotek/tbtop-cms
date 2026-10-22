@@ -21,6 +21,10 @@ export async function submitForm(site: Site, request: Request): Promise<Response
 	if (request.method !== "POST" || match === null) {
 		return null;
 	}
+	if (crossSite(request, site.origin)) {
+		// The PHP route sits in the `web` group, whose CSRF check answers 419 here.
+		return new Response(null, { status: 403 });
+	}
 	const [, rawLocale = "", rawPage = "", rawBlock = ""] = match;
 	const blockId = decodeURIComponent(rawBlock);
 	const allow = site.config.forms?.allow;
@@ -71,6 +75,34 @@ export async function submitForm(site: Site, request: Request): Promise<Response
 	}
 	return reply("sent");
 }
+
+/**
+ * The frontend has no session to carry a CSRF token, so a post counts as
+ * cross-site when the browser says so: `Sec-Fetch-Site: cross-site`, an
+ * Origin (else a Referer) off the site, or an opaque `null` Origin. A client
+ * that sends neither header is no browser, so no visitor's to forge.
+ */
+function crossSite(request: Request, siteOrigin: string): boolean {
+	if (request.headers.get("sec-fetch-site") === "cross-site") {
+		return true;
+	}
+	const source = request.headers.get("origin") ?? request.headers.get("referer");
+	if (source === null) {
+		return false;
+	}
+	const own = [siteOrigin, request.url].map(originOf);
+	const from = originOf(source);
+	return from === null || !own.includes(from);
+}
+
+const originOf = (url: string): string | null => {
+	try {
+		const origin = new URL(url).origin;
+		return origin === "null" ? null : origin;
+	} catch {
+		return null;
+	}
+};
 
 /** SetLanguage for the submit: a frontend-active locale, else the default. */
 async function submitLocale(site: Site, locale: string): Promise<string> {
