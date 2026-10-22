@@ -247,3 +247,16 @@ describe("R3-forms-11: the From display name", () => {
 		expect(sent[1]?.from).toBe("Acme Shop <shop@example.test>");
 	});
 });
+
+describe("R3-forms-12: a rendered subject", () => {
+	test("is one line, whatever the visitor typed", async () => {
+		const { cms, db, sent } = await mailSite();
+		const now = "2026-10-22 00:00:00";
+		await db
+			.insertInto("tbtop_notification_templates")
+			.values({ type: "form.submission", format: "html", locale: "en", subject: "Lead: {{ leadIdentity }}", body: "<p>x</p>", created_at: now, updated_at: now })
+			.execute();
+		await cms.handle(post(await contactAction(cms), { ...valid, name: "Ada\r\nBcc: x@evil.test" }));
+		expect(sent[0]?.subject).toBe("Lead: Ada Bcc: x@evil.test · ada@example.test");
+	});
+});

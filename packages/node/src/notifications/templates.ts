@@ -36,10 +36,13 @@ export async function overrideFor(db: Kysely<CmsDatabase>, type: string, format:
 	return row;
 }
 
-/** Renders an override with the payload as its variables; the subject is plain text. */
+/**
+ * Renders an override with the payload as its variables. The subject is
+ * plain text on one line: a visitor's line break never reaches a header.
+ */
 export async function renderOverride(override: Override, data: Record<string, unknown>): Promise<Rendered> {
 	const [subject, body] = await Promise.all([liquid.parseAndRender(override.subject, data), liquid.parseAndRender(override.body, data)]);
-	return { subject: decode(subject).trim(), body, data };
+	return { subject: decode(subject).replace(/\s+/g, " ").trim(), body, data };
 }
 
 /** Parses a template without rendering it: the admin rejects a broken override before saving it. */
