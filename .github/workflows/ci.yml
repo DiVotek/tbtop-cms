@@ -172,3 +172,30 @@ jobs:
 
       - name: Run tests
         run: bun run test
+
+  node:
+    name: Node
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/node
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # @tbtop/admin is not published yet: build it from DiVotek/tbtop at ADMIN_SHA.
+      - name: Build @tbtop/admin
+        run: ./scripts/fetch-admin.sh
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Run tests
+        run: bun run test
