@@ -123,7 +123,7 @@ describe("page guards (PageObserver)", () => {
 			new Request("http://x/admin/pages/actions/delete", {
 				method: "POST",
 				body: JSON.stringify({ payload: { row: { _key: ids.blog } } }),
-				headers: { "x-inertia": "true", referer: "http://x/admin/pages" },
+				headers: { "content-type": "application/json", "x-inertia": "true", referer: "http://x/admin/pages" },
 			}),
 		);
 		expect(JSON.stringify(await res?.json())).toContain("has child pages");

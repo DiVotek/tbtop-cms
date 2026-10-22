@@ -65,7 +65,7 @@ async function panel(config: Partial<CmsConfig> = {}) {
 	};
 	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
 	const postTo = (url: string, body: unknown, referer: string) =>
-		visit(url, { method: "POST", body: JSON.stringify(body), headers: { referer: `http://x${referer}` } });
+		visit(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", referer: `http://x${referer}` } });
 	const table = async () =>
 		((await (await visit("/admin/form-submissions/tables/formSubmissions", { inertia: false })).json()) as { data: { data: Record<string, unknown>[] } }).data.data;
 	return { ...made, visit, page, post: postTo, table };

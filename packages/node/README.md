@@ -19,6 +19,12 @@ bun run test && bun run typecheck   # `bun test` alone also runs the workbench s
 bun example/server.ts      # demo site on :3100, admin JSON under /admin
 ```
 
+`TBTOP_TEST_DB=postgres` or `mysql` runs the suite on a server instead of
+in-memory SQLite (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`;
+defaults postgres/postgres and root/root on 127.0.0.1). Every test gets its
+own database, `tbtop_test_*`, which is left behind: drop them for a clean
+server. On MySQL, `TIMESTAMP` columns end in 2038, as in the PHP package.
+
 ## Workbench (TanStack Start)
 
 `workbench/` is a TanStack Start host with the package installed from a

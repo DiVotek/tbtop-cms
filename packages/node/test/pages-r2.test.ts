@@ -32,7 +32,7 @@ async function panel(config: Partial<CmsConfig> = {}) {
 	};
 	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
 	const post = (url: string, body: unknown, referer: string) =>
-		visit(url, { method: "POST", body: JSON.stringify(body), headers: { referer: `http://x${referer}` } });
+		visit(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", referer: `http://x${referer}` } });
 	/** The notice a submit flashed, read off the next page view. */
 	const flashed = async () => JSON.stringify(((await page("/admin/pages")) as InertiaPage & { flash?: unknown }).flash ?? null);
 	const editor = async (id: number) => ((await page(`/admin/pages/${id}/edit`)).props.data as Record<string, Record<string, unknown>>).pageEditor ?? {};

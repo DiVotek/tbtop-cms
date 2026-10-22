@@ -30,7 +30,7 @@ async function panel() {
 		return res;
 	};
 	const post = (url: string, body: unknown, referer: string) =>
-		visit(url, { method: "POST", body: JSON.stringify(body), headers: { referer: `http://x${referer}` } });
+		visit(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", referer: `http://x${referer}` } });
 	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
 	/** The notification or halt a form answered with, from its JSON body or the flash on the next visit. */
 	const notice = async (res: Response, url: string): Promise<string> =>

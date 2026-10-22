@@ -2,7 +2,7 @@ import type { Fixture } from "./seed";
 
 /**
  * The demo site: English (default) and Ukrainian, a home page, a blog
- * category with articles (one scheduled for 2099), a draft, a shared
+ * category with articles (one scheduled for 2037, inside the MySQL TIMESTAMP range), a draft, a shared
  * contact form, a redirect. Only the built-in Hero and ContactForm blocks.
  */
 export const demoFixture: Fixture = {
@@ -74,7 +74,7 @@ export const demoFixture: Fixture = {
 					key: "scheduled-post",
 					type: "article",
 					name: { en: "Coming soon", uk: "Незабаром" },
-					publishedAt: "2099-01-01T00:00:00Z",
+					publishedAt: "2037-12-01T00:00:00Z",
 				},
 			],
 		},

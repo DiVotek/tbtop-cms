@@ -32,7 +32,7 @@ async function panel(config: Partial<CmsConfig> = {}) {
 	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
 	const record = async (url: string, form: string) => ((await page(url)).props.data as Record<string, Record<string, unknown>>)[form] ?? {};
 	const post = (url: string, body: unknown, referer: string) =>
-		visit(url, { method: "POST", body: JSON.stringify(body), headers: { referer: `http://x${referer}` } });
+		visit(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", referer: `http://x${referer}` } });
 	const action = (url: string, name: string, form: Record<string, unknown>) => post(`${url}/actions/${name}`, { payload: { form } }, url);
 	const rows = async (id: number) => ((await cms.site().pages.find(id))?.content ?? []) as Row[];
 	const setRows = async (id: number, content: Row[]) => {

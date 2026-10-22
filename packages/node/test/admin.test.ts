@@ -31,7 +31,7 @@ async function panel() {
 	};
 	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
 	const post = (url: string, body: unknown, referer: string) =>
-		visit(url, { method: "POST", body: JSON.stringify(body), headers: { referer: `http://x${referer}` } });
+		visit(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", referer: `http://x${referer}` } });
 	return { ...made, admin, visit, page, post };
 }
 

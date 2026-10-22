@@ -157,7 +157,7 @@ export class Submissions {
 			.where("submission_id", "=", id)
 			.orderBy("id")
 			.execute();
-		return rows.map((row) => ({ id: Number(row.id), userId: row.user_id, body: row.body, createdAt: parseDate(row.created_at) }));
+		return rows.map((row) => ({ id: Number(row.id), userId: userKey(row.user_id), body: row.body, createdAt: parseDate(row.created_at) }));
 	}
 
 	async comment(id: number, userId: number | string, body: string): Promise<void> {
@@ -208,3 +208,6 @@ export function orderedPayload(raw: unknown, rawOrder: unknown): Record<string, 
 	}
 	return { ...out, ...Object.fromEntries(Object.entries(payload).filter(([key]) => !(key in out))) };
 }
+
+/** A bigint user key comes back from Postgres as a string; a uuid/ulid key stays one. */
+const userKey = (raw: number | string): number | string => (typeof raw === "string" && /^\d+$/.test(raw) ? Number(raw) : raw);
