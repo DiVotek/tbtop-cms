@@ -1,0 +1,70 @@
+import { describe, expect, test } from "bun:test";
+import { createAdmin, type InertiaPage } from "@tbtop/admin";
+import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
+import { z } from "zod";
+import { cmsBlockImpls, cmsBlocks, type CmsConfig, implementBlocks, resolveForm } from "../src";
+import type { ResolveContext } from "../src/blocks/context";
+import { get, makeCms } from "./support";
+
+type Row = { id: string; kind: string; active?: boolean; sort?: number; shared?: number; data?: Record<string, unknown> };
+
+async function panel(config: Partial<CmsConfig> = {}) {
+	const made = await makeCms(undefined, config);
+	const { cms, db } = made;
+	const admin = createAdmin({
+		prefix: "/admin",
+		pages: cms.admin.pages,
+		navigationGroups: cms.admin.navigationGroups,
+		driver: kyselyDriver(db),
+		hostRules: kyselyRules(db),
+		user: () => ({ id: 1, name: "Admin" }),
+		context: cms.admin.context,
+	});
+	const visit = async (url: string, init: RequestInit = {}) => {
+		const headers = new Headers(init.headers);
+		headers.set("x-inertia", "true");
+		const res = await admin.handle(new Request(`http://x${url}`, { ...init, headers }));
+		if (res === null) {
+			throw new TypeError(`${url} fell through`);
+		}
+		return res;
+	};
+	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
+	const record = async (url: string, form: string) => ((await page(url)).props.data as Record<string, Record<string, unknown>>)[form] ?? {};
+	const post = (url: string, body: unknown, referer: string) =>
+		visit(url, { method: "POST", body: JSON.stringify(body), headers: { referer: `http://x${referer}` } });
+	const action = (url: string, name: string, form: Record<string, unknown>) => post(`${url}/actions/${name}`, { payload: { form } }, url);
+	const rows = async (id: number) => ((await cms.site().pages.find(id))?.content ?? []) as Row[];
+	const setRows = async (id: number, content: Row[]) => {
+		await db.updateTable("tbtop_pages").set({ content: JSON.stringify(content) }).where("id", "=", id).execute();
+	};
+	return { ...made, admin, visit, page, record, post, action, rows, setRows };
+}
+
+/** The demo kinds plus Banner, a layout-only kind with a required field. */
+const withBanner = () =>
+	implementBlocks(
+		{ ...cmsBlocks, Banner: { props: z.object({ text: z.string().nullable() }), placements: ["layout"] } },
+		{ ...cmsBlockImpls, Banner: { form: (s) => [s.text("text").label("Text").required()] } },
+	);
+
+const effects = async (res: Response) => ((await res.json()) as { effects: { kind: string; message?: string; level?: string }[] }).effects;
+const json = (value: unknown) => JSON.stringify(value);
+
+describe("R3-blocks-5: SEO fields are stored as locale maps", () => {
+	test("saving the editor unchanged stores maps and a blank og_image, and the editor opens again", async () => {
+		const { cms, page, record, post, ids } = await panel();
+		const url = `/admin/pages/${ids.about}/edit`;
+		const form = await record(url, "pageEditor");
+		const res = await post(`${url}/forms/pageEditor`, { ...form, seo_title: { en: "Ours", uk: null } }, url);
+		expect(res.status).toBe(303);
+		const seo = (await cms.site().pages.find(ids.about as number))?.seo as Record<string, unknown>;
+		expect(seo.title).toEqual({ en: "Ours", uk: "" });
+		for (const key of ["description", "og_title", "og_description", "canonical"]) {
+			expect([key, seo[key]]).toEqual([key, {}]);
+		}
+		expect(seo.og_image).toBe("");
+		expect((await page(url)).component).toBe("admin/page");
+		expect((await record(url, "pageEditor")).og_image).toBeNull();
+	});
+});

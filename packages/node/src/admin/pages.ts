@@ -388,7 +388,7 @@ function seoRecord(page: Page): Dict {
 		seo_description: seo.description ?? null,
 		og_title: seo.og_title ?? null,
 		og_description: seo.og_description ?? null,
-		og_image: seo.og_image ?? null,
+		og_image: typeof seo.og_image === "string" && seo.og_image !== "" ? seo.og_image : null,
 		seo_canonical: seo.canonical ?? null,
 		schema_type: schema.type ?? null,
 	};
@@ -427,24 +427,31 @@ function assertSchedule(form: Dict): void {
 	}
 }
 
-const SEO_KEYS: [string, string][] = [
+/** The editor's translatable SEO fields by their key in the seo bag; og_image is a plain path. */
+const SEO_MAPS: [string, string][] = [
 	["seo_title", "title"],
 	["seo_description", "description"],
 	["og_title", "og_title"],
 	["og_description", "og_description"],
-	["og_image", "og_image"],
 	["seo_canonical", "canonical"],
 ];
+
+/** PageFormValues::stringMap: a locale map of strings; anything but a map is empty, a null entry "". */
+const stringMap = (value: unknown): Record<string, string> =>
+	isDict(value) ? Object.fromEntries(Object.entries(value).map(([locale, entry]) => [locale, entry === null || entry === undefined ? "" : String(entry)])) : {};
 
 /** PageFormWriter::save for the editor: columns, seo blob, block rows, slugs; optimistic lock on lock_version. */
 async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): Promise<void> {
 	const site = siteOf(cms, ctx);
 	const form = ctx.form as Dict;
 	const seo: Dict = { ...page.seo };
-	for (const [field, key] of SEO_KEYS) {
+	for (const [field, key] of SEO_MAPS) {
 		if (field in form) {
-			seo[key] = form[field] ?? "";
+			seo[key] = stringMap(form[field]);
 		}
+	}
+	if ("og_image" in form) {
+		seo.og_image = typeof form.og_image === "string" ? form.og_image : "";
 	}
 	if (typeof form.schema_type === "string" && form.schema_type !== "") {
 		seo.schema = { ...(isDict(seo.schema) ? seo.schema : {}), type: form.schema_type };
