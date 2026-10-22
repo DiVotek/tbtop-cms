@@ -23,7 +23,7 @@
 	"scripts": {
 		"setup:admin": "./scripts/fetch-admin.sh",
 		"build": "tsup",
-		"test": "bun test",
+		"test": "bun test ./test",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
