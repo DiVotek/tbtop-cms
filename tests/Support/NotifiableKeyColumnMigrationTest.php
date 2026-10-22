@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Schema\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,11 @@ uses(RefreshDatabase::class);
 
 const NOTIFICATIONS_CREATE_MIGRATION = '2026_01_01_000020_create_notifications_table';
 const NOTIFIABLE_KEY_ALIGNMENT_MIGRATION = '2026_10_22_000000_update_notifications_notifiable_id_match_host_key_type';
+
+afterEach(function (): void {
+    // Schema::morphUsingUuids() is process-wide static state.
+    Builder::defaultMorphKeyType('int');
+});
 
 function runNotificationsMigration(string $name): void
 {
@@ -44,13 +50,20 @@ function notifiableIdIsInteger(): bool
     return str_contains(strtolower(Schema::getColumnType('notifications', 'notifiable_id')), 'int');
 }
 
+function notifiableIdIsNullable(): bool
+{
+    $column = collect(Schema::getColumns('notifications'))->firstWhere('name', 'notifiable_id');
+
+    return (bool) $column['nullable'];
+}
+
 function hasNotifiableMorphIndex(): bool
 {
     return Schema::hasIndex('notifications', 'notifications_notifiable_type_notifiable_id_index')
         && Schema::hasIndex('notifications', ['notifiable_type', 'notifiable_id']);
 }
 
-function insertNotificationFor(string $notifiableType, string $notifiableId): void
+function insertNotificationFor(string $notifiableType, int | string | null $notifiableId): void
 {
     DB::table('notifications')->insert([
         'id' => (string) Str::uuid(),
@@ -68,6 +81,7 @@ it('creates notifiable_id as a string column with the morph index on a HasUlids 
     runNotificationsMigration(NOTIFICATIONS_CREATE_MIGRATION);
 
     expect(notifiableIdIsInteger())->toBeFalse()
+        ->and(notifiableIdIsNullable())->toBeFalse()
         ->and(hasNotifiableMorphIndex())->toBeTrue();
 });
 
@@ -81,8 +95,24 @@ it('creates notifiable_id as an integer column with the morph index on an int-ke
         ->and(hasNotifiableMorphIndex())->toBeTrue();
 });
 
-it('changes an already-migrated integer notifiable_id to a string column on a HasUlids host, keeping the morph index', function (): void {
+it('creates notifiable_id with the host\'s default morph key type when it chose one, over an int user key', function (): void {
+    config(['tbtop-cms.admin.model' => AdminUser::class]);
+    Schema::morphUsingUuids();
+    Schema::drop('notifications');
+
+    runNotificationsMigration(NOTIFICATIONS_CREATE_MIGRATION);
+
+    $uuid = (string) Str::uuid();
+    insertNotificationFor('App\\Models\\Customer', $uuid);
+
+    expect(notifiableIdIsInteger())->toBeFalse()
+        ->and(hasNotifiableMorphIndex())->toBeTrue()
+        ->and(DB::table('notifications')->value('notifiable_id'))->toBe($uuid);
+});
+
+it('changes an already-migrated integer notifiable_id to a string column on a HasUlids host, keeping its rows and the morph index', function (): void {
     recreateNotificationsTable();
+    insertNotificationFor(AdminUser::class, 42);
     config(['tbtop-cms.admin.model' => UlidNotifiableUser::class]);
 
     runNotificationsMigration(NOTIFIABLE_KEY_ALIGNMENT_MIGRATION);
@@ -91,8 +121,24 @@ it('changes an already-migrated integer notifiable_id to a string column on a Ha
     insertNotificationFor(UlidNotifiableUser::class, $ulid);
 
     expect(notifiableIdIsInteger())->toBeFalse()
+        ->and(notifiableIdIsNullable())->toBeFalse()
         ->and(hasNotifiableMorphIndex())->toBeTrue()
-        ->and(DB::table('notifications')->value('notifiable_id'))->toBe($ulid);
+        ->and(DB::table('notifications')->where('notifiable_type', AdminUser::class)->value('notifiable_id'))->toBe('42')
+        ->and(DB::table('notifications')->where('notifiable_id', 42)->value('notifiable_type'))->toBe(AdminUser::class)
+        ->and(DB::table('notifications')->where('notifiable_id', $ulid)->value('notifiable_type'))->toBe(UlidNotifiableUser::class);
+});
+
+it('keeps a nullable integer notifiable_id nullable when it changes it on a HasUlids host', function (): void {
+    recreateNotificationsTable('nullableMorphs');
+    config(['tbtop-cms.admin.model' => UlidNotifiableUser::class]);
+
+    runNotificationsMigration(NOTIFIABLE_KEY_ALIGNMENT_MIGRATION);
+
+    insertNotificationFor(UlidNotifiableUser::class, null);
+
+    expect(notifiableIdIsInteger())->toBeFalse()
+        ->and(notifiableIdIsNullable())->toBeTrue()
+        ->and(DB::table('notifications')->value('notifiable_id'))->toBeNull();
 });
 
 it('leaves an integer notifiable_id alone on an int-key host', function (): void {
@@ -115,6 +161,16 @@ it('leaves a string notifiable_id alone on an int-key host, whose own table may 
 
     expect(notifiableIdIsInteger())->toBeFalse()
         ->and(DB::table('notifications')->value('notifiable_id'))->toBe($uuid);
+});
+
+it('leaves notifiable_id alone when the host chose a default morph key type, which owns its morph columns', function (): void {
+    recreateNotificationsTable('numericMorphs');
+    config(['tbtop-cms.admin.model' => UlidNotifiableUser::class]);
+    Schema::morphUsingUuids();
+
+    runNotificationsMigration(NOTIFIABLE_KEY_ALIGNMENT_MIGRATION);
+
+    expect(notifiableIdIsInteger())->toBeTrue();
 });
 
 it('runs from the package migration list and skips a host without a notifications table', function (): void {

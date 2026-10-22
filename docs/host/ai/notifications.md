@@ -127,7 +127,7 @@ A `Recipient`'s chat id is carried in `$phone` — the only remaining generic ad
 
 Delivers into the admin header bell via Laravel's `database` channel through `tbtop/admin`'s `Notification` builder — same table (`notifications`, migrated by this package if the host doesn't already have one) the panel already reads. Format `Short`. `settings()` returns `[]` — the bell has no opt-out and no configurable settings.
 
-`notifications.notifiable_id` follows the host user key (`UserKeyColumn`, see inventory.md): a ULID or UUID string on a `HasUlids`/`HasUuids` user model, an unsigned big integer otherwise. A table created earlier with `morphs()` has a bigint column; strict MySQL refuses a ULID/UUID there, so every bell delivery was logged `failed`. On such a host `php artisan migrate` runs `2026_10_22_000000_update_notifications_notifiable_id_match_host_key_type`, which changes the column to the key type, a host's own table included.
+`notifications.notifiable_id` follows the host user key (`UserKeyColumn`, see inventory.md): a ULID or UUID string on a `HasUlids`/`HasUuids` user model, an unsigned big integer otherwise. A host that set a default morph key type (`Schema::morphUsingUuids()`/`morphUsingUlids()`) gets `morphs()`'s column instead, and the alignment below leaves its table alone. A table created earlier with `morphs()` has a bigint column; strict MySQL refuses a ULID/UUID there, so every bell delivery was logged `failed`. On such a host `php artisan migrate` runs `2026_10_22_000000_update_notifications_notifiable_id_match_host_key_type`, which changes the column to the key type, a host's own table included.
 
 ## Templates
 
