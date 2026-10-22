@@ -130,7 +130,7 @@ describe("page guards (PageObserver)", () => {
 		expect(await cms.site().pages.find(ids.blog as number)).not.toBeNull();
 	});
 
-	test("the parent select offers only parents that accept the page's type", async () => {
+	test("the parent select offers categories and parents that accept the page's type", async () => {
 		const { cms, db, ids } = await makeCms();
 		const pages = cms.site().pages;
 		const inner = await pages.create({ type: "category", parentId: ids.blog as number, name: en("Inner") });
@@ -149,7 +149,8 @@ describe("page guards (PageObserver)", () => {
 			const match = tree.match(/"label":"Parent","options":(\[.*?\])\},"meta":\{\},"name":"parent_id"/);
 			return match === null ? null : (JSON.parse(match[1] ?? "[]") as { value: string }[]).map((o) => Number(o.value));
 		};
-		expect(await options(ids.about as number)).toEqual([]);
+		// A page is offered categories too: under one it becomes an article (PageLeafType).
+		expect(await options(ids.about as number)).toEqual([ids.blog as number, inner.id]);
 		expect(await options(ids["first-post"] as number)).toEqual([ids.blog as number, inner.id]);
 		expect(await options(ids.blog as number)).toEqual([]);
 	});

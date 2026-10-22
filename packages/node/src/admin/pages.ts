@@ -1,9 +1,10 @@
-import { type ActionCtx, Column, definePage, Effects, HttpError, type S, Tab } from "@tbtop/admin";
+import { type ActionCtx, Column, Cond, definePage, Effects, HttpError, type S, Tab } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { firstText, isLive, type Page, TRANSLATABLE } from "../content/page";
 import { PageConflictError } from "../content/pages";
 import { allowsChild, PageRuleError, subtreeIds } from "../content/pageRules";
 import { type Dict, isDict } from "../support/values";
+import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
 import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowsFromForm, siteOf } from "./support";
 
 const STATUS = [
@@ -37,8 +38,9 @@ export function pagesIndex(cms: Cms) {
 					return "";
 				}
 			};
+			const categories = await site.pages.query().select(["id", "name"]).where("type", "=", "category").orderBy("sort_order").orderBy("id").execute();
 			return s.stack([
-				s.row([createAction(s, cms)]),
+				s.row([createAction(s, cms, parentOptions(categories, locale))]),
 				s
 					.table("pages")
 					.columns([
@@ -103,9 +105,20 @@ export function pagesIndex(cms: Cms) {
 	});
 }
 
-function createAction(s: S, cms: Cms) {
+function createAction(s: S, cms: Cms, categories: Option[]) {
 	const prefix = adminPrefix(cms);
-	const types = cms.pageTypes.bases().map((type) => ({ value: type.key, label: type.label }));
+	const bases = cms.pageTypes.bases();
+	const types = bases.map((type) => ({ value: type.key, label: type.label }));
+	// A parent is always a category: an article's (required while the article type requires one), a subcategory's optional one.
+	const parent = s.select("parent_id").label("Category").options(categories).hiddenIf(Cond.notIn("type", ["category", "article"]));
+	if (cms.pageTypes.has("article") && cms.pageTypes.get("article").requiresParent) {
+		parent.requiredIf(Cond.eq("type", "article"));
+	}
+	// One subtype select per base that has subtypes, shown only for its base (PageForm::subtypeField).
+	const subtypes = bases.flatMap((type) => {
+		const options = subtypeOptions(cms.pageTypes, type.key);
+		return options.length === 0 ? [] : [s.select(`subtype_${type.key}`).label("Subtype").options(options).default("").hiddenIf(Cond.neq("type", type.key))];
+	});
 	return s
 		.action("pageCreate")
 		.label("New page")
@@ -118,6 +131,8 @@ function createAction(s: S, cms: Cms) {
 					s.text("name").label("Name").required().translatable().rules("max:255"),
 					s.text("title").label("Title").translatable().rules("nullable|max:255"),
 					s.select("type").label("Type").options(types).required().default("page"),
+					...subtypes,
+					parent,
 					s.actionsRow([s.action("pageCreateSave").label("Create").color("primary").submit()]),
 				])
 				.onSubmit(async (ctx) => {
@@ -127,7 +142,8 @@ function createAction(s: S, cms: Cms) {
 						return Effects.make().notify("Unknown page type.", "error");
 					}
 					try {
-						const page = await createPage(cms, ctx, { type, parentId: null, subtype: null });
+						const tree = await resolveLeafType(siteOf(cms, ctx), cms.pageTypes, null, type, formParentId(form.parent_id));
+						const page = await createPage(cms, ctx, { ...tree, subtype: formSubtype(form[`subtype_${type}`]) });
 						return `${prefix}/pages/${page.id}/edit`;
 					} catch (error) {
 						if (error instanceof PageRuleError) {
@@ -137,6 +153,13 @@ function createAction(s: S, cms: Cms) {
 					}
 				}),
 		);
+}
+
+type Option = { value: string; label: string };
+
+/** Parent select options: each page's name in `locale`, or its id. */
+function parentOptions(rows: { id: number; name: string | null }[], locale: string): Option[] {
+	return rows.map((row) => ({ value: String(row.id), label: firstText(pageLabel(row), ["name"], locale, locale) || `#${row.id}` }));
 }
 
 /** PageFormWriter::save on create: the title falls back to the name, the content starts from the type's template. */
@@ -228,10 +251,10 @@ export function pageEdit(cms: Cms) {
 			const rows = blockRows(page.content);
 			const slugs = await site.pages.slugs.allFor(page.id);
 			const shared = new Map((await site.sharedBlocks.all()).map((block) => [block.id, block.name]));
-			// Parents whose type takes this page's type; never the page itself or its descendants.
+			// Categories (a page under one becomes an article) and parents whose type takes this page's type; never the page itself or its descendants.
 			const own = await subtreeIds(cms.config.db, page.id);
 			const parents = (await site.pages.query().selectAll("tbtop_pages").orderBy("id").execute()).filter(
-				(row) => !own.has(Number(row.id)) && allowsChild(cms.pageTypes, row.type, page.type),
+				(row) => !own.has(Number(row.id)) && (row.type === "category" || allowsChild(cms.pageTypes, row.type, page.type)),
 			);
 			const defaultLocale = await site.languages.defaultLocale();
 			const save = async (ctx: ActionCtx, content: Dict[]) => {
@@ -254,10 +277,8 @@ export function pageEdit(cms: Cms) {
 									s.datetime("published_at").label("Publish at"),
 									s.datetime("unpublish_at").label("Unpublish at"),
 									s.boolean("is_indexable").label("Search engines may index this page"),
-									s
-										.select("parent_id")
-										.label("Parent")
-										.options(parents.map((row) => ({ value: String(row.id), label: firstText(pageLabel(row), ["name"], defaultLocale, defaultLocale) || `#${row.id}` }))),
+									...typeFields(s, cms, page),
+									s.select("parent_id").label("Parent").options(parentOptions(parents, defaultLocale)),
 									s.number("sort_order").label("Sort order").rules("nullable|integer|min:0"),
 								]),
 							},
@@ -274,6 +295,8 @@ export function pageEdit(cms: Cms) {
 						published_at: page.publishedAt?.toISOString() ?? null,
 						unpublish_at: page.unpublishAt?.toISOString() ?? null,
 						is_indexable: page.isIndexable,
+						type: page.type,
+						subtype: page.subtype ?? "",
 						parent_id: page.parentId === null ? null : String(page.parentId),
 						sort_order: page.sortOrder,
 						lock_version: page.lockVersion,
@@ -310,6 +333,25 @@ const safeJson = (raw: string | null): Dict => {
 		return {};
 	}
 };
+
+/**
+ * PageEditSidebar's type select and the stored base's subtype select; the
+ * subtype stays until cleared, since a type change that leaves one behind is
+ * refused. A system page keeps its type.
+ */
+function typeFields(s: S, cms: Cms, page: Page): unknown[] {
+	if (page.isSystem) {
+		return [];
+	}
+	const types = cms.pageTypes.bases().map((type) => ({ value: type.key, label: type.label }));
+	const subtypes = subtypeOptions(cms.pageTypes, page.type);
+	return [
+		s.select("type").label("Type").options(types).required(),
+		...(subtypes.length === 0
+			? []
+			: [s.select("subtype").label("Subtype").options(subtypes).hiddenIf(Cond.all(Cond.neq("type", page.type), Cond.empty("subtype")))]),
+	];
+}
 
 function generalFields(s: S, page: Page): unknown[] {
 	return [
@@ -361,6 +403,21 @@ const date = (value: unknown): Date | null => {
 	return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+/**
+ * The type, subtype and parent the editor saves (PageFormWriter::resolveTypeAndParent):
+ * PageLeafType settles a page or article by its parent. A system page keeps all three.
+ */
+async function editedTree(cms: Cms, ctx: ActionCtx, page: Page): Promise<Partial<Pick<Page, "type" | "subtype" | "parentId">>> {
+	const form = ctx.form as Dict;
+	if (page.isSystem || !("type" in form || "parent_id" in form)) {
+		return {};
+	}
+	const picked = typeof form.type === "string" && form.type !== "" ? form.type : page.type;
+	const parent = "parent_id" in form ? formParentId(form.parent_id) : page.parentId;
+	const tree = await resolveLeafType(siteOf(cms, ctx), cms.pageTypes, page, picked, parent === page.id ? page.parentId : parent);
+	return { ...tree, ...("subtype" in form ? { subtype: formSubtype(form.subtype) } : {}) };
+}
+
 /** PageFormGuards::scheduling: with both dates set, the page must go live before it goes dark. */
 function assertSchedule(form: Dict): void {
 	const publishedAt = date(form.published_at);
@@ -393,7 +450,7 @@ async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): 
 		seo.schema = { ...(isDict(seo.schema) ? seo.schema : {}), type: form.schema_type };
 	}
 	assertSchedule(form);
-	const parent = form.parent_id === null || form.parent_id === undefined || form.parent_id === "" ? null : Number(form.parent_id);
+	const tree = await editedTree(cms, ctx, page);
 	await site.pages.update(
 		page.id,
 		{
@@ -402,7 +459,7 @@ async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): 
 			...("published_at" in form ? { publishedAt: date(form.published_at) } : {}),
 			...("unpublish_at" in form ? { unpublishAt: date(form.unpublish_at) } : {}),
 			...("is_indexable" in form ? { isIndexable: Boolean(form.is_indexable) } : {}),
-			...("parent_id" in form && !page.isSystem ? { parentId: parent === page.id ? page.parentId : parent } : {}),
+			...tree,
 			...("sort_order" in form && form.sort_order !== null ? { sortOrder: Number(form.sort_order) || 0 } : {}),
 			...("image" in form ? { image: typeof form.image === "string" && form.image !== "" ? form.image : null } : {}),
 			seo,
