@@ -26,15 +26,30 @@ export function blockRows(content: unknown[] | null): Dict[] {
 
 /**
  * The block's form with every top-level field renamed `block_{id}_{name}`
- * (PrefixedField::rename), so many blocks share one editor form.
+ * (PrefixedField::rename), so many blocks share one editor form. With
+ * `activeField`, each `required` (field-level and per locale) becomes
+ * `required_unless:{activeField},false,0`: an inactive block never renders,
+ * so its empty fields must not veto a save. The label keeps its marker.
  */
-export function prefixedForm(blocks: BlockRegistry, kind: string, id: string, s: S): unknown[] {
+export function prefixedForm(blocks: BlockRegistry, kind: string, id: string, s: S, activeField?: string): unknown[] {
 	return blocks.get(kind).form(s).map((field) => {
 		if (field instanceof Field) {
 			Object.defineProperty(field, "name", { value: `block_${id}_${field.name}` });
+			if (activeField !== undefined) {
+				gateRequired(field, `required_unless:${activeField},false,0`);
+			}
 		}
 		return field;
 	});
+}
+
+/** PrefixedField::gateRules: swaps `required` for `rule` in the field's rules and each locale's. */
+function gateRequired(field: Field, rule: string): void {
+	const swap = (rules: string[]) => rules.map((entry) => (entry === "required" ? rule : entry));
+	(field as unknown as { replaceRules(rules: string[]): void }).replaceRules(swap(field.ruleEntries()));
+	for (const [locale, rules] of Object.entries(field.localeRuleEntries())) {
+		field.rulesForLocale(locale, swap(rules));
+	}
 }
 
 const fieldNames = (blocks: BlockRegistry, kind: string): string[] =>
@@ -122,7 +137,7 @@ export function blockTabs(
 		const shared = typeof row.shared === "number" || typeof row.shared === "string" ? Number(row.shared) : null;
 		const body = s.stack([
 			...(shared === null
-				? prefixedForm(blocks, kind, id, s)
+				? prefixedForm(blocks, kind, id, s, `block_${id}_active`)
 				: [
 						s
 							.displayText(`Shared block “${options.sharedNames?.get(shared) ?? `#${shared}`}”: edit it under Design → Shared blocks.`)

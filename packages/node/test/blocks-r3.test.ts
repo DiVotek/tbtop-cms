@@ -51,6 +51,29 @@ const withBanner = () =>
 const effects = async (res: Response) => ((await res.json()) as { effects: { kind: string; message?: string; level?: string }[] }).effects;
 const json = (value: unknown) => JSON.stringify(value);
 
+describe("R3-blocks-3: an inactive block's required fields do not block Save", () => {
+	test("the page editor saves with an empty inactive Hero, and still requires an active one's title", async () => {
+		const { cms, record, post, setRows, ids } = await panel();
+		await setRows(ids.about as number, [{ id: "abc12345", kind: "Hero", active: false, sort: 0, data: {} }]);
+		const url = `/admin/pages/${ids.about}/edit`;
+		const form = await record(url, "pageEditor");
+		await post(`${url}/forms/pageEditor`, { ...form, name: { en: "Renamed", uk: "Про нас" } }, url);
+		expect(((await cms.site().pages.find(ids.about as number))?.name as Record<string, string>).en).toBe("Renamed");
+
+		const fresh = await record(url, "pageEditor");
+		await post(`${url}/forms/pageEditor`, { ...fresh, name: { en: "Again", uk: "Про нас" }, block_abc12345_active: true }, url);
+		expect(((await cms.site().pages.find(ids.about as number))?.name as Record<string, string>).en).toBe("Renamed");
+	});
+
+	test("the shared block editor still requires its fields", async () => {
+		const { cms, post } = await panel();
+		const id = await cms.site().sharedBlocks.create({ name: "Top hero", kind: "Hero", data: { title: { en: "Hi" } } });
+		const url = `/admin/shared-blocks/${id}/edit`;
+		await post(`${url}/forms/sharedBlock`, { lock_version: 0, shared_name: "Renamed", block_shared_title: { en: "" } }, url);
+		expect((await cms.site().sharedBlocks.find(id))?.name).toBe("Top hero");
+	});
+});
+
 describe("R3-blocks-5: SEO fields are stored as locale maps", () => {
 	test("saving the editor unchanged stores maps and a blank og_image, and the editor opens again", async () => {
 		const { cms, page, record, post, ids } = await panel();
