@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
-class RedirectError extends Error {}
+import { RedirectError } from "../src";
 import { get, makeCms } from "./support";
 
 async function panel() {
