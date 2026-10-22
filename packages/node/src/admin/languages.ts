@@ -32,7 +32,10 @@ export function languagesIndex(cms: Cms) {
 							.label("Make default")
 							.handle(async (ctx) => {
 								const row = ctx.row as Dict;
-								await siteOf(cms, ctx).languages.setDefault(String(row.locale));
+								const site = siteOf(cms, ctx);
+								if (await site.languages.setDefault(String(row.locale))) {
+									await site.pages.slugs.backfillLocale(String(row.locale));
+								}
 								return Effects.make().notify("Default language changed").refreshTable("languages");
 							}, ["row"]),
 					])

@@ -98,3 +98,19 @@ describe("redirect validation (R2-content-1)", () => {
 		expect((await db.selectFrom("tbtop_redirects").selectAll().execute()).length).toBe(before.length + 1);
 	});
 });
+
+describe("make default (R2-content-3)", () => {
+	test("making a language that is not live the default backfills its slugs, so the site stays up", async () => {
+		const { cms, post, db, ids } = await panel();
+		const de = await cms.site().languages.create({ name: "Deutsch", locale: "de", isAdminActive: true, isFrontendActive: false });
+		const url = "/admin/languages";
+		const res = await post(`${url}/actions/makeDefault`, { payload: { row: { id: de.id, locale: "de" } } }, url);
+		expect(res.status).toBeLessThan(400);
+		expect((await cms.site().languages.defaultLocale())).toBe("de");
+		const slugs = await db.selectFrom("tbtop_page_slugs").select("path").where("locale", "=", "de").execute();
+		expect(slugs.length).toBeGreaterThan(0);
+		expect((await cms.loadPage(get("/"))).type).not.toBe("notFound");
+		const about = await db.selectFrom("tbtop_page_slugs").select("path").where("locale", "=", "de").where("page_id", "=", ids.about as number).executeTakeFirstOrThrow();
+		expect((await cms.loadPage(get(`/${about.path}`))).type).toBe("page");
+	});
+});

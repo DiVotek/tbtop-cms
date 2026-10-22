@@ -77,10 +77,14 @@ export class Languages {
 		return og !== null && og !== undefined && og !== "" ? og : null;
 	}
 
-	/** Makes `locale` the only default; the default is always admin- and frontend-active. */
-	async setDefault(locale: string): Promise<void> {
-		await this.db.transaction().execute(async (trx) => {
-			const target = await trx.selectFrom("tbtop_languages").select("id").where("locale", "=", locale).executeTakeFirst();
+	/**
+	 * Makes `locale` the only default; the default is always admin- and frontend-active.
+	 * Resolves true when this turned the site on for `locale`: the caller then backfills
+	 * its slugs (`pages.slugs.backfillLocale`), as ContentEventsWiring does on save in PHP.
+	 */
+	async setDefault(locale: string): Promise<boolean> {
+		const activated = await this.db.transaction().execute(async (trx) => {
+			const target = await trx.selectFrom("tbtop_languages").select(["id", "is_frontend_active"]).where("locale", "=", locale).executeTakeFirst();
 			if (target === undefined) {
 				throw new Error(`Language '${locale}' does not exist.`);
 			}
@@ -91,8 +95,10 @@ export class Languages {
 				.set({ is_default: 1, is_admin_active: 1, is_frontend_active: 1, updated_at: now })
 				.where("id", "=", target.id)
 				.execute();
+			return !bool(target.is_frontend_active);
 		});
 		this.rows = null;
+		return activated;
 	}
 
 	/**
