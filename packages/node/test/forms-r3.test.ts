@@ -260,3 +260,14 @@ describe("R3-forms-12: a rendered subject", () => {
 		expect(sent[0]?.subject).toBe("Lead: Ada Bcc: x@evil.test · ada@example.test");
 	});
 });
+
+describe("R3-forms-13: the channels checklist offers only channels the type can render", () => {
+	test("a text-format host channel is not offered on form.submission", async () => {
+		const sms: Channel = { key: "sms", label: "SMS", format: "text", supports: () => true, send: async () => {} };
+		const mail = mailbox();
+		const { page } = await panel({ notifications: { mail: mail.transport, channels: [sms] } });
+		const props = JSON.stringify((await page("/admin/notification-settings")).props);
+		expect(props).toContain('"value":"mail"');
+		expect(props).not.toContain('"value":"sms"');
+	});
+});

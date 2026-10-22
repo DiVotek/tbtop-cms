@@ -112,7 +112,11 @@ function channelFields(s: S, site: Site): unknown[] {
 }
 
 function typeSection(s: S, site: Site, type: AnyType, locales: string[]) {
-	const options = site.notifications.channels().map((channel) => ({ value: channel.key, label: channel.label }));
+	// NotificationTemplateFields::channelsFor: only channels whose format the type has a template for.
+	const options = site.notifications
+		.channels()
+		.filter((channel) => type.templates[channel.format] !== undefined)
+		.map((channel) => ({ value: channel.key, label: channel.label }));
 	const editors = Object.keys(type.templates).flatMap((format) =>
 		locales.map((locale) =>
 			s.collapsible({ label: `${FORMAT_LABELS[format] ?? format} template · ${locale}`, collapsed: true }, [
