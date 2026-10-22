@@ -289,6 +289,15 @@ function seoRecord(page: Page): Dict {
 	};
 }
 
+/** PageFormValues::nullableDateTime: blank or unparsable is null. */
+const date = (value: unknown): Date | null => {
+	if (typeof value !== "string" || value === "") {
+		return null;
+	}
+	const parsed = new Date(value);
+	return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const SEO_KEYS: [string, string][] = [
 	["seo_title", "title"],
 	["seo_description", "description"],
@@ -311,7 +320,6 @@ async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): 
 	if (typeof form.schema_type === "string" && form.schema_type !== "") {
 		seo.schema = { ...(isDict(seo.schema) ? seo.schema : {}), type: form.schema_type };
 	}
-	const date = (value: unknown) => (typeof value === "string" && value !== "" ? new Date(value) : null);
 	const parent = form.parent_id === null || form.parent_id === undefined || form.parent_id === "" ? null : Number(form.parent_id);
 	await site.pages.update(
 		page.id,
