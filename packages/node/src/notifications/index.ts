@@ -152,7 +152,7 @@ export class Notifications {
 			return null;
 		}
 		const name = await this.site.settings.get("mail.from_name");
-		return typeof name === "string" && name.trim() !== "" ? `${name.trim()} <${address.trim()}>` : address.trim();
+		return typeof name === "string" && name.trim() !== "" ? `${displayName(name)} <${address.trim()}>` : address.trim();
 	}
 
 	private translate(key: string, locale: string, fallback: string, params: Record<string, string | number>): string {
@@ -174,6 +174,16 @@ function address(recipient: Recipient): string {
 	}
 	const id = (recipient.user as { id?: unknown } | null | undefined)?.id;
 	return id === undefined ? "" : `user:${String(id)}`;
+}
+
+/**
+ * An RFC 5322 phrase, as Symfony's Address writes it: atoms (and non-ASCII,
+ * which the transport encodes) stay bare, anything else is quoted with `\`
+ * and `"` escaped. Line breaks never reach the header.
+ */
+function displayName(raw: string): string {
+	const name = raw.replace(/\s+/g, " ").trim();
+	return /^[A-Za-z0-9!#$%&'*+\-/=?^_`{|}~ \u0080-\uFFFF]+$/.test(name) ? name : `"${name.replace(/[\\"]/g, "\\$&")}"`;
 }
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));

@@ -225,3 +225,25 @@ describe("R3-forms-10: the inbox page label falls back like PHP", () => {
 		expect(labels).toEqual({ P0: "Контакти", P1: "Ціни", P2: "bare" });
 	});
 });
+
+async function mailSite() {
+	const mail = mailbox();
+	const { cms, db } = await makeCms(undefined, { notifications: { mail: mail.transport } });
+	const settings = cms.site().settings;
+	await settings.set("notifications.form.submission.channels", ["mail"]);
+	await settings.set("notifications.mail.recipients", "team@example.test");
+	await settings.set("mail.from_address", "shop@example.test");
+	return { cms, db, settings, sent: mail.sent };
+}
+
+describe("R3-forms-11: the From display name", () => {
+	test("a name with specials is quoted and escaped; a plain one is not", async () => {
+		const { cms, settings, sent } = await mailSite();
+		await settings.set("mail.from_name", 'Smith, Jones & "Co"');
+		await cms.handle(post(await contactAction(cms), valid));
+		expect(sent[0]?.from).toBe('"Smith, Jones & \\"Co\\"" <shop@example.test>');
+		await settings.set("mail.from_name", "Acme Shop");
+		await cms.handle(post(await contactAction(cms), valid));
+		expect(sent[1]?.from).toBe("Acme Shop <shop@example.test>");
+	});
+});
