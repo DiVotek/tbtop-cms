@@ -1,6 +1,5 @@
 import { type ActionCtx, Column, definePage, Effects, formatPhpDate, HttpError, type S, Tab } from "@tbtop/admin";
 import type { Cms } from "../cms";
-import { translationText } from "../content/page";
 import { formatField, leadIdentity } from "../forms/lead";
 import { retrySubmission } from "../forms/notifier";
 import { isRetryable, LEAD_STATUSES, type LeadStatus, type Submission, submissionFromRow } from "../forms/submissions";
@@ -27,16 +26,33 @@ const DATE_FORMAT = "M j, Y H:i";
 
 const leadLabel = (payload: Record<string, unknown>): string => leadIdentity(payload) ?? "—";
 
-/** The page's name in the admin's default locale, else "Page #id"; a deleted page says so. */
-async function pageLabels(site: Site, ids: number[]): Promise<Map<number, string>> {
-	const fallback = await site.languages.defaultLocale();
+/**
+ * FormSubmissionsPage::formatPage: the first non-blank name in any locale,
+ * then title, then (in the inbox, not on the detail page) a slug path, then
+ * "Page #id"; a deleted page says so.
+ */
+async function pageLabels(site: Site, ids: number[], options: { slug?: boolean } = {}): Promise<Map<number, string>> {
 	const labels = new Map<number, string>();
 	for (const id of new Set(ids)) {
 		const page = await site.pages.find(id);
-		const name = page === null ? null : translationText(page, "name", fallback, fallback);
-		labels.set(id, page === null ? "Deleted page" : name !== null && name.trim() !== "" ? name : `Page #${id}`);
+		if (page === null) {
+			labels.set(id, "Deleted page");
+			continue;
+		}
+		const path = options.slug === false ? null : await slugPath(site, id);
+		labels.set(id, firstLocaleText(page.name) ?? firstLocaleText(page.title) ?? path ?? `Page #${id}`);
 	}
 	return labels;
+}
+
+const firstLocaleText = (values: Record<string, unknown>): string | null =>
+	Object.values(values).find((value): value is string => typeof value === "string" && value.trim() !== "") ?? null;
+
+/** The default locale's path, else any locale's. */
+async function slugPath(site: Site, id: number): Promise<string | null> {
+	const paths = await site.pages.slugs.allFor(id);
+	const fallback = await site.languages.defaultLocale();
+	return [paths[fallback], ...Object.values(paths)].find((path): path is string => typeof path === "string" && path !== "") ?? null;
 }
 
 const selected = (ctx: ActionCtx): number[] => ctx.selection.map(Number).filter(Number.isInteger);
@@ -175,7 +191,7 @@ export function submissionView(cms: Cms) {
 				submission = { ...submission, leadStatus: "read" };
 			}
 			const self = `${list}/${id}`;
-			const page = submission.pageId === null ? null : (await pageLabels(site, [submission.pageId])).get(submission.pageId);
+			const page = submission.pageId === null ? null : (await pageLabels(site, [submission.pageId], { slug: false })).get(submission.pageId);
 			const row = (label: string, value: unknown) =>
 				s.flex([s.displayText(label).variant("muted"), typeof value === "string" ? s.displayValue(value) : value], { gap: 2, align: "center" });
 			const entries = Object.entries(submission.payload);

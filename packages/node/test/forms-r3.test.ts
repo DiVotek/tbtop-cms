@@ -208,3 +208,20 @@ describe("R3-forms-9: field text matches PHP", () => {
 		expect(leads).toEqual(["1", `${"a".repeat(58)}😀…`]);
 	});
 });
+
+describe("R3-forms-10: the inbox page label falls back like PHP", () => {
+	test("a name in another locale, then a title, then the slug, then Page #id", async () => {
+		const { cms, table } = await panel();
+		const site = cms.site();
+		const pages = [
+			await site.pages.create({ type: "page", name: { uk: "Контакти" }, status: "published" }),
+			await site.pages.create({ type: "page", name: { en: " " }, title: { uk: "Ціни" }, status: "published" }),
+			await site.pages.create({ type: "page", status: "published" }, { slugs: { en: "bare" } }),
+		];
+		for (const [index, page] of pages.entries()) {
+			await site.submissions.create({ pageId: page.id, blockId: "fx1", kind: "ContactForm", locale: "en", payload: { name: `P${index}` } });
+		}
+		const labels = Object.fromEntries((await table()).map((row) => [row.payload, row.page_id]));
+		expect(labels).toEqual({ P0: "Контакти", P1: "Ціни", P2: "bare" });
+	});
+});
