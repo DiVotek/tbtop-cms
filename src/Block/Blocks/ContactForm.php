@@ -98,8 +98,13 @@ class ContactForm extends Block implements HandlesFormSubmission, HasFieldLabels
         return is_string($text) ? $text : '';
     }
 
-    /** @return array<string, string> */
-    public function fieldLabels(string $locale): array
+    /**
+     * The built-in labels; the editor cannot change them, so `$input` is unused.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, string>
+     */
+    public function fieldLabels(string $locale, array $input): array
     {
         $labels = [];
         foreach (self::FIELDS as $field) {

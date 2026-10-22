@@ -491,19 +491,22 @@ to extending `Block`:
   and nothing is sent (see notifications.md).
 
 - **Optional: `HasFieldLabels`** (`src/Block/HasFieldLabels.php`) —
-  `fieldLabels(string $locale): array<string, string>`, labels keyed by
-  payload field name. Staff notifications (the mail's field list) show each
-  submitted field under its label, called with the reader's admin UI locale
-  (not the page's), so return text in that locale — e.g.
-  `__('my-app::forms.fields.' . $name, [], $locale)`, which falls back to
-  the app's fallback locale. A field the map leaves out, a blank label, or a
-  block without the interface shows the raw payload key. Values are never
-  touched. `ContactForm` implements it from
-  `tbtop-cms::forms.contact.fields.*`, the same labels its `resolve()` hands
-  the frontend. It is a separate interface, so an existing
-  `HandlesFormSubmission` block keeps compiling unchanged. The block is found
-  by the submission's stored `kind`, so a block that is not a registered
-  `Block` gets raw keys.
+  `fieldLabels(string $locale, array $input): array<string, string>`, labels
+  keyed by payload field name. Staff notifications (the mail's field list)
+  show each submitted field under its label, called with the reader's admin
+  UI locale (not the page's), so return text in that locale. `$input` is the
+  submitting block's stored data (a shared block's when placed by
+  reference) with translatable fields picked for that same `$locale`,
+  falling back to the default content language, so an editor-authored label
+  reads in the admin's language; a form addressed by name (`HasForm`) gets
+  `[]`. A code-authored label can use
+  `__('my-app::forms.fields.' . $name, [], $locale)`. A field the map leaves
+  out, a blank label, a block no longer found on the page, or a block
+  without the interface shows the raw payload key. Values are never touched.
+  `ContactForm` implements it from `tbtop-cms::forms.contact.fields.*`, the
+  same labels its `resolve()` hands the frontend, and ignores `$input`. It is
+  a separate interface, so an existing `HandlesFormSubmission` block keeps
+  compiling unchanged.
 
 `SubmitContext` (`src/Block/SubmitContext.php`) is the trimmed version of
 `ResolveContext` available at submit time: `locale`, `fallbackLocale`,

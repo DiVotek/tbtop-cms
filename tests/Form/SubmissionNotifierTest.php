@@ -34,6 +34,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
+use Tbtop\Cms\Tests\Fixtures\LabelledFormBlock;
 use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingHostChannel;
@@ -233,6 +234,24 @@ it('labels the fields in Ukrainian for a Ukrainian admin locale', function (): v
         ->toContain('<strong>Ім’я:</strong> Ада')
         ->toContain('<strong>Електронна пошта:</strong> ada@example.test')
         ->toContain('<strong>Повідомлення:</strong> Привіт');
+});
+
+it('labels a field from the block\'s stored copy, picked for the reader\'s locale', function (): void {
+    config()->set('tbtop-cms.blocks.types', [LabelledFormBlock::class]);
+    Language::factory()->create(['locale' => 'uk']);
+    notifierMailOnly();
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Survey'],
+        'content' => [['id' => 'lab-1', 'kind' => 'Labelled', 'active' => true, 'data' => [
+            'valueLabel' => ['en' => 'Your answer', 'uk' => 'Ваша відповідь'],
+        ]]],
+    ]);
+
+    $this->post(route('tbtop-cms.form.submit', ['locale' => 'uk', 'page' => $page->getKey(), 'block' => 'lab-1']), ['value' => 'так'])
+        ->assertRedirect();
+
+    expect(notifierMailHtml())->toContain('<strong>Your answer:</strong> так');
 });
 
 it('keeps the raw payload keys for a form that declares no field labels', function (): void {

@@ -14,9 +14,13 @@ interface HasFieldLabels
 {
     /**
      * Field labels keyed by payload field name, in `$locale` (an admin UI
-     * locale, not the page's).
+     * locale, not the page's). `$input` is the submitting block's stored
+     * data with translatable fields picked for `$locale` (default content
+     * language as fallback); `[]` for a form addressed by name, which has
+     * no editor data.
      *
+     * @param  array<string, mixed>  $input
      * @return array<string, string>
      */
-    public function fieldLabels(string $locale): array;
+    public function fieldLabels(string $locale, array $input): array;
 }

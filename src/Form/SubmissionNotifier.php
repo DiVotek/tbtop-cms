@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Context;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Notifications\FormSubmissionPayloadFactory;
 use Tbtop\Cms\Form\Notifications\FormSubmissionRecipients;
+use Tbtop\Cms\Form\Notifications\SubmissionFieldLabels;
 use Tbtop\Cms\Notifications\Delivery;
 use Tbtop\Cms\Notifications\DeliveryStage;
 use Tbtop\Cms\Notifications\NotificationRegistry;
@@ -43,7 +44,10 @@ use Throwable;
  */
 class SubmissionNotifier
 {
-    public function __construct(private readonly Settings $settings) {}
+    public function __construct(
+        private readonly Settings $settings,
+        private readonly SubmissionFieldLabels $fieldLabels,
+    ) {}
 
     /**
      * Any exception after the claim — not only a channel's — ends the row
@@ -124,9 +128,11 @@ class SubmissionNotifier
             $byLocale[$recipient->locale][] = $recipient;
         }
 
+        $labels = $this->fieldLabels->forLocales($submission, $page, array_map(strval(...), array_keys($byLocale)));
+
         $deliveries = [];
         foreach ($byLocale as $locale => $recipients) {
-            $payload = FormSubmissionPayloadFactory::make($submission, $page, (string) $locale);
+            $payload = FormSubmissionPayloadFactory::make($submission, $page, (string) $locale, $labels[(string) $locale] ?? []);
             array_push($deliveries, ...Notifications::send('form.submission', $payload, $recipients));
         }
 
