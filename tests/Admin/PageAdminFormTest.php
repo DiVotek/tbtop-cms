@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tbtop\Cms\Admin\Pages\Support\PageForm;
@@ -240,6 +241,8 @@ it('rejects an unpublish_at earlier than published_at', function (): void {
 })->throws(ValidationException::class);
 
 it('creates a page unaffected by scheduling — the create form never submits schedule fields', function (): void {
+    $this->travelTo(Carbon::parse('2026-03-01 09:00:00'));
+
     $page = PageForm::save([
         'type' => 'page',
         'status' => PageStatus::Published->value,
@@ -247,6 +250,7 @@ it('creates a page unaffected by scheduling — the create form never submits sc
         'parent_id' => '',
     ]);
 
-    expect($page->published_at)->toBeNull()
+    // The first publish stamps published_at with now; no schedule was set, so unpublish_at stays empty.
+    expect($page->published_at?->toDateTimeString())->toBe('2026-03-01 09:00:00')
         ->and($page->unpublish_at)->toBeNull();
 });
