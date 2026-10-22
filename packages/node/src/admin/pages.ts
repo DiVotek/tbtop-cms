@@ -298,6 +298,15 @@ const date = (value: unknown): Date | null => {
 	return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+/** PageFormGuards::scheduling: with both dates set, the page must go live before it goes dark. */
+function assertSchedule(form: Dict): void {
+	const publishedAt = date(form.published_at);
+	const unpublishAt = date(form.unpublish_at);
+	if (publishedAt !== null && unpublishAt !== null && unpublishAt.getTime() <= publishedAt.getTime()) {
+		throw new PageRuleError("The unpublish time must be after the publish time.");
+	}
+}
+
 const SEO_KEYS: [string, string][] = [
 	["seo_title", "title"],
 	["seo_description", "description"],
@@ -320,6 +329,7 @@ async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[]): 
 	if (typeof form.schema_type === "string" && form.schema_type !== "") {
 		seo.schema = { ...(isDict(seo.schema) ? seo.schema : {}), type: form.schema_type };
 	}
+	assertSchedule(form);
 	const parent = form.parent_id === null || form.parent_id === undefined || form.parent_id === "" ? null : Number(form.parent_id);
 	await site.pages.update(
 		page.id,

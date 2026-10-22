@@ -44,6 +44,19 @@ async function panel(config: Partial<CmsConfig> = {}) {
 }
 
 
+describe("R2-content-6: the publishing schedule", () => {
+	test("an unpublish time at or before the publish time is refused", async () => {
+		const { cms, save, flashed, ids } = await panel();
+		const about = ids.about as number;
+		const before = await cms.site().pages.find(about);
+		const res = await save(about, { status: "published", published_at: "2026-10-01T00:00:00Z", unpublish_at: "2026-09-01T00:00:00Z" });
+		expect(res.status).toBeLessThan(500);
+		expect(await flashed()).toContain("unpublish time must be after");
+		const after = await cms.site().pages.find(about);
+		expect([after?.unpublishAt, after?.lockVersion]).toEqual([before?.unpublishAt ?? null, before?.lockVersion]);
+	});
+});
+
 describe("R2-content-7: unparsable dates", () => {
 	test("an unparsable date is saved as empty instead of a 500", async () => {
 		const { cms, save, ids } = await panel();
