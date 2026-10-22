@@ -11,15 +11,15 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Pages\Support\NotificationTemplateFields as Fields;
+use Tbtop\Cms\Admin\Support\AdminLocales;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
-use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Notifications\Format;
 use Tbtop\Cms\Notifications\Models\NotificationTemplate;
 use Tbtop\Cms\Notifications\TypeDefinition;
 
 /**
  * The owner-only template editors on the notification settings page: per
- * type and format, a subject/body pair for each admin locale and a reset
+ * type and format, a subject/body pair for each admin UI locale and a reset
  * action that drops the stored overrides. Field names come from
  * NotificationTemplateFields.
  */
@@ -105,12 +105,13 @@ final class NotificationTemplateEditors
     }
 
     /**
-     * Content locales to offer a template editor for.
+     * Admin UI locales to offer a template editor for: staff notifications
+     * render in the reader's admin locale, never a page's content locale.
      *
      * @return list<string>
      */
     public static function locales(): array
     {
-        return array_column(app(Languages::class)->adminActive(), 'locale');
+        return AdminLocales::all();
     }
 }

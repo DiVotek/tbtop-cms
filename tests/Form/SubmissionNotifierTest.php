@@ -114,6 +114,82 @@ it('writes the bell body as plain text', function (): void {
         ->and($data['body'])->toContain("Ada O'Brien");
 });
 
+it('puts the lead name, contact and page on their own bell lines', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    expect($admin->notifications()->sole()->data['body'])->toBe("Ada\nada@example.test\nPage: Contact");
+});
+
+it('keeps the telegram message as HTML with the title, lead lines, page and link', function (): void {
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    app(Settings::class)->set('notifications.form.submission.channels', ['telegram']);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada & Co', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $url = route('tbtop.cms.form-submission-page', ['submission' => FormSubmission::query()->sole()->id]);
+    Http::assertSent(fn ($request): bool => trim((string) $request['text'])
+        === "<b>New form submission</b>\nAda &amp; Co\nada@example.test\nPage: Contact\n{$url}");
+});
+
+function notifierUkrainianSubmission(): void
+{
+    Language::factory()->create(['locale' => 'uk']);
+    $page = notifierContactPage();
+
+    test()->post(route('tbtop-cms.form.submit', ['locale' => 'uk', 'page' => $page->getKey(), 'block' => 'form-1']), [
+        'name' => 'Ада', 'email' => 'ada@example.test', 'message' => 'Привіт',
+    ])->assertRedirect();
+
+    expect(FormSubmission::query()->sole()->locale)->toBe('uk');
+}
+
+it('writes each admin\'s bell in their own admin locale, not the page locale', function (): void {
+    $english = notifierAdmin('en@example.test');
+    CmsUserProfile::query()->where('user_id', $english->id)->update(['locale' => 'en']);
+    $ukrainian = notifierAdmin('uk@example.test');
+    CmsUserProfile::query()->where('user_id', $ukrainian->id)->update(['locale' => 'uk']);
+    $unset = notifierAdmin('unset@example.test');
+
+    notifierUkrainianSubmission();
+
+    expect($english->notifications()->sole()->data)
+        ->toMatchArray(['title' => 'New form submission'])
+        ->and($english->notifications()->sole()->data['actions'][0]['label'])->toBe('View submission')
+        ->and($english->notifications()->sole()->data['body'])->toContain('Page: Contact')
+        ->and($ukrainian->notifications()->sole()->data['title'])->toBe('Нова заявка з форми')
+        ->and($ukrainian->notifications()->sole()->data['actions'][0]['label'])->toBe('Переглянути заявку')
+        // No stored preference: the admin panel's default UI locale.
+        ->and($unset->notifications()->sole()->data['title'])->toBe('New form submission')
+        // The visitor's own text is passed through untouched.
+        ->and($ukrainian->notifications()->sole()->data['body'])->toContain('Ада');
+});
+
+it('sends mail and telegram in the admin default locale and keeps the page locale as data', function (): void {
+    Mail::fake();
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    app(Settings::class)->set('notifications.form.submission.channels', ['mail', 'telegram']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+
+    notifierUkrainianSubmission();
+
+    Http::assertSent(fn ($request): bool => str_starts_with((string) $request['text'], '<b>New form submission</b>'));
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasSubject('New form submission')
+        && str_contains($mail->render(), '<strong>Locale:</strong> uk')
+        && str_contains($mail->render(), '<strong>name:</strong> Ада'));
+});
+
 it('labels the bell action instead of showing the raw URL', function (): void {
     $admin = notifierAdmin();
     $page = notifierContactPage();

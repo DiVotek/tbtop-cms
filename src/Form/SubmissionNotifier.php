@@ -88,7 +88,7 @@ class SubmissionNotifier
      */
     public function deliver(FormSubmission $submission, Page $page): array
     {
-        $built = FormSubmissionRecipients::build($this->settings, $submission->locale);
+        $built = FormSubmissionRecipients::build($this->settings);
 
         // Two recipients of one broken template fail with the same text;
         // the operator needs it once.
@@ -117,13 +117,18 @@ class SubmissionNotifier
     /** @return list<string> */
     private function send(FormSubmission $submission, Page $page, FormSubmissionRecipients $built): array
     {
-        if ($built->recipients === []) {
-            return [];
+        // Recipients read the admin UI locale, not the page's: the payload's
+        // own translated text (action label, date format) follows each group.
+        $byLocale = [];
+        foreach ($built->recipients as $recipient) {
+            $byLocale[$recipient->locale][] = $recipient;
         }
 
-        $payload = FormSubmissionPayloadFactory::make($submission, $page);
-
-        $deliveries = Notifications::send('form.submission', $payload, $built->recipients);
+        $deliveries = [];
+        foreach ($byLocale as $locale => $recipients) {
+            $payload = FormSubmissionPayloadFactory::make($submission, $page, (string) $locale);
+            array_push($deliveries, ...Notifications::send('form.submission', $payload, $recipients));
+        }
 
         return array_values(array_map(
             $this->errorFor(...),
