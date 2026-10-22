@@ -85,6 +85,9 @@ it('stamps updated_by with a second admin on edit, leaving created_by unchanged'
     $page = Page::query()->where('type', 'page')->firstOrFail();
     expect($page->created_by)->toBe($creator->id);
 
+    // A second admin signs in with a fresh session: AuthenticateSession would
+    // log out a session that still holds the first admin's password hash.
+    test()->flushSession();
     test()->actingAs($editor, 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [...authorTrackingBaseEditPayload(), 'lock_version' => $page->lock_version, 'name' => ['en' => 'About Us Updated']],
