@@ -294,3 +294,13 @@ describe("R3-forms-13: the channels checklist offers only channels the type can 
 		expect(props).not.toContain('"value":"sms"');
 	});
 });
+
+describe("R4-fixes-2: the notification settings save trims like the other admin forms", () => {
+	test("a padded sender name is stored trimmed", async () => {
+		const { cms, page, post: save } = await panel();
+		const url = "/admin/notification-settings";
+		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).notification_settings ?? {};
+		await save(`${url}/forms/notification_settings`, { ...record, mail_from_name: "  Shop  " }, url);
+		expect(await cms.site().settings.get("mail.from_name")).toBe("Shop");
+	});
+});
