@@ -22,6 +22,7 @@ return [
         'updated_by' => 'Оновив(-ла)',
         'deleted_at' => 'Видалено',
         'path' => 'Шлях',
+        'source_backed' => 'З джерела',
     ],
     'status' => [
         'published' => 'Опубліковано',
@@ -208,6 +209,8 @@ return [
         'expired_at' => 'Термін минув :datetime',
     ],
     'preview' => [
+        // The sticky banner the frontend CmsPage shows over a draft opened by its preview link (cms.strings.previewBanner).
+        'banner' => 'Попередній перегляд чернетки — сторінку не опубліковано.',
         'field_label' => 'Посилання',
         'helper' => 'Посилання дійсне протягом :hours год.',
         'copy' => 'Копіювати',
@@ -248,6 +251,11 @@ return [
         'type_change_subtype' => 'У сторінки підтип :subtype, якого немає в нового типу — спершу приберіть підтип.',
         'parent_cycle' => 'Сторінку не можна розмістити під собою або своїми нащадками.',
         'type_unregistered' => 'Тип сторінки [:type] не зареєстровано.',
+        'children_disallowed' => 'Тип сторінки [:type] не може містити наявну дочірню сторінку типу [:child].',
+        'parent_required' => 'Тип сторінки [:type] потребує батьківської сторінки.',
+        'parent_missing' => 'Батьківська сторінка [:id] відсутня або в кошику.',
+        'parent_disallows_child' => 'Тип сторінки [:parent] не може містити дочірню сторінку типу [:type].',
+        'depth_exceeded' => 'Глибина вкладеності :depth перевищує максимум :max для типу [:type].',
         'subtype_invalid' => ':subtype не є підтипом :type.',
         'type_is_subtype' => ':type є підтипом :base: у типі зберігається :base, а :type — у підтипі.',
         'type_source_backed' => 'Сторінки типу :type створюються їхнім джерелом, а не вручну.',

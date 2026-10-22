@@ -11,7 +11,7 @@ interface CmsPageProps {
     render: RenderSpec;
     seo: Seo;
     isPreview?: boolean;
-    cms?: { debug?: boolean };
+    cms?: { debug?: boolean; strings?: { previewBanner?: string } };
     [key: string]: unknown;
 }
 
@@ -32,7 +32,7 @@ export default function CmsPage() {
     return (
         <>
             <CmsHead seo={seo} />
-            {isPreview ? <div style={bannerStyle}>Draft preview — this page is not published.</div> : null}
+            {isPreview ? <div style={bannerStyle}>{cms?.strings?.previewBanner ?? "Draft preview — this page is not published."}</div> : null}
             <JSONUIProvider registry={registry}>
                 <CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={isPreview === true || cms?.debug === true} />
             </JSONUIProvider>

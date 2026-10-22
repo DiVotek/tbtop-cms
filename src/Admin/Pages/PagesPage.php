@@ -164,6 +164,13 @@ class PagesPage extends AdminPage
             // link's '/{path}' template: a row carries only declared columns.
             Column::make('path')->label(__('tbtop-cms::pages.columns.path'))
                 ->toggleable(true, hiddenByDefault: true)->muted(),
+            // Not shown by default — projected purely so the duplicate row
+            // action can hide itself for source-backed rows. Only declared
+            // when such a type is registered (query() selects it then too).
+            ...(self::sourceBackedTypes() === [] ? [] : [
+                Column::make('source_backed')->label(__('tbtop-cms::pages.columns.source_backed'))
+                    ->boolean()->toggleable(true, hiddenByDefault: true),
+            ]),
         ];
     }
 
@@ -215,7 +222,37 @@ class PagesPage extends AdminPage
             )
             ->selectSub(AuthorNames::subselect($table, 'updated_by'), 'updated_by_name');
 
+        $this->selectSourceBacked($query, $table);
+
         return PageSortKey::apply(PageListState::select($query, $table));
+    }
+
+    /**
+     * source_backed: whether the row's type is source-backed, read by the
+     * duplicate row action's hiddenIf through the source_backed column.
+     * Left out when no such type is registered (a missing field is falsy to
+     * the condition).
+     *
+     * @param  Builder<Page>  $query
+     */
+    private function selectSourceBacked(Builder $query, string $table): void
+    {
+        $types = self::sourceBackedTypes();
+
+        if ($types === []) {
+            return;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($types), '?'));
+        $query->selectRaw("CASE WHEN {$table}.type IN ({$placeholders}) THEN 1 ELSE 0 END AS source_backed", $types);
+    }
+
+    /** @return list<string> */
+    private static function sourceBackedTypes(): array
+    {
+        $registry = app(PageTypeRegistry::class);
+
+        return array_values(array_filter($registry->keys(), $registry->isSourceBacked(...)));
     }
 
     /**

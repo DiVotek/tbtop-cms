@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Notifications;
 
+use Closure;
 use InvalidArgumentException;
 
 /**
@@ -14,7 +15,8 @@ use InvalidArgumentException;
  */
 final class TypeDefinition
 {
-    private string $label = '';
+    /** @var string|Closure(): string */
+    private string | Closure $label = '';
 
     private string $group = '';
 
@@ -46,7 +48,14 @@ final class TypeDefinition
         return $this->key;
     }
 
-    public function label(string $label): self
+    /**
+     * A string, or a closure returning one: a closure is called on every
+     * labelValue(), so `fn () => __('...')` follows the current request's
+     * locale while `__('...')` passed at boot stays in the boot locale.
+     *
+     * @param  string|Closure(): string  $label
+     */
+    public function label(string | Closure $label): self
     {
         $this->label = $label;
 
@@ -55,7 +64,7 @@ final class TypeDefinition
 
     public function labelValue(): string
     {
-        return $this->label;
+        return $this->label instanceof Closure ? (string) ($this->label)() : $this->label;
     }
 
     /** Settings tab this type is grouped under: 'forms', 'orders', 'inventory'. */

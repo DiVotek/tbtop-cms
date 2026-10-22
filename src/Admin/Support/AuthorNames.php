@@ -43,7 +43,7 @@ final class AuthorNames
         /** @var class-string<Model> $userModel */
         $userModel = config('tbtop-cms.admin.model', 'App\\Models\\User');
 
-        return $userModel::query()->whereIn('id', $ids)->get()->keyBy(
+        return $userModel::query()->whereKey($ids)->get()->keyBy(
             static fn (Model $user): int | string => $user->getKey(),
         );
     }
@@ -95,11 +95,12 @@ final class AuthorNames
     {
         /** @var class-string<Model> $userModel */
         $userModel = config('tbtop-cms.admin.model', 'App\\Models\\User');
-        $userTable = (new $userModel)->getTable();
+        $user = new $userModel;
+        $userTable = $user->getTable();
 
         return DB::table($userTable)
             ->selectRaw("COALESCE(NULLIF({$userTable}.name, ''), {$userTable}.email)")
-            ->whereColumn($userTable . '.id', $ownerTable . '.' . $ownerColumn)
+            ->whereColumn($user->getQualifiedKeyName(), $ownerTable . '.' . $ownerColumn)
             ->limit(1);
     }
 }

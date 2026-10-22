@@ -18,6 +18,7 @@ use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Mail\SubmissionMail;
 use Tbtop\Cms\Notifications\Audience;
+use Tbtop\Cms\Notifications\Channels\BellChannel;
 use Tbtop\Cms\Notifications\Channels\RenderedMail;
 use Tbtop\Cms\Notifications\Events\NotificationSent;
 use Tbtop\Cms\Notifications\Format;
@@ -25,6 +26,8 @@ use Tbtop\Cms\Notifications\Models\NotificationLog;
 use Tbtop\Cms\Notifications\Models\NotificationTemplate;
 use Tbtop\Cms\Notifications\NotificationLogStatus;
 use Tbtop\Cms\Notifications\Notifications;
+use Tbtop\Cms\Notifications\Recipient;
+use Tbtop\Cms\Notifications\Rendered;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
@@ -109,6 +112,31 @@ it('writes the bell body as plain text', function (): void {
     expect($data['body'])->not->toContain('<b>')
         ->and($data['body'])->not->toContain('&#039;')
         ->and($data['body'])->toContain("Ada O'Brien");
+});
+
+it('labels the bell action instead of showing the raw URL', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    expect($admin->notifications()->sole()->data['actions'][0]['label'])
+        ->toBe(__('tbtop-cms::notifications.bell.view'));
+});
+
+it('labels a bell action generically when the payload carries no actionLabel', function (): void {
+    $admin = notifierAdmin();
+
+    app(BellChannel::class)->send(
+        new Rendered('Order paid', 'Order #7', ['actionUrl' => 'https://shop.test/orders/7']),
+        new Recipient(Audience::Staff, 'en', notifiable: $admin),
+        app(Settings::class),
+    );
+
+    expect($admin->notifications()->sole()->data['actions'][0])
+        ->toMatchArray(['label' => __('tbtop-cms::notifications.bell.open'), 'url' => 'https://shop.test/orders/7']);
 });
 
 it('does not notify a user with no admin profile row', function (): void {
@@ -225,6 +253,25 @@ it('marks the submission failed when telegram is enabled but token or chat ids a
     $submission = FormSubmission::query()->sole();
     expect($submission->status)->toBe(SubmissionStatus::Failed)
         ->and($submission->error)->toContain(__('tbtop-cms::notifications.errors.telegram_not_configured'));
+});
+
+it('reports a missing bot token once and attempts no telegram send per chat id', function (): void {
+    Http::fake();
+    notifierAdmin();
+    app(Settings::class)->set('notifications.form.submission.channels', ['bell', 'telegram']);
+    app(Settings::class)->set('notifications.telegram.bot_token', '');
+    app(Settings::class)->set('notifications.telegram.chat_ids', "111\n222");
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $submission = FormSubmission::query()->sole();
+    expect($submission->status)->toBe(SubmissionStatus::Failed)
+        ->and($submission->error)->toBe(__('tbtop-cms::notifications.errors.telegram_not_configured'))
+        ->and(NotificationLog::query()->where('channel', 'telegram')->count())->toBe(0);
+    Http::assertNothingSent();
 });
 
 it('names a failing host channel through the generic error text', function (): void {
@@ -541,4 +588,21 @@ it('marks a submission failed, not processing, when anything else in the fan-out
         ->and($submission->error)->toBe('listener boom');
     expect($reported)->toBe([[RuntimeException::class, 'listener boom', $submission->id]])
         ->and(Context::has('submission_id'))->toBeFalse();
+});
+
+it('leaves the title and the action URL out of the bell body', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $data = $admin->notifications()->sole()->data;
+    $lines = array_map(trim(...), explode("\n", $data['body']));
+
+    // The short template repeats the title and prints the URL for Telegram; the bell has its own title and button.
+    expect($lines)->not->toContain($data['title'])
+        ->and($data['body'])->not->toContain($data['actions'][0]['url'])
+        ->and($data['body'])->toContain('Ada');
 });

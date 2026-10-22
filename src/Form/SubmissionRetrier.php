@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form;
 
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Context;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Support\FormBlockLocator;
@@ -32,9 +33,16 @@ use Throwable;
  * and this class set it the moment handleSubmit() returns), which lets a
  * retry for a failed fan-out skip the CRM/queue side effects that already
  * happened.
+ *
+ * A Failed row is retryable at once. A Pending or Processing row becomes
+ * retryable once untouched for STALE_AFTER_MINUTES: the worker that should
+ * have finished it died. The claim checks the same age in its conditional
+ * UPDATE, so a send still in flight is never taken over.
  */
 class SubmissionRetrier
 {
+    public const STALE_AFTER_MINUTES = 15;
+
     public function __construct(
         private readonly FormBlockLocator $locator,
         private readonly SubmissionNotifier $notifier,
@@ -48,12 +56,12 @@ class SubmissionRetrier
      */
     public function retry(FormSubmission $submission): void
     {
-        if (! SubmissionClaim::take($submission, SubmissionStatus::Failed)) {
+        if (! self::claim($submission)) {
             return;
         }
 
         // Not null: if even report() throws, the row must not be released Handled.
-        $error = 'Retry did not finish.';
+        $error = __('tbtop-cms::form-submissions.errors.retry_unfinished');
 
         try {
             $error = $this->run($submission);
@@ -73,19 +81,50 @@ class SubmissionRetrier
         }
     }
 
+    /** Whether retry() would take the row now: Failed, or Pending/Processing left stale. */
+    public static function isRetryable(FormSubmission $submission): bool
+    {
+        if ($submission->status === SubmissionStatus::Failed) {
+            return true;
+        }
+
+        $updatedAt = $submission->updated_at;
+
+        return in_array($submission->status, [SubmissionStatus::Pending, SubmissionStatus::Processing], true)
+            && $updatedAt !== null
+            && $updatedAt->lt(self::staleBefore());
+    }
+
+    private static function claim(FormSubmission $submission): bool
+    {
+        if (SubmissionClaim::take($submission, SubmissionStatus::Failed)) {
+            return true;
+        }
+
+        $staleBefore = self::staleBefore();
+
+        return SubmissionClaim::take($submission, SubmissionStatus::Pending, $staleBefore)
+            || SubmissionClaim::take($submission, SubmissionStatus::Processing, $staleBefore);
+    }
+
+    private static function staleBefore(): CarbonInterface
+    {
+        return now()->subMinutes(self::STALE_AFTER_MINUTES);
+    }
+
     /** @return string|null the error the row is released Failed with, null for Handled */
     private function run(FormSubmission $submission): ?string
     {
         $page = $submission->page_id !== null ? Page::query()->find($submission->page_id) : null;
 
         if (! $page instanceof Page) {
-            return 'Page no longer exists.';
+            return __('tbtop-cms::form-submissions.errors.page_missing');
         }
 
         $located = $this->locator->locate($page, $submission->block_id, $submission->locale);
 
         if (! $located instanceof LocatedFormBlock) {
-            return 'Form block no longer exists on the page.';
+            return __('tbtop-cms::form-submissions.errors.block_missing');
         }
 
         if ($submission->handled_at === null) {

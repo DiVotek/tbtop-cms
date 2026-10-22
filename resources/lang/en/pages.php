@@ -22,6 +22,7 @@ return [
         'updated_by' => 'Updated by',
         'deleted_at' => 'Deleted',
         'path' => 'Path',
+        'source_backed' => 'Source-backed',
     ],
     'status' => [
         'published' => 'Published',
@@ -212,6 +213,8 @@ return [
         'expired_at' => 'Expired :datetime',
     ],
     'preview' => [
+        // The sticky banner the frontend CmsPage shows over a draft opened by its preview link (cms.strings.previewBanner).
+        'banner' => 'Draft preview — this page is not published.',
         'field_label' => 'Link',
         'helper' => 'Link is valid for :hours hours.',
         'copy' => 'Copy',
@@ -254,6 +257,11 @@ return [
         'type_change_subtype' => 'This page has the subtype :subtype, which the new type does not have — clear the subtype first.',
         'parent_cycle' => 'A page cannot be placed under itself or one of its descendants.',
         'type_unregistered' => 'Page type [:type] is not registered.',
+        'children_disallowed' => 'Page type [:type] cannot contain existing [:child] child.',
+        'parent_required' => 'Page type [:type] requires a parent.',
+        'parent_missing' => 'Parent page [:id] is missing or trashed.',
+        'parent_disallows_child' => 'Page type [:parent] cannot contain a [:type] child.',
+        'depth_exceeded' => 'Nesting depth :depth exceeds maximum :max for type [:type].',
         'subtype_invalid' => ':subtype is not a subtype of :type.',
         'type_is_subtype' => ':type is a subtype of :base: store :base in the type and :type in the subtype.',
         'type_source_backed' => 'Pages of type :type are created by their source, not by hand.',

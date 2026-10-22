@@ -46,6 +46,6 @@ final class AdminUsers
             return new Collection;
         }
 
-        return $userModel::query()->whereIn('id', $ids)->get();
+        return $userModel::query()->whereKey($ids)->get();
     }
 }

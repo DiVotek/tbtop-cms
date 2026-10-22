@@ -30,7 +30,7 @@ class PageHierarchy
     private static function assertTypeRegistered(Page $page, PageTypeRegistry $registry): void
     {
         if (! $registry->has($page->type)) {
-            throw new DomainException("Page type [{$page->type}] is not registered.");
+            throw new DomainException(__('tbtop-cms::pages.validation.type_unregistered', ['type' => $page->type]));
         }
     }
 
@@ -44,7 +44,7 @@ class PageHierarchy
 
         foreach ($page->children()->distinct()->pluck('type')->all() as $childType) {
             if (! in_array($childType, $allowed, true)) {
-                throw new DomainException("Page type [{$page->type}] cannot contain existing [{$childType}] child.");
+                throw new DomainException(__('tbtop-cms::pages.validation.children_disallowed', ['type' => $page->type, 'child' => $childType]));
             }
         }
     }
@@ -56,24 +56,30 @@ class PageHierarchy
         }
 
         if ($registry->get($page->type)->requiresParent()) {
-            throw new DomainException("Page type [{$page->type}] requires a parent.");
+            throw new DomainException(__('tbtop-cms::pages.validation.parent_required', ['type' => $page->type]));
         }
     }
 
     private static function assertParentAllowsChild(Page $page, PageTypeRegistry $registry): void
     {
         if ($page->exists && $page->parent_id === $page->id) {
-            throw new DomainException('A page cannot be its own parent.');
+            throw new DomainException(__('tbtop-cms::pages.validation.parent_cycle'));
         }
 
         $parent = Page::withTrashed()->find($page->parent_id);
 
         if ($parent === null || $parent->trashed()) {
-            throw new DomainException("Parent page [{$page->parent_id}] is missing or trashed.");
+            throw new DomainException(__('tbtop-cms::pages.validation.parent_missing', ['id' => $page->parent_id]));
+        }
+
+        // A parent whose type lost its registration accepts no children; the
+        // registry's own InvalidArgumentException would surface as a 500.
+        if (! $registry->has($parent->type)) {
+            throw new DomainException(__('tbtop-cms::pages.validation.type_unregistered', ['type' => $parent->type]));
         }
 
         if (! in_array($page->type, $registry->get($parent->type)->allowedChildren(), true)) {
-            throw new DomainException("Page type [{$parent->type}] cannot contain a [{$page->type}] child.");
+            throw new DomainException(__('tbtop-cms::pages.validation.parent_disallows_child', ['parent' => $parent->type, 'type' => $page->type]));
         }
     }
 
@@ -82,7 +88,7 @@ class PageHierarchy
     {
         foreach ($chain as $ancestor) {
             if ($ancestor->id === $page->id) {
-                throw new DomainException('Page parent change would create a cycle.');
+                throw new DomainException(__('tbtop-cms::pages.validation.parent_cycle'));
             }
         }
     }
@@ -115,6 +121,12 @@ class PageHierarchy
 
     private static function assertPageDepth(Page $page, int $depth, PageTypeRegistry $registry): void
     {
+        // A descendant whose type lost its registration has no depth limit
+        // to check; it must not block moving its ancestors.
+        if (! $registry->has($page->type)) {
+            return;
+        }
+
         $type = $registry->get($page->type);
 
         // Leaf types do not extend nesting; depth is bounded by their containers.
@@ -123,7 +135,7 @@ class PageHierarchy
         }
 
         if ($depth > $type->maxDepth()) {
-            throw new DomainException("Nesting depth {$depth} exceeds maximum {$type->maxDepth()} for type [{$page->type}].");
+            throw new DomainException(__('tbtop-cms::pages.validation.depth_exceeded', ['depth' => $depth, 'max' => $type->maxDepth(), 'type' => $page->type]));
         }
     }
 }

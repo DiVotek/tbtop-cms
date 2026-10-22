@@ -109,3 +109,20 @@ it('fails to revoke the owner via the CLI instead of a false success message', f
 
     expect(CmsUserProfile::where('user_id', $owner->id)->exists())->toBeTrue();
 });
+
+it('warns instead of claiming success when revoking a user who has no cms admin access', function (): void {
+    AdminUser::create(['name' => 'Host', 'email' => 'host@example.com', 'password' => 'x']);
+
+    $this->artisan('cms:admin:revoke', ['email' => 'host@example.com'])
+        ->assertExitCode(0)
+        ->expectsOutputToContain('host@example.com has no CMS admin access; nothing to revoke.')
+        ->doesntExpectOutputToContain('Revoked');
+});
+
+it('rejects creating a user with an invalid email', function (): void {
+    $this->artisan('cms:admin:create', ['email' => 'notanemail', '--password' => 'password123'])
+        ->assertExitCode(1)
+        ->expectsOutputToContain('The email must be a valid email address.');
+
+    expect(AdminUser::query()->where('email', 'notanemail')->exists())->toBeFalse();
+});

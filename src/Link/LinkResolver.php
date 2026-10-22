@@ -65,7 +65,7 @@ class LinkResolver
         }
 
         if ($page !== null) {
-            $name = self::pickName($page, $locale);
+            $name = self::pickName($page, $locale, $this->languages->defaultLocale());
 
             if ($name !== null) {
                 return $name;
@@ -75,15 +75,22 @@ class LinkResolver
         return $link->value;
     }
 
-    /** Rendered locale first, then the package-wide default/first-non-empty pick. */
-    private static function pickName(Page $page, string $locale): ?string
+    /**
+     * Rendered locale first, then the CMS default language, then the
+     * package-wide first-non-empty pick (whose own default is tbtop-admin's,
+     * 'en' on a site that never ran the admin panel's locale sync).
+     */
+    private static function pickName(Page $page, string $locale, string $defaultLocale): ?string
     {
         $raw = $page->getRawOriginal('name') ?? $page->name;
         $map = TranslatableValue::asLocaleMap($raw);
-        $exact = is_array($map) ? ($map[$locale] ?? null) : null;
 
-        if (is_string($exact) && trim($exact) !== '') {
-            return $exact;
+        foreach ([$locale, $defaultLocale] as $candidate) {
+            $name = is_array($map) ? ($map[$candidate] ?? null) : null;
+
+            if (is_string($name) && trim($name) !== '') {
+                return $name;
+            }
         }
 
         $picked = TranslatableValue::pick($raw);

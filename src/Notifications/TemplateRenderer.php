@@ -14,8 +14,8 @@ use LogicException;
 /**
  * Renders a notification's view into a Rendered subject/body, with the
  * payload DTO's public properties exposed as template variables. The view
- * is expected to define a `subject` section (`@section('subject', ...)`);
- * its absence just yields an empty subject — a short-format channel like
+ * is expected to define a `subject` section (`@section('subject', ...)`),
+ * handed to channels entity-decoded as plain text; its absence just yields an empty subject — a short-format channel like
  * telegram or bell has no use for one.
  *
  * $template accepts either a registered view name or inline Blade source
@@ -57,7 +57,10 @@ class TemplateRenderer
             );
             [$body, $subject] = $result;
 
-            return new Rendered(trim($subject), $body, $data);
+            // Blade escapes the subject section like any echo, but a subject is
+            // plain text for every channel (a mail header, a bell title, a
+            // host's SMS) — decode it once here so no channel has to.
+            return new Rendered(trim(html_entity_decode($subject, ENT_QUOTES | ENT_HTML5, 'UTF-8')), $body, $data);
         } finally {
             App::setLocale($previousLocale);
         }

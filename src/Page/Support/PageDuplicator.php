@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Support;
 
+use DomainException;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
  * Clones a Page into a new draft sitting next to the original (same parent,
@@ -27,6 +29,13 @@ final class PageDuplicator
 {
     public function duplicate(Page $source): Page
     {
+        // A source-backed type has one page per source (type, source_id);
+        // its source creates it, so a hand-made copy is refused like the
+        // create form refuses it (PageFormGuards::typeAndStatus()).
+        if (app(PageTypeRegistry::class)->isSourceBacked($source->type)) {
+            throw new DomainException(__('tbtop-cms::pages.validation.type_source_backed', ['type' => $source->type]));
+        }
+
         // No $except list: every attribute replicate() would otherwise carry
         // over verbatim (status/published_at/unpublish_at/is_system/
         // sort_order/lock_version) is overwritten explicitly below anyway.
@@ -41,6 +50,9 @@ final class PageDuplicator
         $copy->is_system = false;
         $copy->error_class = null;
         $copy->sort_order = $this->nextSortOrder($source->parent_id);
+        // A new row starts at the column default, like any created page;
+        // the source's version says nothing about the copy's edit forms.
+        $copy->lock_version = 0;
 
         // replicate() copied translation JSON verbatim; overwrite just the
         // name map with the suffixed version (title/heading/summary/body

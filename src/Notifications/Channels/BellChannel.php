@@ -30,7 +30,7 @@ final class BellChannel implements Channel
 
     public function label(): string
     {
-        return __('tbtop-cms::nav.items.notification_settings');
+        return __('tbtop-cms::notifications.channels.bell');
     }
 
     public function format(): Format
@@ -53,9 +53,11 @@ final class BellChannel implements Channel
     {
         $notification = BellNotification::make();
 
-        // The Short template is Telegram HTML; the bell client renders plain text.
-        $subject = self::plainText($message->subject);
-        $body = self::plainText($message->body);
+        // The Short template is Telegram HTML; the bell client renders plain
+        // text. The subject already is (TemplateRenderer decodes it).
+        $subject = trim($message->subject);
+        $actionUrl = $message->data['actionUrl'] ?? null;
+        $body = self::bellBody(self::plainText($message->body), [$subject, is_string($actionUrl) ? $actionUrl : '']);
 
         if ($subject !== '') {
             $notification->title($subject)->body($body);
@@ -63,14 +65,31 @@ final class BellChannel implements Channel
             $notification->title($body);
         }
 
-        $actionUrl = $message->data['actionUrl'] ?? null;
-
         if (is_string($actionUrl) && $actionUrl !== '') {
             $label = $message->data['actionLabel'] ?? null;
-            $notification->actions([NotificationAction::make(is_string($label) ? $label : $actionUrl)->url($actionUrl)]);
+            $label = is_string($label) && $label !== '' ? $label : __('tbtop-cms::notifications.bell.open', [], $to->locale);
+            $notification->actions([NotificationAction::make($label)->url($actionUrl)]);
         }
 
         $notification->sendToDatabase($to->notifiable);
+    }
+
+    /**
+     * The Short template is shared with Telegram, which has no title or
+     * button of its own: it repeats the title and prints the admin URL. The
+     * bell shows both already, so a body line equal to either is dropped.
+     *
+     * @param  list<string>  $shownElsewhere
+     */
+    private static function bellBody(string $body, array $shownElsewhere): string
+    {
+        $shown = array_filter($shownElsewhere, static fn (string $text): bool => $text !== '');
+        $lines = array_filter(
+            array_map(trim(...), explode("\n", $body)),
+            static fn (string $line): bool => $line !== '' && ! in_array($line, $shown, true),
+        );
+
+        return implode("\n", $lines);
     }
 
     private static function plainText(string $html): string

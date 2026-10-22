@@ -114,9 +114,12 @@ route — Fortify, Breeze, Jetstream, most starter kits — keeps it: a second
 route under the same name would still lose `route('login')`'s URL generation
 to whichever registered first while `GET /login` dispatches to whichever
 registered last, and doubles a Wayfinder export, breaking the build. Nothing
-is actually broken by this — `admin/login` still works visited directly, and
-`redirect()->intended(...)` still lands the user on `/admin/dashboard` after
-authenticating there. The only symptom is cosmetic: `/admin` shows the host's
+is actually broken by this — `admin/login` still works visited directly.
+After sign-in there, `LoginPage` pulls the session's `url.intended` (set by
+the `auth` redirect) and goes there when it is an admin URL on this host
+(`{prefix}` itself or anything below it); any other target — a frontend
+page, another host — is dropped and the user lands on `/{prefix}/dashboard`.
+The only symptom is cosmetic: `/admin` shows the host's
 login page, not the CMS's. Fix it (optional) by pointing the host's `login`
 handler at a redirect to `admin/login`, or just link there directly.
 `cms:doctor` does not catch this — its route check only confirms
@@ -157,7 +160,7 @@ public function respond(Request $request, Throwable $e): Response
 ```
 
 See `docs/host/ai/seo.md`'s "Editable error pages" section for the three
-fallback layers (DB page → chrome fallback with `render: []` → static Blade
+fallback layers (DB page → chrome fallback with an empty `render` spec → static Blade
 view for a 5xx that fails to render) and `docs/host/ai/pages.md`'s "Error
 pages" section for how the two pages are identified and seeded. No package
 Blade layout exists for any of this — every layer except the last-resort 5xx
@@ -333,6 +336,7 @@ response:
 | `cms.defaultLocale` | `string` | Configured default content locale (`Languages::defaultLocale()`) |
 | `cms.languages` | `list<{locale, name, is_default}>` | Active frontend languages (`Languages::frontendActive()`) |
 | `cms.debug` | `bool` | `config('app.debug')` — with `isPreview`, what `CmsRenderer`'s `showErrors` is wired to: a developer `console.error` line for a block the client could not draw, nothing on the page |
+| `cms.strings` | `{previewBanner: string}` | Fixed UI text the stock `CmsPage` renders, translated for the request locale (`tbtop-cms::pages.preview.*`): `previewBanner` is the banner over a draft opened by its preview link |
 | `cms.layout` | `array<string, list<ResolvedBlock>>` | Resolved `header`/`footer` block lists — cached across requests per locale under the content version (`CmsCache::rememberLive('layout:{locale}', ...)`, TTL capped at the next page schedule transition) at this call site, not inside `LayoutResolver`, so the admin layout editor reads live data. A `HandlesFormSubmission` block gets `action` bound after the cache read, against the current page or the home page — see blocks.md#layout-blocks |
 
 **Page props** (`Tbtop\Cms\Frontend\Http\Controllers\PageController::props`)

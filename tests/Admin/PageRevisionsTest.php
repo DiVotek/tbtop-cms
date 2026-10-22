@@ -312,3 +312,36 @@ it('cascades its revisions when a page is force-deleted (DB-level FK)', function
 
     DB::purge('fk_test');
 });
+
+it('snapshots a page created without an explicit status as draft', function (): void {
+    $page = Page::create(['type' => 'page', 'name' => ['en' => 'X']]);
+
+    expect($page->status)->toBe(PageStatus::Draft)
+        ->and(PageRevision::query()->where('page_id', $page->id)->value('kind'))->toBe('create');
+});
+
+it('drops a locale added after the revision when restoring it', function (): void {
+    Language::factory()->create(['locale' => 'uk', 'is_frontend_active' => true, 'is_admin_active' => true]);
+    $page = Page::factory()->create(['name' => ['en' => 'Old'], 'title' => ['en' => 'Old title']]);
+    $revision = PageRevision::query()->where('page_id', $page->id)->where('kind', 'create')->firstOrFail();
+
+    $page->setTranslations('name', ['en' => 'New', 'uk' => 'Нова']);
+    $page->setTranslations('title', ['en' => 'New title', 'uk' => 'Новий заголовок']);
+    $page->save();
+
+    app(PageRevisionWriter::class)->restore($page, $revision);
+
+    $fresh = $page->fresh();
+    expect($fresh->getTranslations('name'))->toBe(['en' => 'Old'])
+        ->and($fresh->getTranslations('title'))->toBe(['en' => 'Old title']);
+});
+
+it('records a later save of a just-created instance as a save, not a second create', function (): void {
+    $page = Page::create(['type' => 'page', 'name' => ['en' => 'First']]);
+
+    $page->setTranslation('name', 'en', 'Second');
+    $page->save();
+
+    expect(PageRevision::query()->where('page_id', $page->id)->orderBy('id')->pluck('kind')->all())
+        ->toBe(['create', 'save']);
+});

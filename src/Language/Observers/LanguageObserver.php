@@ -43,7 +43,7 @@ class LanguageObserver
     {
         if ($language->is_default) {
             throw new DomainException(
-                "Default language '{$language->locale}' cannot be deleted. Reassign default first."
+                __('tbtop-cms::languages.errors.default_not_deletable', ['locale' => $language->locale])
             );
         }
     }
@@ -84,7 +84,7 @@ class LanguageObserver
         if (! $language->exists) {
             if ($language->is_frontend_active && ! $language->is_admin_active) {
                 throw new DomainException(
-                    "Language '{$language->locale}' cannot be frontend-active without being admin-active."
+                    __('tbtop-cms::languages.errors.frontend_requires_admin', ['locale' => $language->locale])
                 );
             }
 
@@ -97,7 +97,7 @@ class LanguageObserver
 
         if ($frontendTurnedOn && ! $language->is_admin_active && ! $adminFlippedOff) {
             throw new DomainException(
-                "Language '{$language->locale}' cannot be frontend-active without being admin-active."
+                __('tbtop-cms::languages.errors.frontend_requires_admin', ['locale' => $language->locale])
             );
         }
     }
@@ -115,7 +115,7 @@ class LanguageObserver
 
         if (! $anotherDefaultExists) {
             throw new DomainException(
-                "Language '{$language->locale}' is the only default and cannot be unset. Assign another default first."
+                __('tbtop-cms::languages.errors.only_default', ['locale' => $language->locale])
             );
         }
     }

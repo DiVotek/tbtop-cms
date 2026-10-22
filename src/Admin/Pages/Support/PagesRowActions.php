@@ -54,7 +54,10 @@ final class PagesRowActions
             // Only active rows can be duplicated — a trashed page has no live
             // slug/children guarantees to clone from meaningfully, and
             // restore/forceDelete already own the trashed-row action slot.
-            ->hiddenIf('deleted_at', 'not empty');
+            // A source-backed page is created by its source, never copied
+            // (PageDuplicator refuses it); source_backed is a computed row
+            // column (PagesPage::query()).
+            ->hiddenIf(Cond::any(Cond::notEmpty('deleted_at'), Cond::truthy('source_backed')));
     }
 
     private static function duplicate(ActionCtx $ctx): Effects

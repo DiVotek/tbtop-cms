@@ -41,6 +41,18 @@ it('lists pages for an empty search', function (): void {
     expect(array_column($response->json('options'), 'label'))->toContain('About');
 });
 
+it('answers an array search with no options instead of erroring', function (): void {
+    Page::factory()->create(['name' => ['en' => 'About']]);
+
+    pageSearch(['search' => ['x']])->assertOk()->assertExactJson(['options' => []]);
+});
+
+it('answers an array value with no option instead of erroring', function (): void {
+    Page::factory()->create(['name' => ['en' => 'About']]);
+
+    pageSearch(['value' => ['1']])->assertOk()->assertExactJson(['option' => null]);
+});
+
 it('narrows results by name', function (): void {
     Page::factory()->create(['name' => ['en' => 'About']]);
     Page::factory()->create(['name' => ['en' => 'Contact']]);
@@ -145,4 +157,17 @@ it('returns the name map when resolving a stored id', function (): void {
     $option = pageSearch(['value' => (string) $page->id])->json('option');
 
     expect($option['names'])->toBe(['en' => 'About', 'uk' => 'Про нас']);
+});
+
+it('searches and labels pages by the CMS default language when it is not English', function (): void {
+    Language::query()->where('locale', 'uk')->firstOrFail()->update(['is_default' => true]);
+    Page::factory()->create(['name' => ['uk' => 'Контакти', 'en' => 'Contacts']]);
+    Page::factory()->create(['name' => ['uk' => 'Про нас']]);
+
+    test()->actingAs(pageSearchAdmin(), 'web');
+    $found = test()->postJson('/admin/link/page-search', ['search' => 'конт']);
+    $listed = test()->postJson('/admin/link/page-search', ['search' => '']);
+
+    expect(array_column($found->json('options'), 'label'))->toBe(['Контакти'])
+        ->and(array_column($listed->json('options'), 'label'))->toBe(['Контакти', 'Про нас']);
 });

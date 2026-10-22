@@ -172,7 +172,8 @@ reads it off the `slugs` relation.
 writer. It runs automatically from `PageObserver::saved()` on **every**
 `Page::save()` — a host never calls it directly except when seeding wants to
 force a specific slug (see Seeding below) or after a manual
-`Languages`/locale change (`backfillLocale()`).
+`Languages`/locale change (`backfillLocale()`). It returns `bool`: whether
+any of the page's own slug rows changed (`false` for an error page).
 
 **No language rows → no slugs → 404.** `sync()` writes slug rows only for
 locales that exist in the languages table. In a fresh database with no
@@ -407,7 +408,10 @@ skips writing `content`/`starter_blocks` entirely rather than writing null
 — the stored value (template fallback trigger, or a host-written override)
 survives untouched. Creating a page of a source-backed type, or retyping an
 existing page into one, is rejected **server-side** in `PageForm`, not just
-hidden in the UI.
+hidden in the UI. Duplicating one is refused the same way:
+`PageDuplicator::duplicate()` throws a `DomainException`
+(`tbtop-cms::pages.validation.type_source_backed`), and the pages list hides
+the Duplicate row action for those rows.
 
 `tbtop-ecom/docs/storefront-cms-contract.md` documents the intended host
 usage pattern — a storefront package registering `ProductType`,
@@ -752,7 +756,9 @@ unattended schedule boundary.
 
 `src/Page/Events/*`. `PageSaved`/`PagePublished`/`PageUnpublished` are raised
 from `PageObserver`'s `created()`/`updated()` hooks inside `DB::afterCommit()` — a batched write inside a transaction
-(e.g. `StarterBlockSync::apply()`) fires once per page, only after commit:
+(e.g. `StarterBlockSync::apply()`) fires once per page, only after commit.
+A save that writes no column but changes a slug (a slug-only edit-form save)
+fires no Eloquent `updated`, so `saved()` raises `PageSaved` for it instead:
 
 - `PageSaved(Page $page, bool $wasCreated)` — every finished save, create or
   update, regardless of what changed.

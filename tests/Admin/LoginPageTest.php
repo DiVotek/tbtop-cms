@@ -39,6 +39,29 @@ it('authenticates and redirects on valid credentials', function (): void {
     expect(auth('web')->check())->toBeTrue();
 });
 
+it('redirects to the intended admin URL after sign-in and forgets it', function (): void {
+    makeLoginableAdmin();
+
+    // The auth guard remembers where a guest was headed (url.intended).
+    test()->get('/admin/pages?tab=draft')->assertRedirect();
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])
+        ->assertRedirect(url('/admin/pages?tab=draft'))
+        ->assertSessionMissing('url.intended');
+});
+
+it('ignores an intended URL outside the admin or on another host', function (string $intended): void {
+    makeLoginableAdmin();
+
+    test()->withSession(['url.intended' => $intended]);
+    submitLoginForm(['email' => 'a@example.com', 'password' => 'correct-password'])
+        ->assertRedirect(url('/admin/dashboard'));
+})->with([
+    'frontend page' => fn (): string => url('/about'),
+    'prefix look-alike' => fn (): string => url('/administrator'),
+    'other host' => 'https://evil.example/admin/pages',
+    'protocol-relative' => '//evil.example/admin/pages',
+]);
+
 it('rejects an invalid password without authenticating', function (): void {
     makeLoginableAdmin();
 
@@ -129,6 +152,13 @@ it('redirects an already-authenticated admin away from the login page', function
     test()->actingAs(makeLoginableAdmin(), 'web');
 
     test()->get('/admin/login')->assertRedirect(url('/admin/dashboard'));
+});
+
+it('shows the login form to a signed-in host user without cms access', function (): void {
+    $user = AdminUser::create(['name' => 'H', 'email' => 'h@example.com', 'password' => 'secret']);
+    test()->actingAs($user, 'web');
+
+    test()->get('/admin/login', ['X-Inertia' => 'true'])->assertOk();
 });
 
 it('carries the page title and a single breadcrumb from translations', function (): void {

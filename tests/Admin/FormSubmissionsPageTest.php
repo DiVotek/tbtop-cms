@@ -5,10 +5,12 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Spatie\Activitylog\Models\Activity;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Form\LeadStatus;
 use Tbtop\Cms\Form\Models\FormSubmission;
+use Tbtop\Cms\Form\SubmissionRetrier;
 use Tbtop\Cms\Form\SubmissionStatus;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -130,6 +132,36 @@ it('keeps the submission failed when the retry cause is still present', function
 
     $submission->refresh();
     expect($submission->status)->toBe(SubmissionStatus::Failed);
+});
+
+it('offers retry in the list for a submission stuck in processing, not for one still sending', function (): void {
+    actingAsCmsAdmin();
+    $stuck = FormSubmission::query()->create([
+        'block_id' => 'form-1', 'kind' => 'ContactForm', 'locale' => 'en',
+        'payload' => ['name' => 'Ada'], 'status' => SubmissionStatus::Processing,
+    ]);
+    $this->travel(SubmissionRetrier::STALE_AFTER_MINUTES + 1)->minutes();
+    $sending = FormSubmission::query()->create([
+        'block_id' => 'form-1', 'kind' => 'ContactForm', 'locale' => 'en',
+        'payload' => ['name' => 'Bob'], 'status' => SubmissionStatus::Processing,
+    ]);
+
+    $rows = collect($this->getJson('/admin/form-submissions/tables/formSubmissions')->assertOk()->json('data.data'))
+        ->keyBy('id');
+    $structure = json_encode($this->get('/admin/form-submissions', ['X-Inertia' => 'true'])->json('props.structure'));
+
+    // The retry row action's hiddenIf keys on the per-row retryable flag.
+    expect($structure)->toContain('"retryable"')
+        ->and($rows[$stuck->id]['retryable'] ?? null)->toBe('yes')
+        ->and($rows[$sending->id]['retryable'] ?? null)->toBe('no');
+
+    $this->postJson('/admin/form-submissions/actions/retry', [
+        'payload' => ['row' => ['id' => $stuck->id]],
+    ])->assertOk();
+
+    // Claimed and run (its page is gone, so it ends failed rather than stuck).
+    expect($stuck->refresh()->status)->toBe(SubmissionStatus::Failed)
+        ->and($sending->refresh()->status)->toBe(SubmissionStatus::Processing);
 });
 
 it('declares the retry row action hidden when the submission is not failed', function (): void {
@@ -262,3 +294,29 @@ it('omits the inbox badge when nothing is unread', function (): void {
 // Detail-page equivalents (open marks New -> Read, other statuses untouched)
 // live in FormSubmissionDetailPageTest.php now that payload viewing moved
 // off this list page's removed viewPayload modal.
+
+it('skips a retry and its audit entry for a submission that is not failed', function (SubmissionStatus $status): void {
+    actingAsCmsAdmin();
+
+    $submission = FormSubmission::query()->create([
+        'page_id' => contactPageForListing()->getKey(),
+        'block_id' => 'form-1',
+        'kind' => 'ContactForm',
+        'locale' => 'en',
+        'payload' => ['name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi'],
+        'status' => $status,
+    ]);
+
+    $this->postJson('/admin/form-submissions/actions/retry', [
+        'payload' => ['row' => ['id' => $submission->id]],
+    ])->assertOk()
+        ->assertJsonPath('effects.0.kind', 'notify')
+        ->assertJsonPath('effects.0.level', 'info')
+        ->assertJsonPath('effects.0.message', __('tbtop-cms::form-submissions.actions.already_retrying'));
+
+    expect(Activity::query()->where('event', 'delivery_retried')->exists())->toBeFalse()
+        ->and($submission->refresh()->status)->toBe($status);
+})->with([
+    'processing' => [SubmissionStatus::Processing],
+    'handled' => [SubmissionStatus::Handled],
+]);

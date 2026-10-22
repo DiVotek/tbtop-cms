@@ -44,8 +44,9 @@ is registered, in relative-path order after `blocks.types`; traits, abstract
 classes and helpers in subfolders are skipped by the same test. A folder that
 does not exist contributes nothing.
 
-A class both listed in `blocks.types` and found by discovery is registered
-once — the discovered copy is skipped. Two *different* classes declaring the
+A class both listed in `blocks.types` and found by discovery (or returned by
+a `BlockRegistry::extend()` callback) is registered once — the later copy is
+skipped. Two *different* classes declaring the
 same `kind()` still throw `InvalidArgumentException` naming both classes; the
 registry boots lazily, so that surfaces on the first page render.
 

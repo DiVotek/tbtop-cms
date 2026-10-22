@@ -1,6 +1,6 @@
 import { Renderer } from "@json-render/react";
 import { Component, type FC, type ReactNode } from "react";
-import { type CatalogLike, dropBrokenBlocks, type RenderSpec } from "./blockErrors";
+import { type CatalogLike, dropBrokenBlocks, hasElements, type RenderSpec } from "./blockErrors";
 
 type RegistryComponent = (props: { element: { type: string; props: unknown }; children?: ReactNode }) => ReactNode;
 type Registry = Record<string, RegistryComponent>;
@@ -122,6 +122,9 @@ function guardedRegistry(registry: Record<string, unknown>, showErrors: boolean)
  * renders nothing; with `showErrors` (preview, `app.debug`) it also leaves a console line.
  */
 export function CmsRenderer({ spec, catalog, registry, showErrors }: CmsRendererProps) {
+    if (!hasElements(spec)) {
+        return null;
+    }
     const guarded = guardedRegistry(registry, showErrors);
     const { spec: drawable, dropped } = dropBrokenBlocks(spec, catalog, registry);
     if (showErrors) {

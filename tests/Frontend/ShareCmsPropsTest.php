@@ -191,3 +191,21 @@ it('serves a layout link to a scheduled page once its published_at passes', func
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertJsonPath('props.cms.layout.header.0.props.cta.href', '/' . $scheduled->pathFor('en'));
 });
+
+it('shares the draft-preview banner text in the request locale', function (): void {
+    Language::factory()->default()->create(['locale' => 'en']);
+    Language::factory()->create(['locale' => 'uk']);
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About', 'uk' => 'Pro nas'],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/' . $page->pathFor('en'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.cms.strings.previewBanner', 'Draft preview — this page is not published.');
+    $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
+        ->assertOk()
+        ->assertJsonPath('props.cms.strings.previewBanner', __('tbtop-cms::pages.preview.banner', [], 'uk'));
+});

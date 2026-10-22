@@ -41,10 +41,16 @@ return [
         'no_error' => '—',
         'empty_payload' => '(empty payload)',
     ],
+    'errors' => [
+        'retry_unfinished' => 'Retry did not finish.',
+        'page_missing' => 'Page no longer exists.',
+        'block_missing' => 'Form block no longer exists on the page.',
+    ],
     'actions' => [
         'close' => 'Back to inbox',
         'retry' => 'Retry',
         'retried' => 'Submission retried successfully',
+        'already_retrying' => 'This submission is already being retried or no longer needs a retry',
         'mark_processed' => 'Mark processed',
         'marked_processed' => 'Marked as processed',
         'mark_processed_bulk_title' => 'Mark selected as processed?',

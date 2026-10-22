@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Tbtop\Admin\Dsl\RelationSearchLimit;
-use Tbtop\Admin\I18n\LocaleService;
 use Tbtop\Admin\I18n\TranslatableValue;
 use Tbtop\Cms\Admin\Pages\Support\EditorLocales;
 use Tbtop\Cms\Language\Languages;
@@ -21,10 +20,30 @@ final class LinkPageSearchController
     public function __invoke(Request $request): JsonResponse
     {
         if ($request->has('value')) {
-            return $this->resolveByValue((string) $request->input('value', ''));
+            $value = self::scalarInput($request, 'value');
+
+            return $value === null
+                ? response()->json(['option' => null])
+                : $this->resolveByValue($value);
         }
 
-        return $this->search((string) $request->input('search', ''));
+        $search = self::scalarInput($request, 'search');
+
+        return $search === null
+            ? response()->json(['options' => []])
+            : $this->search($search);
+    }
+
+    /** The input as a string, '' when absent, null when it is an array (nothing can match it). */
+    private static function scalarInput(Request $request, string $key): ?string
+    {
+        $raw = $request->input($key);
+
+        if ($raw === null) {
+            return '';
+        }
+
+        return is_scalar($raw) ? (string) $raw : null;
     }
 
     private function resolveByValue(string $value): JsonResponse
@@ -39,7 +58,7 @@ final class LinkPageSearchController
         $query = self::query();
 
         if ($search !== '') {
-            PageNameSearch::apply($query, $search, [LocaleService::defaultContentLocale()]);
+            PageNameSearch::apply($query, $search, [self::defaultLocale()]);
         }
 
         $options = $query->limit(RelationSearchLimit::resolve())->get()
@@ -68,13 +87,37 @@ final class LinkPageSearchController
     private static function toOption(Page $page): array
     {
         $raw = $page->getRawOriginal('name') ?? $page->name;
-        $label = TranslatableValue::pick($raw);
 
         return [
             'value' => (string) $page->getKey(),
-            'label' => is_scalar($label) ? (string) $label : '',
+            'label' => self::label($raw),
             'names' => self::names($raw),
         ];
+    }
+
+    /** The name in the CMS default language, else the package-wide first-non-empty pick. */
+    private static function label(mixed $raw): string
+    {
+        $map = TranslatableValue::asLocaleMap($raw);
+        $default = is_array($map) ? ($map[self::defaultLocale()] ?? null) : null;
+
+        if (is_string($default) && trim($default) !== '') {
+            return $default;
+        }
+
+        $picked = TranslatableValue::pick($raw);
+
+        return is_scalar($picked) ? (string) $picked : '';
+    }
+
+    /**
+     * The CMS default language, not LocaleService::defaultContentLocale():
+     * tbtop-admin.content_locales is only populated by SyncContentLocales,
+     * which this route does not run, so that one reads 'en' on any site.
+     */
+    private static function defaultLocale(): string
+    {
+        return app(Languages::class)->defaultLocale();
     }
 
     /** @return array<string, string> */
@@ -83,9 +126,8 @@ final class LinkPageSearchController
         $map = TranslatableValue::asLocaleMap($raw);
         $names = [];
 
-        // CMS languages, not tbtop-admin.content_locales: that config is only
-        // populated by SyncContentLocales, which this route does not run.
-        foreach (EditorLocales::list(app(Languages::class)->defaultLocale()) as $locale) {
+        // CMS languages, not tbtop-admin.content_locales: see defaultLocale().
+        foreach (EditorLocales::list(self::defaultLocale()) as $locale) {
             $text = is_array($map) ? ($map[$locale] ?? null) : null;
 
             if (is_string($text) && trim($text) !== '') {

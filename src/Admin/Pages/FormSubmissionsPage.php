@@ -99,10 +99,16 @@ class FormSubmissionsPage extends AdminPage
                     ]),
                 Column::make('created_at')->label(__('tbtop-cms::form-submissions.columns.submitted'))
                     ->datetime(__('tbtop-cms::form-submissions.date_format'))->muted(),
-                // Not shown by default — projected raw purely so retry's
-                // hiddenIf() can read it: a row carries only declared columns.
+                // Not shown by default — the raw delivery value, for anyone
+                // who toggles it on.
                 Column::make('status')->label(__('tbtop-cms::form-submissions.columns.delivery'))
                     ->toggleable(true, hiddenByDefault: true),
+                // Never shown, not toggleable — projected purely so retry's
+                // hiddenIf() can read it (a row carries only declared
+                // columns). Server-computed: staleness needs the clock.
+                Column::make('retryable')->label(__('tbtop-cms::form-submissions.actions.retry'))
+                    ->formatUsing(static fn (mixed $value, FormSubmission $row): string => SubmissionRetrier::isRetryable($row) ? 'yes' : 'no')
+                    ->toggleable(false, hiddenByDefault: true),
             ])
             ->tabs($this->tabs())
             ->filters($this->filters($s))
@@ -270,20 +276,30 @@ class FormSubmissionsPage extends AdminPage
 
     private function retryAction(S $s): ActionBuilder
     {
-        // With no delivery column formatting the row, status reaches the
-        // client as the raw enum value — hiddenIf compares against it
-        // directly (no more coupling to the translated label).
+        // Failed, or Pending/Processing left stale by a dead worker — see
+        // SubmissionRetrier::isRetryable() and the retryable column.
         return $s->action('retry')->label(__('tbtop-cms::form-submissions.actions.retry'))
             ->handle($this->retry(...), needs: ['row'])
-            ->hiddenIf('status', '!=', SubmissionStatus::Failed->value);
+            ->hiddenIf('retryable', '!=', 'yes');
     }
 
     private function retry(ActionCtx $ctx): Effects
     {
         $submission = FormSubmission::query()->findOrFail((int) $ctx->key());
 
+        // retry() no-ops when it cannot claim the row (not retryable, or a
+        // concurrent retry won the claim): nothing ran, so nothing to audit.
+        if (! SubmissionRetrier::isRetryable($submission)) {
+            return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.already_retrying'), 'info')->refreshTable();
+        }
+
         app(SubmissionRetrier::class)->retry($submission);
         $submission->refresh();
+
+        if (in_array($submission->status, [SubmissionStatus::Pending, SubmissionStatus::Processing], true)) {
+            return Effects::make()->notify(__('tbtop-cms::form-submissions.actions.already_retrying'), 'info')->refreshTable();
+        }
+
         $this->logSubmission(
             $submission,
             'delivery_retried',

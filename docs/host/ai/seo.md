@@ -79,10 +79,13 @@ Field-by-field:
   (routing, not `noindex`) — this flag only covers a *live* page an editor
   marked non-indexable, or a site-wide indexing kill switch.
 - **hreflang alternates** — one absolute URL per frontend-active locale for
-  which the page has a slug (`Page::pathFor()`), built the same way the
-  sitemap builds its per-locale `loc` (`SitemapEntryBuilder::alternates()`
-  mirrors this exactly, including the canonical-override exclusion below).
-  `xDefault` points at the default locale's alternate, if present.
+  which the page has a slug (`Page::pathFor()`), minus any locale
+  canonicalized away (its `seo.canonical` override names a different URL —
+  the sitemap's exclusion rule below). `SeoAlternates::forPage()` owns the
+  list; the sitemap reads the same one (`SeoResolver::alternates()`), so head
+  and sitemap always agree. `xDefault` points at the default locale's
+  alternate, if present (`null` when that locale is canonicalized away), and
+  `ogLocaleAlternates` is derived from the same filtered list.
 - **robots (meta)** — driven by `noindex` only; there is no separate
   `robots` field beyond that boolean (rendered as `<meta name="robots"
   content="noindex">` when true, omitted otherwise). The same verdict also
@@ -455,7 +458,9 @@ per locale — any locale whose `seo.canonical` override resolves to a
 different URL than that locale's own sitemap address
 (`SeoResolver::validCanonicalOverride()`, same check `canonical` uses). A
 canonical that merely restates the same URL (trailing-slash/case cosmetic
-differences only) does **not** exclude the locale.
+differences only) does **not** exclude the locale. The rule lives in
+`SeoAlternates`; the page head's `alternates`/`xDefault`/`ogLocaleAlternates`
+leave out the same locales.
 
 ## robots.txt
 
@@ -552,8 +557,8 @@ client component `resources/js/cms/admin/seoChecklist.tsx`, needs
   locale) — presence of the keyword in the **rendered** title, rendered
   description, `heading`, and slug. `focus_keyword` itself warns when empty.
 - **duplicate_title / duplicate_description** — compares this page's rendered
-  title/description against every other page's rendered title/description
-  (via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
+  title/description against every other non-error page's rendered
+  title/description (drafts included; via `renderedTitle()`/`renderedDescription()`, breadcrumbs resolved
   lazily only if the template uses `{parent}`) — `warn` on a collision,
   including collisions a template that omits `{title}`/`{description}` can
   create even between pages with distinct own values. Empty short-circuits
@@ -582,7 +587,9 @@ issue count), each holding a list of that page's issues.
 
 **Daily snapshots** (`tbtop_seo_audit_snapshots`, one row per calendar day,
 `Tbtop\Cms\Seo\Models\SeoAuditSnapshot`) back the Overview sparklines and
-history chart. `php artisan cms:seo:snapshot` runs the audit and
+history chart. `issue_counts` is keyed by the stable issue key
+(`missing_title`, `duplicate_description`, …), never the translated label, so
+rows written in different locales stay comparable. `php artisan cms:seo:snapshot` runs the audit and
 upserts/updates today's row via `SeoAuditSnapshotWriter` — it is **not**
 auto-scheduled by the package, so a host wanting daily history needs its own
 cron entry for it. As a fallback so history still accumulates without cron,
@@ -636,7 +643,7 @@ Response` always returns a response, in three fallback layers:
    a `BreadcrumbList`/`WebPage` would claim "Home › 404" lives at the home
    URL.
 2. Missing/unpublished page (e.g. seeder not run yet): the same `Cms/Page`
-   component with `render: []` and `page.heading` from
+   component with an empty `render` spec (a root with no children) and `page.heading` from
    `tbtop-cms::errors.{4xx,5xx}.heading` — never Laravel's stock error view.
 3. **5xx only**: if rendering the page itself throws, a static Blade view
    (`resources/views/errors/fallback.blade.php`) with no DB/Inertia/Settings
@@ -657,10 +664,14 @@ throws `NotFoundHttpException` like any other route, so it goes through this
 same registration and obeys every gate above — `errors.handle = false` leaves
 the CMS's own not-found handling to stock Laravel too.
 
-**Maintenance mode**: a `503` served by Laravel's maintenance screen (`php
-artisan down`) happens before the framework boots the request pipeline —
-this package's exception handler registration is never reached, so a
-maintenance page is unaffected by any of the above.
+**Maintenance mode**: a plain `php artisan down` is enforced by Laravel's
+`PreventRequestsDuringMaintenance` middleware, which throws a `503`
+`HttpException` through the exception handler — so, with `503` in
+`tbtop-cms.errors.statuses` (the default) and `app.debug` off, frontend
+requests get the seeded 5xx error page above. Only `--render=<view>`
+(answered from `public/index.php` before the framework boots) and
+`--redirect` (a redirect, not an exception) bypass this package. To keep Laravel's own maintenance
+screen without `--render`, drop `503` from `tbtop-cms.errors.statuses`.
 
 ## Redirects, briefly
 

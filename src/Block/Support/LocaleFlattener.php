@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Block\Support;
 
+use Tbtop\Cms\Support\BlankValue;
+
 class LocaleFlattener
 {
     /**
@@ -43,7 +45,7 @@ class LocaleFlattener
         }
 
         if (self::isLocaleMap($data, $locale, $fallback, $locales, $fieldIsTranslatable)) {
-            return $data[$locale] ?? $data[$fallback] ?? null;
+            return self::pick($data, $locale, $fallback);
         }
 
         if (array_is_list($data)) {
@@ -76,6 +78,25 @@ class LocaleFlattener
         }
 
         return $out;
+    }
+
+    /**
+     * The first non-blank of the active and the fallback locale: the editor
+     * saves '' (or an empty richtext document) for a locale it showed, which
+     * must not shadow the default-locale value. When both are blank the
+     * active value stands, as before.
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    private static function pick(array $data, string $locale, string $fallback): mixed
+    {
+        foreach ([$locale, $fallback] as $candidate) {
+            if (! BlankValue::is($data[$candidate] ?? null)) {
+                return $data[$candidate];
+            }
+        }
+
+        return $data[$locale] ?? $data[$fallback] ?? null;
     }
 
     /**

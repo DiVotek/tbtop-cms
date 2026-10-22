@@ -25,7 +25,7 @@ use Tbtop\Cms\Settings\Settings;
  * og:image) the same way, straight from one Page query's already-hydrated
  * columns.
  *
- * @phpstan-type Issue array{severity: 'warn'|'fail', issue: string, pageId: int, page: string, locale: string, detail: string, sortKey: string}
+ * @phpstan-type Issue array{severity: 'warn'|'fail', key: string, issue: string, pageId: int, page: string, locale: string, detail: string, sortKey: string}
  */
 final class SeoAudit
 {
@@ -322,6 +322,7 @@ final class SeoAudit
 
         return [
             'severity' => $severity,
+            'key' => $issueKey,
             'issue' => __('tbtop-cms::seo_report.issues.' . $issueKey . '.label'),
             'pageId' => $pageId,
             'page' => $page,

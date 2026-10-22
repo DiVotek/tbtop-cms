@@ -65,7 +65,9 @@ final readonly class FormSubmissionRecipients
             $chatIds = ChatIds::parse($settings->get('notifications.telegram.chat_ids'));
             $telegramMisconfigured = ! is_string($token) || trim($token) === '' || $chatIds === [];
 
-            foreach ($chatIds as $chatId) {
+            // Without a token every chat send would fail with the same error
+            // the misconfigured flag already reports once.
+            foreach ($telegramMisconfigured ? [] : $chatIds as $chatId) {
                 $recipients[] = new Recipient(Audience::Staff, $locale, phone: $chatId);
             }
         }

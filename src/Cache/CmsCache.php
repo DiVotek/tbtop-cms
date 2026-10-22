@@ -21,6 +21,9 @@ final class CmsCache
 {
     private const string VERSION_KEY = 'tbtop-cms:content-version';
 
+    /** Ten years, as DatabaseStore::forever(). */
+    private const int VERSION_SEED_TTL = 315360000;
+
     private ?int $version = null;
 
     /**
@@ -106,13 +109,17 @@ final class CmsCache
      * (e.g. database) return false instead of seeding the key when it
      * doesn't exist yet. Atomically seed zero in that case, then retry the
      * increment; a concurrent initializer winning add() is harmless.
+     *
+     * The seed TTL is the ten years DatabaseStore::forever() uses: add() has
+     * no atomic "forever", and PHP_INT_MAX would overflow the store's
+     * time() + seconds expiration column.
      */
     public function bump(): void
     {
         $store = $this->store();
 
         if ($store->increment(self::VERSION_KEY) === false) {
-            $store->add(self::VERSION_KEY, 0, PHP_INT_MAX);
+            $store->add(self::VERSION_KEY, 0, self::VERSION_SEED_TTL);
             $store->increment(self::VERSION_KEY);
         }
 

@@ -187,6 +187,30 @@ describe("LinkForm page picker", () => {
 		expect(onChange).toHaveBeenCalledWith({ type: "page", page: "7", value: null, anchor: "how", label: null });
 	});
 
+	it("says so when the search finds no page, in the text the server sent", async () => {
+		const post = mock(async () => ({ options: [] }));
+		const { getByRole, getByText } = renderForm({
+			value: { type: "page", page: null, value: null, anchor: null, label: null },
+			options: { searchEndpoint: ENDPOINT, pageEmpty: "Сторінок не знайдено." },
+			client: stubClient(post as unknown as AdminClient["post"]),
+		});
+
+		fireEvent.click(getByRole("button"));
+
+		await waitFor(() => expect(getByText("Сторінок не знайдено.")).toBeTruthy());
+	});
+
+	it("names the page search input for assistive tech", async () => {
+		const { getByRole, findByLabelText } = renderForm({
+			value: { type: "page", page: null, value: null, anchor: null, label: null },
+			options: { searchEndpoint: ENDPOINT, pageSearchLabel: "Пошук сторінки" },
+		});
+
+		fireEvent.click(getByRole("button"));
+
+		expect((await findByLabelText("Пошук сторінки")).tagName).toBe("INPUT");
+	});
+
 	it("flags an anchor carrying a hash", () => {
 		const { getByRole } = renderForm({
 			value: { type: "page", page: "7", value: null, anchor: "#how", label: null },

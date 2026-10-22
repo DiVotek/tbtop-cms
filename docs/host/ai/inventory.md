@@ -69,9 +69,9 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 |---|---|---|---|
 | `cms:install` | `{--force : Overwrite published config files} {--skip-migrations : Do not run database migrations}` | Publish config, run migrations, seed default languages and home page, rebuild the page references index | No |
 | `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks; `page_type_pairs` — stored pages whose `type` is a subtype key or whose `subtype` is not a registered subtype of their `type`, per pair with a count and the first ids, trashed included; `page_subtype_bases` — subtypes whose `base()` is unregistered or itself a subtype; `unknown_schema_types` — page types whose `schemaTypes()` list a key `SchemaTypeRegistry` does not know, which the page skips). Exit 1 only on an error-level check | No |
-| `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access | No |
+| `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access (a new user needs a valid email) | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
-| `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
+| `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses the protected owner; a user with no CMS access gets a warning, exit 0) | No |
 | `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `ScheduleWiring::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
 | `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
 | `cms:page-refs:rebuild` | (none) | Recompute `tbtop_page_refs` from every page's (trashed included) type fields of kind `pages` | No |
@@ -113,7 +113,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|
 | DashboardPage | `dashboard` |
 | ProfilePage | `profile` |
-| LoginPage | `login` |
+| LoginPage | `login` — after sign-in redirects to the session's `url.intended` when it is an admin URL on this host, else `dashboard` (wiring.md) |
 | LanguagesPage | `languages` |
 | PagesPage | `pages` |
 | PageEditPage | `pages/{page}/edit` |
@@ -150,6 +150,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
 | `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, which only gates a developer `console.error` line for a block the client could not draw — the page looks the same either way |
+| `strings` | `{previewBanner:string}` | UI text the stock `CmsPage` renders, translated for the request locale; `previewBanner` = `tbtop-cms::pages.preview.banner`, shown when `isPreview` |
 | `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::rememberLive` (TTL capped at the next page schedule transition, since layout page links resolve against the live scope); `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
@@ -166,11 +167,11 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.title` | `string\|null` | translated title, same fallback |
 | `page.heading` | `string\|null` | translated heading, same fallback |
 | `page.summary` | `string\|null` | translated summary, same fallback |
-| `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
+| `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty. A DB error page (`ErrorResponse`) carries its Body the same way; the fallback error page sends `''` |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
 | `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none; typed per type and subtype in `pages.generated.ts` (pages.md, "Page prop types") |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
-| `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
+| `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. `alternates` leaves out a locale canonicalized away, same as the sitemap. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; a non-live ancestor or site root is left out (the page itself never is); `[]` when fewer than two crumbs remain (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
 | `path` | `string` | requested path |
 | `isPreview` | `bool` | true when the page is not live (draft/scheduled/expired) and the viewer has preview access |
@@ -204,7 +205,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
 | `HasForm` (trait, opt-in on a `HandlesFormSubmission` block) | `src/Form/HasForm.php` | `formName(): string` (default `kind()`) | Registers the form by name in `Forms` (`Cms::forms()`), so a template posts to it from any page |
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
-| `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms) |
+| `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms). `label()` is the option label in the settings channel picker (built-ins: `tbtop-cms::notifications.channels.{key}`, Email/Telegram/Bell); `send()` gets `Rendered::$subject` as plain text (entities decoded once by `TemplateRenderer`) |
 | `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `DatabaseTemplateStore` (backed by `tbtop_notification_templates`, strict locale match, no fallback) |
 | `HealthCheck` | `src/Health/HealthCheck.php` | `id(): string`, `run(): HealthCheckResult` | One diagnostic check; must not throw |
 | `LogsCmsActivity` (trait) | `src/Audit/Concerns/LogsCmsActivity.php` | Required: `auditFields(): list<string>`, `auditLabel(): string`. Overridable: `auditMarkerFields()`, `auditBlockFields()` (default `[]`) | Wires Spatie `LogsActivity` plus CMS audit enrichment onto a model |
@@ -353,9 +354,9 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 |---|---|---|
 | `Tbtop\Cms\Cms` (facade `Tbtop\Cms\Facades\Cms`) | `frontendRoutes(): void` | Registers all CMS frontend routes — call from a `web`-middleware route file |
 | | `resolve(string $path, ?string $locale = null): ?Page` | Resolves a path to a `Page` for the given/current locale |
-| | `url(Page $page, ?string $locale = null): string` | Builds the absolute frontend URL for a page in a locale |
+| | `url(Page $page, ?string $locale = null): string` | Builds the root-relative frontend path for a page in a locale (`/about`, `/uk/about`); wrap in `url()` for an absolute URL |
 | | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, non-live ancestors and a non-live home left out, `[]` for home or when fewer than two crumbs remain |
-| | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
+| | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (empty `render` spec) → (5xx only) static Blade view if rendering throws |
 | | `forms(): Forms` | The `HasForm` forms by name (blocks.md "Forms reachable from any page") |
 | | `referencedBy(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<Page>` | Live pages whose page-type `pages` field `$field` picks `$page` (only type/subtype `$from` when given), by `sort_order` then name; `[]` for a null page (pages.md "Page references") |
 | | `referencedByLinks(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<{id, name, url}>` | `referencedBy()` as the `{id, name, url}` list a `pages` field resolves to |

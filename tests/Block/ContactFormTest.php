@@ -38,3 +38,29 @@ it('does nothing on submit — notifying the team is SubmissionNotifier\'s job, 
 
     Mail::assertNothingSent();
 });
+
+it('defaults blank copy and the field labels in the page locale', function (): void {
+    $props = (new ContactForm)->resolve([
+        'heading' => '',
+        'submitLabel' => '  ',
+    ], new ResolveContext('uk', 'en'));
+
+    expect($props['heading'])->toBe(__('tbtop-cms::forms.contact.heading', [], 'uk'))
+        ->and($props['heading'])->not->toBe('Contact us')
+        ->and($props['submitLabel'])->toBe(__('tbtop-cms::forms.contact.submit', [], 'uk'))
+        ->and($props['successMessage'])->toBe(__('tbtop-cms::forms.contact.success', [], 'uk'))
+        ->and(array_column($props['fields'], 'label'))->toBe([
+            __('tbtop-cms::forms.contact.fields.name', [], 'uk'),
+            __('tbtop-cms::forms.contact.fields.email', [], 'uk'),
+            __('tbtop-cms::forms.contact.fields.message', [], 'uk'),
+        ]);
+});
+
+it('keeps the English defaults for an English page', function (): void {
+    $props = (new ContactForm)->resolve([], new ResolveContext('en', 'en'));
+
+    expect($props['heading'])->toBe('Contact us')
+        ->and($props['submitLabel'])->toBe('Send')
+        ->and($props['successMessage'])->toBe('Thanks, we will be in touch.')
+        ->and(array_column($props['fields'], 'label'))->toBe(['Name', 'Email', 'Message']);
+});
