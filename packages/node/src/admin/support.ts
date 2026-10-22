@@ -1,6 +1,7 @@
 import { type ActionCtx, Effects, Field, S } from "@tbtop/admin";
 import type { BlockRegistry } from "../blocks/registry";
 import type { Placement } from "../blocks/catalog";
+import { rowProblem } from "../blocks/resolver";
 import type { Cms } from "../cms";
 import type { Site } from "../site";
 import { type Dict, isDict } from "../support/values";
@@ -121,6 +122,8 @@ export type BlockTabsOptions = {
 	 */
 	skipsValidation: boolean;
 	sharedNames?: Map<number, string>;
+	/** Rows the site skips, by id (rowProblems): listed under Problem blocks instead of a tab. */
+	problems?: Map<string, string>;
 };
 
 /**
@@ -135,10 +138,12 @@ export function blockTabs(
 ): { label: string; badge?: string; body: unknown }[] {
 	const blocks = cms.config.blocks;
 	const tabs: { label: string; badge?: string; body: unknown }[] = [];
+	const problems = options.problems ?? new Map<string, string>();
 	for (const row of rows) {
 		const id = row.id as string;
 		const kind = row.kind as string;
-		if (!blocks.has(kind)) {
+		// A row the site skips has no tab: the Problem blocks tab lists it (PageEditBlockTabs::build).
+		if (!blocks.has(kind) || problems.has(id)) {
 			continue;
 		}
 		const label = blocks.get(kind).label;
@@ -155,22 +160,48 @@ export function blockTabs(
 				s.boolean(`block_${id}_active`).label("Active"),
 				s.number(`block_${id}_sort`).label("Sort").rules("nullable|integer"),
 			]),
-			s.row([
-				s
-					.action(`blockRemove_${id}`)
-					.label("Remove block")
-					.color("danger")
-					.confirm("Remove this block?", "Its content is deleted when you confirm.")
-					.withoutValidation(options.skipsValidation)
-					.handle(async (ctx) => {
-						return (await options.save(ctx, rowsFromForm(blocks, rows, ctx.form as Dict).filter((r) => r.id !== id))) ?? options.back;
-					}, ["form"]),
-			]),
+			s.row([removeAction(s, cms, rows, id, options)]),
 		]);
 		tabs.push({ label: shared === null ? label : `${label} · shared`, ...(row.active === false ? { badge: "·" } : {}), body });
 	}
+	if (problems.size > 0) {
+		tabs.push({ label: "Problem blocks", badge: String(problems.size), body: problemsBody(s, cms, rows, problems, options) });
+	}
 	tabs.push({ label: "+ Add block", body: addBlockBody(s, cms, rows, options) });
 	return tabs;
+}
+
+/** BlockRowProblem for each stored row the site skips (an unregistered kind, a missing or mismatched shared block), by row id. */
+export async function rowProblems(site: Site, rows: Dict[]): Promise<Map<string, string>> {
+	const out = new Map<string, string>();
+	for (const row of rows) {
+		const problem = await rowProblem(site, row, row.kind as string);
+		if (problem !== null) {
+			out.set(row.id as string, problem);
+		}
+	}
+	return out;
+}
+
+/** The Problem blocks list (ProblemBlocksAction): what is wrong with each row, and a remove that saves without it. */
+function problemsBody(s: S, cms: Cms, rows: Dict[], problems: Map<string, string>, options: BlockTabsOptions): unknown {
+	return s.stack([
+		s.displayText("The site skips these blocks. Remove them, or register their kind again.").variant("muted"),
+		...[...problems].map(([id, problem]) => s.row([s.displayText(problem), removeAction(s, cms, rows, id, options)])),
+	]);
+}
+
+function removeAction(s: S, cms: Cms, rows: Dict[], id: string, options: BlockTabsOptions) {
+	return s
+		.action(`blockRemove_${id}`)
+		.label("Remove block")
+		.color("danger")
+		.confirm("Remove this block?", "Its content is deleted when you confirm.")
+		.withoutValidation(options.skipsValidation)
+		.handle(async (ctx) => {
+			const kept = rowsFromForm(cms.config.blocks, rows, ctx.form as Dict).filter((row) => row.id !== id);
+			return (await options.save(ctx, kept)) ?? options.back;
+		}, ["form"]);
 }
 
 function addBlockBody(

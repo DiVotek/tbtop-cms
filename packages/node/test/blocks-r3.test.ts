@@ -180,3 +180,21 @@ describe("R3-blocks-5: SEO fields are stored as locale maps", () => {
 		expect((await record(url, "pageEditor")).og_image).toBeNull();
 	});
 });
+
+describe("R3-blocks-11: rows the site skips are listed as problems and can be removed", () => {
+	test("an unknown kind and a missing shared block get no tab, a Problem blocks tab lists them", async () => {
+		const { page, record, action, rows, setRows, ids } = await panel();
+		await setRows(ids.about as number, [
+			{ id: "gone1111", kind: "Gone", active: true, sort: 0, data: {} },
+			{ id: "miss1111", kind: "Hero", active: true, sort: 1, shared: 999 },
+		]);
+		const url = `/admin/pages/${ids.about}/edit`;
+		const props = json((await page(url)).props);
+		expect(props).toContain("Problem blocks");
+		expect(props).toContain("Block kind [Gone] is not registered.");
+		expect(props).toContain("shared block #999, which does not exist");
+		expect(props).not.toContain("Shared block “#999”");
+		await action(url, "blockRemove_gone1111", await record(url, "pageEditor"));
+		expect((await rows(ids.about as number)).map((row) => row.id)).toEqual(["miss1111"]);
+	});
+});

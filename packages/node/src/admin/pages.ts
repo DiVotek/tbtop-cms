@@ -5,7 +5,7 @@ import { PageConflictError } from "../content/pages";
 import { allowsChild, PageRuleError, subtreeIds } from "../content/pageRules";
 import { type Dict, isDict } from "../support/values";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
-import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowsFromForm, siteOf } from "./support";
+import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf } from "./support";
 
 const STATUS = [
 	{ value: "draft", label: "Draft" },
@@ -251,6 +251,7 @@ export function pageEdit(cms: Cms) {
 			const rows = blockRows(page.content);
 			const slugs = await site.pages.slugs.allFor(page.id);
 			const shared = new Map((await site.sharedBlocks.all()).map((block) => [block.id, block.name]));
+			const problems = await rowProblems(site, rows);
 			// Categories (a page under one becomes an article) and parents whose type takes this page's type; never the page itself or its descendants.
 			const own = await subtreeIds(cms.config.db, page.id);
 			const parents = (await site.pages.query().selectAll("tbtop_pages").orderBy("id").execute()).filter(
@@ -274,7 +275,7 @@ export function pageEdit(cms: Cms) {
 						s.tabs([
 							{ label: "General", body: s.stack(generalFields(s, page)) },
 							{ label: "SEO", body: s.stack(seoFields(s, cms, page)) },
-							...blockTabs(s, cms, rows, { placement: "pages", save, back, sharedNames: shared, skipsValidation: page.status !== "published" }),
+							...blockTabs(s, cms, rows, { placement: "pages", save, back, sharedNames: shared, problems, skipsValidation: page.status !== "published" }),
 							{
 								label: "Publishing",
 								body: s.stack([
