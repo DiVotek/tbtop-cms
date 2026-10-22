@@ -7,7 +7,7 @@ const en = [{ locale: "en", name: "English", default: true }];
 
 describe("slugs", () => {
 	test("a taken path gets a numeric suffix; renaming a parent's slug moves its children", async () => {
-		const { cms } = await makeCms({ languages: en, pages: [{ key: "a", type: "category", name: { en: "News" }, children: [{ name: { en: "Item" } }] }] });
+		const { cms } = await makeCms({ languages: en, pages: [{ key: "a", type: "category", name: { en: "News" }, children: [{ type: "article", name: { en: "Item" } }] }] });
 		const site = cms.site();
 		const second = await site.pages.create({ type: "page", name: { en: "News" } });
 		expect(await site.pages.slugs.allFor(second.id)).toEqual({ en: "news-2" });

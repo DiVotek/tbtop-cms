@@ -45,6 +45,7 @@ export class Site {
 			db,
 			async () => (await this.languages.frontendActive()).map((row) => row.locale),
 			() => this.languages.defaultLocale(),
+			pageTypes,
 		);
 		this.layouts = new Layouts(db);
 		this.sharedBlocks = new SharedBlocks(db);

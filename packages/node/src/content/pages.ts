@@ -3,6 +3,8 @@ import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { encodeJson, flag, sqlDate } from "../support/values";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
+import { assertHierarchy } from "./pageRules";
+import { PageTypes } from "./pageTypes";
 import { PageSlugs } from "./slugs";
 
 type PagesQuery = SelectQueryBuilder<CmsDatabase, "tbtop_pages", object>;
@@ -29,6 +31,8 @@ export class Pages {
 		private readonly db: Kysely<CmsDatabase>,
 		frontendLocales: () => Promise<string[]>,
 		defaultLocale: () => Promise<string>,
+		/** The tree rules every write checks; the built-ins when omitted. */
+		private readonly types: PageTypes = new PageTypes(),
 	) {
 		this.slugs = new PageSlugs(db, frontendLocales, defaultLocale);
 	}
@@ -100,7 +104,9 @@ export class Pages {
 		return (await this.ancestors(page)).filter((ancestor) => isLive(ancestor, now));
 	}
 
+	/** Creates a page; the type's tree rules (PageHierarchy) throw PageRuleError. */
 	async create(input: PageInput & { type: string }, options: { slugs?: Record<string, string>; by?: string | number | null } = {}): Promise<Page> {
+		await assertHierarchy(this.db, this.types, { id: null, type: input.type, subtype: input.subtype ?? null, parentId: input.parentId ?? null });
 		const now = sqlDate(new Date());
 		const id = await insertId(
 			this.db,
@@ -124,13 +130,19 @@ export class Pages {
 
 	/**
 	 * Updates a page. With `lockVersion` the write only lands when the row still
-	 * has it (optimistic lock); a stale version throws PageConflictError.
+	 * has it (optimistic lock); a stale version throws PageConflictError. A type
+	 * or parent change re-checks the tree rules (PageRuleError).
 	 */
 	async update(
 		id: number,
 		input: PageInput,
 		options: { slugs?: Record<string, string>; lockVersion?: number; by?: string | number | null } = {},
 	): Promise<Page> {
+		const current = await this.find(id);
+		if (current === null) {
+			throw new PageConflictError(id);
+		}
+		await this.guardUpdate(current, input);
 		let qb = this.db
 			.updateTable("tbtop_pages")
 			.set({
@@ -160,6 +172,16 @@ export class Pages {
 	async delete(id: number): Promise<void> {
 		await this.db.updateTable("tbtop_pages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
 		await this.slugs.remove(id);
+	}
+
+	/** PageObserver::updating's checks, before anything is written. */
+	private async guardUpdate(current: Page, input: PageInput): Promise<void> {
+		const type = input.type ?? current.type;
+		const parentId = input.parentId !== undefined ? input.parentId : current.parentId;
+		const changed = { type: type !== current.type, parent: parentId !== current.parentId };
+		if (changed.type || changed.parent) {
+			await assertHierarchy(this.db, this.types, { id: current.id, type, subtype: input.subtype !== undefined ? input.subtype : current.subtype, parentId }, changed);
+		}
 	}
 
 	private async mustFind(id: number): Promise<Page> {

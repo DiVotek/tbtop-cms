@@ -2,6 +2,7 @@ import { type ActionCtx, Column, definePage, Effects, HttpError, type S, Tab } f
 import type { Cms } from "../cms";
 import { firstText, isLive, type Page, TRANSLATABLE } from "../content/page";
 import { PageConflictError } from "../content/pages";
+import { allowsChild, PageRuleError, subtreeIds } from "../content/pageRules";
 import { type Dict, isDict } from "../support/values";
 import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, rowsFromForm, siteOf } from "./support";
 
@@ -121,8 +122,15 @@ function createAction(s: S, cms: Cms) {
 					if (!cms.pageTypes.has(type)) {
 						return Effects.make().notify("Unknown page type.", "error");
 					}
-					const page = await site.pages.create({ type, name: isDict(form.name) ? form.name : {}, content: [] }, { by: userKey(ctx) });
-					return `${prefix}/pages/${page.id}/edit`;
+					try {
+						const page = await site.pages.create({ type, name: isDict(form.name) ? form.name : {}, content: [] }, { by: userKey(ctx) });
+						return `${prefix}/pages/${page.id}/edit`;
+					} catch (error) {
+						if (error instanceof PageRuleError) {
+							return Effects.make().notify(error.message, "error");
+						}
+						throw error;
+					}
 				}),
 		);
 }
@@ -153,8 +161,10 @@ export function pageEdit(cms: Cms) {
 			const rows = blockRows(page.content);
 			const slugs = await site.pages.slugs.allFor(page.id);
 			const shared = new Map((await site.sharedBlocks.all()).map((block) => [block.id, block.name]));
-			const parents = (await site.pages.query().selectAll("tbtop_pages").where("type", "=", "category").execute()).filter(
-				(row) => Number(row.id) !== page.id,
+			// Parents whose type takes this page's type; never the page itself or its descendants.
+			const own = await subtreeIds(cms.config.db, page.id);
+			const parents = (await site.pages.query().selectAll("tbtop_pages").orderBy("id").execute()).filter(
+				(row) => !own.has(Number(row.id)) && allowsChild(cms.pageTypes, row.type, page.type),
 			);
 			const defaultLocale = await site.languages.defaultLocale();
 			const save = async (ctx: ActionCtx, content: Dict[]) => {
@@ -179,7 +189,7 @@ export function pageEdit(cms: Cms) {
 									s.boolean("is_indexable").label("Search engines may index this page"),
 									s
 										.select("parent_id")
-										.label("Parent category")
+										.label("Parent")
 										.options(parents.map((row) => ({ value: String(row.id), label: firstText(pageLabel(row), ["name"], defaultLocale, defaultLocale) || `#${row.id}` }))),
 									s.number("sort_order").label("Sort order").rules("nullable|integer|min:0"),
 								]),
@@ -210,6 +220,9 @@ export function pageEdit(cms: Cms) {
 						} catch (error) {
 							if (error instanceof PageConflictError) {
 								return Effects.make().notify("Someone else saved this page meanwhile. Reload to see their changes.", "error");
+							}
+							if (error instanceof PageRuleError) {
+								return Effects.make().notify(error.message, "error");
 							}
 							throw error;
 						}
