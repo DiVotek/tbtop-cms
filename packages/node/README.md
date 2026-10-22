@@ -6,8 +6,8 @@ It reads and writes the same `tbtop_*` tables as the PHP package, so a Node
 host can open a database the Laravel package migrated.
 
 The frontend is headless: the host framework (TanStack Start, Hono + React,
-Astro…) asks the CMS for a page's props and renders them, usually with
-json-render's `Renderer` over the block catalog.
+Astro…) asks the CMS for a page's props and renders them. `@tbtop/cms/react`
+has the React half: the SEO head, the block renderer and the built-in blocks.
 
 ## Install (until it is published)
 
@@ -92,6 +92,36 @@ the page request from the route path (see `workbench/src/server/page.ts`).
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone.
 
+## React (`@tbtop/cms/react`)
+
+Peers: `react` 19, `@json-render/core` and `@json-render/react` 0.19. The
+entry has no server code, so it goes into the browser bundle.
+
+```tsx
+import { defineRegistry, JSONUIProvider } from "@json-render/react";
+import { cmsBlocks } from "@tbtop/cms/catalog";
+import { CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
+
+export const catalog = cmsCatalog({ ...cmsBlocks, Faq: faqMeta });
+export const { registry } = defineRegistry(catalog, { components: { ...cmsComponents, Faq } });
+
+// TanStack Start: head: ({ loaderData }) => seoHead(loaderData.seo)
+// Anything else on React 19: <CmsHead seo={props.seo} /> (title, meta and links hoist into <head>)
+<JSONUIProvider registry={registry}>
+	<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={props.isPreview} />
+</JSONUIProvider>;
+```
+
+- `seoTags(seo)` is the framework-neutral list behind both; JSON-LD comes out
+  escaped (`<`, `>`, `&` as `\u00XX`), so a title cannot close the script.
+- `CmsRenderer` drops a block with no component or with props that fail the
+  catalog, and one that throws while rendering; with `showErrors` it says so
+  in the console. Wrap all of a page's specs (header, body, footer) in one
+  `JSONUIProvider`.
+- `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
+  `useCmsForm(action)` is the ContactForm's submit logic for a custom form
+  block: JSON post, field errors, a plain form post without JS.
+
 ## Forms and notifications
 
 A form block declares `submit` in its implementation: the validation rules
@@ -151,6 +181,8 @@ it is ignored with a warning and the built-in template answers.
 - Forms: the submit endpoint, honeypot, stored submissions with D1-safe
   claims, retries, outbox delivery; notifications over mail, Telegram and the
   admin bell with Liquid overrides and a delivery log.
+- React: `@tbtop/cms/react` with the SEO head, the block renderer and the
+  built-in blocks.
 - Admin: pages list and editor (General, SEO, a tab per block, Publishing),
   redirects, layout, shared blocks, languages, site, SEO and notification
   settings, the inbox (list, submission page with status, retry, comments).
@@ -158,8 +190,6 @@ it is ignored with a warning and the built-in template answers.
 ## Not yet
 
 Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
-page revisions, page refs, audit log, 404 log, roles/abilities, caching, the
-React client entry (`@tbtop/cms/react`: the workbench keeps its json-render
-registry and SEO head mapping locally for now), source-backed page types, the
+page revisions, page refs, audit log, 404 log, roles/abilities, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

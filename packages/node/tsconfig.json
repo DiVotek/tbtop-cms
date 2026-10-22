@@ -11,7 +11,8 @@
 		"skipLibCheck": true,
 		"types": ["bun"],
 		"resolveJsonModule": true,
-		"verbatimModuleSyntax": true
+		"verbatimModuleSyntax": true,
+		"jsx": "react-jsx"
 	},
 	"include": ["src", "test", "example"]
 }

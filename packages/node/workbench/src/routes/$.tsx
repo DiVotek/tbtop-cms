@@ -1,7 +1,8 @@
-import { JSONUIProvider, Renderer } from "@json-render/react";
+import { JSONUIProvider } from "@json-render/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { PageProps } from "@tbtop/cms";
-import { registry } from "../blocks/registry";
+import { CmsRenderer, seoHead } from "@tbtop/cms/react";
+import { catalog, registry } from "../blocks/registry";
 import { site } from "../server/cms";
 import { loadCmsPage } from "../server/page";
 
@@ -18,32 +19,6 @@ export const Route = createFileRoute("/$")({
 	head: ({ loaderData }) => (loaderData === undefined ? {} : seoHead(loaderData.seo)),
 	component: CmsPage,
 });
-
-function seoHead(seo: PageProps["seo"]) {
-	return {
-		meta: [
-			{ title: seo.title },
-			{ name: "description", content: seo.description },
-			...(seo.noindex ? [{ name: "robots", content: "noindex" }] : []),
-			{ property: "og:title", content: seo.ogTitle },
-			{ property: "og:description", content: seo.ogDescription },
-			{ property: "og:type", content: seo.ogType },
-			{ property: "og:url", content: seo.ogUrl },
-			...(seo.ogImage === null ? [] : [{ property: "og:image", content: seo.ogImage }]),
-			...(seo.ogLocale === null ? [] : [{ property: "og:locale", content: seo.ogLocale }]),
-			{ name: "twitter:card", content: seo.twitterCard },
-		],
-		links: [
-			{ rel: "canonical", href: seo.canonical },
-			...seo.alternates.map((alternate) => ({ rel: "alternate", hrefLang: alternate.locale, href: alternate.url })),
-			...(seo.xDefault === null ? [] : [{ rel: "alternate", hrefLang: "x-default", href: seo.xDefault }]),
-		],
-		scripts: seo.jsonLd.map((node) => ({ type: "application/ld+json", children: jsonLd(node) })),
-	};
-}
-
-/** The JSON with `<`, `>`, `&` escaped (JSON_HEX_TAG | JSON_HEX_AMP): the router writes it as raw HTML. */
-const jsonLd = (node: unknown) => JSON.stringify(node).replace(/[<>&]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 function CmsPage() {
 	const { page, render, breadcrumbs, isPreview, cms: shared }: PageProps = Route.useLoaderData();
@@ -69,7 +44,7 @@ function CmsPage() {
 				{/* richtextHtml output: the Lexical allowlist, already escaped. */}
 				<div data-testid="page-body" dangerouslySetInnerHTML={{ __html: page.body }} />
 				<JSONUIProvider registry={registry}>
-					<Renderer spec={render} registry={registry} />
+					<CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={isPreview} />
 				</JSONUIProvider>
 			</main>
 		</>

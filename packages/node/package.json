@@ -18,6 +18,10 @@
 			"types": "./dist/catalog.d.ts",
 			"import": "./dist/catalog.js"
 		},
+		"./react": {
+			"types": "./dist/react.d.ts",
+			"import": "./dist/react.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"scripts": {
@@ -32,18 +36,40 @@
 	},
 	"peerDependencies": {
 		"@tbtop/admin": "*",
-		"kysely": "^0.28.0"
+		"kysely": "^0.28.0",
+		"@json-render/core": "^0.19.0",
+		"@json-render/react": "^0.19.0",
+		"react": "^19.0.0"
 	},
 	"devDependencies": {
+		"@happy-dom/global-registrator": "^20.10.6",
+		"@json-render/core": "^0.19.0",
+		"@json-render/react": "^0.19.0",
 		"@tbtop/admin": "file:.tbtop/packages/node",
+		"@testing-library/react": "^16.3.2",
 		"@types/bun": "^1.3.11",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
 		"kysely": "^0.28.2",
 		"kysely-bun-sqlite": "^0.4.0",
-		"typescript": "^5.9.0",
-		"tsup": "^8.5.0"
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1",
+		"tsup": "^8.5.0",
+		"typescript": "^5.9.0"
 	},
 	"files": [
 		"dist",
 		"README.md"
-	]
+	],
+	"peerDependenciesMeta": {
+		"@json-render/core": {
+			"optional": true
+		},
+		"@json-render/react": {
+			"optional": true
+		},
+		"react": {
+			"optional": true
+		}
+	}
 }
