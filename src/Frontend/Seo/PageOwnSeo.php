@@ -23,15 +23,16 @@ final class PageOwnSeo
     /**
      * Meta title, falling back to the editorial title and then the name —
      * name is the only required editorial field, so this is never empty for
-     * a page that has one in this locale.
+     * a page that has one in this locale. The whole chain runs in this
+     * locale before the default one: this locale's name beats the default
+     * language's title, or a translated page ships an untranslated <title>.
      *
      * @param  array<string, mixed>  $seo
      */
     public static function title(Page $page, array $seo, string $locale): string
     {
         return LocalizedSeo::value($seo['title'] ?? null, $locale)
-            ?: (string) PageTranslation::text($page, 'title', $locale, self::fallbackLocale())
-            ?: (string) PageTranslation::text($page, 'name', $locale, self::fallbackLocale());
+            ?: PageTranslation::firstText($page, ['title', 'name'], $locale, self::fallbackLocale());
     }
 
     /**
