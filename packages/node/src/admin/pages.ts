@@ -4,7 +4,7 @@ import { firstText, isLive, type Page, TRANSLATABLE } from "../content/page";
 import { PageConflictError } from "../content/pages";
 import { allowsChild, PageRuleError, subtreeIds } from "../content/pageRules";
 import { type Dict, isDict } from "../support/values";
-import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, rowsFromForm, siteOf } from "./support";
+import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowsFromForm, siteOf } from "./support";
 
 const STATUS = [
 	{ value: "draft", label: "Draft" },
@@ -116,18 +116,18 @@ function createAction(s: S, cms: Cms) {
 			s
 				.form("pageCreate", [
 					s.text("name").label("Name").required().translatable().rules("max:255"),
+					s.text("title").label("Title").translatable().rules("nullable|max:255"),
 					s.select("type").label("Type").options(types).required().default("page"),
 					s.actionsRow([s.action("pageCreateSave").label("Create").color("primary").submit()]),
 				])
 				.onSubmit(async (ctx) => {
-					const site = siteOf(cms, ctx);
 					const form = ctx.form as Dict;
 					const type = String(form.type ?? "page");
 					if (!cms.pageTypes.has(type)) {
 						return Effects.make().notify("Unknown page type.", "error");
 					}
 					try {
-						const page = await site.pages.create({ type, name: isDict(form.name) ? form.name : {}, content: [] }, { by: userKey(ctx) });
+						const page = await createPage(cms, ctx, { type, parentId: null, subtype: null });
 						return `${prefix}/pages/${page.id}/edit`;
 					} catch (error) {
 						if (error instanceof PageRuleError) {
@@ -138,6 +138,69 @@ function createAction(s: S, cms: Cms) {
 				}),
 		);
 }
+
+/** PageFormWriter::save on create: the title falls back to the name, the content starts from the type's template. */
+async function createPage(cms: Cms, ctx: ActionCtx, tree: { type: string; parentId: number | null; subtype: string | null }): Promise<Page> {
+	const form = ctx.form as Dict;
+	const name = isDict(form.name) ? form.name : {};
+	const title = withTitleFallback(name, isDict(form.title) ? form.title : {});
+	const content = templateContent(cms, draftPage({ ...tree, name, title }));
+	return siteOf(cms, ctx).pages.create({ ...tree, name, title, content }, { by: userKey(ctx) });
+}
+
+/** PageFormAttributes::withTitleFallback: per locale, a blank title takes the name. Create only. */
+function withTitleFallback(name: Dict, title: Dict): Dict {
+	const out: Dict = { ...title };
+	for (const [locale, value] of Object.entries(name)) {
+		const current = out[locale];
+		if (typeof value === "string" && value !== "" && (typeof current !== "string" || current === "")) {
+			out[locale] = value;
+		}
+	}
+	return out;
+}
+
+/**
+ * TypeTemplateContent::contentFor: the base type's template() with a fresh id
+ * per block, and active/sort/data defaults the template may leave out. The
+ * frontend renders template() only for a null content, so an admin-made page
+ * starts with the rows instead of `[]`.
+ */
+function templateContent(cms: Cms, page: Page): Dict[] {
+	if (!cms.pageTypes.has(page.type)) {
+		return [];
+	}
+	return (cms.pageTypes.get(page.type).template(page) ?? [])
+		.filter(isDict)
+		.map((block, index) => ({ active: true, sort: index, data: {}, ...block, id: blockId() }));
+}
+
+/** The page about to be created, for template(): PHP passes the unsaved model. */
+const draftPage = (input: Pick<Page, "type" | "parentId" | "subtype" | "name" | "title">): Page => ({
+	id: 0,
+	sourceId: null,
+	status: "draft",
+	publishedAt: null,
+	unpublishAt: null,
+	content: null,
+	fields: null,
+	starterBlocks: null,
+	heading: {},
+	summary: {},
+	body: {},
+	image: null,
+	seo: {},
+	isIndexable: true,
+	isSystem: false,
+	errorClass: null,
+	sortOrder: 0,
+	lockVersion: 0,
+	createdBy: null,
+	updatedBy: null,
+	createdAt: null,
+	updatedAt: null,
+	...input,
+});
 
 const userKey = (ctx: ActionCtx): string | number | null => {
 	const user = ctx.user as { id?: unknown } | null;

@@ -68,3 +68,30 @@ describe("R2-content-7: unparsable dates", () => {
 		expect(page?.unpublishAt?.toISOString()).toBe("2027-01-01T00:00:00.000Z");
 	});
 });
+
+describe("R2-content-8: a new page's title and content", () => {
+	test("the title falls back to the name, and the content starts from the type's template", async () => {
+		const { cms, post } = await panel({
+			pageTypes: [{ key: "landing", template: () => [{ kind: "Hero", data: { title: { en: "Hi" } } }, { kind: "Faq", active: false }] }],
+		});
+		await post("/admin/pages/forms/pageCreate", { name: { en: "Fresh", uk: "Свіжа" }, type: "landing" }, "/admin/pages");
+		const page = await cms.site().pages.query().selectAll().orderBy("id", "desc").executeTakeFirst();
+		const created = await cms.site().pages.find(Number(page?.id));
+		expect(created?.title).toEqual({ en: "Fresh", uk: "Свіжа" });
+		const content = (created?.content ?? []) as Record<string, unknown>[];
+		expect(content.map((row) => [row.kind, row.active, row.sort, row.data])).toEqual([
+			["Hero", true, 0, { title: { en: "Hi" } }],
+			["Faq", false, 1, {}],
+		]);
+		expect(content.every((row) => typeof row.id === "string" && row.id !== "")).toBe(true);
+		expect(new Set(content.map((row) => row.id)).size).toBe(2);
+	});
+
+	test("a type without a template starts with no blocks", async () => {
+		const { cms, post } = await panel();
+		await post("/admin/pages/forms/pageCreate", { name: { en: "Fresh" }, type: "page" }, "/admin/pages");
+		const page = await cms.site().pages.query().selectAll().orderBy("id", "desc").executeTakeFirst();
+		const created = await cms.site().pages.find(Number(page?.id));
+		expect([created?.title, created?.content]).toEqual([{ en: "Fresh" }, []]);
+	});
+});
