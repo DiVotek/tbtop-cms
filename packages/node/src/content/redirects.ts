@@ -65,16 +65,23 @@ export class Redirects {
 
 	/** Validates (see `validate`) and stores a rule; throws RedirectError when it is invalid. */
 	async create(input: RedirectInput): Promise<number> {
-		const rule = await this.validate(input);
+		return this.insert({ ...input, ...(await this.validate(input)) });
+	}
+
+	/**
+	 * Stores a rule as given, the way a PHP seeder or model write does: the
+	 * admin form's checks (`validate`) are not run. For fixtures and imports.
+	 */
+	async insert(rule: RedirectInput): Promise<number> {
 		const now = sqlDate(new Date());
 		return insertId(
 			this.db,
 			this.db.insertInto("tbtop_redirects").values({
-				locale: rule.locale,
-				from_path: rule.fromPath,
-				to_path: rule.toPath,
-				status_code: rule.statusCode,
-				is_auto: flag(input.isAuto ?? false),
+				locale: rule.locale ?? null,
+				from_path: normalizePath(rule.fromPath),
+				to_path: rule.toPath.trim(),
+				status_code: rule.statusCode ?? 301,
+				is_auto: flag(rule.isAuto ?? false),
 				created_at: now,
 				updated_at: now,
 			}),

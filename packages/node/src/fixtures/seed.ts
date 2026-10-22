@@ -158,7 +158,7 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 		}
 	}
 	for (const redirect of fixture.redirects ?? []) {
-		await site.redirects.create({ fromPath: redirect.from, toPath: redirect.to, statusCode: redirect.status ?? 301, locale: redirect.locale ?? null });
+		await site.redirects.insert({ fromPath: redirect.from, toPath: redirect.to, statusCode: redirect.status ?? 301, locale: redirect.locale ?? null });
 	}
 	return ids;
 }

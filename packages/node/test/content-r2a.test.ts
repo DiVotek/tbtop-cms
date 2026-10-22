@@ -247,3 +247,17 @@ describe("SEO settings (R2-content-11)", () => {
 		expect(await settings().get("seo.identity.type")).toBe("local_business");
 	});
 });
+
+describe("R4-fixes-3: fixtures write redirects like a PHP seeder", () => {
+	test("an external target and a redirect over a seeded page path seed without the admin's checks", async () => {
+		const { cms } = await makeCms({
+			languages: [{ locale: "en", name: "English", default: true }],
+			pages: [{ key: "a", name: { en: "About" } }],
+			redirects: [
+				{ from: "old-shop", to: "https://shop.example.com" },
+				{ from: "about", to: "/" },
+			],
+		});
+		expect(await cms.loadPage(new Request("https://site.test/old-shop"))).toEqual({ type: "redirect", status: 301, location: "https://shop.example.com" });
+	});
+});
