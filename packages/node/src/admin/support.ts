@@ -193,7 +193,9 @@ function addBlockBody(
 					}
 					const current = rowsFromForm(blocks, rows, form);
 					const sort = Math.max(-1, ...current.map((row) => row.sort as number)) + 1;
-					await options.save(ctx, [...current, { id: blockId(), kind, active: true, sort, data: {} }]);
+					// Saved inactive (PageEditBlockTabs::handleAdd): the action writes outside Save and a layout has no draft,
+					// so an empty block would go live at once. The editor turns it on once it is filled in.
+					await options.save(ctx, [...current, { id: blockId(), kind, active: false, sort, data: {} }]);
 					return options.back;
 				}, ["form"]),
 		]),

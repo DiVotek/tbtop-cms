@@ -51,6 +51,28 @@ const withBanner = () =>
 const effects = async (res: Response) => ((await res.json()) as { effects: { kind: string; message?: string; level?: string }[] }).effects;
 const json = (value: unknown) => JSON.stringify(value);
 
+describe("R3-blocks-1: a new block is added inactive", () => {
+	test("Add block on a published page stores an inactive row the site does not render", async () => {
+		const { cms, record, action, rows, ids } = await panel();
+		const url = `/admin/pages/${ids.about}/edit`;
+		const res = await action(url, "blockAdd", { ...(await record(url, "pageEditor")), new_block_kind: "Hero" });
+		expect(res.status).toBe(200);
+		const stored = await rows(ids.about as number);
+		expect(stored.map((row) => [row.kind, row.active])).toEqual([["Hero", false]]);
+		const result = await cms.loadPage(get("/about-us"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(json(result.props)).not.toContain('"Hero"');
+	});
+
+	test("Add block in the header layout stores an inactive row", async () => {
+		const { cms, action } = await panel({ blocks: withBanner() });
+		const res = await action("/admin/layout/header", "blockAdd", { new_block_kind: "Banner" });
+		expect(res.status).toBe(200);
+		const header = (await cms.site().layouts.content()).header as Row[];
+		expect(header.map((row) => [row.kind, row.active])).toEqual([["Banner", false]]);
+	});
+});
+
 describe("R3-blocks-3: an inactive block's required fields do not block Save", () => {
 	test("the page editor saves with an empty inactive Hero, and still requires an active one's title", async () => {
 		const { cms, record, post, setRows, ids } = await panel();
