@@ -157,3 +157,34 @@ describe("R3-forms-4: Telegram has a timeout and names the chat in its errors", 
 		expect(await send(notOk)).toBe("Telegram delivery failed: chat 42: Telegram API error (sendMessage): HTTP 200");
 	});
 });
+
+describe("R3-forms-7: Blade overrides in the shared table", () => {
+	const subject = "tpl__form_submission__html__en__subject";
+	const body = "tpl__form_submission__html__en__body";
+	const blade = "@foreach($fields as $k => $v) {{ $k }} @endforeach";
+
+	test("an untouched Blade row from PHP does not block the save and stays as it was", async () => {
+		const { cms, db, page, post: save } = await panel();
+		const now = "2026-10-22 00:00:00";
+		await db
+			.insertInto("tbtop_notification_templates")
+			.values({ type: "form.submission", format: "html", locale: "en", subject: "Lead {{ $name }}", body: blade, created_at: now, updated_at: now })
+			.execute();
+		const url = "/admin/notification-settings";
+		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).notification_settings ?? {};
+		await save(`${url}/forms/notification_settings`, { ...record, mail_from_name: "Shop" }, url);
+		expect(await cms.site().settings.get("mail.from_name")).toBe("Shop");
+		const stored = await db.selectFrom("tbtop_notification_templates").select(["subject", "body"]).execute();
+		expect(stored).toEqual([{ subject: "Lead {{ $name }}", body: blade }]);
+	});
+
+	test("new Blade text is refused, in the body or the subject", async () => {
+		const { cms, db, page, post: save } = await panel();
+		const url = "/admin/notification-settings";
+		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).notification_settings ?? {};
+		await save(`${url}/forms/notification_settings`, { ...record, mail_from_name: "A", [body]: "@php system('id'); @endphp" }, url);
+		await save(`${url}/forms/notification_settings`, { ...record, mail_from_name: "B", [subject]: "{!! $x !!}", [body]: "<p>{{ pageName }}</p>" }, url);
+		expect(await cms.site().settings.get("mail.from_name")).toBeNull();
+		expect(await db.selectFrom("tbtop_notification_templates").select("id").execute()).toHaveLength(0);
+	});
+});

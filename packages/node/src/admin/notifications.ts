@@ -1,7 +1,7 @@
 import { definePage, Effects, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import type { NotificationType } from "../notifications/types";
-import { templateError } from "../notifications/templates";
+import { looksLikeBlade, templateError } from "../notifications/templates";
 import type { Site } from "../site";
 import { sqlDate } from "../support/values";
 import { NAV, siteOf } from "./support";
@@ -69,9 +69,9 @@ export function notificationSettings(cms: Cms) {
 				.onSubmit(async (ctx) => {
 					const target = siteOf(cms, ctx);
 					const form = ctx.form as Record<string, unknown>;
+					const stored = await storedTemplates(target);
 					for (const { type, format, locale } of all) {
-						const body = String(form[bodyField(type.key, format, locale)] ?? "");
-						const error = body.trim() === "" ? null : (templateError(body) ?? templateError(String(form[subjectField(type.key, format, locale)] ?? "")));
+						const error = overrideError(form, type.key, format, locale, stored.get(`${type.key}|${format}|${locale}`));
 						if (error !== null) {
 							return Effects.make().notify(`${type.label}, ${FORMAT_LABELS[format] ?? format} (${locale}): ${error}`, "error");
 						}
@@ -131,6 +131,33 @@ function typeSection(s: S, site: Site, type: AnyType, locales: string[]) {
 	]);
 }
 
+type StoredTemplate = { subject: string; body: string };
+
+async function storedTemplates(site: Site): Promise<Map<string, StoredTemplate>> {
+	const rows = await site.config.db.selectFrom("tbtop_notification_templates").select(["type", "format", "locale", "subject", "body"]).execute();
+	return new Map(rows.map((row) => [`${row.type}|${row.format}|${row.locale}`, row]));
+}
+
+const sameTemplate = (subject: string, body: string, row: StoredTemplate | undefined): boolean =>
+	row !== undefined && row.subject.trim() === subject.trim() && row.body.trim() === body.trim();
+
+/**
+ * Why an editor's text cannot be saved, or null. PHP runs these rows as
+ * Blade, which is code: a Blade row the PHP package wrote may stay as it
+ * is, but none is written from here.
+ */
+function overrideError(form: Record<string, unknown>, type: string, format: string, locale: string, row: StoredTemplate | undefined): string | null {
+	const body = String(form[bodyField(type, format, locale)] ?? "");
+	const subject = String(form[subjectField(type, format, locale)] ?? "");
+	if (body.trim() === "" || sameTemplate(subject, body, row)) {
+		return null;
+	}
+	if (looksLikeBlade(body) || looksLikeBlade(subject)) {
+		return "Blade template from the PHP package; clear it to use Liquid.";
+	}
+	return templateError(body) ?? templateError(subject);
+}
+
 async function record(site: Site, all: { type: AnyType; format: string; locale: string }[]): Promise<Record<string, unknown>> {
 	const out: Record<string, unknown> = {};
 	for (const [field, key] of Object.entries(TAG_SETTINGS)) {
@@ -142,8 +169,7 @@ async function record(site: Site, all: { type: AnyType; format: string; locale: 
 	for (const type of site.notifications.types()) {
 		out[channelsField(type.key)] = await site.notifications.enabledChannels(type.key);
 	}
-	const rows = await site.config.db.selectFrom("tbtop_notification_templates").selectAll().execute();
-	const stored = new Map(rows.map((row) => [`${row.type}|${row.format}|${row.locale}`, row]));
+	const stored = await storedTemplates(site);
 	for (const { type, format, locale } of all) {
 		const row = stored.get(`${type.key}|${format}|${locale}`);
 		out[subjectField(type.key, format, locale)] = row?.subject ?? "";
@@ -176,12 +202,15 @@ async function saveTemplates(site: Site, form: Record<string, unknown>, all: { t
 		const subject = String(form[subjectField(type.key, format, locale)] ?? "").trim();
 		const where = db
 			.selectFrom("tbtop_notification_templates")
-			.select("id")
+			.select(["id", "subject", "body"])
 			.where("type", "=", type.key)
 			.where("format", "=", format)
 			.where("locale", "=", locale);
 		const existing = await where.executeTakeFirst();
 		const now = sqlDate(new Date());
+		if (body.trim() !== "" && sameTemplate(subject, body, existing)) {
+			continue;
+		}
 		if (body.trim() === "") {
 			if (existing !== undefined) {
 				await db.deleteFrom("tbtop_notification_templates").where("id", "=", existing.id).execute();
