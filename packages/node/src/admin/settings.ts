@@ -5,7 +5,7 @@ import { verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
-import { NAV, siteOf } from "./support";
+import { NAV, siteOf, trimmedForm } from "./support";
 
 /** A settings page (SettingsPageBase): form fields mapped to dotted settings keys. */
 function settingsPage(
@@ -42,7 +42,8 @@ function settingsPage(
 					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
 				])
 				.record(record)
-				.onSubmit(async (ctx) => {
+				.onSubmit(async (submitted) => {
+					const ctx = trimmedForm(submitted);
 					const site = siteOf(cms, ctx);
 					const form = { ...(ctx.form as Dict) };
 					const rows = options.rows ?? {};

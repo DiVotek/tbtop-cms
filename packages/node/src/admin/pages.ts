@@ -5,7 +5,7 @@ import { PageConflictError } from "../content/pages";
 import { allowsChild, PageRuleError, subtreeIds } from "../content/pageRules";
 import { type Dict, isDict } from "../support/values";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
-import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf } from "./support";
+import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf, trimmedForm } from "./support";
 
 const STATUS = [
 	{ value: "draft", label: "Draft" },
@@ -135,7 +135,8 @@ function createAction(s: S, cms: Cms, categories: Option[]) {
 					parent,
 					s.actionsRow([s.action("pageCreateSave").label("Create").color("primary").submit()]),
 				])
-				.onSubmit(async (ctx) => {
+				.onSubmit(async (submitted) => {
+					const ctx = trimmedForm(submitted);
 					const form = ctx.form as Dict;
 					const type = String(form.type ?? "page");
 					if (!cms.pageTypes.has(type)) {
@@ -319,7 +320,8 @@ export function pageEdit(cms: Cms) {
 						...seoRecord(page),
 						...blockRecord(cms.config.blocks, rows),
 					})
-					.onSubmit(async (ctx) => {
+					.onSubmit(async (submitted) => {
+						const ctx = trimmedForm(submitted);
 						try {
 							await savePage(cms, ctx, page, rowsFromForm(cms.config.blocks, rows, ctx.form as Dict));
 						} catch (error) {
