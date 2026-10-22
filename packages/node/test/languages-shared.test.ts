@@ -127,3 +127,81 @@ describe("shared blocks", () => {
 		expect((await cms.site().sharedBlocks.find(block.id))?.name).toBe("Theirs");
 	});
 });
+
+describe("languages", () => {
+	test("a new language gets its og_locale from the catalog; a blank one stays blank outside it", async () => {
+		const { cms } = await makeCms({ languages: en, pages: [] });
+		const languages = cms.site().languages;
+		await languages.create({ name: "Deutsch", locale: "de" });
+		await languages.create({ name: "Norsk", locale: "no", isAdminActive: true });
+		await languages.create({ name: "Custom", locale: "xx" });
+		expect(await languages.ogLocale("de")).toBe("de_DE");
+		expect(await languages.ogLocale("no")).toBe("nb_NO");
+		expect(await languages.ogLocale("xx")).toBeNull();
+	});
+
+	test("og_locale must be language_TERRITORY", async () => {
+		const { cms } = await makeCms({ languages: en, pages: [] });
+		const languages = cms.site().languages;
+		await expect(languages.create({ name: "Deutsch", locale: "de", ogLocale: "de-DE" })).rejects.toThrow("language_TERRITORY");
+		const en1 = await languages.find("en");
+		await expect(languages.update(en1?.id ?? 0, { ogLocale: "english" })).rejects.toThrow("language_TERRITORY");
+		await languages.update(en1?.id ?? 0, { ogLocale: "en_GB" });
+		expect(await languages.ogLocale("en")).toBe("en_GB");
+		await languages.update(en1?.id ?? 0, { ogLocale: "" });
+		expect(await languages.ogLocale("en")).toBeNull();
+	});
+
+	test("a language cannot be live on the site while the admin is off; admin off turns the site off", async () => {
+		const { cms } = await makeCms({ languages: en, pages: [] });
+		const languages = cms.site().languages;
+		await expect(languages.create({ name: "Deutsch", locale: "de", isAdminActive: false, isFrontendActive: true })).rejects.toThrow(
+			"cannot be frontend-active without being admin-active",
+		);
+		const de = await languages.create({ name: "Deutsch", locale: "de", isAdminActive: true, isFrontendActive: true });
+		await languages.update(de.id, { isAdminActive: false, isFrontendActive: true });
+		expect(await languages.find("de")).toMatchObject({ is_admin_active: false, is_frontend_active: false });
+		await expect(languages.update(de.id, { isFrontendActive: true })).rejects.toThrow("cannot be frontend-active");
+	});
+
+	test("the default stays admin- and frontend-active", async () => {
+		const { cms } = await makeCms({ languages: en, pages: [] });
+		const languages = cms.site().languages;
+		const en1 = await languages.find("en");
+		await languages.update(en1?.id ?? 0, { isAdminActive: false, isFrontendActive: false });
+		expect(await languages.find("en")).toMatchObject({ is_admin_active: true, is_frontend_active: true });
+	});
+
+	test("re-adding a soft-deleted locale restores its row", async () => {
+		const { cms, db } = await makeCms({ languages: [...en, { locale: "de", name: "Deutsch", ogLocale: "de_AT" }], pages: [] });
+		await db.updateTable("tbtop_languages").set({ deleted_at: "2026-01-01 00:00:00" }).where("locale", "=", "de").execute();
+		const languages = cms.site().languages;
+		languages.forget();
+		expect(await languages.find("de")).toBeNull();
+		const restored = await languages.create({ name: "German", locale: "de", isAdminActive: true });
+		const rows = await db.selectFrom("tbtop_languages").selectAll().where("locale", "=", "de").execute();
+		expect(rows).toHaveLength(1);
+		expect(Number(rows[0]?.id)).toBe(restored.id);
+		expect(rows[0]?.deleted_at).toBeNull();
+		expect(await languages.find("de")).toMatchObject({ name: "German", og_locale: "de_AT", is_admin_active: true });
+	});
+
+	test("the admin add form restores a trashed locale and reports invariant errors", async () => {
+		const { cms, db, post, page } = await panel({ languages: [...en, { locale: "de", name: "Deutsch" }], pages: [] });
+		await db.updateTable("tbtop_languages").set({ deleted_at: "2026-01-01 00:00:00" }).where("locale", "=", "de").execute();
+		const bad = await post(
+			"/admin/languages/new/forms/language",
+			{ name: "Français", locale: "fr", is_admin_active: false, is_frontend_active: true, sort_order: 0 },
+			"/admin/languages/new",
+		);
+		expect(await notice(bad, page, "/admin/languages/new")).toContain("cannot be frontend-active");
+		const ok = await post(
+			"/admin/languages/new/forms/language",
+			{ name: "Deutsch", locale: "de", is_admin_active: true, is_frontend_active: false, sort_order: 1 },
+			"/admin/languages/new",
+		);
+		expect(ok.status).toBeLessThan(400);
+		cms.site().languages.forget();
+		expect((await cms.site().languages.find("de"))?.og_locale).toBe("de_DE");
+	});
+});
