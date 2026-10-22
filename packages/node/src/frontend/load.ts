@@ -97,13 +97,14 @@ function externalLocation(target: string, origin: string): string {
 /**
  * SetLanguage: a default-locale prefix 301s to the bare path; a frontend
  * locale prefix is stripped and picked; anything else is the default locale.
+ * Empty segments stay in the routed path (`blog//post` misses, as in PHP).
  */
 export async function routeLocale(
 	site: Site,
 	url: URL,
 ): Promise<{ type: "redirect"; location: string } | { type: "route"; locale: string; path: string }> {
 	const path = decodePath(url.pathname).replace(/^\/+|\/+$/g, "");
-	const segments = path.split("/").filter((segment) => segment !== "");
+	const segments = path === "" ? [] : path.split("/");
 	const first = segments[0] ?? "";
 	const defaultLocale = await site.languages.defaultLocale();
 	if (first !== "" && first === defaultLocale) {

@@ -58,3 +58,13 @@ describe("stored redirects", () => {
 		expect(followed(await cms.loadPage(get("/tab"))).origin).toBe("https://site.test");
 	});
 });
+
+describe("routing", () => {
+	test("empty path segments are kept, so the slug lookup misses as in PHP (R2-frontend-6)", async () => {
+		const { cms } = await makeCms();
+		expect((await cms.loadPage(get("/blog/first-post"))).type).toBe("page");
+		expect((await cms.loadPage(get("/blog//first-post"))).type).toBe("notFound");
+		expect((await cms.loadPage(get("/blog///first-post"))).type).toBe("notFound");
+		expect((await cms.loadPage(get("/blog/first-post/"))).type).toBe("page");
+	});
+});
