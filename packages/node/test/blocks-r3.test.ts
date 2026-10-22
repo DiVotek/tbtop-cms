@@ -181,6 +181,40 @@ describe("R3-blocks-5: SEO fields are stored as locale maps", () => {
 	});
 });
 
+describe("R3-blocks-6: shared blocks can be placed and made", () => {
+	test("the add tab adds a shared block of a kind by reference, inactive", async () => {
+		const { cms, record, action, rows, ids } = await panel();
+		const shared = (await cms.site().sharedBlocks.all()).find((block) => block.kind === "ContactForm");
+		const url = `/admin/pages/${ids.about}/edit`;
+		const res = await action(url, `blockAddShared_${shared?.id}`, await record(url, "pageEditor"));
+		expect(res.status).toBe(200);
+		const stored = await rows(ids.about as number);
+		expect(stored.map((row) => [row.kind, row.active, row.shared])).toEqual([["ContactForm", false, shared?.id]]);
+	});
+
+	test("Share turns an inline block into a shared one named after the block and the page", async () => {
+		const { cms, record, action, rows, setRows, ids } = await panel();
+		await setRows(ids.about as number, [{ id: "abc12345", kind: "Hero", active: true, sort: 0, data: { title: { en: "Old" } } }]);
+		const url = `/admin/pages/${ids.about}/edit`;
+		const form = { ...(await record(url, "pageEditor")), block_abc12345_title: { en: "Fresh" } };
+		await action(url, "blockShare_abc12345", form);
+		const [row] = await rows(ids.about as number);
+		const made = await cms.site().sharedBlocks.find(Number(row?.shared));
+		expect([made?.name, made?.kind, made?.data]).toEqual(["Hero — About us", "Hero", { title: { en: "Fresh" } }]);
+		expect(row).toEqual({ id: "abc12345", kind: "Hero", active: true, sort: 0, shared: made?.id as number });
+
+		await setRows(ids.about as number, [{ id: "ghi12345", kind: "Hero", active: true, sort: 0, data: { title: { en: "Two" } } }]);
+		await action(url, "blockShare_ghi12345", await record(url, "pageEditor"));
+		const [second] = await rows(ids.about as number);
+		expect((await cms.site().sharedBlocks.find(Number(second?.shared)))?.name).toBe("Hero — About us 2");
+	});
+
+	test("the create modal offers every registered kind, a layout-only one too", async () => {
+		const { page } = await panel({ blocks: withBanner() });
+		expect(json((await page("/admin/shared-blocks")).props)).toContain('"value":"Banner"');
+	});
+});
+
 describe("R3-blocks-11: rows the site skips are listed as problems and can be removed", () => {
 	test("an unknown kind and a missing shared block get no tab, a Problem blocks tab lists them", async () => {
 		const { page, record, action, rows, setRows, ids } = await panel();

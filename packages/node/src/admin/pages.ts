@@ -250,7 +250,8 @@ export function pageEdit(cms: Cms) {
 			const back = `${prefix}/pages/${page.id}/edit`;
 			const rows = blockRows(page.content);
 			const slugs = await site.pages.slugs.allFor(page.id);
-			const shared = new Map((await site.sharedBlocks.all()).map((block) => [block.id, block.name]));
+			const sharedBlocks = await site.sharedBlocks.all();
+			const shared = new Map(sharedBlocks.map((block) => [block.id, block.name]));
 			const problems = await rowProblems(site, rows);
 			// Categories (a page under one becomes an article) and parents whose type takes this page's type; never the page itself or its descendants.
 			const own = await subtreeIds(cms.config.db, page.id);
@@ -275,7 +276,15 @@ export function pageEdit(cms: Cms) {
 						s.tabs([
 							{ label: "General", body: s.stack(generalFields(s, page)) },
 							{ label: "SEO", body: s.stack(seoFields(s, cms, page)) },
-							...blockTabs(s, cms, rows, { placement: "pages", save, back, sharedNames: shared, problems, skipsValidation: page.status !== "published" }),
+							...blockTabs(s, cms, rows, {
+									placement: "pages",
+									save,
+									back,
+									sharedNames: shared,
+									problems,
+									skipsValidation: page.status !== "published",
+									sharing: { blocks: sharedBlocks, owner: firstText(page, ["name"], defaultLocale, defaultLocale) || `#${page.id}` },
+								}),
 							{
 								label: "Publishing",
 								body: s.stack([

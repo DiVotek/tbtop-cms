@@ -64,7 +64,8 @@ export function layoutEdit(cms: Cms) {
 /** Shared blocks (SharedBlocksPage + SharedBlockEditPage). */
 export function sharedBlocksIndex(cms: Cms) {
 	const prefix = adminPrefix(cms);
-	const kinds = cms.config.blocks.forPlacement("pages");
+	// Every registered kind, as SharedBlockForm::kindOptions: a shared block may serve any placement.
+	const kinds = [...cms.config.blocks.all()].sort((a, b) => a.label.localeCompare(b.label));
 	return definePage({
 		path: "shared-blocks",
 		title: "Shared blocks",

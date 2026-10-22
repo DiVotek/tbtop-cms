@@ -3,6 +3,7 @@ import type { BlockRegistry } from "../blocks/registry";
 import type { Placement } from "../blocks/catalog";
 import { rowProblem } from "../blocks/resolver";
 import type { Cms } from "../cms";
+import type { SharedBlock } from "../content/sharedBlocks";
 import type { Site } from "../site";
 import { type Dict, isDict } from "../support/values";
 
@@ -124,6 +125,12 @@ export type BlockTabsOptions = {
 	sharedNames?: Map<number, string>;
 	/** Rows the site skips, by id (rowProblems): listed under Problem blocks instead of a tab. */
 	problems?: Map<string, string>;
+	/**
+	 * The page editor's shared blocks: the add tab offers each one of a placeable
+	 * kind by reference, and every inline tab gets a Share action that names the
+	 * new shared block "{label} — {owner}".
+	 */
+	sharing?: { blocks: SharedBlock[]; owner: string };
 };
 
 /**
@@ -160,7 +167,7 @@ export function blockTabs(
 				s.boolean(`block_${id}_active`).label("Active"),
 				s.number(`block_${id}_sort`).label("Sort").rules("nullable|integer"),
 			]),
-			s.row([removeAction(s, cms, rows, id, options)]),
+			s.row([removeAction(s, cms, rows, id, options), ...(shared === null && options.sharing !== undefined ? [shareAction(s, cms, rows, id, options)] : [])]),
 		]);
 		tabs.push({ label: shared === null ? label : `${label} · shared`, ...(row.active === false ? { badge: "·" } : {}), body });
 	}
@@ -216,6 +223,7 @@ function addBlockBody(
 		return s.displayText("No block kinds are registered for this place.").variant("muted");
 	}
 	return s.stack([
+		...sharedAddRows(s, cms, rows, options),
 		s.select("new_block_kind").label("Block kind").options(kinds.map((block) => ({ value: block.kind, label: block.label }))),
 		s.row([
 			s
@@ -229,12 +237,96 @@ function addBlockBody(
 					if (!blocks.has(kind) || !blocks.get(kind).placements.includes(options.placement)) {
 						return Effects.make().notify("Pick a block kind first.", "error");
 					}
-					const current = rowsFromForm(blocks, rows, form);
-					const sort = Math.max(-1, ...current.map((row) => row.sort as number)) + 1;
-					// Saved inactive (PageEditBlockTabs::handleAdd): the action writes outside Save and a layout has no draft,
-					// so an empty block would go live at once. The editor turns it on once it is filled in.
-					return (await options.save(ctx, [...current, { id: blockId(), kind, active: false, sort, data: {} }])) ?? options.back;
+					return (await options.save(ctx, appendRow(rowsFromForm(blocks, rows, form), { kind, data: {} }))) ?? options.back;
 				}, ["form"]),
 		]),
 	]);
+}
+
+/**
+ * PageEditBlockTabs::handleAdd: the new row goes last, saved inactive. The
+ * action writes outside Save and a layout has no draft, so an empty block
+ * would otherwise go live at once; the editor turns it on once it is filled
+ * in. A shared reference is configured already, but the same rule keeps
+ * "add" from publishing.
+ */
+function appendRow(current: Dict[], row: { kind: string; data: Dict } | { kind: string; shared: number }): Dict[] {
+	const sort = Math.max(-1, ...current.map((entry) => entry.sort as number)) + 1;
+	return [...current, { id: blockId(), active: false, sort, ...row }];
+}
+
+/** The add tab's shared blocks of a placeable kind, each with its own add action (addChoiceAction/addSharedAction). */
+function sharedAddRows(s: S, cms: Cms, rows: Dict[], options: BlockTabsOptions): unknown[] {
+	const blocks = cms.config.blocks;
+	const placeable = (options.sharing?.blocks ?? [])
+		.filter((shared) => blocks.has(shared.kind) && blocks.get(shared.kind).placements.includes(options.placement))
+		.sort((a, b) => a.name.localeCompare(b.name));
+	if (placeable.length === 0) {
+		return [];
+	}
+	return [
+		s.displayText("Add a shared block: its content is edited in one place and shows wherever it is placed.").variant("muted"),
+		...placeable.map((shared) =>
+			s.row([
+				s.displayText(`${shared.name} · ${blocks.get(shared.kind).label}`),
+				s
+					.action(`blockAddShared_${shared.id}`)
+					.label("Add")
+					.withoutValidation(options.skipsValidation)
+					.handle(async (ctx) => {
+						const current = rowsFromForm(blocks, rows, ctx.form as Dict);
+						return (await options.save(ctx, appendRow(current, { kind: shared.kind, shared: shared.id }))) ?? options.back;
+					}, ["form"]),
+			]),
+		),
+		s.displayText("Or add a new block of its own:").variant("muted"),
+	];
+}
+
+/**
+ * PageEditBlockTabs::shareAction: the block's content as it is in the form,
+ * unsaved edits included, becomes a new shared block and the row a
+ * reference to it. A refused page save removes the new shared block again.
+ */
+function shareAction(s: S, cms: Cms, rows: Dict[], id: string, options: BlockTabsOptions) {
+	const blocks = cms.config.blocks;
+	return s
+		.action(`blockShare_${id}`)
+		.label("Share")
+		.confirm("Share this block?", "Its content moves to a new shared block that other pages can place too.")
+		.withoutValidation(options.skipsValidation)
+		.handle(async (ctx) => {
+			const current = rowsFromForm(blocks, rows, ctx.form as Dict);
+			const row = current.find((entry) => entry.id === id && entry.shared === undefined);
+			if (row === undefined || options.sharing === undefined) {
+				return Effects.make().notify("This block is no longer on the page. Reload to see the latest version.", "error");
+			}
+			const store = siteOf(cms, ctx).sharedBlocks;
+			const kind = row.kind as string;
+			const name = await freeSharedName(store, `${blocks.get(kind).label} — ${options.sharing.owner}`);
+			const sharedId = await store.create({ name, kind, data: isDict(row.data) ? row.data : {} });
+			const next = current.map((entry) => (entry.id === id ? { id, kind, active: entry.active, sort: entry.sort, shared: sharedId } : entry));
+			let refused: Effects | void;
+			try {
+				refused = await options.save(ctx, next);
+			} catch (error) {
+				await store.delete(sharedId);
+				throw error;
+			}
+			if (refused !== undefined) {
+				await store.delete(sharedId);
+				return refused;
+			}
+			return Effects.make().notify(`Shared as “${name}”`).redirect(options.back);
+		}, ["form"]);
+}
+
+/** SharedBlocks name for a share: `base`, then "base 2", "base 3"… while taken. */
+async function freeSharedName(store: Site["sharedBlocks"], base: string): Promise<string> {
+	const taken = new Set((await store.all()).map((block) => block.name));
+	let name = base;
+	for (let i = 2; taken.has(name); i++) {
+		name = `${base} ${i}`;
+	}
+	return name;
 }
