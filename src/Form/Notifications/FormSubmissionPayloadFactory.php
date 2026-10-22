@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form\Notifications;
 
+use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Block\HasFieldLabels;
 use Tbtop\Cms\Form\Models\FormSubmission;
 use Tbtop\Cms\Form\Support\LeadIdentity;
 use Tbtop\Cms\Form\Support\SubmissionFieldFormatter;
@@ -27,7 +29,24 @@ final class FormSubmissionPayloadFactory
             actionLabel: __('tbtop-cms::notifications.bell.view', [], $locale),
             leadName: LeadIdentity::name($submission->payload) ?? '',
             leadContact: LeadIdentity::contact($submission->payload) ?? '',
+            fieldLabels: self::fieldLabels($submission, $locale),
         );
+    }
+
+    /** @return array<string, string> */
+    private static function fieldLabels(FormSubmission $submission, string $locale): array
+    {
+        $registry = app(BlockRegistry::class);
+        $block = $registry->has($submission->kind) ? $registry->get($submission->kind) : null;
+        $labels = $block instanceof HasFieldLabels ? $block->fieldLabels($locale) : [];
+
+        $resolved = [];
+        foreach (array_keys($submission->payload) as $key) {
+            $label = $labels[$key] ?? '';
+            $resolved[$key] = trim($label) !== '' ? $label : (string) $key;
+        }
+
+        return $resolved;
     }
 
     private static function pageName(Page $page, string $locale): string

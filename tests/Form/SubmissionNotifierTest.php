@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Tbtop\Admin\Panels\PanelRegistry;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Cms;
@@ -33,6 +34,7 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
+use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingHostChannel;
 use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
@@ -187,7 +189,65 @@ it('sends mail and telegram in the admin default locale and keeps the page local
     Http::assertSent(fn ($request): bool => str_starts_with((string) $request['text'], '<b>New form submission</b>'));
     Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasSubject('New form submission')
         && str_contains($mail->render(), '<strong>Locale:</strong> uk')
-        && str_contains($mail->render(), '<strong>name:</strong> Ада'));
+        && str_contains($mail->render(), '<strong>Name:</strong> Ада'));
+});
+
+function notifierMailOnly(): void
+{
+    Mail::fake();
+    app(Settings::class)->set('notifications.form.submission.channels', ['mail']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+}
+
+function notifierMailHtml(): string
+{
+    $html = '';
+    Mail::assertSent(RenderedMail::class, function (RenderedMail $mail) use (&$html): bool {
+        $html = $mail->render();
+
+        return true;
+    });
+
+    return $html;
+}
+
+it('labels each submitted field in the mail with the form label in the reader\'s locale', function (): void {
+    notifierMailOnly();
+
+    notifierUkrainianSubmission();
+
+    expect(notifierMailHtml())
+        ->toContain('<strong>Name:</strong> Ада')
+        ->toContain('<strong>Email:</strong> ada@example.test')
+        ->toContain('<strong>Message:</strong> Привіт')
+        ->not->toContain('<strong>name:</strong>');
+});
+
+it('labels the fields in Ukrainian for a Ukrainian admin locale', function (): void {
+    app(PanelRegistry::class)->all()['cms']->defaultLocale('uk');
+    notifierMailOnly();
+
+    notifierUkrainianSubmission();
+
+    expect(notifierMailHtml())
+        ->toContain('<strong>Ім’я:</strong> Ада')
+        ->toContain('<strong>Електронна пошта:</strong> ada@example.test')
+        ->toContain('<strong>Повідомлення:</strong> Привіт');
+});
+
+it('keeps the raw payload keys for a form that declares no field labels', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    notifierMailOnly();
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recording'],
+        'content' => [['id' => 'rec-1', 'kind' => 'Recording', 'active' => true, 'data' => []]],
+    ]);
+
+    $this->post(route('tbtop-cms.form.submit', ['locale' => 'en', 'page' => $page->getKey(), 'block' => 'rec-1']), ['value' => 'x'])
+        ->assertRedirect();
+
+    expect(notifierMailHtml())->toContain('<strong>value:</strong> x');
 });
 
 it('labels the bell action instead of showing the raw URL', function (): void {
