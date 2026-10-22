@@ -1,6 +1,9 @@
 import { definePage, Effects, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
-import { BUSINESS_SUBTYPES } from "../seo/identity";
+import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
+import { verification } from "../seo/resolver";
+import { OWNED } from "../seo/robots";
+import type { Site } from "../site";
 import type { Dict } from "../support/values";
 import { NAV, siteOf } from "./support";
 
@@ -16,8 +19,8 @@ function settingsPage(
 		defaults?: Dict;
 		/** Repeater fields stored as trimmed rows of these keys, an empty list included (cleanRows). */
 		rows?: Record<string, string[]>;
-		/** A save-time check on the submitted form: an error message rejects the whole save. */
-		validate?: (form: Dict) => string | null;
+		/** A save-time check that may rewrite the form (normalizeForm + validateForm): an error message rejects the whole save. */
+		prepare?: (form: Dict, site: Site) => string | null | Promise<string | null>;
 	},
 ) {
 	return definePage({
@@ -48,7 +51,7 @@ function settingsPage(
 							form[field] = cleanRows(form[field], keys);
 						}
 					}
-					const rejected = options.validate?.(form) ?? null;
+					const rejected = (await options.prepare?.(form, site)) ?? null;
 					if (rejected !== null) {
 						return Effects.make().notify(rejected, "error");
 					}
@@ -125,7 +128,7 @@ export function siteSettings(cms: Cms) {
 			socials: "site.contacts.socials",
 		},
 		rows: { phones: ["number"], emails: ["address"], socials: ["label", "name", "href"] },
-		validate: socialsComplete,
+		prepare: socialsComplete,
 		fields: (s) => [
 			s.tabs([
 				{
@@ -174,6 +177,100 @@ const IDENTITY = [
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+/** Per-type template fields, keyed as the resolver reads them (SeoSettingsPage::typeTemplateMap). */
+function typeTemplateMap(cms: Cms): Record<string, string> {
+	const map: Record<string, string> = {};
+	for (const type of cms.pageTypes.all()) {
+		for (const slot of ["title", "description"]) {
+			map[`seo_type_${type.key}_${slot}`] = `seo.type_templates.${type.key}.${slot}`;
+		}
+	}
+	return map;
+}
+
+/** SeoSettingsPage::guardRobotsExtra: a line claiming a directive the CMS writes is refused. */
+function robotsExtraError(value: unknown): string | null {
+	if (typeof value !== "string") {
+		return null;
+	}
+	for (const line of value.split(/\r\n|\n|\r/)) {
+		const trimmed = line.trim();
+		if (trimmed === "" || trimmed.startsWith("#")) {
+			continue;
+		}
+		if (OWNED.includes((line.split(":", 1)[0] ?? "").trim().toLowerCase())) {
+			return `The line "${trimmed}" sets a directive this site writes itself. Remove it — User-agent, Allow, Disallow and Sitemap come from the indexing switch and the sitemap setting.`;
+		}
+	}
+	return null;
+}
+
+/** SeoSettingsPage::guardVerification: stores the bare token; input that yields none is refused. */
+function verificationToken(form: Dict, field: string, metaName: string): string | null {
+	const raw = form[field];
+	if (typeof raw !== "string" || raw.trim() === "") {
+		return null;
+	}
+	const token = verification(raw, metaName);
+	if (token === null) {
+		return "This does not look like a verification token or the matching meta tag. Paste the value the search console shows for this exact method — a tag for a different search engine will not work here.";
+	}
+	form[field] = token;
+	return null;
+}
+
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** The identity rules of organisationFields/localBusinessFields that apply to the chosen type. */
+async function identityError(form: Dict, site: Site): Promise<string | null> {
+	const type = typeof form.seo_identity_type === "string" ? form.seo_identity_type : "none";
+	if (!ORGANISATION_TYPES.includes(type)) {
+		return null;
+	}
+	const country = form.seo_identity_country;
+	if (typeof country === "string" && country !== "" && !/^[A-Za-z]{2}$/.test(country)) {
+		return "The country must be a two-letter ISO code.";
+	}
+	if (type !== "local_business") {
+		return null;
+	}
+	const locale = await site.languages.defaultLocale();
+	for (const [field, label] of [["seo_identity_street", "street"], ["seo_identity_locality", "city"]]) {
+		const value = form[field as string];
+		const text = typeof value === "object" && value !== null ? (value as Dict)[locale] : value;
+		if (typeof text !== "string" || text.trim() === "") {
+			return `A local business needs its ${label}.`;
+		}
+	}
+	const rows = Array.isArray(form.seo_identity_opening_hours) ? (form.seo_identity_opening_hours as Dict[]) : [];
+	for (const row of rows) {
+		const days = Array.isArray(row.days) ? row.days : [];
+		if (days.length === 0 || !days.every((day) => DAYS.includes(String(day)))) {
+			return "Each opening hours row needs its days.";
+		}
+		if (!TIME.test(String(row.opens ?? "")) || !TIME.test(String(row.closes ?? ""))) {
+			return "Each opening hours row needs an opening and a closing time (HH:MM).";
+		}
+	}
+	return null;
+}
+
+/** SeoSettingsPage::normalizeForm plus the identity rules: refuses owned robots lines and bad tokens, upper-cases the country. */
+async function prepareSeo(form: Dict, site: Site): Promise<string | null> {
+	const rejected =
+		robotsExtraError(form.seo_robots_extra) ??
+		verificationToken(form, "seo_verification_google", "google-site-verification") ??
+		verificationToken(form, "seo_verification_bing", "msvalidate.01") ??
+		(await identityError(form, site));
+	if (rejected !== null) {
+		return rejected;
+	}
+	if (typeof form.seo_identity_country === "string") {
+		form.seo_identity_country = form.seo_identity_country.toUpperCase();
+	}
+	return null;
+}
+
 export function seoSettings(cms: Cms) {
 	return settingsPage(cms, {
 		path: "settings/seo",
@@ -207,7 +304,9 @@ export function seoSettings(cms: Cms) {
 			seo_identity_opening_hours: "seo.identity.opening_hours",
 			seo_verification_google: "seo.verification.google",
 			seo_verification_bing: "seo.verification.bing",
+			...typeTemplateMap(cms),
 		},
+		prepare: prepareSeo,
 		fields: (s) => [
 			s.tabs([
 				{
@@ -226,6 +325,22 @@ export function seoSettings(cms: Cms) {
 						s.text("seo_title_separator").label("Separator").translatable(),
 						s.text("seo_title_suffix").label("Title suffix").helperText("Appended when there is no template."),
 						s.textarea("seo_default_description").label("Default description").translatable(),
+					],
+				},
+				{
+					label: "Page types",
+					children: [
+						s
+							.displayText(
+								'A type\'s template overrides the site-wide one. An empty field means "same as the site", not an empty title. {parent} is the parent category\'s name and {date} the publication date.',
+							)
+							.variant("muted"),
+						...cms.pageTypes
+							.all()
+							.flatMap((type) => [
+								s.text(`seo_type_${type.key}_title`).label(`Title: ${type.label}`).translatable().rules("nullable|max:255"),
+								s.text(`seo_type_${type.key}_description`).label(`Description: ${type.label}`).translatable().rules("nullable|max:500"),
+							]),
 					],
 				},
 				{
@@ -251,7 +366,7 @@ export function seoSettings(cms: Cms) {
 						s.text("seo_identity_locality").label("City").translatable(),
 						s.text("seo_identity_region").label("Region").translatable(),
 						s.text("seo_identity_postal_code").label("Postal code"),
-						s.text("seo_identity_country").label("Country (ISO code)").rules("nullable|size:2"),
+						s.text("seo_identity_country").label("Country (ISO code)").placeholder("UA"),
 						s.number("seo_identity_latitude").label("Latitude").rules("nullable|numeric|between:-90,90"),
 						s.number("seo_identity_longitude").label("Longitude").rules("nullable|numeric|between:-180,180"),
 						s

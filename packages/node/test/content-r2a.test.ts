@@ -199,3 +199,51 @@ describe("site contact rows (R2-content-10)", () => {
 		expect(await cms.site().settings.get("site.contacts.socials")).not.toEqual([{ name: "Telegram" }]);
 	});
 });
+
+describe("SEO settings (R2-content-11)", () => {
+	const url = "/admin/settings/seo";
+	const save = async (made: Awaited<ReturnType<typeof panel>>, form: Record<string, unknown>) =>
+		made.notice(await made.post(`${url}/forms/settings_seo`, { seo_identity_type: "none", ...form }, url), url);
+
+	test("every page type gets per-type title and description templates the resolver reads", async () => {
+		const made = await panel();
+		const page = JSON.stringify(await made.page(url));
+		expect(page).toContain("seo_type_article_title");
+		expect(page).toContain("seo_type_category_description");
+		await save(made, { seo_type_article_title: { en: "{title} — Journal", uk: "" } });
+		expect(await made.cms.site().settings.get("seo.type_templates.article.title")).toMatchObject({ en: "{title} — Journal" });
+		const result = await made.cms.loadPage(get("/blog/first-post"));
+		expect(JSON.stringify(result)).toContain("First post — Journal");
+	});
+
+	test("a robots line claiming an owned directive is refused", async () => {
+		const made = await panel();
+		expect(await save(made, { seo_robots_extra: "# ok\nCrawl-delay: 5\nDisallow: /secret" })).toContain('The line \\"Disallow: /secret\\" sets a directive');
+		expect(await made.cms.site().settings.get("seo.robots_extra")).toBeNull();
+		await save(made, { seo_robots_extra: "# ok\nCrawl-delay: 5" });
+		expect(await made.cms.site().settings.get("seo.robots_extra")).toBe("# ok\nCrawl-delay: 5");
+	});
+
+	test("verification stores the token from a pasted tag and refuses a tag for another engine", async () => {
+		const made = await panel();
+		await save(made, { seo_verification_google: '<meta name="google-site-verification" content="abc123_-" />' });
+		expect(await made.cms.site().settings.get("seo.verification.google")).toBe("abc123_-");
+		expect(await save(made, { seo_verification_bing: '<meta name="google-site-verification" content="abc" />' })).toContain("does not look like a verification token");
+		expect(await made.cms.site().settings.get("seo.verification.bing")).toBeNull();
+	});
+
+	test("identity: the country is upper-cased and checked; a local business needs street, city and valid hours", async () => {
+		const made = await panel();
+		const settings = () => made.cms.site().settings;
+		await save(made, { seo_identity_type: "organization", seo_identity_country: "de" });
+		expect(await settings().get("seo.identity.address.country")).toBe("DE");
+		expect(await save(made, { seo_identity_type: "organization", seo_identity_country: "D1" })).toContain("two-letter ISO code");
+		const business = { seo_identity_type: "local_business", seo_identity_street: { en: "1 Main St" }, seo_identity_locality: { en: "Kyiv" } };
+		expect(await save(made, { ...business, seo_identity_street: { en: " ", uk: "вул. 1" } })).toContain("needs its street");
+		expect(await save(made, { ...business, seo_identity_opening_hours: [{ days: ["Funday"], opens: "09:00", closes: "18:00" }] })).toContain("needs its days");
+		expect(await save(made, { ...business, seo_identity_opening_hours: [{ days: ["Monday"], opens: "9am", closes: "18:00" }] })).toContain("opening and a closing time");
+		expect(await settings().get("seo.identity.type")).toBe("organization");
+		await save(made, { ...business, seo_identity_opening_hours: [{ days: ["Monday"], opens: "09:00", closes: "18:00" }] });
+		expect(await settings().get("seo.identity.type")).toBe("local_business");
+	});
+});

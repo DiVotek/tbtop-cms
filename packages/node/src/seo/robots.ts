@@ -1,7 +1,8 @@
 import type { Site } from "../site";
 import { indexingEnabled } from "./resolver";
 
-const OWNED = ["user-agent", "allow", "disallow", "sitemap"];
+/** Directives the CMS writes itself (RobotsTxt::OWNED_DIRECTIVES). */
+export const OWNED = ["user-agent", "allow", "disallow", "sitemap"];
 
 const normalize = (path: string): string => {
 	const trimmed = path.trim().replace(/^\/+|\/+$/g, "");
