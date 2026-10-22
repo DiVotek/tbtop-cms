@@ -144,6 +144,9 @@ it('conflicts when editor B saves with the version editor A already superseded',
         ->and($page->getTranslation('name', 'en'))->toBe('A wins');
 
     // B still holds the stale lock_version=0 form and submits it.
+    // B signs in with a fresh session: AuthenticateSession would log out a
+    // session that still holds A's password hash.
+    test()->flushSession();
     test()->actingAs($editorB, 'web')->post(
         "/admin/pages/{$page->id}/edit/forms/pageEditor",
         [...lockingBaseEditPayload(), 'lock_version' => 0, 'name' => ['en' => 'B tries to overwrite']],
