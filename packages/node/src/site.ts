@@ -138,5 +138,9 @@ export class Site {
 
 function pageName(page: Page, locale: string, fallback: string): string | null {
 	const name = firstText(page, ["name"], locale, fallback);
-	return name === "" ? null : name;
+	if (name !== "") {
+		return name;
+	}
+	// TranslatableValue::pick: the first non-blank name in any locale.
+	return Object.values(page.name).find((value): value is string => typeof value === "string" && value.trim() !== "") ?? null;
 }

@@ -68,3 +68,13 @@ describe("routing", () => {
 		expect((await cms.loadPage(get("/blog/first-post/"))).type).toBe("page");
 	});
 });
+
+describe("links", () => {
+	test("a page link's label falls back to the name in any locale (R2-frontend-5)", async () => {
+		const { cms, ids } = await makeCms();
+		const site = cms.site();
+		const id = ids.about ?? 0;
+		await site.pages.update(id, { name: { en: "", uk: "Про нас" } });
+		expect((await site.link({ type: "page", page: id }, "en"))?.label).toBe("Про нас");
+	});
+});
