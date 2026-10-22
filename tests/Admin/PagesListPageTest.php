@@ -9,6 +9,7 @@ use Tbtop\Cms\Admin\Pages\Support\PageForm;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\ErrorClass;
 use Tbtop\Cms\Page\Enums\PageStatus;
+use Tbtop\Cms\Page\Enums\SeoState;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
 use Tbtop\Cms\Page\PageTypeRegistry;
@@ -699,4 +700,61 @@ it('reports an error instead of duplicating a source-backed page via the row act
     $response->assertOk();
     expect(Page::query()->count())->toBe(1)
         ->and(collect($response->json('effects'))->firstWhere('kind', 'notify')['level'] ?? null)->toBe('error');
+});
+
+it('declares the parent, publication status and SEO filters, and no subtype filter', function (): void {
+    $filters = pagesTableNode()['options']['filters'];
+
+    expect(array_column($filters, 'name'))->toBe(['parent_id', 'display_state', 'seo_state']);
+});
+
+it('offers only pages that have children as parent filter options', function (): void {
+    $blog = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
+    Page::create(['type' => 'article', 'parent_id' => $blog->id, 'status' => 'published', 'name' => ['en' => 'Post']]);
+    Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Empty']]);
+
+    $filter = collect(pagesTableNode()['options']['filters'])->firstWhere('name', 'parent_id');
+
+    expect(array_column($filter['options']['options'], 'label'))->toBe(['Blog']);
+});
+
+it('filters the list to the children of the chosen parent', function (): void {
+    $blog = Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
+    $post = Page::create(['type' => 'article', 'parent_id' => $blog->id, 'status' => 'published', 'name' => ['en' => 'Post']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
+
+    $rows = $this->getJson("/admin/pages/tables/pages?tab=all&filters[parent_id]={$blog->id}")->assertOk()->json('data.data');
+
+    expect(array_column($rows, 'id'))->toBe([$post->id]);
+});
+
+it('filters the list by publication status using the computed display state', function (): void {
+    Page::create(['type' => 'page', 'status' => 'draft', 'name' => ['en' => 'Draft one']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'published_at' => now()->addDay(), 'name' => ['en' => 'Scheduled one']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'unpublish_at' => now()->subDay(), 'name' => ['en' => 'Expired one']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'Live one']]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all&filters[display_state]=scheduled')->assertOk()->json('data.data');
+
+    expect(array_column($rows, 'name'))->toBe(['Scheduled one']);
+});
+
+it('keeps a live page with a future unpublish date out of the expired filter', function (): void {
+    Page::create(['type' => 'page', 'status' => 'published', 'unpublish_at' => now()->addDay(), 'name' => ['en' => 'Live one']]);
+    Page::create(['type' => 'page', 'status' => 'published', 'unpublish_at' => now()->subDay(), 'name' => ['en' => 'Expired one']]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all&filters[display_state]=expired')->assertOk()->json('data.data');
+
+    expect(array_column($rows, 'name'))->toBe(['Expired one']);
+});
+
+it('filters the list by SEO state using the computed badge rank', function (): void {
+    $blank = Page::create(['type' => 'page', 'status' => 'draft']);
+    Page::create(['type' => 'page', 'status' => 'draft', 'name' => ['en' => 'Titled'], 'summary' => ['en' => 'Summary']]);
+
+    $rows = $this->getJson('/admin/pages/tables/pages?tab=all&filters[seo_state]=' . SeoState::Fail->value)
+        ->assertOk()
+        ->json('data.data');
+
+    expect(array_column($rows, 'id'))->toBe([$blank->id]);
 });
