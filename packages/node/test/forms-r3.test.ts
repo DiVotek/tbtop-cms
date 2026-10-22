@@ -104,3 +104,28 @@ describe("R3-forms-1: a cross-site post is refused", () => {
 		expect(await rows(db)).toHaveLength(4);
 	});
 });
+
+describe("R3-forms-3: inputs are trimmed and blanks become null, as Laravel's middleware does", () => {
+	test("a padded email validates; padded text is stored trimmed", async () => {
+		const { cms } = await makeCms();
+		const action = await contactAction(cms);
+		const response = await cms.handle(post(action, { name: "  Ada  ", email: " a@b.co ", message: " m \n" }));
+		expect(response?.status).toBe(200);
+		const [row] = await cms.site().submissions.query().select("id").execute();
+		expect((await cms.site().submissions.findOrFail(Number(row?.id))).payload).toEqual({ name: "Ada", email: "a@b.co", message: "m" });
+	});
+
+	test("nested strings are trimmed, an empty one is null, a password keeps its spaces; form data alike", async () => {
+		const { cms } = await makeCms(undefined, withRules({ name: "required|string", phone: "nullable|string", tags: "array", password: "required|string" }));
+		const action = await contactAction(cms);
+		await cms.handle(post(action, { name: " Ada ", phone: "  ", tags: [" a ", ""], password: " secret " }));
+		const form = new URLSearchParams({ name: " Grace​", phone: "", password: " pw " });
+		await cms.handle(new Request(action, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }));
+		const ids = (await cms.site().submissions.query().select("id").orderBy("id").execute()).map((row) => Number(row.id));
+		const payloads = await Promise.all(ids.map(async (id) => (await cms.site().submissions.findOrFail(id)).payload));
+		expect(payloads).toEqual([
+			{ name: "Ada", phone: null, tags: ["a", null], password: " secret " },
+			{ name: "Grace", phone: null, password: " pw " },
+		]);
+	});
+});

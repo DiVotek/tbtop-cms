@@ -38,7 +38,7 @@ export async function submitForm(site: Site, request: Request): Promise<Response
 		return new Response(null, { status: 404 });
 	}
 	const reply = responder(site, request, blockId, await site.pageUrl(page, locale));
-	const input = await readBody(request);
+	const input = cleanInput(await readBody(request));
 	const honeypot = honeypotField(site);
 	if (honeypot !== null && String(input[honeypot] ?? "").trim() !== "") {
 		// Look exactly like success, so a bot's script has nothing to learn; nothing is stored or sent.
@@ -129,6 +129,32 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
 	} catch {
 		return {};
 	}
+}
+
+/** Kept as typed, as Laravel's TrimStrings keeps them. */
+const UNTRIMMED = new Set(["password", "password_confirmation", "current_password"]);
+
+/**
+ * Laravel's TrimStrings + ConvertEmptyStringsToNull, which run before the
+ * PHP controller validates: every string, nested ones too, is trimmed
+ * (zero-width spaces included) and a blank one becomes null.
+ */
+function cleanInput(input: Record<string, unknown>): Record<string, unknown> {
+	return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, clean(value, !UNTRIMMED.has(key))]));
+}
+
+function clean(value: unknown, trim = true): unknown {
+	if (typeof value === "string") {
+		const text = trim ? value.replace(/^[\s\uFEFF\u200B\u200E]+|[\s\uFEFF\u200B\u200E]+$/g, "") : value;
+		return text === "" ? null : text;
+	}
+	if (Array.isArray(value)) {
+		return value.map((item) => clean(item));
+	}
+	if (typeof value === "object" && value !== null) {
+		return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clean(item)]));
+	}
+	return value;
 }
 
 function responder(site: Site, request: Request, blockId: string, pageUrl: string | null) {
