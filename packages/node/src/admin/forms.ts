@@ -1,7 +1,7 @@
 import { type ActionCtx, Column, definePage, Effects, formatPhpDate, HttpError, type S, Tab } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { translationText } from "../content/page";
-import { leadIdentity } from "../forms/lead";
+import { formatField, leadIdentity } from "../forms/lead";
 import { retrySubmission } from "../forms/notifier";
 import { isRetryable, LEAD_STATUSES, type LeadStatus, type Submission, submissionFromRow } from "../forms/submissions";
 import type { Site } from "../site";
@@ -155,8 +155,6 @@ async function retryEffects(site: Site, id: number): Promise<Effects> {
 	return after.status === "handled" ? Effects.make().notify("Delivered") : Effects.make().notify(after.error ?? "Delivery failed.", "error");
 }
 
-const valueText = (value: unknown): string =>
-	value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
 
 /** FormSubmissionPage: payload, delivery, lead-status moves and comments. Opening a New one marks it Read. */
 export function submissionView(cms: Cms) {
@@ -203,7 +201,7 @@ export function submissionView(cms: Cms) {
 				s.section({ title: "Submitted fields", variant: "card" }, [
 					entries.length === 0
 						? s.displayText("The submission has no fields.").variant("muted")
-						: s.stack(entries.map(([key, value]) => row(key, valueText(value)))),
+						: s.stack(entries.map(([key, value]) => row(key, formatField(value)))),
 				]),
 				s.section({ title: "Status", variant: "card" }, [
 					s.flex(

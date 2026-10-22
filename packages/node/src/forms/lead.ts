@@ -5,8 +5,17 @@ const nonEmpty = (value: unknown): string | null => {
 	if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
 		return null;
 	}
-	const text = String(value).trim();
+	const text = scalarText(value).trim();
 	return text === "" ? null : text;
+};
+
+/** PHP's (string) cast: true is "1", false is "". */
+const scalarText = (value: string | number | boolean): string => (typeof value === "boolean" ? (value ? "1" : "") : String(value));
+
+/** mb_substr: cut by code points, so an emoji at the cut is never split. */
+const truncate = (text: string): string => {
+	const chars = Array.from(text);
+	return chars.length > FALLBACK_MAX_LENGTH ? `${chars.slice(0, FALLBACK_MAX_LENGTH - 1).join("")}…` : text;
 };
 
 /**
@@ -26,7 +35,7 @@ export function leadIdentity(payload: Record<string, unknown>): string | null {
 	for (const value of Object.values(payload)) {
 		const text = nonEmpty(value);
 		if (text !== null) {
-			return text.length > FALLBACK_MAX_LENGTH ? `${text.slice(0, FALLBACK_MAX_LENGTH - 1)}…` : text;
+			return truncate(text);
 		}
 	}
 	return null;
@@ -36,6 +45,9 @@ export function leadIdentity(payload: Record<string, unknown>): string | null {
 export function formatField(value: unknown): string {
 	if (value === null || value === undefined) {
 		return "";
+	}
+	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+		return scalarText(value);
 	}
 	return typeof value === "object" ? JSON.stringify(value) : String(value);
 }

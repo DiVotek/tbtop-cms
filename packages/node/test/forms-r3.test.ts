@@ -188,3 +188,23 @@ describe("R3-forms-7: Blade overrides in the shared table", () => {
 		expect(await db.selectFrom("tbtop_notification_templates").select("id").execute()).toHaveLength(0);
 	});
 });
+
+describe("R3-forms-9: field text matches PHP", () => {
+	test("booleans read 1 and empty, false is no lead, and truncation keeps whole characters", async () => {
+		const mail = mailbox();
+		const { cms, table } = await panel({
+			...withRules({ newsletter: "boolean", note: "nullable|string", consent: "accepted" }),
+			notifications: { mail: mail.transport },
+		});
+		const settings = cms.site().settings;
+		await settings.set("notifications.form.submission.channels", ["mail"]);
+		await settings.set("notifications.mail.recipients", "team@example.test");
+		const action = await contactAction(cms);
+		await cms.handle(post(action, { consent: true, newsletter: false }));
+		expect(mail.sent[0]?.html).toContain("<p><strong>consent:</strong> 1</p>");
+		expect(mail.sent[0]?.html).toContain("<p><strong>newsletter:</strong> </p>");
+		await cms.handle(post(action, { newsletter: false, consent: true, note: `${"a".repeat(58)}😀tail` }));
+		const leads = (await table()).map((row) => row.payload).sort();
+		expect(leads).toEqual(["1", `${"a".repeat(58)}😀…`]);
+	});
+});
