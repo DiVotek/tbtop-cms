@@ -68,6 +68,33 @@ function decodePath(path: string): string {
 }
 
 /**
+ * A Location must be a ByteString, and a browser drops tabs and newlines from
+ * a URL, so everything outside printable ASCII is percent-encoded, as are `\`
+ * (folded into `/` by browsers). Escapes already present are kept.
+ */
+function headerSafe(location: string): string {
+	return location.replace(/[^\x21-\x7e]|\\/gu, (char) => {
+		try {
+			return encodeURIComponent(char);
+		} catch {
+			return "%EF%BF%BD";
+		}
+	});
+}
+
+/** An external target: non-ASCII hosts go to punycode and the rest is percent-encoded. */
+function externalLocation(target: string, origin: string): string {
+	if (/^[\x21-\x7e]*$/.test(target)) {
+		return target;
+	}
+	try {
+		return new URL(target, origin).href;
+	} catch {
+		return headerSafe(target);
+	}
+}
+
+/**
  * SetLanguage: a default-locale prefix 301s to the bare path; a frontend
  * locale prefix is stripped and picked; anything else is the default locale.
  */
@@ -112,7 +139,9 @@ export async function loadPage(site: Site, request: Request, options: { preview:
 	if (page === null) {
 		const redirect = await site.redirects.resolve(path, locale);
 		if (redirect !== null) {
-			const target = isExternal(redirect.target) ? redirect.target : await site.url(redirect.target, locale);
+			const target = isExternal(redirect.target)
+				? externalLocation(redirect.target, site.origin)
+				: headerSafe(await site.url(redirect.target, locale));
 			return { type: "redirect", status: redirect.status, location: withQuery(target, url.search) };
 		}
 		return { type: "notFound", status: 404, locale, path, cms: asJson(await sharedProps(site, locale, null)) };
