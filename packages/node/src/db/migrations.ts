@@ -166,6 +166,7 @@ export function baselineMigration(options: MigrationOptions): Migration {
 					.addColumn("submission_id", t.bigint, (c) =>
 						c.notNull().references("tbtop_form_submissions.id").onDelete("cascade"),
 					)
+					.addColumn("user_id", user, (c) => c.notNull())
 					.addColumn("body", "text", (c) => c.notNull()),
 			).execute();
 

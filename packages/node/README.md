@@ -60,7 +60,7 @@ const cms = createCms({
 const result = await cms.loadPage(request);
 // { type: "page", status, headers, props: { page, render, seo, breadcrumbs, path, isPreview, cms } }
 // | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms }
-(await cms.handle(request)) ?? ...; // robots.txt, sitemap.xml, sitemap-N.xml
+(await cms.handle(request)) ?? ...; // robots.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/...
 
 // Admin
 createAdmin({
@@ -82,6 +82,44 @@ the page request from the route path (see `workbench/src/server/page.ts`).
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone.
 
+## Forms and notifications
+
+A form block declares `submit` in its implementation: the validation rules
+(Laravel rule strings, run by the admin validator) and an optional `handle`
+for the host's own work (a CRM call). `ContactForm` ships with rules and no
+handler. The block's props carry `action` and `honeypotField`; post the
+fields there as JSON (`{ ok }`, 422 `{ errors }`, 500 `{ errors: { form } }`)
+or as a plain form (303 back to the page with `cms_form_status`).
+
+```ts
+createCms({
+	// ...
+	forms: {
+		allow: (request) => rateLimit(request), // false answers 429
+		delivery: "inline", // or "outbox": run cms.tasks.deliver() from a cron
+	},
+	notifications: {
+		mail: { send: async (message) => smtp.send(message) }, // { to, from, subject, html, text }
+		telegram: { botToken: env.TELEGRAM_BOT_TOKEN },
+		bell: { store: kyselyNotifications(db), staff: () => staffUsers() },
+	},
+});
+```
+
+Every submission is stored (`forms.store: false` turns that off), then
+notified on the channels the merchant enabled in Settings → Notifications
+(the bell by default). A failed delivery keeps its error on the row and can
+be retried from the inbox; `cms.tasks.deliver()` also picks up rows a dead
+worker left in pending or processing for 15 minutes. Inline delivery runs before
+the visitor gets the answer; on Cloudflare Workers prefer the outbox and call
+`cms.tasks.deliver()` from `scheduled()`. Outside a request, links in notifications use `url` from the
+config, so set it when you deliver from a cron.
+
+Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
+edited per type, format and locale in the notification settings and stored
+in `tbtop_notification_templates`. A row the PHP package wrote holds Blade;
+it is ignored with a warning and the built-in template answers.
+
 ## What 0.0 has
 
 - Schema and one baseline migration equal to the PHP migrations (SQLite,
@@ -100,15 +138,18 @@ database with pages is left alone.
   alternates, x-default, verification tokens), JSON-LD (WebSite,
   BreadcrumbList, the WebPage/Article families, CollectionPage, block nodes,
   site identity), robots.txt, chunked sitemap with hreflang alternates.
+- Forms: the submit endpoint, honeypot, stored submissions with D1-safe
+  claims, retries, outbox delivery; notifications over mail, Telegram and the
+  admin bell with Liquid overrides and a delivery log.
 - Admin: pages list and editor (General, SEO, a tab per block, Publishing),
-  redirects, layout, shared blocks, languages, site and SEO settings.
+  redirects, layout, shared blocks, languages, site, SEO and notification
+  settings, the inbox (list, submission page with status, retry, comments).
 
 ## Not yet
 
-Form submissions and notifications (the ContactForm action URL is bound but
-`/_cms/forms/...` has no handler), secret settings (Laravel Crypt), legacy
-HTML richtext conversion (escaped instead), auto-redirects on slug change,
+Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
 page revisions, page refs, audit log, 404 log, roles/abilities, caching, the
 React client entry (`@tbtop/cms/react`: the workbench keeps its json-render
 registry and SEO head mapping locally for now), source-backed page types, the
-remaining admin pages (dashboard, users, inbox, health, SEO report).
+remaining admin pages (dashboard, users, health, SEO report), test sends
+from the notification settings, owner-only template editing.

@@ -1,8 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { createAdmin, rootView, type ViteManifest, viteTags } from "@tbtop/admin";
-import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
+import { kyselyDriver, kyselyNotifications, kyselyRules } from "@tbtop/admin/kysely";
 import { localDisk } from "@tbtop/admin/local-disk";
-import { type CmsDatabase, cmsBlockImpls, cmsBlocks, createCms, demoFixture, implementBlocks, migrateCms, seedFixtures } from "@tbtop/cms";
+import { type CmsDatabase, type MailMessage, cmsBlockImpls, cmsBlocks, createCms, demoFixture, implementBlocks, migrateCms, seedFixtures } from "@tbtop/cms";
 import Database from "better-sqlite3";
 import { Kysely, SqliteDialect } from "kysely";
 
@@ -16,11 +16,20 @@ const db = new Kysely<CmsDatabase>({
 	dialect: new SqliteDialect({ database: new Database(process.env.CMS_DB ?? "workbench.sqlite") }),
 });
 
+/** Sent mail, one JSON line per message: the workbench has no SMTP. */
+export const MAILBOX = process.env.CMS_MAILBOX ?? "mailbox.jsonl";
+
+const bell = kyselyNotifications(db);
+
 const cms = createCms({
 	db,
 	blocks: implementBlocks(cmsBlocks, cmsBlockImpls),
 	// The PHP host previews for signed-in editors; the workbench takes `?preview`.
 	canPreview: (request) => new URL(request.url).searchParams.has("preview"),
+	notifications: {
+		mail: { send: async (message: MailMessage) => appendFile(MAILBOX, `${JSON.stringify(message)}\n`) },
+		bell: { store: bell, staff: () => [{ id: 1 }] },
+	},
 });
 
 async function adminAssets(): Promise<string> {
@@ -43,6 +52,7 @@ async function boot() {
 		context: cms.admin.context,
 		// The CMS upload fields write to "public"; its refs read back as /storage/{ref}.
 		disks: { public: localDisk(STORAGE, "/storage") },
+		notifications: { store: bell },
 		rootView: rootView({ head: await adminAssets() }),
 	});
 	return { cms, admin };

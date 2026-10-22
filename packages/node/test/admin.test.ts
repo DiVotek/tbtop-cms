@@ -51,12 +51,14 @@ describe("admin pages", () => {
 			"/admin/languages/1/edit",
 			"/admin/settings/site",
 			"/admin/settings/seo",
+			"/admin/form-submissions",
+			"/admin/notification-settings",
 		]) {
 			const res = await page(url);
 			expect([url, res.component]).toEqual([url, "admin/page"]);
 		}
 		const nav = JSON.stringify((await page("/admin/pages")).props);
-		for (const label of ["Pages", "Redirects", "Layout", "Shared blocks", "Languages", "Site", "SEO"]) {
+		for (const label of ["Pages", "Inbox", "Redirects", "Layout", "Shared blocks", "Languages", "Site", "SEO", "Notifications"]) {
 			expect(nav).toContain(`"${label}"`);
 		}
 	});
@@ -106,5 +108,51 @@ describe("admin pages", () => {
 		const settings = cms.site().settings;
 		expect(await settings.get("site.name")).toBe("Renamed");
 		expect(await settings.get("site.contacts.phones")).toEqual([{ number: "+1 555 0100" }]);
+	});
+
+	test("the inbox lists a submission; opening it marks it read; a comment and a delete work", async () => {
+		const { cms, visit, page, post, ids } = await panel();
+		const site = cms.site();
+		const submission = await site.submissions.create({
+			pageId: ids.home as number,
+			blockId: "fx000002",
+			kind: "ContactForm",
+			locale: "en",
+			payload: { name: "Ada", email: "ada@example.test", message: "Hi" },
+		});
+		const table = await visit("/admin/form-submissions/tables/formSubmissions", { inertia: false });
+		const rows = ((await table.json()) as { data: { data: Record<string, unknown>[] } }).data.data;
+		expect(rows[0]).toMatchObject({ payload: "Ada · ada@example.test", kind: "Contact form", page_id: "Home", lead_status: "new" });
+
+		const url = `/admin/form-submissions/${submission.id}`;
+		expect(JSON.stringify((await page(url)).props)).toContain("ada@example.test");
+		expect((await site.submissions.findOrFail(submission.id)).leadStatus).toBe("read");
+
+		expect((await post(`${url}/forms/addCommentForm`, { body: "Called back" }, url)).status).toBe(303);
+		expect(await site.submissions.comments(submission.id)).toMatchObject([{ userId: 1, body: "Called back" }]);
+
+		await post(`${url}/actions/setStatus_processed`, {}, url);
+		expect((await site.submissions.findOrFail(submission.id)).leadStatus).toBe("processed");
+		await post(`${url}/actions/deleteSubmission`, {}, url);
+		expect(await site.submissions.find(submission.id)).toBeNull();
+	});
+
+	test("notification settings save recipients, channels and a Liquid override; a broken one is refused", async () => {
+		const { cms, page, post } = await panel();
+		const url = "/admin/notification-settings";
+		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).notification_settings ?? {};
+		expect(record.channels__form_submission).toEqual(["bell"]);
+		const save = (extra: Record<string, unknown>) =>
+			post(`${url}/forms/notification_settings`, { ...record, notification_mail_recipients: ["a@example.test", "b@example.test"], channels__form_submission: ["mail"], ...extra }, url);
+
+		await save({ tpl__form_submission__html__en__subject: "Lead", tpl__form_submission__html__en__body: "{% if x %}" });
+		expect(await cms.site().settings.get("notifications.mail.recipients")).toBeNull();
+
+		expect((await save({ tpl__form_submission__html__en__subject: "Lead {{ leadIdentity }}", tpl__form_submission__html__en__body: "<p>{{ pageName }}</p>" })).status).toBe(303);
+		const settings = cms.site().settings;
+		expect(await settings.get("notifications.mail.recipients")).toBe("a@example.test\nb@example.test");
+		expect(await settings.get("notifications.form.submission.channels")).toEqual(["mail"]);
+		const rows = await cms.config.db.selectFrom("tbtop_notification_templates").select(["format", "locale", "subject", "body"]).execute();
+		expect(rows).toEqual([{ format: "html", locale: "en", subject: "Lead {{ leadIdentity }}", body: "<p>{{ pageName }}</p>" }]);
 	});
 });

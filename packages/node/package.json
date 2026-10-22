@@ -27,6 +27,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"liquidjs": "^10.30.0",
 		"zod": "^4.4.3"
 	},
 	"peerDependencies": {

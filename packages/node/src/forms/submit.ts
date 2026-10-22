@@ -1,0 +1,127 @@
+import { validate } from "@tbtop/admin";
+import { honeypotField } from "../blocks/resolver";
+import type { Site } from "../site";
+import { locateForm } from "./locate";
+import { notifySubmission } from "./notifier";
+
+const ROUTE = /^\/_cms\/forms\/([^/]+)\/(\d+)\/([^/]+)\/?$/;
+
+type Outcome = "sent" | "invalid" | "failed";
+
+/**
+ * FormSubmitController: POST /_cms/forms/{locale}/{page}/{block}. A fetch
+ * client (Accept or Content-Type JSON) gets JSON: 200 `{ ok }`, 422
+ * `{ errors }`, 500 `{ errors: { form } }`. A plain HTML form gets a 303
+ * back to the page with `cms_form` and `cms_form_status` in the query.
+ * Null for any other URL.
+ */
+export async function submitForm(site: Site, request: Request): Promise<Response | null> {
+	const url = new URL(request.url);
+	const match = ROUTE.exec(url.pathname);
+	if (request.method !== "POST" || match === null) {
+		return null;
+	}
+	const [, rawLocale = "", rawPage = "", rawBlock = ""] = match;
+	const blockId = decodeURIComponent(rawBlock);
+	const allow = site.config.forms?.allow;
+	if (allow !== undefined && !(await allow(request))) {
+		return new Response(null, { status: 429 });
+	}
+	const locale = await submitLocale(site, decodeURIComponent(rawLocale));
+	const page = await site.pages.find(Number(rawPage), { live: true });
+	const located = page === null ? null : await locateForm(site, page, blockId, locale);
+	if (page === null || located === null) {
+		return new Response(null, { status: 404 });
+	}
+	const reply = responder(site, request, blockId, await site.pageUrl(page, locale));
+	const input = await readBody(request);
+	const honeypot = honeypotField(site);
+	if (honeypot !== null && String(input[honeypot] ?? "").trim() !== "") {
+		// Look exactly like success, so a bot's script has nothing to learn; nothing is stored or sent.
+		console.debug("form.submit.honeypot_tripped", { page: page.id, block: blockId });
+		return reply("sent");
+	}
+	const rules = Object.fromEntries(
+		Object.entries(located.submit.rules(located.data, located.ctx)).map(([field, rule]) => [field, Array.isArray(rule) ? rule : rule.split("|")]),
+	);
+	const result = await validate(input, rules);
+	if (!result.ok) {
+		return reply("invalid", result.errors);
+	}
+	const payload = result.validated;
+	const submission =
+		site.config.forms?.store === false
+			? null
+			: await site.submissions.create({ pageId: page.id, blockId, kind: located.block.kind, locale, payload });
+	try {
+		await located.submit.handle?.(payload, located.data, located.ctx);
+		if (submission !== null) {
+			await site.submissions.markHandled(submission.id);
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error("form.submit.failed", { page: page.id, block: blockId, error: message });
+		if (submission !== null) {
+			await site.submissions.fail(submission.id, message);
+		}
+		return reply("failed", { form: [await site.t("forms.submit_failed", locale)] });
+	}
+	if (submission !== null && site.config.forms?.delivery !== "outbox") {
+		await notifySubmission(site, await site.submissions.findOrFail(submission.id));
+	}
+	return reply("sent");
+}
+
+/** SetLanguage for the submit: a frontend-active locale, else the default. */
+async function submitLocale(site: Site, locale: string): Promise<string> {
+	const active = (await site.languages.frontendActive()).map((row) => row.locale);
+	return active.includes(locale) ? locale : site.languages.defaultLocale();
+}
+
+/** The fields as strings: a JSON object, or url-encoded / multipart form data (files are dropped). */
+async function readBody(request: Request): Promise<Record<string, unknown>> {
+	const type = request.headers.get("content-type") ?? "";
+	try {
+		if (type.includes("application/json")) {
+			const body = (await request.json()) as unknown;
+			return typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+		}
+		const form = await request.formData();
+		const out: Record<string, unknown> = {};
+		for (const [key, value] of form.entries()) {
+			if (typeof value === "string") {
+				out[key] = value;
+			}
+		}
+		return out;
+	} catch {
+		return {};
+	}
+}
+
+function responder(site: Site, request: Request, blockId: string, pageUrl: string | null) {
+	const accept = request.headers.get("accept") ?? "";
+	const json = accept.includes("application/json") || (request.headers.get("content-type") ?? "").includes("application/json");
+	return (outcome: Outcome, errors: Record<string, string[]> = {}): Response => {
+		const status = outcome === "sent" ? 200 : outcome === "invalid" ? 422 : 500;
+		if (json) {
+			return Response.json(outcome === "sent" ? { ok: true } : { ok: false, errors }, { status });
+		}
+		const back = new URL(sameOrigin(request.headers.get("referer"), site.origin) ?? site.absolute(pageUrl ?? "/"));
+		back.searchParams.set("cms_form", blockId);
+		back.searchParams.set("cms_form_status", outcome);
+		return new Response(null, { status: 303, headers: { Location: back.toString() } });
+	};
+}
+
+/** The Referer only when it is on the site, so the redirect never leaves it. */
+function sameOrigin(referer: string | null, origin: string): string | null {
+	if (referer === null) {
+		return null;
+	}
+	try {
+		return new URL(referer).origin === new URL(origin).origin ? referer : null;
+	} catch {
+		return null;
+	}
+}

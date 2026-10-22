@@ -123,11 +123,21 @@ export async function rowProblem(site: Site, row: Dict, kind: string): Promise<s
 /** FormActionBinder: a form block gets the URL it posts to. */
 export function bindForms(site: Site, blocks: ResolvedBlock[], page: Page, locale: string): ResolvedBlock[] {
 	return blocks.map((block) =>
-		site.blocks.has(block.kind) && site.blocks.get(block.kind).handlesSubmission
-			? { ...block, props: { ...block.props, action: site.absolute(`/_cms/forms/${locale}/${page.id}/${block.id}`) } }
-			: block,
+		site.blocks.has(block.kind) && site.blocks.get(block.kind).submit !== null ? { ...block, props: { ...block.props, ...formActionProps(site, page, block.id, locale) } } : block,
 	);
 }
+
+/** FormActionProps: the submit URL, and the honeypot input name when one is configured. */
+export function formActionProps(site: Site, page: Page, blockId: string, locale: string): { action: string; honeypotField?: string } {
+	const action = site.absolute(`/_cms/forms/${encodeURIComponent(locale)}/${page.id}/${encodeURIComponent(blockId)}`);
+	const honeypot = honeypotField(site);
+	return honeypot === null ? { action } : { action, honeypotField: honeypot };
+}
+
+export const honeypotField = (site: Site): string | null => {
+	const field = site.config.forms?.honeypotField;
+	return field === undefined ? "website" : field === null || field.trim() === "" ? null : field;
+};
 
 /** The catalog's zod schema is the contract: props that do not match it are dropped, not shipped. */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {

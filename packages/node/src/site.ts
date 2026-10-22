@@ -11,6 +11,8 @@ import { Redirects } from "./content/redirects";
 import { richtextHtml } from "./content/richtext";
 import { Settings } from "./content/settings";
 import { SharedBlocks } from "./content/sharedBlocks";
+import { Submissions } from "./forms/submissions";
+import { Notifications } from "./notifications";
 import type { SchemaTypes } from "./seo/schemaTypes";
 import { translate } from "./support/strings";
 
@@ -27,6 +29,8 @@ export class Site {
 	readonly sharedBlocks: SharedBlocks;
 	readonly redirects: Redirects;
 	readonly blocks: BlockRegistry;
+	readonly submissions: Submissions;
+	readonly notifications: Notifications;
 
 	constructor(
 		readonly config: CmsConfig,
@@ -50,6 +54,8 @@ export class Site {
 		this.sharedBlocks = new SharedBlocks(db);
 		this.redirects = new Redirects(db);
 		this.blocks = config.blocks;
+		this.submissions = new Submissions(db);
+		this.notifications = new Notifications(this);
 	}
 
 	media(ref: string | null | undefined): MediaDetails | null {
@@ -124,8 +130,8 @@ export class Site {
 		};
 	}
 
-	async t(key: string, locale: string): Promise<string> {
-		return translate(key, locale, await this.languages.defaultLocale(), this.config.strings);
+	async t(key: string, locale: string, params: Record<string, string | number> = {}): Promise<string> {
+		return translate(key, locale, await this.languages.defaultLocale(), this.config.strings, params);
 	}
 }
 

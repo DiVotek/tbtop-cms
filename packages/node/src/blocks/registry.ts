@@ -1,5 +1,6 @@
 import { S } from "@tbtop/admin";
 import type { z } from "zod";
+import type { Page } from "../content/page";
 import type { SchemaContext } from "../seo/schemaContext";
 import type { BlockMeta, Catalog, Placement } from "./catalog";
 import { cmsBlocks } from "./catalog";
@@ -15,8 +16,23 @@ export type BlockImpl<P = unknown> = {
 	resolve?: (input: Record<string, unknown>, ctx: ResolveContext) => P | Promise<P>;
 	/** A JSON-LD node the block adds to the page, or null. */
 	toSchema?: (props: P, ctx: SchemaContext) => Record<string, unknown> | null;
-	/** The block posts a form (`action` is bound to the submit URL). */
-	handlesSubmission?: boolean;
+	/** The block posts a form: `action` (and `honeypotField`) are bound into its props, `/_cms/forms/...` takes the post. */
+	submit?: SubmitHandler;
+};
+
+/** What a submit needs besides the payload (SubmitContext.php). */
+export type SubmitContext = { locale: string; fallbackLocale: string; page: Page };
+
+/** HandlesFormSubmission: the payload's rules and what a valid submission does. */
+export type SubmitHandler = {
+	/** Laravel validation rules by field (`required|email|max:200`), checked by @tbtop/admin's validator. */
+	rules: (blockData: Record<string, unknown>, ctx: SubmitContext) => Record<string, string | string[]>;
+	/**
+	 * The block's own delivery (forward to a CRM, a queue). Runs once per
+	 * submission; a throw fails it and the visitor sees an error. The team's
+	 * mail/Telegram/bell notifications are the CMS's job, not this.
+	 */
+	handle?: (payload: Record<string, unknown>, blockData: Record<string, unknown>, ctx: SubmitContext) => void | Promise<void>;
 };
 
 export type Implementations<C extends Catalog> = { [K in keyof C]: BlockImpl<z.infer<C[K]["props"]>> };
@@ -33,7 +49,7 @@ export type BlockKind = {
 	resolve: (input: Record<string, unknown>, ctx: ResolveContext) => Promise<unknown>;
 	translatableFields: () => string[];
 	toSchema: (props: unknown, ctx: SchemaContext) => Record<string, unknown> | null;
-	handlesSubmission: boolean;
+	submit: SubmitHandler | null;
 };
 
 export type BlockRegistry = {
@@ -69,7 +85,7 @@ export function implementBlocks<const C extends Catalog>(catalog: C, impls: Impl
 				impl.resolve === undefined ? resolveForm(impl.form(new S()), input, ctx) : impl.resolve(input, ctx),
 			translatableFields: () => translatablePaths(impl.form(new S())),
 			toSchema: (props, ctx) => impl.toSchema?.(props, ctx) ?? null,
-			handlesSubmission: impl.handlesSubmission ?? false,
+			submit: impl.submit ?? null,
 		});
 	}
 	return {
@@ -139,6 +155,12 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 				action: "",
 			};
 		},
-		handlesSubmission: true,
+		submit: {
+			rules: () => ({
+				name: "required|string|max:200",
+				email: "required|email|max:200",
+				message: "required|string|max:5000",
+			}),
+		},
 	},
 };

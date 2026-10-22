@@ -1,7 +1,9 @@
 import type { AdminContext, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
+import { submissionsIndex, submissionView } from "./forms";
 import { languageEdit, languageNew, languagesIndex } from "./languages";
+import { notificationSettings } from "./notifications";
 import { pageEdit, pagesIndex } from "./pages";
 import { seoSettings, siteSettings } from "./settings";
 
@@ -19,6 +21,8 @@ export function adminPages(cms: Cms): CmsAdmin {
 		pages: [
 			pagesIndex(cms),
 			pageEdit(cms),
+			submissionsIndex(cms),
+			submissionView(cms),
 			redirectsIndex(cms),
 			layoutIndex(cms),
 			layoutEdit(cms),
@@ -29,6 +33,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			languageEdit(cms),
 			siteSettings(cms),
 			seoSettings(cms),
+			notificationSettings(cms),
 		] as PageDef[],
 		navigationGroups: [
 			{ key: "content", label: "Content", icon: "files" },

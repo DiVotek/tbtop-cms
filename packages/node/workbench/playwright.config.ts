@@ -16,7 +16,7 @@ export default defineConfig({
 		trace: "retain-on-failure",
 	},
 	webServer: {
-		command: `rm -f e2e.sqlite && bun run build && CMS_DB=e2e.sqlite vite preview --port ${port}`,
+		command: `rm -f e2e.sqlite e2e-mailbox.jsonl && bun run build && CMS_DB=e2e.sqlite CMS_MAILBOX=e2e-mailbox.jsonl vite preview --port ${port}`,
 		url: `http://localhost:${port}/robots.txt`,
 		timeout: 120_000,
 		reuseExistingServer: false,

@@ -1,7 +1,9 @@
+import type { NotificationStore } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { BlockRegistry } from "./blocks/registry";
 import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
+import type { Channel, MailTransport, NotificationType } from "./notifications/types";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
 
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
@@ -38,6 +40,36 @@ export type CmsConfig = {
 	/** Extra frontend strings per locale, over the package's own. */
 	strings?: Record<string, Record<string, string>>;
 	debug?: boolean;
+	forms?: FormsConfig;
+	notifications?: NotificationsConfig;
+};
+
+export type FormsConfig = {
+	/** Store submissions (`tbtop-cms.forms.store`); default true. Without a row nothing is delivered or retried. */
+	store?: boolean;
+	/** The honeypot input name handed to form blocks; a filled one looks like success and stores nothing. Default `website`, null turns it off. */
+	honeypotField?: string | null;
+	/**
+	 * `inline` (default): notifications go out before the submit answers.
+	 * `outbox`: the submission stays pending until `cms.tasks.deliver()` runs,
+	 * from a cron, `ctx.waitUntil()` on Workers, or a queue.
+	 */
+	delivery?: "inline" | "outbox";
+	/** A rate limit or bot check before anything runs; false answers 429 (`forms.throttle` in PHP). */
+	allow?: (request: Request) => boolean | Promise<boolean>;
+};
+
+export type NotificationsConfig = {
+	/** Sends mail: nodemailer, Resend, Cloudflare Email, SES. Without it the mail channel is not offered. */
+	mail?: MailTransport;
+	/** The bot token (`notifications.telegram.bot_token`), from the environment; chat ids are a setting. */
+	telegram?: { botToken: string; fetch?: typeof fetch };
+	/** The admin bell: the panel's store and the staff users who get it. */
+	bell?: { store: NotificationStore; staff: () => unknown[] | Promise<unknown[]> };
+	/** Host notification types next to `form.submission`. */
+	types?: NotificationType<never>[];
+	/** Host channels (SMS, Slack) next to mail, Telegram and the bell. */
+	channels?: Channel[];
 };
 
 const MIME: Record<string, string> = {

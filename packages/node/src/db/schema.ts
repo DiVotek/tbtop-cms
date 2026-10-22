@@ -142,6 +142,7 @@ export type FormSubmissionsTable = Stamps & {
 export type FormSubmissionCommentsTable = Stamps & {
 	id: Generated<number>;
 	submission_id: number;
+	user_id: number | string;
 	body: string;
 };
 

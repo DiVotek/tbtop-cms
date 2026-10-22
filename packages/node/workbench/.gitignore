@@ -7,3 +7,5 @@ public/admin-build
 test-results
 playwright-report
 /storage
+mailbox.jsonl
+e2e-mailbox.jsonl

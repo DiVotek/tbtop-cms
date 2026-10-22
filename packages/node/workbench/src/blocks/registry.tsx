@@ -2,6 +2,7 @@ import { defineCatalog } from "@json-render/core";
 import { defineRegistry } from "@json-render/react";
 import { schema } from "@json-render/react/schema";
 import { cmsBlocks, type PropsOf } from "@tbtop/cms/catalog";
+import { type FormEvent, useState } from "react";
 import { z } from "zod";
 
 // The browser half of the block catalog: the shared zod props from
@@ -26,9 +27,34 @@ function Hero({ props }: { props: PropsOf<typeof cmsBlocks, "Hero"> }) {
 	);
 }
 
+type FormState = { status: "idle" | "sending" | "sent" | "failed"; errors: Record<string, string[]> };
+
+// Progressive: without JS the browser posts the form and the server answers
+// with a 303 back to the page; with JS it posts JSON and shows the answer here.
 function ContactForm({ props }: { props: PropsOf<typeof cmsBlocks, "ContactForm"> }) {
+	const [state, setState] = useState<FormState>({ status: "idle", errors: {} });
+	async function submit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setState({ status: "sending", errors: {} });
+		const body = Object.fromEntries(new FormData(event.currentTarget));
+		const response = await fetch(props.action, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", Accept: "application/json" },
+			body: JSON.stringify(body),
+		}).catch(() => null);
+		const answer = (await response?.json().catch(() => null)) as { ok?: boolean; errors?: Record<string, string[]> } | null;
+		setState(answer?.ok === true ? { status: "sent", errors: {} } : { status: "failed", errors: answer?.errors ?? {} });
+	}
+	if (state.status === "sent") {
+		return (
+			<section data-testid="contact-form">
+				<h2>{props.heading}</h2>
+				<p role="status">{props.successMessage}</p>
+			</section>
+		);
+	}
 	return (
-		<form data-testid="contact-form" method="post" action={props.action}>
+		<form data-testid="contact-form" method="post" action={props.action} onSubmit={submit} noValidate>
 			<h2>{props.heading}</h2>
 			{props.fields.map((field) => (
 				<label key={field.name}>
@@ -38,9 +64,25 @@ function ContactForm({ props }: { props: PropsOf<typeof cmsBlocks, "ContactForm"
 					) : (
 						<input type={field.type} name={field.name} required={field.required} />
 					)}
+					{state.errors[field.name]?.map((error) => (
+						<small key={error} role="alert">
+							{error}
+						</small>
+					))}
 				</label>
 			))}
-			<button type="submit">{props.submitLabel}</button>
+			{props.honeypotField ? (
+				// Hidden from people and screen readers; a bot that fills it gets a fake success.
+				<input type="text" name={props.honeypotField} tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-10000px" }} />
+			) : null}
+			{state.errors.form?.map((error) => (
+				<p key={error} role="alert">
+					{error}
+				</p>
+			))}
+			<button type="submit" disabled={state.status === "sending"}>
+				{props.submitLabel}
+			</button>
 		</form>
 	);
 }

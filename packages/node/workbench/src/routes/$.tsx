@@ -6,10 +6,12 @@ import { site } from "../server/cms";
 import { loadCmsPage } from "../server/page";
 
 export const Route = createFileRoute("/$")({
-	// robots.txt and the sitemaps are plain responses; every other URL is a page.
+	// robots.txt, the sitemaps and form posts (/_cms/forms/...) are plain
+	// responses; every other URL is a page.
 	server: {
 		handlers: {
 			GET: async ({ request, next }) => (await (await site()).cms.handle(request)) ?? next(),
+			POST: async ({ request, next }) => (await (await site()).cms.handle(request)) ?? next(),
 		},
 	},
 	loader: ({ location }) => loadCmsPage({ data: location.href }),

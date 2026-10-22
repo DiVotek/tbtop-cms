@@ -1,6 +1,8 @@
 import { adminPages, type CmsAdmin } from "./admin";
 import type { CmsConfig } from "./config";
 import { PageTypes } from "./content/pageTypes";
+import { notifySubmission, retrySubmission } from "./forms/notifier";
+import { submitForm } from "./forms/submit";
 import { type LoadResult, loadPage } from "./frontend/load";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
@@ -16,10 +18,20 @@ export type Cms = {
 	site(request?: Request): Site;
 	/** The page at the request URL: props for the host to render, a redirect, or not found. */
 	loadPage(request: Request): Promise<LoadResult>;
-	/** robots.txt, sitemap.xml and its chunks; null for every other URL. */
+	/** robots.txt, sitemap.xml and its chunks, and form posts to /_cms/forms/...; null for every other URL. */
 	handle(request: Request): Promise<Response | null>;
+	/** Background work for a cron, `ctx.waitUntil()` or a queue: the same functions the `tbtop-cms` CLI runs. */
+	readonly tasks: CmsTasks;
 	/** Admin pages and nav groups to spread into the host's createAdmin(). */
 	readonly admin: CmsAdmin;
+};
+
+export type CmsTasks = {
+	/**
+	 * Delivers pending submissions (`forms.delivery: "outbox"`) and retries
+	 * the ones a dead worker left processing. Returns how many it took.
+	 */
+	deliver(options?: { limit?: number }): Promise<number>;
 };
 
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
@@ -38,6 +50,9 @@ export function createCms(config: CmsConfig): Cms {
 		site,
 		loadPage: async (request) => loadPage(site(request), request, { preview: (await config.canPreview?.(request)) === true }),
 		handle: async (request) => {
+			if (request.method === "POST") {
+				return submitForm(site(request), request);
+			}
 			if (request.method !== "GET" && request.method !== "HEAD") {
 				return null;
 			}
@@ -57,6 +72,20 @@ export function createCms(config: CmsConfig): Cms {
 			}
 			const chunk = Number(SITEMAP_CHUNK.exec(pathname)?.[1]);
 			return chunk > (await chunkCount(scope)) ? new Response(null, { status: 404 }) : xml(await sitemapChunkXml(scope, chunk));
+		},
+		tasks: {
+			deliver: async ({ limit = 50 } = {}) => {
+				const scope = site();
+				const ids = await scope.submissions.due(limit);
+				for (const id of ids) {
+					const submission = await scope.submissions.find(id);
+					if (submission === null) {
+						continue;
+					}
+					await (submission.status === "pending" ? notifySubmission(scope, submission) : retrySubmission(scope, submission));
+				}
+				return ids.length;
+			},
 		},
 		admin: undefined as unknown as CmsAdmin,
 	};
