@@ -6,6 +6,17 @@ type Resolve = (value: unknown, ctx: ResolveContext) => unknown;
 
 const blankToNull = (value: string): string | null => (value === "" ? null : value);
 
+/** PHP's `(string)` cast of a scalar: true is "1", false "". */
+const phpString = (value: string | number | boolean): string => (typeof value === "boolean" ? (value ? "1" : "") : String(value));
+
+const isScalar = (value: unknown): value is string | number | boolean => ["string", "number", "boolean"].includes(typeof value);
+
+/** PHP's is_numeric for a string: decimal, optional sign, fraction and exponent, surrounding whitespace allowed. No hex. */
+const NUMERIC = /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/;
+
+/** filter_var(FILTER_VALIDATE_BOOLEAN): "1", "true", "on", "yes", trimmed and in any case. */
+const TRUTHY = ["1", "true", "on", "yes"];
+
 /** The top-level fields of a form definition, layout wrappers unwrapped. */
 export function formFields(nodes: unknown[]): Field[] {
 	const out: Field[] = [];
@@ -59,11 +70,11 @@ function ruleFor(field: Field): Resolve {
 				if (typeof value === "number") {
 					return value;
 				}
-				return typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : null;
+				return typeof value === "string" && NUMERIC.test(value) ? Number(value) : null;
 			};
 		case "boolean":
 		case "checkbox":
-			return (value) => value === true || value === 1 || ["1", "true", "on", "yes"].includes(String(value).toLowerCase());
+			return (value) => value === true || (isScalar(value) && TRUTHY.includes(String(value).trim().toLowerCase()));
 		case "daterange":
 			return (value) => ({
 				from: isDict(value) && typeof value.from === "string" ? blankToNull(value.from.trim()) : null,
@@ -73,17 +84,17 @@ function ruleFor(field: Field): Resolve {
 			return (value) =>
 				Object.fromEntries(
 					Object.entries(isDict(value) ? value : {})
-						.filter(([, v]) => ["string", "number", "boolean"].includes(typeof v))
-						.map(([k, v]) => [k, String(v)]),
+						.filter((entry): entry is [string, string | number | boolean] => isScalar(entry[1]))
+						.map(([k, v]) => [k, phpString(v)]),
 				);
 	}
 	if (kind === "checkboxlist" || kind === "tags" || (multiple && ["select", "togglebuttons"].includes(kind))) {
 		return (value) =>
 			(Array.isArray(value) ? value : [])
-				.map((item) => (["string", "number", "boolean"].includes(typeof item) ? blankToNull(String(item).trim()) : null))
+				.map((item) => (isScalar(item) ? blankToNull(phpString(item).trim()) : null))
 				.filter((item) => item !== null);
 	}
-	return (value) => (["string", "number", "boolean"].includes(typeof value) ? blankToNull(String(value).trim()) : null);
+	return (value) => (isScalar(value) ? blankToNull(phpString(value).trim()) : null);
 }
 
 function mediaRef(value: unknown, ctx: ResolveContext): string | null {

@@ -215,6 +215,16 @@ describe("R3-blocks-6: shared blocks can be placed and made", () => {
 	});
 });
 
+describe("R3-blocks-10: FormResolver converts scalars the PHP way", () => {
+	test("booleans become '1'/null strings, hex is not a number, a padded yes is true", async () => {
+		const { S } = await import("@tbtop/admin");
+		const s = new S();
+		const fields = [s.text("t"), s.text("f"), s.number("n"), s.number("d"), s.boolean("b"), s.select("m").multiple(), s.keyvalue("k")];
+		const out = await resolveForm(fields, { t: true, f: false, n: "0x10", d: " 1.5 ", b: " yes ", m: [true, false, "a"], k: { x: true, y: false } }, {} as ResolveContext);
+		expect(out).toEqual({ t: "1", f: null, n: null, d: 1.5, b: true, m: ["1", "a"], k: { x: "1", y: "" } });
+	});
+});
+
 describe("R3-blocks-11: rows the site skips are listed as problems and can be removed", () => {
 	test("an unknown kind and a missing shared block get no tab, a Problem blocks tab lists them", async () => {
 		const { page, record, action, rows, setRows, ids } = await panel();
