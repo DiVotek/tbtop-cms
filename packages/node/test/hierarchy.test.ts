@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createAdmin } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
-import { makeCms } from "./support";
+import { get, makeCms } from "./support";
 
 const en = (name: string) => ({ en: name });
 
@@ -68,7 +68,68 @@ describe("page hierarchy (PageHierarchy)", () => {
 	});
 });
 
-describe("admin parent select", () => {
+describe("page guards (PageObserver)", () => {
+	test("a page with live children cannot be deleted; once they are gone it can", async () => {
+		const { cms, ids } = await makeCms();
+		const pages = cms.site().pages;
+		await expect(pages.delete(ids.blog as number)).rejects.toThrow("has child pages");
+		expect((await cms.loadPage(get("/blog/first-post"))).type).toBe("page");
+		await pages.delete(ids["first-post"] as number);
+		await pages.delete(ids["scheduled-post"] as number);
+		await pages.delete(ids.blog as number);
+		expect(await pages.find(ids.blog as number)).toBeNull();
+	});
+
+	test("a system page cannot be deleted nor change status", async () => {
+		const { cms, ids } = await makeCms();
+		const pages = cms.site().pages;
+		const home = ids.home as number;
+		await expect(pages.delete(home)).rejects.toThrow("System pages cannot be deleted");
+		await expect(pages.update(home, { status: "draft" })).rejects.toThrow("status of a system page cannot be changed");
+		await pages.update(home, { status: "published", name: en("Home") });
+	});
+
+	test("an error page's class is immutable", async () => {
+		const { cms } = await makeCms();
+		const pages = cms.site().pages;
+		const page = await pages.create({ type: "page", name: en("Not found"), errorClass: "4xx", isSystem: true });
+		await expect(pages.update(page.id, { errorClass: "5xx" })).rejects.toThrow("cannot be changed after creation");
+	});
+
+	test("the type/subtype pair must be a base and one of its subtypes", async () => {
+		const { cms, ids } = await makeCms(undefined, { pageTypes: [{ key: "news", base: "article" }] });
+		const pages = cms.site().pages;
+		const blog = ids.blog as number;
+		await expect(pages.create({ type: "news", parentId: blog, name: en("N") })).rejects.toThrow("news is a subtype of article");
+		await expect(pages.create({ type: "article", subtype: "page", parentId: blog, name: en("N") })).rejects.toThrow(
+			"page is not a subtype of article",
+		);
+		const ok = await pages.create({ type: "article", subtype: "news", parentId: blog, name: en("N") });
+		expect(ok.subtype).toBe("news");
+	});
+
+	test("the admin delete action reports the refusal as a notification", async () => {
+		const { cms, db, ids } = await makeCms();
+		const admin = createAdmin({
+			prefix: "/admin",
+			pages: cms.admin.pages,
+			navigationGroups: cms.admin.navigationGroups,
+			driver: kyselyDriver(db),
+			hostRules: kyselyRules(db),
+			user: () => ({ id: 1, name: "Admin" }),
+			context: cms.admin.context,
+		});
+		const res = await admin.handle(
+			new Request("http://x/admin/pages/actions/delete", {
+				method: "POST",
+				body: JSON.stringify({ payload: { row: { _key: ids.blog } } }),
+				headers: { "x-inertia": "true", referer: "http://x/admin/pages" },
+			}),
+		);
+		expect(JSON.stringify(await res?.json())).toContain("has child pages");
+		expect(await cms.site().pages.find(ids.blog as number)).not.toBeNull();
+	});
+
 	test("the parent select offers only parents that accept the page's type", async () => {
 		const { cms, db, ids } = await makeCms();
 		const pages = cms.site().pages;

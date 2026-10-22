@@ -86,10 +86,14 @@ export function pagesIndex(cms: Cms) {
 								if (page === null) {
 									return Effects.make().notify("The page is already gone.", "error");
 								}
-								if (page.isSystem) {
-									return Effects.make().notify("System pages cannot be deleted.", "error");
+								try {
+									await siteOf(cms, ctx).pages.delete(page.id);
+								} catch (error) {
+									if (error instanceof PageRuleError) {
+										return Effects.make().notify(error.message, "error");
+									}
+									throw error;
 								}
-								await siteOf(cms, ctx).pages.delete(page.id);
 								return Effects.make().notify("Page deleted").refreshTable("pages");
 							}, ["row"]),
 					])

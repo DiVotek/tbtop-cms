@@ -3,7 +3,7 @@ import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { encodeJson, flag, sqlDate } from "../support/values";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
-import { assertHierarchy } from "./pageRules";
+import { assertHierarchy, assertTypePair, PageRuleError } from "./pageRules";
 import { PageTypes } from "./pageTypes";
 import { PageSlugs } from "./slugs";
 
@@ -106,6 +106,7 @@ export class Pages {
 
 	/** Creates a page; the type's tree rules (PageHierarchy) throw PageRuleError. */
 	async create(input: PageInput & { type: string }, options: { slugs?: Record<string, string>; by?: string | number | null } = {}): Promise<Page> {
+		assertTypePair(this.types, input.type, input.subtype ?? null);
 		await assertHierarchy(this.db, this.types, { id: null, type: input.type, subtype: input.subtype ?? null, parentId: input.parentId ?? null });
 		const now = sqlDate(new Date());
 		const id = await insertId(
@@ -168,8 +169,15 @@ export class Pages {
 		return page;
 	}
 
-	/** Soft delete; the slugs go, so the path frees up. */
+	/** Soft delete; the slugs go, so the path frees up. A system page or one with live children throws PageRuleError. */
 	async delete(id: number): Promise<void> {
+		const page = await this.find(id);
+		if (page?.isSystem === true) {
+			throw new PageRuleError("System pages cannot be deleted.");
+		}
+		if ((await this.query().select("id").where("parent_id", "=", id).executeTakeFirst()) !== undefined) {
+			throw new PageRuleError("This page has child pages — move or delete them first.");
+		}
 		await this.db.updateTable("tbtop_pages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
 		await this.slugs.remove(id);
 	}
@@ -178,9 +186,19 @@ export class Pages {
 	private async guardUpdate(current: Page, input: PageInput): Promise<void> {
 		const type = input.type ?? current.type;
 		const parentId = input.parentId !== undefined ? input.parentId : current.parentId;
+		const subtype = input.subtype !== undefined ? input.subtype : current.subtype;
 		const changed = { type: type !== current.type, parent: parentId !== current.parentId };
+		if (changed.type || subtype !== current.subtype) {
+			assertTypePair(this.types, type, subtype);
+		}
+		if ((input.isSystem ?? current.isSystem) && input.status !== undefined && input.status !== current.status) {
+			throw new PageRuleError("The status of a system page cannot be changed.");
+		}
+		if (input.errorClass !== undefined && input.errorClass !== current.errorClass) {
+			throw new PageRuleError("An error page's class (4xx/5xx) cannot be changed after creation.");
+		}
 		if (changed.type || changed.parent) {
-			await assertHierarchy(this.db, this.types, { id: current.id, type, subtype: input.subtype !== undefined ? input.subtype : current.subtype, parentId }, changed);
+			await assertHierarchy(this.db, this.types, { id: current.id, type, subtype, parentId }, changed);
 		}
 	}
 
