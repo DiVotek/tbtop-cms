@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tbtop\Cms\Cache\CmsCache;
+
+// The database-store test reads the `cache` table: on MySQL only migrate:fresh creates it.
+uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     config(['cache.default' => 'array']);
