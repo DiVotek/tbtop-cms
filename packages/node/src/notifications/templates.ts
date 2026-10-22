@@ -15,6 +15,14 @@ const liquid = new Liquid({ outputEscape: "escape", strictFilters: true, ownProp
  */
 export const looksLikeBlade = (source: string): boolean => /\{\{\s*\$|\{!!|@(section|foreach|if|endif|endforeach|php)\b/.test(source);
 
+/**
+ * Text PHP would execute if it compiled this row as Blade: a PHP open tag,
+ * any `@directive(…)`, or a call inside `{{ }}`. Wider than looksLikeBlade,
+ * so the admin never writes a row that runs code on the PHP side.
+ */
+export const runsAsPhp = (source: string): boolean =>
+	looksLikeBlade(source) || /<\?|@[A-Za-z_]\w*\s*\(|@(unless|endunless|else|elseif|for|endfor|while|endwhile|switch|verbatim)\b|\{\{[^}]*\(/.test(source);
+
 export type Override = { subject: string; body: string };
 
 /** DatabaseTemplateStore: the stored override of a type's format in a locale, or null. */

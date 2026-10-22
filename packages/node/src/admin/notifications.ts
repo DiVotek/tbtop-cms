@@ -1,7 +1,7 @@
 import { definePage, Effects, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import type { NotificationType } from "../notifications/types";
-import { looksLikeBlade, templateError } from "../notifications/templates";
+import { runsAsPhp, templateError } from "../notifications/templates";
 import type { Site } from "../site";
 import { sqlDate } from "../support/values";
 import { NAV, siteOf } from "./support";
@@ -156,8 +156,8 @@ function overrideError(form: Record<string, unknown>, type: string, format: stri
 	if (body.trim() === "" || sameTemplate(subject, body, row)) {
 		return null;
 	}
-	if (looksLikeBlade(body) || looksLikeBlade(subject)) {
-		return "Blade template from the PHP package; clear it to use Liquid.";
+	if (runsAsPhp(body) || runsAsPhp(subject)) {
+		return "Templates are Liquid: Blade directives and PHP code are not allowed.";
 	}
 	return templateError(body) ?? templateError(subject);
 }

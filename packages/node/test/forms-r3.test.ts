@@ -187,6 +187,18 @@ describe("R3-forms-7: Blade overrides in the shared table", () => {
 		expect(await cms.site().settings.get("mail.from_name")).toBeNull();
 		expect(await db.selectFrom("tbtop_notification_templates").select("id").execute()).toHaveLength(0);
 	});
+
+	test("anything Blade or PHP would run is refused, not only the common directives (R4-fixes-1)", async () => {
+		const { db, page, post: save } = await panel();
+		const url = "/admin/notification-settings";
+		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).notification_settings ?? {};
+		for (const code of ["<?php system('id'); ?>", "<?= 1 ?>", "@json(system('id'))", "@unless(true) x @endunless", "@include('x')", "{{ system('id') }}"]) {
+			await save(`${url}/forms/notification_settings`, { ...record, [body]: `<p>${code}</p>` }, url);
+		}
+		expect(await db.selectFrom("tbtop_notification_templates").select("id").execute()).toHaveLength(0);
+		await save(`${url}/forms/notification_settings`, { ...record, [body]: "<p>{{ pageName }} — mail info@example.test</p>" }, url);
+		expect(await db.selectFrom("tbtop_notification_templates").select("id").execute()).toHaveLength(1);
+	});
 });
 
 describe("R3-forms-9: field text matches PHP", () => {
