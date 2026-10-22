@@ -129,3 +129,31 @@ describe("R3-forms-3: inputs are trimmed and blanks become null, as Laravel's mi
 		]);
 	});
 });
+
+describe("R3-forms-4: Telegram has a timeout and names the chat in its errors", () => {
+	async function send(fetch: typeof globalThis.fetch) {
+		const { cms, db } = await makeCms(undefined, { notifications: { telegram: { botToken: "T0KEN", fetch } } });
+		const settings = cms.site().settings;
+		await settings.set("notifications.form.submission.channels", ["telegram"]);
+		await settings.set("notifications.telegram.chat_ids", "42");
+		await cms.handle(post(await contactAction(cms), valid));
+		return (await rows(db))[0]?.error;
+	}
+
+	test("the request carries an abort signal; an unreachable API reads as PHP does", async () => {
+		let signal: unknown;
+		const error = await send((async (_url: string, init?: RequestInit) => {
+			signal = init?.signal;
+			throw new DOMException("The operation timed out.", "TimeoutError");
+		}) as unknown as typeof fetch);
+		expect(signal).toBeInstanceOf(AbortSignal);
+		expect(error).toBe("Telegram delivery failed: chat 42: Could not reach Telegram.");
+	});
+
+	test("an API error, or a 200 that is not ok, carries the chat and the method", async () => {
+		const failing = (async () => Response.json({ ok: false, description: "Bad Request: chat not found" }, { status: 400 })) as unknown as typeof fetch;
+		expect(await send(failing)).toBe("Telegram delivery failed: chat 42: Telegram API error (sendMessage): Bad Request: chat not found");
+		const notOk = (async () => Response.json({ ok: false })) as unknown as typeof fetch;
+		expect(await send(notOk)).toBe("Telegram delivery failed: chat 42: Telegram API error (sendMessage): HTTP 200");
+	});
+});

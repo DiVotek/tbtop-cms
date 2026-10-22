@@ -26,17 +26,37 @@ export function telegramChannel(options: { botToken: string; fetch?: typeof fetc
 		format: "short",
 		supports: (recipient) => typeof recipient.phone === "string" && recipient.phone !== "",
 		send: async (rendered, recipient) => {
-			const response = await send(`https://api.telegram.org/bot${options.botToken}/sendMessage`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ chat_id: recipient.phone, text: rendered.body.trim(), parse_mode: "HTML", disable_web_page_preview: true }),
-			});
-			if (!response.ok) {
-				const reply = (await response.json().catch(() => null)) as { description?: string } | null;
-				throw new Error(reply?.description ?? `HTTP ${response.status}`);
+			const chat = recipient.phone ?? "";
+			try {
+				await sendMessage(send, options.botToken, chat, rendered.body.trim());
+			} catch (error) {
+				throw new Error(`chat ${chat}: ${error instanceof Error ? error.message : String(error)}`);
 			}
 		},
 	};
+}
+
+/** TelegramClient.php: Http::timeout(5) per call. */
+const TELEGRAM_TIMEOUT_MS = 5000;
+
+/** TelegramClient::call(): a network failure or timeout, a non-2xx and a Bot API `ok: false` all throw. */
+async function sendMessage(send: typeof fetch, token: string, chat: string, html: string): Promise<void> {
+	let response: Response;
+	try {
+		response = await send(`https://api.telegram.org/bot${token}/sendMessage`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ chat_id: chat, text: html, parse_mode: "HTML", disable_web_page_preview: true }),
+			signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
+		});
+	} catch {
+		throw new Error("Could not reach Telegram.");
+	}
+	const reply = (await response.json().catch(() => null)) as { ok?: unknown; description?: unknown } | null;
+	if (reply?.ok !== true) {
+		const description = typeof reply?.description === "string" ? reply.description : `HTTP ${response.status}`;
+		throw new Error(`Telegram API error (sendMessage): ${description}`);
+	}
 }
 
 /**
