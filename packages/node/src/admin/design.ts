@@ -1,6 +1,7 @@
 import { type ActionCtx, Column, definePage, Effects, HttpError, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { SLOTS, type Slot } from "../content/layouts";
+import { SharedBlockConflictError, SharedBlockInUseError } from "../content/sharedBlocks";
 import { type Dict, isDict } from "../support/values";
 import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, prefixedForm, rowsFromForm, siteOf } from "./support";
 
@@ -65,8 +66,9 @@ export function sharedBlocksIndex(cms: Cms) {
 		path: "shared-blocks",
 		title: "Shared blocks",
 		nav: { group: NAV.design, label: "Shared blocks", icon: "copy", order: 45 },
-		view: (s, { request }) =>
-			s.stack([
+		view: async (s, { request }) => {
+			const usage = await cms.site(request).sharedBlocks.usageCounts();
+			return s.stack([
 				s.row([
 					s
 						.action("new")
@@ -103,6 +105,9 @@ export function sharedBlocksIndex(cms: Cms) {
 						Column.make("kind")
 							.label("Kind")
 							.formatUsing((value) => (cms.config.blocks.has(String(value)) ? cms.config.blocks.get(String(value)).label : String(value))),
+						Column.make("id")
+							.label("Usage")
+							.formatUsing((value) => placedIn(usage.get(Number(value)) ?? 0)),
 						Column.make("updated_at").label("Updated").datetime().sortable(),
 					])
 					.defaultSort("name", "asc")
@@ -112,15 +117,28 @@ export function sharedBlocksIndex(cms: Cms) {
 							.action("delete")
 							.label("Delete")
 							.color("danger")
-							.confirm("Delete this shared block?", "Pages that use it stop showing it.")
+							.confirm("Delete this shared block?", "A block still placed on a page or layout cannot be deleted.")
 							.handle(async (ctx) => {
-								await siteOf(cms, ctx).sharedBlocks.delete(Number(ctx.key()));
+								try {
+									await siteOf(cms, ctx).sharedBlocks.delete(Number(ctx.key()));
+								} catch (error) {
+									if (error instanceof SharedBlockInUseError) {
+										return Effects.make().notify(error.message, "error");
+									}
+									throw error;
+								}
 								return Effects.make().notify("Deleted").refreshTable("sharedBlocks");
 							}, ["row"]),
 					])
 					.query(() => cms.site(request).config.db.selectFrom("tbtop_shared_blocks")),
-			]),
+			]);
+		},
 	});
+}
+
+/** The usage line (shared-blocks.usage_count). */
+function placedIn(count: number): string {
+	return count === 0 ? "Not placed anywhere" : `Placed in ${count} ${count === 1 ? "place" : "places"}`;
 }
 
 export function sharedBlockEdit(cms: Cms) {
@@ -144,6 +162,7 @@ export function sharedBlockEdit(cms: Cms) {
 				.filter((name): name is string => typeof name === "string");
 			return s
 				.form("sharedBlock", [
+					s.number("lock_version").meta("hidden", true),
 					s.text("shared_name").label("Name").required().rules("max:255"),
 					s.section({ title: cms.config.blocks.get(block.kind).label }, prefixedForm(cms.config.blocks, block.kind, "shared", s)),
 					s.actionsRow([
@@ -152,6 +171,7 @@ export function sharedBlockEdit(cms: Cms) {
 					]),
 				])
 				.record({
+					lock_version: block.lockVersion,
 					shared_name: block.name,
 					...Object.fromEntries(names.filter((name) => name in block.data).map((name) => [`block_shared_${name}`, block.data[name]])),
 				})
@@ -163,10 +183,18 @@ export function sharedBlockEdit(cms: Cms) {
 							data[name] = form[`block_shared_${name}`];
 						}
 					}
-					await siteOf(cms, ctx).sharedBlocks.update(block.id, {
-						name: String(form.shared_name ?? block.name),
-						data: isDict(data) ? data : {},
-					});
+					try {
+						await siteOf(cms, ctx).sharedBlocks.update(
+							block.id,
+							{ name: String(form.shared_name ?? block.name), data: isDict(data) ? data : {} },
+							{ lockVersion: typeof form.lock_version === "number" ? form.lock_version : Number(form.lock_version ?? block.lockVersion) },
+						);
+					} catch (error) {
+						if (error instanceof SharedBlockConflictError) {
+							return Effects.make().notify("This shared block was changed by someone else while you were editing; your edits were not applied. Reload to see the latest version.", "error");
+						}
+						throw error;
+					}
 					return Effects.make().notify("Saved");
 				});
 		},
