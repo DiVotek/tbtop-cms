@@ -34,6 +34,12 @@ describe("default-locale prefix redirect", () => {
 	});
 });
 
+/** A row as another writer (the PHP admin, an import) left it: the store's write validation would refuse some of these. */
+async function storeRaw(db: Awaited<ReturnType<typeof makeCms>>["db"], fromPath: string, toPath: string) {
+	const now = "2026-01-01 00:00:00";
+	await db.insertInto("tbtop_redirects").values({ locale: null, from_path: fromPath, to_path: toPath, status_code: 301, is_auto: 0, created_at: now, updated_at: now }).execute();
+}
+
 describe("stored redirects", () => {
 	test("a non-ASCII target is percent-encoded, existing escapes kept (R2-frontend-2)", async () => {
 		const { cms } = await makeCms();
@@ -44,17 +50,17 @@ describe("stored redirects", () => {
 	});
 
 	test("an external non-ASCII target becomes a valid header to the same host (R2-frontend-2)", async () => {
-		const { cms } = await makeCms();
-		await cms.site().redirects.create({ fromPath: "out", toPath: "https://bücher.example/ä?q=ü" });
-		await cms.site().redirects.create({ fromPath: "plain", toPath: "https://example.com" });
+		const { cms, db } = await makeCms();
+		await storeRaw(db, "out", "https://bücher.example/ä?q=ü");
+		await storeRaw(db, "plain", "https://example.com");
 		const target = followed(await cms.loadPage(get("/out")));
 		expect(target.href).toBe("https://xn--bcher-kva.example/%C3%A4?q=%C3%BC");
 		expect(await cms.loadPage(get("/plain"))).toEqual({ type: "redirect", status: 301, location: "https://example.com" });
 	});
 
 	test("an internal target with a control character cannot become protocol-relative (R2-frontend-1)", async () => {
-		const { cms } = await makeCms();
-		await cms.site().redirects.create({ fromPath: "tab", toPath: "\t//evil.com" });
+		const { cms, db } = await makeCms();
+		await storeRaw(db, "tab", "\t//evil.com");
 		expect(followed(await cms.loadPage(get("/tab"))).origin).toBe("https://site.test");
 	});
 });
