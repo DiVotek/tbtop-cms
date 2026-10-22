@@ -17,6 +17,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 |---|---|---|---|---|
 | `languages.seed` | `list<array{name:string,locale:string,is_default:bool,is_admin_active:bool,is_frontend_active:bool,sort_order:int}>` | one English entry | Rows seeded into `tbtop_languages` on `cms:install` / `LanguageSeeder` | wiring.md |
 | `pages.types` | `array<string,class-string>` | `[]` | Host page-type classes merged into `PageTypeRegistry` (`Page/PageTypeRegistry.php`) | pages.md |
+| `pages.types_path` | `string\|false\|null` | `null`, falls back to `pages.generated.ts` next to the blocks types file | Output path for the `page` prop's zod schemas/TS types written by `cms:blocks:types` (`BlockTypes/PageTypeScriptEmitter.php`); `false` turns it off | pages.md |
 | `pages.home.name` | `string` | `'Home'` | Name given to the seeded home page (`database/seeders/PageSeeder.php`) | wiring.md |
 | `pages.home.title` | `string` | falls back to `pages.home.name` | Title given to the seeded home page | wiring.md |
 | `pages.errors.4xx.name` / `.title` | `string` | `'Page not found'` | Name/title given to the seeded 4xx error page (`database/seeders/PageSeeder.php`) | pages.md |
@@ -67,20 +68,20 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | Command | Signature/options | Purpose | Scheduled? |
 |---|---|---|---|
 | `cms:install` | `{--force : Overwrite published config files} {--skip-migrations : Do not run database migrations}` | Publish config, run migrations, seed default languages and home page, rebuild the page references index | No |
-| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks; `page_type_pairs` — stored pages whose `type` is a subtype key or whose `subtype` is not a registered subtype of their `type`, per pair with a count and the first ids, trashed included; `page_subtype_bases` — subtypes whose `base()` is unregistered or itself a subtype; `unknown_schema_types` — page types whose `schemaTypes()` list a key `SchemaTypeRegistry` does not know, which the page skips; `page_field_collisions` — page types (base and subtype fields merged) with a `backReferences()` key named like one of their fields, which the back-reference list then replaces in `page.fields`). Exit 1 only on an error-level check | No |
+| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks; `page_type_pairs` — stored pages whose `type` is a subtype key or whose `subtype` is not a registered subtype of their `type`, per pair with a count and the first ids, trashed included; `page_subtype_bases` — subtypes whose `base()` is unregistered or itself a subtype; `unknown_schema_types` — page types whose `schemaTypes()` list a key `SchemaTypeRegistry` does not know, which the page skips). Exit 1 only on an error-level check | No |
 | `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses to revoke the protected owner) | No |
-| `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `CmsServiceProvider::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
+| `cms:not-found:prune` | (none) | Delete 404 log rows older than the Settings key `seo.not_found.retention_days` (default 90) | Yes — daily, if `tbtop-cms.not_found.auto_prune` is true (default true). `ScheduleWiring::wireNotFoundPruneSchedule()`, schedule name `tbtop-cms:not-found:prune` |
 | `cms:seo:snapshot` | (none) | Run the SEO audit and write/update today's row in `tbtop_seo_audit_snapshots` | No — host must schedule via cron |
 | `cms:page-refs:rebuild` | (none) | Recompute `tbtop_page_refs` from every page's (trashed included) type fields of kind `pages` | No |
-| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists | No |
+| `cms:blocks:types` | `{--check} {--path=}` | Generate zod schemas + TS types for registered blocks from each `resolve()`'s `@return array{...}` docblock (from the form for a block without its own `resolve()`), plus `registry.generated.ts` (catalog entries + component map) when the component folder exists, and `pages.generated.ts` (the `page` prop per page type and subtype, pages.md "Page prop types") unless `pages.types_path` is `false`; `--check` compares every file it would write | No |
 
-All eight registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
+All nine registered via `CmsServiceProvider::configurePackage()` -> `->hasCommands([...])`.
 
 Two more schedule entries exist but are not Artisan commands owned by this package:
-- `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `CmsServiceProvider::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
-- An inline `$schedule->call(...)` heartbeat writing `SchedulerHeartbeatCheck::CACHE_KEY` — every minute, unconditional. `CmsServiceProvider::wireSchedulerHeartbeat()`, schedule name `tbtop-cms:health:scheduler-heartbeat`.
+- `activitylog:clean tbtop-cms --days={retention_days} --force` (from `spatie/laravel-activitylog`) — daily, if `tbtop-cms.audit.auto_prune` is true (default true). `ScheduleWiring::wireAuditPruneSchedule()`, schedule name `tbtop-cms:audit:prune`.
+- An inline `$schedule->call(...)` heartbeat writing `SchedulerHeartbeatCheck::CACHE_KEY` — every minute, unconditional. `ScheduleWiring::wireSchedulerHeartbeat()`, schedule name `tbtop-cms:health:scheduler-heartbeat`.
 
 ## 3. Routes
 
@@ -90,19 +91,19 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 
 | Name | Method | Path | Purpose |
 |---|---|---|---|
-| `tbtop-cms.form.submit` | POST | `_cms/forms/{locale}/{page}/{block}` | `FormSubmitController` — handles a form block submission; throttled by `tbtop-cms.forms.throttle` |
+| `tbtop-cms.form.submit` | POST | `_cms/forms/{locale}/{page}/{block}` | `FormSubmitController` — handles a form block submission; `{block}` is a placed block id or a `HasForm` form name (blocks.md); throttled by `tbtop-cms.forms.throttle` |
 | `tbtop-cms.robots` | GET | `robots.txt` | `RobotsController` — dynamic robots.txt |
 | `tbtop-cms.sitemap` | GET | `sitemap.xml` | `SitemapController@index` — sitemap index; only if `tbtop-cms.seo.sitemap.enabled` (default true) |
 | `tbtop-cms.sitemap.chunk` | GET | `sitemap-{chunk}.xml` | `SitemapController@chunk` — one sitemap chunk; registered before the catch-all so it isn't shadowed by a page slug |
 | `tbtop-cms.page` | GET | `{path?}` (catch-all, `.*`) | `PageController` — resolves and renders any CMS page; must be registered last |
 
-**Not a route**: `CmsServiceProvider::wireErrorPages()` registers a `renderable()` on the host's exception handler (`Illuminate\Contracts\Debug\ExceptionHandler::renderable()`), gated by `tbtop-cms.errors.handle` — see seo.md/wiring.md.
+**Not a route**: `ErrorPagesWiring::wireErrorPages()` registers a `renderable()` on the host's exception handler (`Illuminate\Contracts\Debug\ExceptionHandler::renderable()`), gated by `tbtop-cms.errors.handle` — see seo.md/wiring.md.
 
 **Admin, registered directly by `CmsServiceProvider`:**
 
 | Name | Method | Path | Purpose |
 |---|---|---|---|
-| `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
+| `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `AdminWiring::wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
 | `tbtop.cms.logout` | POST | `{admin.prefix}/logout` | `LogoutController`, middleware `['web','auth:{admin.guard}']` |
 | `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
 
@@ -149,7 +150,7 @@ Source of truth: `src/Frontend/Http/Middleware/ShareCmsProps.php` for shared pro
 | `defaultLocale` | `string` | `Languages::defaultLocale()` |
 | `languages` | `list<{locale:string,name:string,is_default:bool}>` | frontend-active languages (`Languages::frontendActive()`) |
 | `debug` | `bool` | `config('app.debug')` — there is no `tbtop-cms.*` key for it. The stock `CmsPage` passes `showErrors={isPreview \|\| cms.debug}` to `CmsRenderer`, which only gates a developer `console.error` line for a block the client could not draw — the page looks the same either way |
-| `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::remember`; `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
+| `layout` | `array<string,list<ResolvedBlock>>` | resolved header/footer slot blocks, cached per locale under key `layout:{locale}` via `CmsCache::rememberLive` (TTL capped at the next page schedule transition, since layout page links resolve against the live scope); `HandlesFormSubmission` blocks get `action` bound per request against the current page (`CurrentPage`) or the home page |
 
 Also shared at the top level (not under `cms`): `errors` — session validation error bag, first message per field.
 
@@ -167,7 +168,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.summary` | `string\|null` | translated summary, same fallback |
 | `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty |
 | `page.image` | `string\|null` | resolved media URL (`MediaUrlResolver`) |
-| `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none |
+| `page.fields` | `object` | the page type's resolved type fields (`resolveFields()`), keyed by field name; always a JSON object, `{}` when there are none; typed per type and subtype in `pages.generated.ts` (pages.md, "Page prop types") |
 | `render` | `{root:string, elements:array<string,{type:string,props:object,children?:list<string>}>}` | page spec from `PageSpecAssembler::assemble()` — flat element map keyed by block id; `root` is a synthetic element (`type` = `config('tbtop-cms.render.root_kind')`, default `Fragment`) whose `children` is the ordered block-id list |
 | `seo` | `array<string,mixed>` | `SeoResolver::resolve()` output (title, description, canonical, og*, article*, twitterCard, alternates, xDefault, noindex, ...) — full shape owned by seo.md. The fallback error page (no published DB error page) carries the same key set, empty (`FallbackProps`) |
 | `breadcrumbs` | `list<{label:string,path:string,url:string}>` | `Breadcrumbs::forPage()` — the full trail: site root, real ancestry, the page itself last; a non-live ancestor or site root is left out (the page itself never is); `[]` when fewer than two crumbs remain (the home page) and on error pages. Same trail as the JSON-LD `BreadcrumbList` (see seo.md) |
@@ -195,12 +196,13 @@ Source of truth: the contract/base-class files themselves under `src/`.
 |---|---|---|---|
 | `Block` (abstract) | `src/Block/Block.php` | Required: `kind(): string`, `form(S $s): list<Field>`. Overridable (have defaults): `label()`, `description()`, `category()`, `placements(): list<string>`, `resolve(array $input, ResolveContext $ctx): array`, `translatableFields()`, `toSchema(array $props, SchemaContext $ctx): ?array` (default `null`) | Base for a block type: schema/form, an optional server-side resolve step, and an optional schema.org node published into the page's `seo.jsonLd` |
 | `Placement` | `src/Block/Placement.php` | Constants `LAYOUT`, `PAGES` | Values a `Block::placements()` entry may hold: a page-type key, `Placement::LAYOUT`, or the wildcard `Placement::PAGES` (every page type) |
-| `PageTypeInterface` | `src/Page/Contracts/PageTypeInterface.php` | `key()`, `label()`, `allowedChildren(): list<string>`, `requiresParent(): bool`, `maxDepth(): int`, `isSourceBacked(): bool`, `source(Page $page): ?object`, `template(Page $page): ?array`, `schemaTypes(): non-empty-list<string>`, `base(): string`, `fields(S $s): list<Field>`, `resolveFields(array $input, ResolveContext $ctx): array`, `backReferences(): array<string, array{field: string, from?: string}>`, `childSubtype(): ?string` | Contract for a page type; `base() !== key()` makes it a subtype (pages.md, "Subtypes and type fields") |
-| `BasePageType` (abstract) | `src/Page/Types/BasePageType.php` | Implements `PageTypeInterface` with defaults (`label`=ucfirst(key), `allowedChildren`=[], `requiresParent`=false, `maxDepth`=1, `isSourceBacked`=false, `source`=null, `template`=null, `schemaTypes`=`['WebPage','AboutPage','ContactPage','ItemPage']`, `base`=own key, `backReferences`=[], `childSubtype`=null, `fields`=[]); a subclass need only override `key()` plus whatever defaults don't fit | Convenience base for page types |
+| `PageTypeInterface` | `src/Page/Contracts/PageTypeInterface.php` | `key()`, `label()`, `allowedChildren(): list<string>`, `requiresParent(): bool`, `maxDepth(): int`, `isSourceBacked(): bool`, `source(Page $page): ?object`, `template(Page $page): ?array`, `schemaTypes(): non-empty-list<string>`, `base(): string`, `fields(S $s): list<Field>`, `resolveFields(array $input, ResolveContext $ctx): array`, `childSubtype(): ?string` | Contract for a page type; `base() !== key()` makes it a subtype (pages.md, "Subtypes and type fields") |
+| `BasePageType` (abstract) | `src/Page/Types/BasePageType.php` | Implements `PageTypeInterface` with defaults (`label`=ucfirst(key), `allowedChildren`=[], `requiresParent`=false, `maxDepth`=1, `isSourceBacked`=false, `source`=null, `template`=null, `schemaTypes`=`['WebPage','AboutPage','ContactPage','ItemPage']`, `base`=own key, `childSubtype`=null, `fields`=[]); a subclass need only override `key()` plus whatever defaults don't fit | Convenience base for page types |
 | `SchemaTypeInterface` | `src/Frontend/Seo/Schema/SchemaTypeInterface.php` | `key(): string`, `label(): string`, `openGraph(SchemaContext $ctx): OpenGraph`, `build(SchemaContext $ctx): list<array<string,mixed>>` | Contract for a schema.org node type selectable via `page.seo.schema.type` |
 | `SchemaType` (abstract) | `src/Frontend/Seo/Schema/SchemaType.php` | Required: `key()`, `build(SchemaContext $ctx): list<array<string,mixed>>`. Overridable (have defaults): `label()` (`Str::headline($this->key())`), `openGraph()` (`OpenGraph::website()`) | Convenience base for a host schema type — extend this, not `SchemaTypeInterface` directly |
 | `SchemaContextFactory` | `src/Frontend/Seo/Schema/SchemaContextFactory.php` | `make(Page $page, string $locale, ?object $source = null): SchemaContext` — one og-image media lookup per call, its `alt`/`mime`/`width`/`height` ride on the context | Builds the `SchemaContext` a page's schema node(s) and its blocks' `toSchema()` share; constructible with a purpose-built `Settings` the same way `SeoResolver` is |
 | `HandlesFormSubmission` (interface, opt-in on a `Block`) | `src/Block/HandlesFormSubmission.php` | `submitRules(array $blockData, SubmitContext $ctx): array`, `handleSubmit(array $payload, array $blockData, SubmitContext $ctx): void` | Server-side validation and handling for anonymous form submits |
+| `HasForm` (trait, opt-in on a `HandlesFormSubmission` block) | `src/Form/HasForm.php` | `formName(): string` (default `kind()`) | Registers the form by name in `Forms` (`Cms::forms()`), so a template posts to it from any page |
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
 | `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms) |
 | `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `DatabaseTemplateStore` (backed by `tbtop_notification_templates`, strict locale match, no fallback) |
@@ -255,6 +257,7 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s are the identity `sameAs` (the only source) |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
+| `seo.title_suffix` | none — legacy, still mapped by `SeoSettingsPage` with no field; a stored value keeps working | no | yes |
 | `seo.description_template` | `SeoSettingsPage` | no | yes |
 | `seo.default_description` | `SeoSettingsPage` | no | yes |
 | `seo.default_og_image` | `SeoSettingsPage` | no | yes (media URL) |
@@ -265,8 +268,8 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.verification.google` | `SeoSettingsPage` | no | yes |
 | `seo.verification.bing` | `SeoSettingsPage` | no | yes |
 | `seo.identity.type` | `SeoSettingsPage` | no | yes |
-| `seo.identity.name` | `SeoSettingsPage` | no | yes |
-| `seo.identity.logo` | `SeoSettingsPage` | no | yes (media URL) |
+| `seo.identity.name` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.name` | no | yes |
+| `seo.identity.logo` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.logo` | no | yes (media URL) |
 | `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
@@ -353,6 +356,10 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `url(Page $page, ?string $locale = null): string` | Builds the absolute frontend URL for a page in a locale |
 | | `breadcrumbs(Page $page, ?string $locale = null): array` | Returns the breadcrumb trail for a page — home › ancestors › page, non-live ancestors and a non-live home left out, `[]` for home or when fewer than two crumbs remain |
 | | `errorResponse(Request $request, int $status): Response` | Always returns a response for the status's error class: seeded DB page → chrome fallback (`render: []`) → (5xx only) static Blade view if rendering throws |
+| | `forms(): Forms` | The `HasForm` forms by name (blocks.md "Forms reachable from any page") |
+| | `referencedBy(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<Page>` | Live pages whose page-type `pages` field `$field` picks `$page` (only type/subtype `$from` when given), by `sort_order` then name; `[]` for a null page (pages.md "Page references") |
+| | `referencedByLinks(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<{id, name, url}>` | `referencedBy()` as the `{id, name, url}` list a `pages` field resolves to |
+| `Tbtop\Cms\Form\Forms` | `props(string $name, Page $page, ?string $locale = null): array` | `{action, honeypotField?}` for a template-rendered form posting from `$page`; also `all()`, `has()`, `get()`, `action()` |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |
 | | `forget(string $key): void` | Deletes one setting, bumps the content cache |
@@ -374,7 +381,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `setCurrent(string $locale): void` | Sets the active locale for this request; throws if not frontend-active |
 | | `frontendActive(): array` | Languages with `is_frontend_active` |
 | | `adminActive(): array` | Languages with `is_admin_active` |
-| | `setDefault(string $locale): void` | Transactionally reassigns the default language |
+| | `setDefault(string $locale): void` | Transactionally reassigns the default language, then dispatches `LanguagesChanged` |
 | | `refresh(): void` | Forces a re-read from the database, bypassing the cross-request cache |
 
 ## 11. Built-in blocks and page types

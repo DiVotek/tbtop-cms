@@ -54,5 +54,7 @@ return [
         'status_invalid' => 'Status code must be 301 or 302.',
         'from_taken' => 'A redirect already exists for this path and locale.',
         'from_shadows_page' => 'A page already exists at this path.',
+        'loop' => 'This redirect would create a loop.',
+        'chain_too_long' => 'Redirect chain is too long.',
     ],
 ];

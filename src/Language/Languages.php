@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Tbtop\Cms\Cache\CmsCache;
+use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Models\Language;
 
 /**
@@ -112,7 +113,9 @@ class Languages
             ]);
         });
 
+        // Query-builder updates skip LanguageObserver; mirror its refresh + event.
         $this->refresh();
+        event(new LanguagesChanged);
     }
 
     /**

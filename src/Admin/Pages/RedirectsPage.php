@@ -148,14 +148,14 @@ class RedirectsPage extends AdminPage
         // the row click has a modal to open.
         return $s->action('redirectEdit')->label(__('tbtop-cms::redirects.actions.edit'))
             ->modal(__('tbtop-cms::redirects.actions.edit_title'), $form)
-            ->query(static fn (ActionCtx $ctx): array => RedirectForm::loadRow((int) ($ctx->row['id'] ?? 0)), needs: ['row'])
+            ->query(static fn (ActionCtx $ctx): array => RedirectForm::loadRow((int) $ctx->key()), needs: ['row'])
             ->meta('hidden', true);
     }
 
     private function update(ActionCtx $ctx): Effects
     {
         try {
-            RedirectForm::save($ctx->form, (int) ($ctx->row['id'] ?? 0));
+            RedirectForm::save($ctx->form, (int) $ctx->key());
         } catch (ValidationException $e) {
             return self::haltWithErrors($e);
         }
@@ -168,7 +168,7 @@ class RedirectsPage extends AdminPage
         return DeleteAction::make(
             $s,
             static function (ActionCtx $ctx): Effects {
-                Redirect::query()->find($ctx->row['id'] ?? null)?->delete();
+                Redirect::query()->find($ctx->key())?->delete();
 
                 return Effects::make()->notify(__('tbtop-cms::redirects.actions.deleted'))->refreshTable();
             },

@@ -161,14 +161,14 @@ class SharedBlockEditPage extends Page
 
     private function open(ActionCtx $ctx): Effects
     {
-        $url = $this->containerUrl((string) ($ctx->row['id'] ?? ''));
+        $url = $this->containerUrl((string) $ctx->key());
 
         return $url === null ? Effects::make() : Effects::make()->redirect($url);
     }
 
     private function detach(ActionCtx $ctx, SharedBlock $block): Effects
     {
-        $container = $this->container((string) ($ctx->row['id'] ?? ''));
+        $container = $this->container((string) $ctx->key());
         // Gated like the editor it stands in for: a page is content, a
         // layout is design (the ability this page already holds).
         if ($container !== null && ! $this->allows($container instanceof CmsPage ? 'tbtop-cms.pages' : 'tbtop-cms.design')) {
@@ -201,12 +201,15 @@ class SharedBlockEditPage extends Page
         };
     }
 
+    /** A trashed page has no editor (it 404s), so its row gets no link, as on PagesPage. */
     private function containerUrl(string $rowId): ?string
     {
         [$type, $key] = array_pad(explode(':', $rowId, 2), 2, '');
 
         return match (true) {
-            $type === 'page' && Route::has('tbtop.cms.page-edit-page') => route('tbtop.cms.page-edit-page', ['page' => $key]),
+            $type === 'page' && Route::has('tbtop.cms.page-edit-page') => ctype_digit($key) && CmsPage::query()->whereKey((int) $key)->exists()
+                ? route('tbtop.cms.page-edit-page', ['page' => $key])
+                : null,
             $type === 'layout' && Route::has('tbtop.cms.layout-edit-page') => route('tbtop.cms.layout-edit-page', ['slot' => $key]),
             default => null,
         };

@@ -8,6 +8,12 @@ parameters:
         - config
         - database
     tmpDir: build/phpstan
+    # HasForm is a host-facing opt-in; no package block uses it, so PHPStan
+    # would skip it as unused rather than analyse it.
+    ignoreErrors:
+        -
+            identifier: trait.unused
+            path: src/Form/HasForm.php
     # Larastan's noEnvCallsOutsideOfConfig rule defaults to the booted
     # application's config_path(), which under Testbench resolves to the
     # workbench skeleton, not this package's own config/ source directory —

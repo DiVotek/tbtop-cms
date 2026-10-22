@@ -472,7 +472,7 @@ class UsersPage extends AdminPage
      */
     private function rowId(ActionCtx $ctx): int | string
     {
-        $id = $ctx->row['id'] ?? '';
+        $id = $ctx->key() ?? '';
         if (is_int($id)) {
             return $id;
         }

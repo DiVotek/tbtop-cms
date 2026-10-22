@@ -13,58 +13,86 @@ use Tbtop\Cms\Block\BlockDiscovery;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\BlockTypes\BlockShape;
 use Tbtop\Cms\BlockTypes\BlockShapeExtractor;
+use Tbtop\Cms\BlockTypes\PageShapeExtractor;
+use Tbtop\Cms\BlockTypes\PageTypeScriptEmitter;
 use Tbtop\Cms\BlockTypes\RegistryEmitter;
 use Tbtop\Cms\BlockTypes\TypeAliasCollector;
 use Tbtop\Cms\BlockTypes\TypeScriptEmitter;
 use Tbtop\Cms\BlockTypes\UnsupportedShapeException;
+use Tbtop\Cms\Page\PageTypeRegistry;
 
 class BlocksTypesCommand extends Command
 {
     protected $signature = 'cms:blocks:types
         {--check : Exit 1 when the file on disk differs from the generated output, without writing}
-        {--path= : Override the output path (default: config(tbtop-cms.blocks.types_path))}';
+        {--path= : Override the blocks output path (default: config(tbtop-cms.blocks.types_path)); page types go next to it unless config(tbtop-cms.pages.types_path) is set}';
 
-    protected $description = 'Generate zod schemas, TS types and the catalog/component registry for registered CMS blocks.';
+    protected $description = 'Generate zod schemas, TS types and the catalog/component registry for registered CMS blocks, and the page prop types.';
 
-    public function handle(BlockRegistry $registry): int
+    public function handle(BlockRegistry $registry, PageTypeRegistry $pageTypes): int
     {
         $path = $this->outputPath();
         $registryPath = $this->registryPath($path);
+        $pagesPath = $this->pagesPath($path);
 
         try {
             $output = $this->generate($registry);
             $registryContents = $this->generateRegistry($registry, $path, $registryPath);
+            $pages = $pagesPath === null ? null : $this->generatePages($pageTypes);
         } catch (RuntimeException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;
         }
 
-        foreach ($output->warnings as $warning) {
+        foreach ([...$output->warnings, ...$pages->warnings ?? []] as $warning) {
             $this->warn($warning);
         }
 
+        /** @var array<string, string> $files path => contents */
+        $files = [$path => $output->contents];
+        if ($registryContents !== null) {
+            $files[$registryPath] = $registryContents;
+        }
+        if ($pagesPath !== null && $pages !== null) {
+            $files[$pagesPath] = $pages->contents;
+        }
+
         if ($this->option('check')) {
-            $typesOk = $this->check($path, $output->contents) === self::SUCCESS;
-            $registryOk = $registryContents === null || $this->check($registryPath, $registryContents) === self::SUCCESS;
+            $ok = true;
+            foreach ($files as $file => $contents) {
+                $ok = $this->check($file, $contents) === self::SUCCESS && $ok;
+            }
 
-            return $typesOk && $registryOk ? self::SUCCESS : self::FAILURE;
+            return $ok ? self::SUCCESS : self::FAILURE;
         }
 
-        File::ensureDirectoryExists(dirname($path));
-        if ($registryContents !== null) {
-            File::ensureDirectoryExists(dirname($registryPath));
-        }
-
-        File::put($path, $output->contents);
-        $this->info("Wrote {$path}");
-
-        if ($registryContents !== null) {
-            File::put($registryPath, $registryContents);
-            $this->info("Wrote {$registryPath}");
+        foreach ($files as $file => $contents) {
+            File::ensureDirectoryExists(dirname($file));
+            File::put($file, $contents);
+            $this->info("Wrote {$file}");
         }
 
         return self::SUCCESS;
+    }
+
+    /** Next to the blocks file by default; `false` turns the page types off. */
+    private function pagesPath(string $typesPath): ?string
+    {
+        $configured = config('tbtop-cms.pages.types_path');
+
+        if ($configured === false) {
+            return null;
+        }
+
+        return is_string($configured) && $configured !== '' ? $configured : dirname($typesPath) . '/pages.generated.ts';
+    }
+
+    private function generatePages(PageTypeRegistry $pageTypes): GeneratedOutput
+    {
+        ['shapes' => $shapes, 'aliases' => $aliases, 'warnings' => $warnings] = (new PageShapeExtractor)->extract($pageTypes);
+
+        return new GeneratedOutput((new PageTypeScriptEmitter)->emit($shapes, $aliases), $warnings);
     }
 
     private function check(string $path, string $contents): int

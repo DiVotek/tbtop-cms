@@ -8,6 +8,8 @@ use Tbtop\Cms\Tests\Fixtures\BlockTypes\TypedAliasBlock;
 beforeEach(function (): void {
     $this->outputPath = sys_get_temp_dir() . '/tbtop-cms-blocks-types-check-test-' . uniqid() . '.ts';
     config()->set('tbtop-cms.blocks.types', []);
+    // Page types have their own test; the default would share one pages.generated.ts in the temp dir.
+    config()->set('tbtop-cms.pages.types_path', false);
     BlockRegistry::extend(fn (): array => [TypedAliasBlock::class]);
 });
 

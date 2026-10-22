@@ -24,12 +24,20 @@ interface FormHarness {
 	value?: LinkValue | null;
 	onChange?: (next: LinkValue | null) => void;
 	client?: AdminClient;
+	describedBy?: string;
 }
 
-function renderForm({ options, value = null, onChange = NOOP, client }: FormHarness = {}) {
+function renderForm({ options, value = null, onChange = NOOP, client, describedBy }: FormHarness = {}) {
 	return render(
 		<ClientProvider client={client ?? stubClient(async () => ({ options: [] }))}>
-			<LinkForm name="cta" value={value} onChange={onChange} options={options as Record<string, unknown>} />
+			<LinkForm
+				name="cta"
+				id="cta"
+				value={value}
+				onChange={onChange}
+				describedBy={describedBy}
+				options={options as Record<string, unknown>}
+			/>
 		</ClientProvider>,
 	);
 }
@@ -64,6 +72,26 @@ describe("LinkForm type switch", () => {
 
 		expect(getByText("Email")).toBeTruthy();
 		expect(queryByText("Page")).toBeNull();
+	});
+});
+
+describe("LinkForm accessibility", () => {
+	it("points the page picker at the field's description, like the text targets", () => {
+		const { container } = renderForm({
+			value: { type: "page", page: null, value: null, anchor: null, label: null },
+			describedBy: "cta-help",
+		});
+
+		expect(container.querySelector("#cta")?.getAttribute("aria-describedby")).toBe("cta-help");
+	});
+
+	it("points a text target at the field's description", () => {
+		const { container } = renderForm({
+			value: { type: "email", page: null, value: null, anchor: null, label: null },
+			describedBy: "cta-help",
+		});
+
+		expect(container.querySelector("#cta")?.getAttribute("aria-describedby")).toBe("cta-help");
 	});
 });
 

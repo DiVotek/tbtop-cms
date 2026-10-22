@@ -43,7 +43,7 @@ final class PageEditSidebar
                     ...PageForm::subtypeField($s, $page->type, isStored: true),
                 ]),
                 // Excludes the page itself and its descendants — placing it
-                // under its own subtree is a cycle PageForm::guardParent()
+                // under its own subtree is a cycle PageFormGuards::parent()
                 // rejects on submit; excluding here keeps the picker from
                 // offering an option that would only bounce back as an error.
                 $s->relation('parent_id')->label(__('tbtop-cms::pages.fields.parent'))

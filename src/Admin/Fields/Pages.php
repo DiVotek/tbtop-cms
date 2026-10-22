@@ -12,6 +12,7 @@ use Tbtop\Cms\Page\Refs\PageIds;
 use Tbtop\Cms\Page\Refs\PageRefList;
 use Tbtop\Cms\Page\Refs\PageRefRule;
 use Tbtop\Cms\Page\Refs\PageTypeFilter;
+use Tbtop\Cms\Page\Support\PageNameSearch;
 
 /**
  * `$s->pages('services')->of('article', 'legal_service')` — a searchable
@@ -19,7 +20,7 @@ use Tbtop\Cms\Page\Refs\PageTypeFilter;
  * picked. On the wire it is a plain async `select`: the admin client already
  * renders it. The site gets `list<{id, name, url}>` of the live ones
  * (FormResolver); a page type's field also feeds the reverse index behind
- * PageTypeInterface::backReferences(). pages.md.
+ * Cms::referencedBy(). pages.md.
  *
  * Its closures are built in the constructor from the options, so
  * PrefixedField::rename(), which replays options into `$field::make()`, gets
@@ -97,7 +98,8 @@ final class Pages extends Select
         return [...($isRequired ? [] : ['nullable']), ...$declared, PageRefRule::except($this->exceptPageId)];
     }
 
-    private function filter(): PageTypeFilter
+    /** The type/subtype pairs of(): which pages the search offers. */
+    public function typeFilter(): PageTypeFilter
     {
         $pairs = $this->opts[self::TYPES] ?? [];
 
@@ -112,7 +114,7 @@ final class Pages extends Select
     private function search(string $search): array
     {
         $locale = LocaleService::currentLocale();
-        $query = $this->filter()->apply(Page::query());
+        $query = $this->typeFilter()->apply(Page::query());
 
         if ($this->exceptPageId !== null) {
             $query->whereKeyNot($this->exceptPageId);
@@ -120,9 +122,7 @@ final class Pages extends Select
 
         $search = trim($search);
         if ($search !== '') {
-            $like = '%' . $search . '%';
-            $query->where(static fn ($q) => $q->where('name->' . $locale, 'like', $like)
-                ->orWhere('name->' . LocaleService::defaultContentLocale(), 'like', $like));
+            PageNameSearch::apply($query, $search, [$locale, LocaleService::defaultContentLocale()]);
         }
 
         return $query->orderBy('sort_order')->orderBy('id')->limit(self::SEARCH_LIMIT)->get()

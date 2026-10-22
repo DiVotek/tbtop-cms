@@ -11,6 +11,7 @@ use Tbtop\Cms\Layout\Slots;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Tests\Fixtures\HeroBlock;
+use Tbtop\Cms\Tests\Fixtures\LinkBlock;
 
 uses(RefreshDatabase::class);
 
@@ -158,4 +159,35 @@ it('skips an inactive block in a layout slot', function (): void {
     $this->get('/about', ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.cms.layout.header', []);
+});
+
+it('serves a layout link to a scheduled page once its published_at passes', function (): void {
+    config()->set('tbtop-cms.blocks.types', [HeroBlock::class, LinkBlock::class]);
+    Language::factory()->default()->create(['locale' => 'en']);
+
+    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
+    $scheduled = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Launch'],
+        'published_at' => now()->addSeconds(10),
+    ]);
+
+    Layout::query()->create([
+        'slot' => Slots::HEADER,
+        'content' => [
+            ['id' => 'l1', 'kind' => 'LinkBlock', 'active' => true, 'data' => ['cta' => ['type' => 'page', 'page' => (string) $scheduled->id]]],
+        ],
+    ]);
+
+    app(Cms::class)->frontendRoutes();
+
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertJsonPath('props.cms.layout.header.0.props.cta', null);
+
+    $this->travel(11)->seconds();
+
+    // A cached layout must not outlive the schedule transition: the link
+    // appears without any write happening at that instant.
+    $this->get('/about', ['X-Inertia' => 'true'])
+        ->assertJsonPath('props.cms.layout.header.0.props.cta.href', '/' . $scheduled->pathFor('en'));
 });

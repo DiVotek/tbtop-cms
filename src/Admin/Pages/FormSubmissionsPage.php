@@ -280,7 +280,7 @@ class FormSubmissionsPage extends AdminPage
 
     private function retry(ActionCtx $ctx): Effects
     {
-        $submission = FormSubmission::query()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $submission = FormSubmission::query()->findOrFail((int) $ctx->key());
 
         app(SubmissionRetrier::class)->retry($submission);
         $submission->refresh();
@@ -314,7 +314,7 @@ class FormSubmissionsPage extends AdminPage
 
     private function delete(ActionCtx $ctx): Effects
     {
-        $submission = FormSubmission::query()->findOrFail((int) ($ctx->row['id'] ?? 0));
+        $submission = FormSubmission::query()->findOrFail((int) $ctx->key());
         $submission->delete();
         $this->logSubmission($submission, 'deleted');
 

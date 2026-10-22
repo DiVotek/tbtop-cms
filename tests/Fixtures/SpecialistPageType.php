@@ -29,6 +29,7 @@ class SpecialistPageType extends ArticleType
     {
         return [
             $s->pages('services')->label('Services')->of('article', 'legal_service'),
+            $s->text('bio')->label('Bio'),
         ];
     }
 }

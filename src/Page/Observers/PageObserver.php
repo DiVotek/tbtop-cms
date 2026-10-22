@@ -35,7 +35,7 @@ class PageObserver
 
     /**
      * PageSaved is bound to the write rather than to each caller: the content
-     * cache bump rides on it (CmsServiceProvider::wireContentCacheInvalidation()),
+     * cache bump rides on it (ContentEventsWiring::wireContentCacheInvalidation()),
      * so a caller-side dispatch left every other write path serving stale
      * content with no error. Same move as LanguagesChanged into LanguageObserver.
      *

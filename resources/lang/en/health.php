@@ -224,13 +224,5 @@ return [
                 'warning' => 'Such a key is skipped: the page publishes the next listed key, or WebPage when none is left. Fix the key or register its class in tbtop-cms.seo.schema_types.',
             ],
         ],
-        'page_field_collisions' => [
-            'label' => 'Page field names',
-            'ok' => 'No page type has a back-reference named like one of its fields.',
-            'warning' => 'These page types have back-references named like one of their (base and subtype) fields (type: names): :types.',
-            'hints' => [
-                'warning' => 'On the site, page.fields carries the back-reference list under that name and the field\'s value is lost. Rename the backReferences() key or the field.',
-            ],
-        ],
     ],
 ];

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Activitylog\Models\Activity;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\NotFound\Models\NotFoundHit;
@@ -139,6 +140,22 @@ it('creates a redirect from the row action and marks the hit ignored', function 
         ->and($redirect->to_path)->toBe('new-target');
 
     expect($hit->fresh()->is_ignored)->toBeTrue();
+});
+
+it('does not log a second ignore when a redirect is created for an already-ignored hit', function (): void {
+    actingAsNotFoundAdmin();
+    $hit = makeNotFoundHit(['path' => 'old-broken-link']);
+    $hit->forceFill(['is_ignored' => true])->save();
+
+    test()->postJson('/admin/not-found/actions/notFoundCreateRedirectSave', [
+        'payload' => [
+            'row' => ['id' => $hit->id, 'path' => $hit->path, 'locale' => $hit->locale],
+            'form' => ['to_path' => 'new-target', 'locale' => 'en', 'status_code' => '301'],
+        ],
+    ])->assertOk();
+
+    expect(Redirect::query()->where('from_path', 'old-broken-link')->exists())->toBeTrue()
+        ->and(Activity::query()->forSubject($hit)->where('event', 'ignored')->count())->toBe(0);
 });
 
 it('toggles a hit to ignored and back via the ignore/unignore actions', function (): void {

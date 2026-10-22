@@ -43,6 +43,10 @@ return [
     ],
     'pages' => [
         'types' => [],
+        // Where `cms:blocks:types` writes the zod schemas / TS types of the
+        // `page` prop. Null means pages.generated.ts next to the blocks types
+        // file; false turns it off.
+        'types_path' => null,
         'home' => [
             'name' => 'Home',
             'title' => 'Home',

@@ -178,11 +178,14 @@ class SitemapEntryBuilder
      *
      * Formatted to one decimal because the spec's range is 0.0–1.0 and a
      * locale with a comma decimal separator would otherwise emit "0,8".
+     * A page with no default-locale slug takes its depth from another
+     * locale's path; only an empty path is the home page.
      */
     private function priority(Page $page): string
     {
-        $depth = substr_count(trim((string) $page->pathFor($this->languages->defaultLocale()), '/'), '/');
-        $isHome = (string) $page->pathFor($this->languages->defaultLocale()) === '';
+        $path = $page->pathFor($this->languages->defaultLocale()) ?? $page->slugs->first()?->path;
+        $depth = substr_count(trim((string) $path, '/'), '/');
+        $isHome = $path === '';
 
         $priority = $isHome ? 1.0 : max(0.3, 0.8 - ($depth * 0.2));
 

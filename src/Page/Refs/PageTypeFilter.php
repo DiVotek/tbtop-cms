@@ -39,6 +39,17 @@ final readonly class PageTypeFilter
         return $subtype === null ? $type : "{$type}/{$subtype}";
     }
 
+    /** Whether a page of $type/$subtype is one this filter lets the field pick — apply() for a single page. */
+    public function accepts(string $type, ?string $subtype): bool
+    {
+        if ($this->pairs === []) {
+            return true;
+        }
+
+        return in_array($type, $this->pairs, true)
+            || ($subtype !== null && in_array("{$type}/{$subtype}", $this->pairs, true));
+    }
+
     /**
      * @param  Builder<Page>  $query
      * @return Builder<Page>

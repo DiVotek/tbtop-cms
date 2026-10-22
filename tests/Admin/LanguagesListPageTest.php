@@ -228,3 +228,56 @@ it('lets a trashed locale be recreated via the create form, reviving the row ins
     expect(Language::query()->where('locale', 'de')->count())->toBe(1)
         ->and(Language::withTrashed()->find($original->id)->trashed())->toBeFalse();
 });
+
+it('keeps the create modal open with the reason when the language rules reject the form', function (): void {
+    $response = test()->postJson('/admin/languages/actions/languageCreateSave', [
+        'payload' => ['form' => ['locale' => 'de', 'is_admin_active' => false, 'is_frontend_active' => true]],
+    ]);
+
+    $response->assertOk();
+    expect(collect($response->json('effects'))->pluck('kind')->all())->toBe(['haltModal'])
+        ->and(Language::query()->where('locale', 'de')->exists())->toBeFalse();
+});
+
+it('keeps the edit modal open with the reason when unsetting the only default language', function (): void {
+    $default = Language::query()->where('locale', 'en')->firstOrFail();
+
+    $response = test()->postJson('/admin/languages/actions/languageEditSave', [
+        'payload' => [
+            'row' => ['id' => $default->id],
+            'form' => ['name' => 'English', 'locale' => 'en', 'is_default' => false, 'is_admin_active' => true, 'is_frontend_active' => true],
+        ],
+    ]);
+
+    $response->assertOk();
+    expect(collect($response->json('effects'))->pluck('kind')->all())->toBe(['haltModal'])
+        ->and($default->fresh()->is_default)->toBeTrue();
+});
+
+it('keeps the edit modal open with the field error when the og_locale is malformed', function (): void {
+    $language = Language::factory()->create(['locale' => 'de', 'og_locale' => 'de_DE']);
+
+    $response = test()->postJson('/admin/languages/actions/languageEditSave', [
+        'payload' => [
+            'row' => ['id' => $language->id],
+            'form' => ['name' => 'Deutsch', 'locale' => 'de', 'og_locale' => 'nope', 'is_admin_active' => true],
+        ],
+    ]);
+
+    $response->assertOk();
+    $effects = $response->json('effects');
+    expect($effects[0])->toMatchArray([
+        'kind' => 'haltModal',
+        'message' => __('tbtop-cms::languages.validation.og_locale_format'),
+    ])->and($language->fresh()->og_locale)->toBe('de_DE');
+});
+
+it('reports an error instead of failing when a stale row deletes the default language', function (): void {
+    $default = Language::query()->where('locale', 'en')->firstOrFail();
+
+    $response = test()->postJson('/admin/languages/actions/languageDelete', ['payload' => ['row' => ['id' => $default->id]]]);
+
+    $response->assertOk();
+    expect(collect($response->json('effects'))->firstWhere('kind', 'notify')['level'] ?? null)->toBe('error')
+        ->and($default->fresh()->trashed())->toBeFalse();
+});
