@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import { RedirectError } from "../src";
+import { slugify } from "../src/support/slug";
 import { get, makeCms } from "./support";
 
 async function panel() {
@@ -112,5 +113,60 @@ describe("make default (R2-content-3)", () => {
 		expect((await cms.loadPage(get("/"))).type).not.toBe("notFound");
 		const about = await db.selectFrom("tbtop_page_slugs").select("path").where("locale", "=", "de").where("page_id", "=", ids.about as number).executeTakeFirstOrThrow();
 		expect((await cms.loadPage(get(`/${about.path}`))).type).toBe("page");
+	});
+});
+
+describe("slugs match Str::slug (R2-content-5)", () => {
+	/** Str::slug outputs from illuminate/support 12 (voku/portable-ascii 2.1.1). */
+	const php: [string, string][] = [
+		["Щастя їжак Єва хліб", "shhastia-yizak-jeva-xlib"],
+		["Київ, вул. Хрещатик 1/2", "kiyiv-vul-xreshhatik-12"],
+		["Ж Х Ц Ч Ш Щ", "z-x-c-c-s-shh"],
+		["Ёлка ЪЫЬ Эх юла", "elka-iey-ex-iula"],
+		["Ґанок цукор", "ganok-cukor"],
+		["Ελληνικά", "ellinika"],
+		["مرحبا", "mrhba"],
+		["Ğüşçö ıİ", "gusco-ii"],
+		["ﬁ ½ ™ №5", "fi-5"],
+		["Hello World", "hello-world"],
+		["user@example.com", "user-at-examplecom"],
+		["snake_case and-dash", "snake-case-and-dash"],
+		["Düsseldorf Straße", "dusseldorf-strasse"],
+		["Æsir øl œuvre łódź đak", "aesir-ol-oeuvre-lodz-dak"],
+		["  --Leading & trailing!!--  ", "leading-trailing"],
+		["Про нас", "pro-nas"],
+		["Головна сторінка нашого сайту про все на світі та ще трохи більше тексту", "golovna-storinka-nasogo-saitu-pro-vse-na-sviti-ta-shhe-troxi-bilse-tekstu"],
+		["Aι short", "ai-short"],
+		["Αι Greek", "ai-greek"],
+		["Ünïcödé Ēxtrâ Lõng Tîtlé Thät Gœs Pàst Sixty Four Bytes Of UTF-8 Ïnpüt Aι", "unicode-extra-long-title-that-goes-past-sixty-four-bytes-of-utf-8-input-ai"],
+		["Привет, мир! Как дела?", "privet-mir-kak-dela"],
+		["中文 标题", ""],
+		["日本語", ""],
+		["한국어", ""],
+		["עברית", ""],
+		["Tiếng Việt có dấu", "tieng-viet-co-dau"],
+		["ქართული", "qartuli"],
+		["Հայերեն", "hayeren"],
+		["\tTab\nnew", "tab-new"],
+		["A̧ combining", "a-combining"],
+		["€ 100 £ 5", "eur-100-ps-5"],
+		["Ⅻ ①", ""],
+		["---", ""],
+		["Ω≈ç√∫", "oc"],
+		["Șțăîâ", "staia"],
+		["Ꜳ", "aa"],
+	];
+
+	test("slugify gives Laravel's output, Cyrillic, Greek and Arabic included", () => {
+		expect(php.map(([input]) => [input, slugify(input)])).toEqual(php);
+	});
+
+	test("a new page's slug is derived like PHP's; a stored slug is kept on rename", async () => {
+		const { cms } = await makeCms();
+		const site = cms.site();
+		const page = await site.pages.create({ type: "page", name: { en: "Ελληνικά", uk: "Київ, вул. Хрещатик 1/2" } });
+		expect(await site.pages.slugs.allFor(page.id)).toMatchObject({ en: "ellinika", uk: "kiyiv-vul-xreshhatik-12" });
+		await site.pages.update(page.id, { name: { en: "Renamed", uk: "Інша назва" } });
+		expect(await site.pages.slugs.allFor(page.id)).toMatchObject({ en: "ellinika", uk: "kiyiv-vul-xreshhatik-12" });
 	});
 });

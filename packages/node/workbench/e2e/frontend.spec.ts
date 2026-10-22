@@ -18,7 +18,7 @@ test("blocks render through json-render", async ({ page }) => {
 });
 
 test("a locale prefix picks the translation and the html lang", async ({ page }) => {
-	await page.goto("/uk/blog/pershiy-zapis");
+	await page.goto("/uk/blog/persii-zapis");
 	await expect(page.locator("html")).toHaveAttribute("lang", "uk");
 	const crumbs = page.getByRole("navigation", { name: "Breadcrumbs" }).getByRole("link");
 	await expect(crumbs).toHaveCount(3);

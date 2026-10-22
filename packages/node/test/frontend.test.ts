@@ -85,7 +85,7 @@ describe("loadPage", () => {
 			twitterCard: "summary",
 			alternates: [
 				{ locale: "en", url: "https://site.test/blog/first-post" },
-				{ locale: "uk", url: "https://site.test/uk/blog/pershiy-zapis" },
+				{ locale: "uk", url: "https://site.test/uk/blog/persii-zapis" },
 			],
 			xDefault: "https://site.test/blog/first-post",
 		});
@@ -170,7 +170,7 @@ describe("handle", () => {
 			"https://site.test/blog",
 			"https://site.test/uk/blog",
 			"https://site.test/blog/first-post",
-			"https://site.test/uk/blog/pershiy-zapis",
+			"https://site.test/uk/blog/persii-zapis",
 		]);
 		expect(chunk).toContain('<xhtml:link rel="alternate" hreflang="x-default" href="https://site.test/about-us"/>');
 		expect(chunk).toContain("<priority>1.0</priority>");
