@@ -56,7 +56,7 @@ const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
 	pageTypes: [], // extra page types next to page, category, article
-	url: "https://example.com", // default: the request origin
+	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
 });

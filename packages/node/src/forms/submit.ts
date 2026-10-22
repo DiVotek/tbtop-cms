@@ -21,7 +21,7 @@ export async function submitForm(site: Site, request: Request): Promise<Response
 	if (request.method !== "POST" || match === null) {
 		return null;
 	}
-	if (crossSite(request, site.origin)) {
+	if (crossSite(request, site.origin, site.config.url === undefined)) {
 		// The PHP route sits in the `web` group, whose CSRF check answers 419 here.
 		return new Response(null, { status: 403 });
 	}
@@ -80,9 +80,12 @@ export async function submitForm(site: Site, request: Request): Promise<Response
  * The frontend has no session to carry a CSRF token, so a post counts as
  * cross-site when the browser says so: `Sec-Fetch-Site: cross-site`, an
  * Origin (else a Referer) off the site, or an opaque `null` Origin. A client
- * that sends neither header is no browser, so no visitor's to forge.
+ * that sends neither header is no browser, so no visitor's to forge. With no
+ * configured `url` the origin comes from the request, which behind a
+ * TLS-terminating proxy is `http` while the browser says `https`: then only
+ * the host is compared.
  */
-function crossSite(request: Request, siteOrigin: string): boolean {
+function crossSite(request: Request, siteOrigin: string, hostOnly: boolean): boolean {
 	if (request.headers.get("sec-fetch-site") === "cross-site") {
 		return true;
 	}
@@ -90,10 +93,16 @@ function crossSite(request: Request, siteOrigin: string): boolean {
 	if (source === null) {
 		return false;
 	}
-	const own = [siteOrigin, request.url].map(originOf);
-	const from = originOf(source);
+	const key = hostOnly ? hostOf : originOf;
+	const own = [siteOrigin, request.url].map(key);
+	const from = key(source);
 	return from === null || !own.includes(from);
 }
+
+const hostOf = (url: string): string | null => {
+	const origin = originOf(url);
+	return origin === null ? null : new URL(origin).host;
+};
 
 const originOf = (url: string): string | null => {
 	try {

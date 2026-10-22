@@ -105,6 +105,17 @@ describe("R3-forms-1: a cross-site post is refused", () => {
 	});
 });
 
+describe("R4-fixes-4: behind a TLS-terminating proxy", () => {
+	test("without a configured url, an https Origin of the same host passes an http request URL", async () => {
+		const { cms, db } = await makeCms(undefined, { url: undefined });
+		const path = new URL(await contactAction(cms), "https://site.test").pathname;
+		const proxied = (origin: string) => post(`http://site.test${path}`, valid, { Origin: origin });
+		expect((await cms.handle(proxied("https://site.test")))?.status).toBe(200);
+		expect((await cms.handle(proxied("https://evil.test")))?.status).toBe(403);
+		expect(await rows(db)).toHaveLength(1);
+	});
+});
+
 describe("R3-forms-3: inputs are trimmed and blanks become null, as Laravel's middleware does", () => {
 	test("a padded email validates; padded text is stored trimmed", async () => {
 		const { cms } = await makeCms();
