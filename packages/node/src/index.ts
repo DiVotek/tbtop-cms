@@ -19,6 +19,7 @@ export type { Language } from "./content/languages";
 export { isLive, type Page, type PageStatus, type Translations } from "./content/page";
 export { PageConflictError, type PageInput } from "./content/pages";
 export { definePageType, type PageType, type PageTypeDef } from "./content/pageTypes";
+export { RedirectError } from "./content/redirects";
 export { richtextHtml } from "./content/richtext";
 export { baselineMigration, cmsMigrations, type Dialect, type MigrationOptions, migrateCms } from "./db/migrations";
 export type { CmsDatabase } from "./db/schema";

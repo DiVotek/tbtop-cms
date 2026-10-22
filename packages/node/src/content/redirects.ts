@@ -4,6 +4,24 @@ import { insertId } from "../support/db";
 import { flag, sqlDate } from "../support/values";
 
 const MAX_HOPS = 10;
+/** Longest chain a new or edited rule may extend (RedirectCycle::MAX_HOPS). */
+const MAX_WRITE_HOPS = 20;
+/**
+ * External hosts a redirect may point at. PHP reads
+ * `tbtop-cms.redirects.allowed_external_hosts` (default `[]`); Node has no
+ * such key yet, so every external target is rejected, like PHP's default.
+ */
+const ALLOWED_EXTERNAL_HOSTS: readonly string[] = [];
+
+/** A redirect rule that fails RedirectValidator's checks; the message is user-facing. */
+export class RedirectError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "RedirectError";
+	}
+}
+
+export type RedirectInput = { locale?: string | null; fromPath: string; toPath: string; statusCode?: number; isAuto?: boolean };
 
 export type Redirect = { id: number; locale: string | null; fromPath: string; toPath: string; statusCode: number; isAuto: boolean };
 
@@ -45,20 +63,111 @@ export class Redirects {
 		return null;
 	}
 
-	async create(input: { locale?: string | null; fromPath: string; toPath: string; statusCode?: number; isAuto?: boolean }): Promise<number> {
+	/** Validates (see `validate`) and stores a rule; throws RedirectError when it is invalid. */
+	async create(input: RedirectInput): Promise<number> {
+		const rule = await this.validate(input);
 		const now = sqlDate(new Date());
 		return insertId(
 			this.db,
 			this.db.insertInto("tbtop_redirects").values({
-				locale: input.locale ?? null,
-				from_path: normalizePath(input.fromPath),
-				to_path: isExternal(input.toPath) ? input.toPath : normalizePath(input.toPath),
-				status_code: input.statusCode ?? 301,
+				locale: rule.locale,
+				from_path: rule.fromPath,
+				to_path: rule.toPath,
+				status_code: rule.statusCode,
 				is_auto: flag(input.isAuto ?? false),
 				created_at: now,
 				updated_at: now,
 			}),
 		);
+	}
+
+	/**
+	 * The normalized rule, or a RedirectError (RedirectForm::save + RedirectValidator::assert):
+	 * a local, non-empty `from`; an http(s) target on an allowlisted host; status 301/302;
+	 * unique per locale (NULL included); not shadowed by a page path; no loop or over-long chain.
+	 * `id` is the rule being edited, left out of the uniqueness and chain checks.
+	 */
+	async validate(input: RedirectInput, id: number | null = null): Promise<{ locale: string | null; fromPath: string; toPath: string; statusCode: number }> {
+		const locale = typeof input.locale === "string" && input.locale.trim() !== "" ? input.locale.trim() : null;
+		const fromPath = normalizePath(input.fromPath);
+		const rawTo = input.toPath.trim();
+		if (rawTo === "" || fromPath === "") {
+			throw new RedirectError("From and to paths are required.");
+		}
+		if (isExternal(fromPath)) {
+			throw new RedirectError("From path must be a local path, not an external URL.");
+		}
+		const toPath = isExternal(rawTo) ? rawTo : normalizePath(rawTo);
+		assertTargetAllowed(toPath);
+		const statusCode = input.statusCode ?? 301;
+		if (statusCode !== 301 && statusCode !== 302) {
+			throw new RedirectError("Status code must be 301 or 302.");
+		}
+		await this.assertUnique(locale, fromPath, id);
+		await this.assertNotShadowing(locale, fromPath);
+		await this.assertAcyclic(locale, fromPath, toPath, id);
+		return { locale, fromPath, toPath, statusCode };
+	}
+
+	private async assertUnique(locale: string | null, from: string, id: number | null): Promise<void> {
+		let query = this.db.selectFrom("tbtop_redirects").select("id").where("from_path", "=", from);
+		query = locale === null ? query.where("locale", "is", null) : query.where("locale", "=", locale);
+		if (id !== null) {
+			query = query.where("id", "!=", id);
+		}
+		if ((await query.executeTakeFirst()) !== undefined) {
+			throw new RedirectError("A redirect already exists for this path and locale.");
+		}
+	}
+
+	private async assertNotShadowing(locale: string | null, from: string): Promise<void> {
+		let query = this.db.selectFrom("tbtop_page_slugs").select("id").where("path", "=", from);
+		if (locale !== null) {
+			query = query.where("locale", "=", locale);
+		}
+		if ((await query.executeTakeFirst()) !== undefined) {
+			throw new RedirectError("A page already exists at this path.");
+		}
+	}
+
+	/** RedirectCycle::assertAcyclic: for an any-locale rule, every locale with its own rules is walked too. */
+	private async assertAcyclic(locale: string | null, from: string, to: string, id: number | null): Promise<void> {
+		if (isExternal(to)) {
+			return;
+		}
+		const others = locale === null ? await this.db.selectFrom("tbtop_redirects").select("locale").distinct().where("locale", "is not", null).execute() : [];
+		const locales = locale === null ? [null, ...others.map((row) => row.locale)] : [locale];
+		for (const candidate of locales) {
+			await this.assertAcyclicFor(candidate, from, to, id);
+		}
+	}
+
+	private async assertAcyclicFor(locale: string | null, from: string, to: string, id: number | null): Promise<void> {
+		const seen = [from];
+		let current = normalizePath(to);
+		for (let hop = 0; hop < MAX_WRITE_HOPS; hop++) {
+			if (seen.includes(current)) {
+				throw new RedirectError("This redirect would create a loop.");
+			}
+			seen.push(current);
+			const next = await this.nextTarget(locale, current, id);
+			if (next === null) {
+				return;
+			}
+			current = next;
+		}
+		throw new RedirectError("Redirect chain is too long.");
+	}
+
+	private async nextTarget(locale: string | null, path: string, id: number | null): Promise<string | null> {
+		let base = this.db.selectFrom("tbtop_redirects").select("to_path").where("from_path", "=", path);
+		if (id !== null) {
+			base = base.where("id", "!=", id);
+		}
+		const row =
+			(locale === null ? undefined : await base.where("locale", "=", locale).executeTakeFirst()) ??
+			(await base.where("locale", "is", null).executeTakeFirst());
+		return row === undefined || isExternal(row.to_path) ? null : normalizePath(row.to_path);
 	}
 
 	private async match(from: string, locale: string): Promise<Redirect | null> {
@@ -76,5 +185,28 @@ export class Redirects {
 					statusCode: Number(row.status_code),
 					isAuto: Boolean(row.is_auto),
 				};
+	}
+}
+
+/** RedirectValidator::assertToAllowed: an external target needs an http(s) URL with a host on the allowlist. */
+function assertTargetAllowed(to: string): void {
+	if (!isExternal(to)) {
+		return;
+	}
+	const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(to)?.[1]?.toLowerCase();
+	const host = scheme === "http" || scheme === "https" ? hostOf(to) : "";
+	if (host === "") {
+		throw new RedirectError("External redirect target must be a valid http(s) URL with a host.");
+	}
+	if (!ALLOWED_EXTERNAL_HOSTS.map((allowed) => allowed.toLowerCase()).includes(host.toLowerCase())) {
+		throw new RedirectError("External redirect host is not allowlisted.");
+	}
+}
+
+function hostOf(url: string): string {
+	try {
+		return new URL(url).hostname;
+	} catch {
+		return "";
 	}
 }

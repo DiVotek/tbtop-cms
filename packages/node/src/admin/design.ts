@@ -1,6 +1,7 @@
 import { type ActionCtx, Column, definePage, Effects, HttpError, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { SLOTS, type Slot } from "../content/layouts";
+import { RedirectError } from "../content/redirects";
 import { SharedBlockConflictError, SharedBlockInUseError } from "../content/sharedBlocks";
 import { type Dict, isDict } from "../support/values";
 import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, prefixedForm, rowsFromForm, siteOf } from "./support";
@@ -208,7 +209,7 @@ export function redirectsIndex(cms: Cms) {
 		title: "Redirects",
 		nav: { group: NAV.content, label: "Redirects", icon: "corner-up-right", order: 20 },
 		view: async (s, { request }) => {
-			const locales = (await cms.site(request).languages.all()).map((row) => ({ value: row.locale, label: row.name }));
+			const locales = (await cms.site(request).languages.frontendActive()).map((row) => ({ value: row.locale, label: row.name }));
 			return s.stack([
 				s.row([
 					s
@@ -235,12 +236,19 @@ export function redirectsIndex(cms: Cms) {
 								])
 								.onSubmit(async (ctx) => {
 									const form = ctx.form as Dict;
-									await siteOf(cms, ctx).redirects.create({
-										fromPath: String(form.from_path),
-										toPath: String(form.to_path),
-										statusCode: Number(form.status_code ?? 301) === 302 ? 302 : 301,
-										locale: typeof form.locale === "string" && form.locale !== "" ? form.locale : null,
-									});
+									try {
+										await siteOf(cms, ctx).redirects.create({
+											fromPath: String(form.from_path ?? ""),
+											toPath: String(form.to_path ?? ""),
+											statusCode: Number(form.status_code ?? 301),
+											locale: typeof form.locale === "string" && form.locale !== "" ? form.locale : null,
+										});
+									} catch (error) {
+										if (error instanceof RedirectError) {
+											return Effects.make().haltModal(error.message);
+										}
+										throw error;
+									}
 									return Effects.make().notify("Redirect created").closeModal().refreshTable("redirects");
 								}),
 						),
@@ -254,7 +262,7 @@ export function redirectsIndex(cms: Cms) {
 						Column.make("locale").label("Language"),
 						Column.make("is_auto").label("Automatic").boolean(),
 					])
-					.defaultSort("id", "desc")
+					.defaultSort("from_path", "asc")
 					.paginate(25, [25, 50, 100])
 					.rowActions([
 						s
