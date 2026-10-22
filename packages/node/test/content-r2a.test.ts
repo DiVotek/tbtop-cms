@@ -170,3 +170,32 @@ describe("slugs match Str::slug (R2-content-5)", () => {
 		expect(await site.pages.slugs.allFor(page.id)).toMatchObject({ en: "ellinika", uk: "kiyiv-vul-xreshhatik-12" });
 	});
 });
+
+describe("site contact rows (R2-content-10)", () => {
+	const url = "/admin/settings/site";
+
+	test("rows are stored trimmed with only their own non-blank keys; nothing left stores []", async () => {
+		const { cms, post } = await panel();
+		const settings = () => cms.site().settings;
+		await post(`${url}/forms/settings_site`, {
+			site_name: "Demo",
+			phones: [{ number: "  +380 44 000 00 00 " }, { number: "   " }, { number: "+1", extra: "x" }],
+			emails: [{ address: "a@example.test" }, { address: "" }],
+			socials: [{ label: " TG ", name: "", href: "https://t.me/demo" }, { label: "", name: " ", href: "" }],
+		}, url);
+		expect(await settings().get("site.contacts.phones")).toEqual([{ number: "+380 44 000 00 00" }, { number: "+1" }]);
+		expect(await settings().get("site.contacts.emails")).toEqual([{ address: "a@example.test" }]);
+		expect(await settings().get("site.contacts.socials")).toEqual([{ label: "TG", href: "https://t.me/demo" }]);
+
+		await post(`${url}/forms/settings_site`, { site_name: "Demo", phones: [{ number: " " }] }, url);
+		expect(await settings().get("site.contacts.phones")).toEqual([]);
+	});
+
+	test("a social row with only a name is refused and nothing is saved", async () => {
+		const { cms, post, notice } = await panel();
+		const res = await post(`${url}/forms/settings_site`, { site_name: "Changed", socials: [{ label: "", name: "Telegram", href: "" }] }, url);
+		expect(await notice(res, url)).toContain("needs a short label and a link");
+		expect(await cms.site().settings.get("site.name")).not.toBe("Changed");
+		expect(await cms.site().settings.get("site.contacts.socials")).not.toEqual([{ name: "Telegram" }]);
+	});
+});

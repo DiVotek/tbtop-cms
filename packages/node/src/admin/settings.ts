@@ -14,6 +14,10 @@ function settingsPage(
 		map: Record<string, string>;
 		fields: (s: S) => unknown[];
 		defaults?: Dict;
+		/** Repeater fields stored as trimmed rows of these keys, an empty list included (cleanRows). */
+		rows?: Record<string, string[]>;
+		/** A save-time check on the submitted form: an error message rejects the whole save. */
+		validate?: (form: Dict) => string | null;
 	},
 ) {
 	return definePage({
@@ -37,12 +41,22 @@ function settingsPage(
 				.record(record)
 				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
-					const form = ctx.form as Dict;
+					const form = { ...(ctx.form as Dict) };
+					const rows = options.rows ?? {};
+					for (const [field, keys] of Object.entries(rows)) {
+						if (field in form) {
+							form[field] = cleanRows(form[field], keys);
+						}
+					}
+					const rejected = options.validate?.(form) ?? null;
+					if (rejected !== null) {
+						return Effects.make().notify(rejected, "error");
+					}
 					for (const [field, key] of Object.entries(options.map)) {
 						if (!(field in form)) {
 							continue;
 						}
-						const value = normalize(form[field]);
+						const value = field in rows ? form[field] : normalize(form[field]);
 						if (value === null) {
 							await site.settings.forget(key);
 						} else {
@@ -70,6 +84,33 @@ function normalize(value: unknown): unknown {
 	return value ?? null;
 }
 
+/** SiteSettingsPage::cleanRows: each row keeps only its own trimmed, non-blank keys; empty rows go. */
+function cleanRows(value: unknown, keys: string[]): Dict[] {
+	const clean: Dict[] = [];
+	for (const row of Array.isArray(value) ? value : []) {
+		if (typeof row !== "object" || row === null) {
+			continue;
+		}
+		const values: Dict = {};
+		for (const key of keys) {
+			const cell = (row as Dict)[key];
+			if (typeof cell === "string" && cell.trim() !== "") {
+				values[key] = cell.trim();
+			}
+		}
+		if (Object.keys(values).length > 0) {
+			clean.push(values);
+		}
+	}
+	return clean;
+}
+
+/** The `requiredWith` pair on a social row: once any field is filled, the label and the link are required. */
+function socialsComplete(form: Dict): string | null {
+	const socials = Array.isArray(form.socials) ? (form.socials as Dict[]) : [];
+	return socials.every((row) => "label" in row && "href" in row) ? null : "Each social profile needs a short label and a link.";
+}
+
 export function siteSettings(cms: Cms) {
 	return settingsPage(cms, {
 		path: "settings/site",
@@ -83,6 +124,8 @@ export function siteSettings(cms: Cms) {
 			emails: "site.contacts.emails",
 			socials: "site.contacts.socials",
 		},
+		rows: { phones: ["number"], emails: ["address"], socials: ["label", "name", "href"] },
+		validate: socialsComplete,
 		fields: (s) => [
 			s.tabs([
 				{
