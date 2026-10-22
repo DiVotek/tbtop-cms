@@ -26,9 +26,10 @@ never caught it.
   host chose a default morph key type, and its `down()` is a no-op. Existing
   integer ids stay as numeric strings (`42` → `'42'`).
 
-> ⚠️ **Behavior change** On a HasUlids/HasUuids host, `php artisan migrate`
-> alters `notifications.notifiable_id`, even when the host created that table
-> itself.
+> ⚠️ **Behavior change** On a HasUlids/HasUuids host that kept the default
+> `int` morph key type, `php artisan migrate` alters an integer
+> `notifications.notifiable_id` to the user key type, even when the host
+> created that table itself.
 
 Unchanged: int-key hosts on the default `int` morph key type (column stays
 `bigint unsigned`), hosts that chose a default morph key type (column stays
