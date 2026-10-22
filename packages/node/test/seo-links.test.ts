@@ -18,3 +18,13 @@ describe("page types", () => {
 		expect(seo.jsonLd.map((node) => node["@type"])).toContain("Article");
 	});
 });
+
+describe("seo templates", () => {
+	test("placeholders inside substituted values stay literal, like PHP strtr (F13)", async () => {
+		const { cms, ids } = await makeCms();
+		await cms.site().pages.update(ids.about ?? 0, { title: { en: "Use {site_name} and {sep}" } });
+		await cms.site().settings.set("site.name", "Acme {title}");
+		const { seo } = await pageAt(cms, "/about-us");
+		expect(seo.title).toBe("Use {site_name} and {sep} — Acme {title}");
+	});
+});
