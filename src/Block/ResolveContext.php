@@ -41,6 +41,20 @@ final readonly class ResolveContext
         return $resolver->resolve($id);
     }
 
+    /**
+     * The media as an `<img>`: `src`, a `srcset` of its proportional variants
+     * (null when there are none), `width`, `height` and `alt`. Null for a
+     * missing or pathless row, like mediaUrl().
+     *
+     * @return array{src: string, srcset: string|null, width: int|null, height: int|null, alt: string|null}|null
+     */
+    public function mediaImage(string | int $id): ?array
+    {
+        $resolver = $this->mediaUrlResolver ?? app(MediaUrlResolver::class);
+
+        return $resolver->image($id);
+    }
+
     public function richtextHtml(mixed $value): string
     {
         $renderer = $this->richtextHtmlRenderer ?? app(RichtextHtmlRenderer::class);

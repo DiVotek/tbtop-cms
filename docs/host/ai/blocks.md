@@ -287,6 +287,16 @@ Overridable, all with sane defaults:
   `MediaUrlResolver`, `null` if the media row is missing or has no path.
   Call this from `resolve()`, never store the resolved URL back into the
   envelope.
+- **`mediaImage(string|int $id): ?array`** — the same lookup, shaped for an
+  `<img>`: `{src: string, srcset: string|null, width: int|null, height: int|null, alt: string|null}`.
+  `src` is the original; `srcset` lists the media's stored variants
+  (tbtop/admin `media.profiles`, webp by default) narrowest first, then the
+  original at its own width. Only a variant with the original's aspect ratio
+  is listed (a cropped variant is a different picture), and only one
+  narrower than the original. `srcset` is `null` when no variant qualifies
+  or the original's width is unknown (SVG), so render `src` alone then.
+  `null` for a missing or pathless row, like `mediaUrl()`. One query per
+  call, like `mediaUrl()`.
 - **`richtextHtml(mixed $value): string`** — renders a stored richtext value
   (from an `$s->richtext()` field) to safe HTML via `RichtextHtmlRenderer`.
   Always call this rather than passing the raw richtext value to props; the
@@ -404,6 +414,36 @@ here. Block-specific usage:
   `$ctx->mediaUrl($input['image'] ?? null)`, which returns `null` for a
   missing/pathless row — always guard the field type before calling it
   (`is_string($value) || is_int($value)`), since editor input is untrusted.
+  For a large image (a hero, a banner) resolve `$ctx->mediaImage(...)`
+  instead and let the browser pick a width; `sizes` is the host's call, as
+  only the layout knows the rendered width:
+
+  ```php
+  /** @return array{image: array{src: string, srcset: string|null, width: int|null, height: int|null, alt: string|null}|null} */
+  public function resolve(array $input, ResolveContext $ctx): array
+  {
+      $image = $input['image'] ?? null;
+
+      return ['image' => is_string($image) || is_int($image) ? $ctx->mediaImage($image) : null];
+  }
+  ```
+
+  ```tsx
+  {image && (
+    <img
+      src={image.src}
+      srcSet={image.srcset ?? undefined}
+      sizes="(min-width: 1024px) 1024px, 100vw"
+      width={image.width ?? undefined}
+      height={image.height ?? undefined}
+      alt={image.alt ?? ''}
+      fetchPriority="high"
+    />
+  )}
+  ```
+
+  Give `width`/`height` so the browser reserves the box before the image
+  loads, and `loading="lazy"` to any image below the fold (never the LCP one).
 - **Richtext fields** (`$s->richtext('body')`) — store the editor's document
   shape; never pass it straight through to props. Resolve via
   `$ctx->richtextHtml($input['body'] ?? null)` to get the HTML string the
