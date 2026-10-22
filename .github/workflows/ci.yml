@@ -227,12 +227,11 @@ jobs:
         run: bun install --frozen-lockfile
 
       # The workbench installs both packages from tarballs, as a host would.
-      - name: Pack @tbtop/cms and @tbtop/admin
-        run: ./scripts/pack-workbench.sh
-
-      - name: Install the workbench
+      # A fresh pack has a new hash, so `setup` packs and then runs
+      # `bun update` on the two tarballs; the other dependencies stay locked.
+      - name: Pack @tbtop/cms and @tbtop/admin, install the workbench
         working-directory: packages/node/workbench
-        run: bun install --frozen-lockfile
+        run: bun run setup
 
       - name: Type check the workbench
         working-directory: packages/node/workbench
