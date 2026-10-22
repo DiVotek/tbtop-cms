@@ -54,3 +54,11 @@ describe("links", () => {
 		}
 	});
 });
+
+describe("routing", () => {
+	test("a malformed percent-escape is not found, not a thrown URIError (F16)", async () => {
+		const { cms } = await makeCms();
+		expect(await cms.loadPage(get("/%E0%A4%A"))).toMatchObject({ type: "notFound", status: 404 });
+		expect(await cms.loadPage(get("/blog/%ZZ"))).toMatchObject({ type: "notFound", status: 404 });
+	});
+});
