@@ -30,6 +30,8 @@ export type FixturePage = {
 	unpublishAt?: string;
 	/** The root system page is the home page (empty slug). */
 	system?: boolean;
+	/** An error page (4xx or 5xx): rendered for that status class, never at a URL (see `ensureErrorPages`). */
+	errorClass?: "4xx" | "5xx";
 	indexable?: boolean;
 	slug?: Record<string, string>;
 	seo?: Record<string, unknown>;
@@ -140,7 +142,8 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 				status: page.status ?? "published",
 				publishedAt: page.publishedAt === undefined ? null : new Date(page.publishedAt),
 				unpublishAt: page.unpublishAt === undefined ? null : new Date(page.unpublishAt),
-				isSystem: page.system ?? false,
+				isSystem: page.system ?? page.errorClass !== undefined,
+				...(page.errorClass === undefined ? {} : { errorClass: page.errorClass }),
 				isIndexable: page.indexable ?? true,
 				seo: page.seo ?? {},
 				image: page.image ?? null,

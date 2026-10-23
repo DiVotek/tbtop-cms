@@ -76,7 +76,8 @@ const cms = createCms({
 // Frontend
 const result = await cms.loadPage(request);
 // { type: "page", status, headers, props: { page, render, seo, breadcrumbs, path, isPreview, cms } }
-// | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms }
+// | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms, props } (props: ErrorPageProps)
+const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the host's own 5xx handler (see Error pages)
 (await cms.handle(request)) ?? ...; // robots.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/...
 
 // Admin
@@ -130,6 +131,32 @@ Like `cms:install`, it then gives a database with no live language its
 default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
 A host that merges `cmsMigrations` into its own Migrator calls
 `ensureDefaultLanguage(db, "en")` after it.
+
+### Error pages
+
+A 404 from `loadPage` and `cms.errorPage(request, status)` carry
+`ErrorPageProps` (ErrorResponse): the live error page of the status class
+(`4xx` or `5xx`, the `error_class` column) or, without one, fallback props
+with no blocks and the package's heading ("Page not found", "Something went
+wrong"). The shape is `PageProps`' (`page`, `render`, `seo`, `breadcrumbs`,
+`cms`) plus `status`, `locale` and `path`; `page.id` is null in the fallback.
+`seo` is always noindex with no canonical, og:url or JSON-LD (`ErrorSeo`;
+`seoTags`/`seoHead`/`CmsHead` take it), and `breadcrumbs` is empty. Render
+it with the page component, inside the host's chrome, and answer the status.
+
+```ts
+const result = await cms.loadPage(request);
+if (result.type === "notFound") return render(<Page {...result.props} />, { status: 404 });
+// the host's 500 handler (TanStack errorComponent, Hono onError):
+return render(<Page {...(await cms.errorPage(request, 500))} />, { status: 500 });
+```
+
+The error pages are system pages an editor edits in the pages list; like
+`cms:install`, `ensureErrorPages(cms)` creates the missing ones (published,
+in the default language) and a fixture page with `errorClass: "4xx"` is one.
+They have no slug and are not in the sitemap. For a 5xx `errorPage` never
+throws: when the database is what failed, it logs and answers fallback
+props built without it (no settings, languages or layout).
 
 ### Access
 

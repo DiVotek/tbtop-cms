@@ -1,3 +1,4 @@
+import type { ErrorSeo } from "../frontend/errorPage";
 import type { Seo } from "../seo/resolver";
 import { gtmNoscriptHtml, seoTags } from "./head";
 
@@ -6,7 +7,7 @@ import { gtmNoscriptHtml, seoTags } from "./head";
  * `<link>` into the document head wherever they render; a host with its own
  * head API (TanStack's `head()`, Next's metadata) uses `seoHead()` instead.
  */
-export function CmsHead({ seo }: { seo: Seo }) {
+export function CmsHead({ seo }: { seo: Seo | ErrorSeo }) {
 	return (
 		<>
 			{seoTags(seo).map((tag, index) => {
