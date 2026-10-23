@@ -38,7 +38,8 @@ export function adminPages(cms: Cms): CmsAdmin {
 			gated(cms, "tbtop-cms.settings", siteSettings(cms)),
 			gated(cms, "tbtop-cms.settings", seoSettings(cms)),
 			gated(cms, "tbtop-cms.settings", notificationSettings(cms)),
-			gated(cms, "tbtop-cms.pages", linkPageSearch(cms)),
+			// Any CMS editor, as PHP guards the route with EnsureCmsAdmin only: layout and shared blocks use link fields too.
+			linkPageSearch(cms),
 		] as PageDef[],
 		hostRules: cmsHostRules(cms),
 		navigationGroups: [
