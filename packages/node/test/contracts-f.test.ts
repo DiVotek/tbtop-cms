@@ -31,7 +31,9 @@ describe("error pages (q09)", () => {
 		expect(await ensureErrorPages(cms)).toEqual(["4xx", "5xx"]);
 		expect(await ensureErrorPages(cms)).toEqual([]);
 		const site = cms.site();
-		const page = await site.pages.query().selectAll().where("error_class", "=", "4xx").executeTakeFirstOrThrow();
+		const row = await site.pages.query().selectAll().where("error_class", "=", "4xx").executeTakeFirstOrThrow();
+		// A Postgres bigint comes back as a string.
+		const page = { ...row, id: Number(row.id) };
 		await site.pages.update(page.id, {
 			heading: { en: "Lost?", uk: "Загубились?" },
 			content: [{ id: "hero1", kind: "Hero", active: true, sort: 0, data: { title: { en: "Try the blog" }, ctaHref: "/blog" } }],

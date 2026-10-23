@@ -13,7 +13,7 @@ const { LinkCell, LinkForm, linkFieldClient } = await import("../src/admin-clien
 afterEach(() => cleanup());
 afterAll(async () => {
 	await GlobalRegistrator.unregister();
-	globalThis.fetch = realFetch;
+	Object.defineProperty(globalThis, "fetch", { value: realFetch, configurable: true, writable: true });
 });
 
 const NOOP = () => {};

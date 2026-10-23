@@ -9,7 +9,7 @@ const { ContactForm } = await import("../src/react");
 
 afterAll(async () => {
 	await GlobalRegistrator.unregister();
-	globalThis.fetch = realFetch;
+	Object.defineProperty(globalThis, "fetch", { value: realFetch, configurable: true, writable: true });
 });
 
 describe("ContactForm in the browser", () => {
@@ -19,10 +19,14 @@ describe("ContactForm in the browser", () => {
 			Response.json({ ok: true }),
 		];
 		const bodies: unknown[] = [];
-		globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+		const stub = (async (_url: string, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body)));
 			return answers.shift();
 		}) as unknown as typeof fetch;
+		// defineProperty, not assignment: another DOM suite in the same process may leave happy-dom's fetch as an accessor.
+		for (const target of [globalThis, window]) {
+			Object.defineProperty(target, "fetch", { value: stub, configurable: true, writable: true });
+		}
 		const props = {
 			heading: "Write to us",
 			submitLabel: "Send",
