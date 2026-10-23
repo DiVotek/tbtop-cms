@@ -398,6 +398,14 @@ in `tbtop_notification_templates`.
   through a content-versioned cache (`ttl` default 3600 s). Admin reads stay
   live and every write through the CMS bumps the version; a write made
   around the CMS shows once the entry expires.
+- Tasks and the CLI: `cms.tasks.scheduled()` is the one scheduler entry
+  (outbox delivery, the daily 404 prune, the heartbeat); call it from a
+  cron every minute or from Workers `scheduled()`. `cms.tasks.health()`
+  runs the checks (site URL, default language, block rows, page types,
+  notifications, scheduler, secrets). The `tbtop-cms` bin runs the same over
+  a `cms.config.ts` whose default export is the host's Cms: `migrate`,
+  `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`
+  (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by

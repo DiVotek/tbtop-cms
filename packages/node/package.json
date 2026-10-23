@@ -8,6 +8,9 @@
 	"sideEffects": [
 		"./dist/admin-client.js"
 	],
+	"bin": {
+		"tbtop-cms": "./dist/cli.js"
+	},
 	"engines": {
 		"node": ">=20"
 	},

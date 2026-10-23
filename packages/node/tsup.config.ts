@@ -7,6 +7,7 @@ export default defineConfig({
 		catalog: "src/blocks/catalog.ts",
 		react: "src/react/index.ts",
 		"admin-client": "src/admin-client/index.ts",
+		cli: "src/cli/bin.ts",
 	},
 	format: ["esm"],
 	target: "es2022",

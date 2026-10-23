@@ -1,5 +1,6 @@
 import { adminPages, type CmsAdmin } from "./admin";
 import type { CmsConfig } from "./config";
+import { rebuildPageRefs } from "./content/pageRefIndex";
 import { type PageTypeDef, PageTypes } from "./content/pageTypes";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
@@ -7,6 +8,7 @@ import { submitThrottle } from "./forms/throttle";
 import { type ErrorPageProps, errorPage } from "./frontend/errorPage";
 import { type LoadResult, loadPage, type PageProps } from "./frontend/load";
 import { hasValidPreviewSignature } from "./frontend/previewLink";
+import { type HealthResult, runHealthChecks, SCHEDULER_HEARTBEAT } from "./health";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
 import { chunkCount, sitemapChunkXml, sitemapIndexXml } from "./seo/sitemap";
@@ -53,7 +55,20 @@ export type CmsTasks = {
 	deliver(options?: { limit?: number }): Promise<number>;
 	/** Deletes 404 log rows not seen within `seo.not_found.retention_days` (default 90); how many went. */
 	pruneNotFound(): Promise<number>;
+	/** Rewrites the page references index from every page (`cms:page-refs:rebuild`); the rows written. */
+	rebuildPageRefs(): Promise<number>;
+	/** The health checks (`cms:doctor`): site URL, default language, block rows, page types, notifications, scheduler, secrets. */
+	health(): Promise<HealthResult[]>;
+	/**
+	 * The scheduler's one entry point, for a cron every minute or Workers
+	 * `scheduled()`: delivers the outbox, prunes the 404 log once a day, and
+	 * stamps the heartbeat the health check reads.
+	 */
+	scheduled(): Promise<{ delivered: number; pruned: number | null }>;
 };
+
+const LAST_PRUNE = "system.scheduler.not_found_pruned_at";
+const DAY_MS = 86_400_000;
 
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
 
@@ -116,6 +131,21 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 				return ids.length;
 			},
 			pruneNotFound: () => site().notFound.prune(),
+			rebuildPageRefs: () => rebuildPageRefs(config.db, pageTypes),
+			health: () => runHealthChecks(site()),
+			scheduled: async () => {
+				const scope = site();
+				const delivered = await cms.tasks.deliver();
+				const lastPrune = await scope.settings.get(LAST_PRUNE);
+				const due = typeof lastPrune !== "string" || Date.now() - new Date(lastPrune).getTime() >= DAY_MS || Number.isNaN(new Date(lastPrune).getTime());
+				const pruned = due ? await scope.notFound.prune() : null;
+				const now = new Date().toISOString();
+				if (due) {
+					await scope.settings.set(LAST_PRUNE, now);
+				}
+				await scope.settings.set(SCHEDULER_HEARTBEAT, now);
+				return { delivered, pruned };
+			},
 		},
 		admin: undefined as unknown as CmsAdmin,
 	};
