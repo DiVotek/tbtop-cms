@@ -37,11 +37,23 @@ export const testDialect = (process.env.TBTOP_TEST_DB ?? "sqlite") as Dialect;
 
 let fresh = 0;
 const run = `${process.pid}_${Date.now().toString(36)}`;
+/** Server databases still open; the oldest are closed so a long run stays under the server's connection limit. */
+const open: Kysely<CmsDatabase>[] = [];
+const KEEP_OPEN = 8;
 
 async function freshDb(): Promise<Kysely<CmsDatabase>> {
 	if (testDialect === "sqlite") {
 		return new Kysely<CmsDatabase>({ dialect: new StrictBindsDialect({ database: new Database(":memory:") }) });
 	}
+	while (open.length >= KEEP_OPEN) {
+		await open.shift()?.destroy().catch(() => {});
+	}
+	const db = await serverDb();
+	open.push(db);
+	return db;
+}
+
+async function serverDb(): Promise<Kysely<CmsDatabase>> {
 	const name = `tbtop_test_${run}_${++fresh}`;
 	const host = process.env.DB_HOST ?? "127.0.0.1";
 	const user = process.env.DB_USERNAME ?? (testDialect === "postgres" ? "postgres" : "root");
