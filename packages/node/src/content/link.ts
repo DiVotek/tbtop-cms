@@ -5,7 +5,7 @@ export type LinkType = "page" | "external" | "email" | "phone";
 export type ResolvedLink = { href: string; type: LinkType; label: string };
 
 const TYPES: LinkType[] = ["page", "external", "email", "phone"];
-const EXTERNAL_SCHEMES = ["viber", "tg", "whatsapp", "skype", "sms"];
+export const EXTERNAL_SCHEMES = ["viber", "tg", "whatsapp", "skype", "sms"];
 
 /** A parsed link field value (LinkValue.php). */
 export type LinkValue = {

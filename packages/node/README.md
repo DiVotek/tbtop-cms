@@ -128,6 +128,10 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 - `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
   `useCmsForm(action)` is the ContactForm's submit logic for a custom form
   block: JSON post, field errors, a plain form post without JS.
+- The Hero's CTA link takes only http(s), `/path`, `#anchor`, `mailto:`,
+  `tel:` and the messenger schemes (`tg:`, `viber:`, `whatsapp:`, `skype:`,
+  `sms:`): the editor refuses anything else, and a stored `javascript:` or
+  `//host` link resolves to no CTA, so the component renders only a safe href.
 
 ## Forms and notifications
 
