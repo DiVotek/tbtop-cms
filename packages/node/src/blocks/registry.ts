@@ -18,6 +18,13 @@ export type BlockImpl<P = unknown> = {
 	toSchema?: (props: P, ctx: SchemaContext) => Record<string, unknown> | null;
 	/** The block posts a form: `action` (and `honeypotField`) are bound into its props, `/_cms/forms/...` takes the post. */
 	submit?: SubmitHandler;
+	/**
+	 * HasForm: the form's stable name, which makes it postable from any live
+	 * page, not only where an editor placed the block. A page type template or
+	 * the host renders it from `site.formProps(name, page)`; a post by name
+	 * runs `submit` with empty block data. Needs `submit`; unique per registry.
+	 */
+	formName?: string;
 };
 
 /** What a submit needs besides the payload (SubmitContext.php). */
@@ -50,6 +57,8 @@ export type BlockKind = {
 	translatableFields: () => string[];
 	toSchema: (props: unknown, ctx: SchemaContext) => Record<string, unknown> | null;
 	submit: SubmitHandler | null;
+	/** The HasForm name, or null when the form is reachable only where it is placed. */
+	formName: string | null;
 };
 
 export type BlockRegistry = {
@@ -68,10 +77,14 @@ const headline = (kind: string) => kind.replace(/([a-z0-9])([A-Z])/g, "$1 $2").r
  */
 export function implementBlocks<const C extends Catalog>(catalog: C, impls: Implementations<C>): BlockRegistry {
 	const kinds = new Map<string, BlockKind>();
+	const formNames = new Map<string, string>();
 	for (const [kind, meta] of Object.entries(catalog) as [string, BlockMeta][]) {
 		const impl = (impls as Record<string, BlockImpl | undefined>)[kind];
 		if (impl === undefined) {
 			throw new Error(`Block [${kind}] has no implementation.`);
+		}
+		if (impl.formName !== undefined) {
+			namedForm(formNames, kind, impl);
 		}
 		kinds.set(kind, {
 			kind,
@@ -86,6 +99,7 @@ export function implementBlocks<const C extends Catalog>(catalog: C, impls: Impl
 			translatableFields: () => translatablePaths(impl.form(new S())),
 			toSchema: (props, ctx) => impl.toSchema?.(props, ctx) ?? null,
 			submit: impl.submit ?? null,
+			formName: impl.formName ?? null,
 		});
 	}
 	return {
@@ -100,6 +114,22 @@ export function implementBlocks<const C extends Catalog>(catalog: C, impls: Impl
 		all: () => [...kinds.values()],
 		forPlacement: (placement) => [...kinds.values()].filter((block) => block.placements.includes(placement)),
 	};
+}
+
+/** Forms::collect: a name needs a submit handler and names one kind only. */
+function namedForm(names: Map<string, string>, kind: string, impl: BlockImpl): void {
+	const name = impl.formName ?? kind;
+	if (name.trim() === "" || name.includes("/")) {
+		throw new Error(`Block [${kind}] declares a form name that cannot be a URL segment: [${name}].`);
+	}
+	if (impl.submit === undefined) {
+		throw new Error(`Block [${kind}] declares form [${name}] but has no submit handler.`);
+	}
+	const taken = names.get(name);
+	if (taken !== undefined) {
+		throw new Error(`Form [${name}] is declared by both [${taken}] and [${kind}].`);
+	}
+	names.set(name, kind);
 }
 
 const CONTACT_FIELDS = [

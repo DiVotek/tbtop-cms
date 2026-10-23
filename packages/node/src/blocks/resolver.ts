@@ -128,8 +128,8 @@ export function bindForms(site: Site, blocks: ResolvedBlock[], page: Page, local
 }
 
 /** FormActionProps: the submit URL, and the honeypot input name when one is configured. */
-export function formActionProps(site: Site, page: Page, blockId: string, locale: string): { action: string; honeypotField?: string } {
-	const action = site.absolute(`/_cms/forms/${encodeURIComponent(locale)}/${page.id}/${encodeURIComponent(blockId)}`);
+export function formActionProps(site: Site, page: Page | number, blockId: string, locale: string): { action: string; honeypotField?: string } {
+	const action = site.absolute(`/_cms/forms/${encodeURIComponent(locale)}/${typeof page === "number" ? page : page.id}/${encodeURIComponent(blockId)}`);
 	const honeypot = honeypotField(site);
 	return honeypot === null ? { action } : { action, honeypotField: honeypot };
 }

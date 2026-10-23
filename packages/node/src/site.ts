@@ -11,6 +11,7 @@ import { Redirects } from "./content/redirects";
 import { richtextHtml } from "./content/richtext";
 import { Settings } from "./content/settings";
 import { SharedBlocks } from "./content/sharedBlocks";
+import { namedFormProps } from "./forms/locate";
 import { Submissions } from "./forms/submissions";
 import { Notifications } from "./notifications";
 import type { SchemaTypes } from "./seo/schemaTypes";
@@ -129,6 +130,11 @@ export class Site {
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
 		};
+	}
+
+	/** Forms::props: `action` (and `honeypotField`) for a named form (`formName`) posted from `page`; the default locale unless given. */
+	formProps(name: string, page: Page | number, locale?: string): Promise<{ action: string; honeypotField?: string }> {
+		return namedFormProps(this, name, page, locale);
 	}
 
 	async t(key: string, locale: string, params: Record<string, string | number> = {}): Promise<string> {

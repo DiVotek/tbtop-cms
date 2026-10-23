@@ -137,6 +137,14 @@ handler. The block's props carry `action` and `honeypotField`; post the
 fields there as JSON (`{ ok }`, 422 `{ errors }`, 500 `{ errors: { form } }`)
 or as a plain form (303 back to the page with `cms_form_status`).
 
+A form an editor does not place (one a page type's `template()` or the host
+renders) gets a name: `formName: "service-order"` next to `submit` in its
+implementation (PHP's `HasForm`). It then posts from any live page, and
+`await cms.site(request).formProps("service-order", page, locale)` gives the
+host its `{ action, honeypotField }` (Forms::props; the default locale
+unless given). A post by name runs `submit` with empty block data. A name
+needs `submit` and is unique; an unknown name throws in `formProps`.
+
 ```ts
 createCms({
 	// ...

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
+import { type CmsConfig, cmsBlockImpls, cmsBlocks, defineBlocks, implementBlocks } from "../src";
 import { makeCms } from "./support";
 
 type Made = Awaited<ReturnType<typeof makeCms>>;
@@ -91,5 +93,77 @@ describe("q12: a built-in rate limit on form posts", () => {
 
 	test("a throttle without a positive max is refused at createCms", async () => {
 		await expect(makeCms(null, { forms: { throttle: { max: 0, perSeconds: 60 } } })).rejects.toThrow("forms.throttle");
+	});
+});
+
+const orderCatalog = defineBlocks({ ...cmsBlocks, ServiceOrder: { props: z.object({ action: z.string(), honeypotField: z.string().optional() }) } });
+
+/** A HasForm block: a service order form a page type template renders, never placed by an editor. */
+function orderForm(seen: Record<string, unknown>[] = []): Partial<CmsConfig> {
+	return {
+		blocks: implementBlocks(orderCatalog, {
+			...cmsBlockImpls,
+			ServiceOrder: {
+				form: () => [],
+				resolve: () => ({ action: "" }),
+				formName: "service-order",
+				submit: {
+					rules: () => ({ service: "required|string|max:50" }),
+					handle: (payload, blockData) => void seen.push({ payload, blockData }),
+				},
+			},
+		}),
+	};
+}
+
+async function homeId(cms: Made["cms"]): Promise<number> {
+	const result = await cms.loadPage(new Request("https://site.test/"));
+	if (result.type !== "page") {
+		throw new Error("no page");
+	}
+	return result.props.page.id;
+}
+
+describe("q14: named forms (HasForm, Forms::props)", () => {
+	test("formProps gives the action and honeypot; a post by name validates, handles with empty data and is stored", async () => {
+		const seen: Record<string, unknown>[] = [];
+		const { cms, db } = await makeCms(undefined, orderForm(seen));
+		const id = await homeId(cms);
+		const props = await cms.site().formProps("service-order", id);
+		expect(props).toEqual({ action: `https://site.test/_cms/forms/en/${id}/service-order`, honeypotField: "website" });
+		expect((await cms.handle(post(props.action, {})))?.status).toBe(422);
+		expect((await cms.handle(post(props.action, { service: "Repair" })))?.status).toBe(200);
+		expect(seen).toEqual([{ payload: { service: "Repair" }, blockData: {} }]);
+		const stored = await rows(db);
+		expect(stored).toHaveLength(1);
+		expect(stored[0]).toMatchObject({ block_id: "service-order", kind: "ServiceOrder", status: "handled" });
+	});
+
+	test("the name answers on any live page and in another locale; an undeclared name stays 404", async () => {
+		const { cms } = await makeCms(undefined, orderForm());
+		const id = await homeId(cms);
+		const page = await cms.site().pages.find(id);
+		if (page === null) {
+			throw new Error("no page");
+		}
+		const { action } = await cms.site().formProps("service-order", page, "uk");
+		expect(action).toContain(`/_cms/forms/uk/${id}/service-order`);
+		expect((await cms.handle(post(action, { service: "Repair" })))?.status).toBe(200);
+		expect((await cms.handle(post(`https://site.test/_cms/forms/en/${id}/ServiceOrder`, { service: "x" })))?.status).toBe(404);
+		expect((await cms.handle(post(`https://site.test/_cms/forms/en/${id}/nope`, { service: "x" })))?.status).toBe(404);
+	});
+
+	test("formProps throws for a name no block declares", async () => {
+		const { cms } = await makeCms(undefined, orderForm());
+		await expect(cms.site().formProps("ContactForm", 1)).rejects.toThrow("Form [ContactForm] is not registered.");
+	});
+
+	test("a form name without a submit handler, or declared twice, is refused", () => {
+		const catalog = defineBlocks({ A: { props: z.object({}) }, B: { props: z.object({}) } });
+		const submit = { rules: () => ({}) };
+		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x" }, B: { form: () => [] } })).toThrow("has no submit handler");
+		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x", submit }, B: { form: () => [], formName: "x", submit } })).toThrow(
+			"Form [x] is declared by both [A] and [B].",
+		);
 	});
 });
