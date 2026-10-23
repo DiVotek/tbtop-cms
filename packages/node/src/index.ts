@@ -26,6 +26,7 @@ export type { CmsDatabase } from "./db/schema";
 export { demoFixture } from "./fixtures/demo";
 export { type Fixture, type FixtureBlock, type FixturePage, seedFixtures } from "./fixtures/seed";
 export { LEAD_STATUSES, type LeadStatus, type Submission, Submissions, type SubmissionStatus } from "./forms/submissions";
+export type { SubmissionEvent } from "./forms/submit";
 export type { Crumb } from "./frontend/breadcrumbs";
 export type { LoadResult, PageProps, SharedProps } from "./frontend/load";
 export { htmlToText } from "./notifications/channels";
@@ -33,6 +34,7 @@ export { formSubmissionType, type FormSubmissionPayload } from "./notifications/
 export {
 	type Channel,
 	type Delivery,
+	type DeliveryEvent,
 	type Format,
 	type MailMessage,
 	type MailTransport,

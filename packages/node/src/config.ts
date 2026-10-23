@@ -3,7 +3,8 @@ import type { Kysely } from "kysely";
 import type { BlockRegistry } from "./blocks/registry";
 import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
-import type { Channel, MailTransport, NotificationType } from "./notifications/types";
+import type { SubmissionEvent } from "./forms/submit";
+import type { Channel, DeliveryEvent, MailTransport, NotificationType } from "./notifications/types";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
 
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
@@ -68,6 +69,12 @@ export type FormsConfig = {
 	 * memory, so per process, and per isolate on Workers.
 	 */
 	throttle?: { max: number; perSeconds: number } | false;
+	/**
+	 * After a valid submission is stored (or would be, with `store: false`)
+	 * and before the block's own handler runs (SubmissionReceived). A throw is
+	 * logged and never fails the submit.
+	 */
+	onSubmission?: (event: SubmissionEvent) => void | Promise<void>;
 	/** The client address the throttle counts by; default: proxy headers (see README). */
 	clientIp?: (request: Request) => string | null | undefined | Promise<string | null | undefined>;
 };
@@ -83,6 +90,12 @@ export type NotificationsConfig = {
 	types?: NotificationType<never>[];
 	/** Host channels (SMS, Slack) next to mail, Telegram and the bell. */
 	channels?: Channel[];
+	/**
+	 * After each (recipient, channel) pair is sent or fails, in render or send
+	 * (NotificationSent / NotificationFailed). A throw is logged and never
+	 * fails the delivery.
+	 */
+	onDelivery?: (event: DeliveryEvent) => void | Promise<void>;
 };
 
 const MIME: Record<string, string> = {

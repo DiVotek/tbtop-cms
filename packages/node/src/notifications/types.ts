@@ -64,6 +64,9 @@ export type Delivery = {
 	error: string | null;
 };
 
+/** What `notifications.onDelivery` gets: the delivery and the recipient it went to. */
+export type DeliveryEvent = Delivery & { to: Recipient };
+
 /** The message a host mail transport sends: nodemailer, Resend, Cloudflare Email, SES. */
 export type MailMessage = { to: string; from: string | null; subject: string; html: string; text: string };
 

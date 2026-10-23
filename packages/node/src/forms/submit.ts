@@ -1,13 +1,18 @@
 import { validate } from "@tbtop/admin";
+import type { Page } from "../content/page";
 import { honeypotField } from "../blocks/resolver";
 import type { Site } from "../site";
 import { locateForm } from "./locate";
+import type { Submission } from "./submissions";
 import { notifySubmission } from "./notifier";
 import { clientKey, type SubmitThrottle } from "./throttle";
 
 const ROUTE = /^\/_cms\/forms\/([^/]+)\/(\d+)\/([^/]+)\/?$/;
 
 type Outcome = "sent" | "invalid" | "failed";
+
+/** SubmissionReceived: what `forms.onSubmission` gets. `submission` is null with `forms.store: false`. */
+export type SubmissionEvent = { submission: Submission | null; payload: Record<string, unknown>; page: Page; blockId: string; locale: string };
 
 /**
  * FormSubmitController: POST /_cms/forms/{locale}/{page}/{block}. A fetch
@@ -63,6 +68,7 @@ export async function submitForm(site: Site, request: Request, throttle: SubmitT
 		site.config.forms?.store === false
 			? null
 			: await site.submissions.create({ pageId: page.id, blockId, kind: located.block.kind, locale, payload });
+	await received(site, { submission, payload, page, blockId, locale });
 	try {
 		await located.submit.handle?.(payload, located.data, located.ctx);
 		if (submission !== null) {
@@ -80,6 +86,15 @@ export async function submitForm(site: Site, request: Request, throttle: SubmitT
 		await notifySubmission(site, await site.submissions.findOrFail(submission.id));
 	}
 	return reply("sent");
+}
+
+/** The host's listener runs as PHP's event does, before the block's handler; a throw is logged, never the visitor's error. */
+async function received(site: Site, event: SubmissionEvent): Promise<void> {
+	try {
+		await site.config.forms?.onSubmission?.(event);
+	} catch (error) {
+		console.error("form.submit.on_submission_failed", { page: event.page.id, block: event.blockId, error: error instanceof Error ? error.message : String(error) });
+	}
 }
 
 /**

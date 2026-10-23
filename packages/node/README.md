@@ -153,11 +153,13 @@ createCms({
 		clientIp: (request) => server.requestIP(request)?.address, // what the throttle counts by
 		allow: (request) => rateLimit(request), // the host's own limiter; false answers 429
 		delivery: "inline", // or "outbox": run cms.tasks.deliver() from a cron
+		onSubmission: ({ submission, payload, page, blockId, locale }) => crm.lead(payload), // SubmissionReceived
 	},
 	notifications: {
 		mail: { send: async (message) => smtp.send(message) }, // { to, from, subject, html, text }
 		telegram: { botToken: env.TELEGRAM_BOT_TOKEN },
 		bell: { store: kyselyNotifications(db), staff: () => staffUsers() },
+		onDelivery: (event) => metrics.count(event.channel, event.status), // NotificationSent / NotificationFailed
 	},
 });
 ```
@@ -183,6 +185,14 @@ worker left in pending or processing for 15 minutes. Inline delivery runs before
 the visitor gets the answer; on Cloudflare Workers prefer the outbox and call
 `cms.tasks.deliver()` from `scheduled()`. Outside a request, links in notifications use `url` from the
 config, so set it when you deliver from a cron.
+
+`forms.onSubmission` runs after a valid submission is stored (`submission`
+is null with `store: false`) and before the block's own `handle`, as PHP's
+`SubmissionReceived` listeners do; the honeypot never reaches it.
+`notifications.onDelivery` hears each (recipient, channel) pair once it is
+sent or has failed (`status`, `stage` render or send, `error`, `to` the
+recipient), on retries too. Both are awaited; a throw in either is logged
+and never fails the submit or the delivery.
 
 Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored

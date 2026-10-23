@@ -4,7 +4,7 @@ import { sqlDate } from "../support/values";
 import { bellChannel, mailChannel, telegramChannel } from "./channels";
 import { formSubmissionType } from "./formSubmission";
 import { overrideFor, renderOverride } from "./templates";
-import type { Channel, Delivery, NotificationType, Recipient, Rendered } from "./types";
+import type { Channel, Delivery, DeliveryEvent, NotificationType, Recipient, Rendered } from "./types";
 
 type AnyType = NotificationType<Record<string, unknown>>;
 
@@ -74,6 +74,7 @@ export class Notifications {
 				const delivery = await this.deliver(type, channel, payload, recipient);
 				if (delivery !== null) {
 					deliveries.push(delivery);
+					await this.announce({ ...delivery, to: recipient });
 				}
 			}
 		}
@@ -99,6 +100,15 @@ export class Notifications {
 			return { ...base, status: "sent", stage: "send", error: null };
 		} catch (error) {
 			return { ...base, status: "failed", stage: "send", error: message(error) };
+		}
+	}
+
+	/** NotificationSent / NotificationFailed: the host's listener, which never fails the delivery. */
+	private async announce(event: DeliveryEvent): Promise<void> {
+		try {
+			await this.site.config.notifications?.onDelivery?.(event);
+		} catch (error) {
+			console.error("notifications.on_delivery_failed", { type: event.type, channel: event.channel, error: message(error) });
 		}
 	}
 
@@ -188,4 +198,4 @@ function displayName(raw: string): string {
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-export type { Channel, Delivery, Format, MailMessage, MailTransport, NotificationType, Recipient, Rendered, Template } from "./types";
+export type { Channel, Delivery, DeliveryEvent, Format, MailMessage, MailTransport, NotificationType, Recipient, Rendered, Template } from "./types";

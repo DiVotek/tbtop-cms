@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { type CmsConfig, cmsBlockImpls, cmsBlocks, defineBlocks, implementBlocks } from "../src";
+import { type CmsConfig, type DeliveryEvent, type MailMessage, type SubmissionEvent, cmsBlockImpls, cmsBlocks, defineBlocks, implementBlocks } from "../src";
 import { makeCms } from "./support";
 
 type Made = Awaited<ReturnType<typeof makeCms>>;
@@ -165,5 +165,75 @@ describe("q14: named forms (HasForm, Forms::props)", () => {
 		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x", submit }, B: { form: () => [], formName: "x", submit } })).toThrow(
 			"Form [x] is declared by both [A] and [B].",
 		);
+	});
+});
+
+describe("q15: host hooks for a submission and a delivery", () => {
+	test("onSubmission gets the stored row before the block's handler runs; with store off the row is null", async () => {
+		const order: string[] = [];
+		const events: SubmissionEvent[] = [];
+		const blocks = implementBlocks(cmsBlocks, {
+			...cmsBlockImpls,
+			ContactForm: { ...cmsBlockImpls.ContactForm, submit: { ...cmsBlockImpls.ContactForm.submit!, handle: () => void order.push("handle") } },
+		});
+		const onSubmission = (event: SubmissionEvent) => {
+			order.push("hook");
+			events.push(event);
+		};
+		const { cms } = await makeCms(undefined, { blocks, forms: { onSubmission } });
+		const action = await contactAction(cms);
+		expect((await cms.handle(post(action, valid)))?.status).toBe(200);
+		expect(order).toEqual(["hook", "handle"]);
+		expect(events[0]).toMatchObject({ payload: valid, locale: "en", blockId: action.split("/").at(-1), submission: { status: "pending", payload: valid } });
+		expect(events[0]?.page.id).toBe(await homeId(cms));
+
+		const off = await makeCms(undefined, { forms: { store: false, onSubmission } });
+		expect((await off.cms.handle(post(await contactAction(off.cms), valid)))?.status).toBe(200);
+		expect(events[1]?.submission).toBeNull();
+	});
+
+	test("a throwing onSubmission is logged and the submit still succeeds and delivers", async () => {
+		const { cms, db } = await makeCms(undefined, {
+			forms: {
+				onSubmission: () => {
+					throw new Error("listener down");
+				},
+			},
+		});
+		expect((await cms.handle(post(await contactAction(cms), valid)))?.status).toBe(200);
+		expect((await rows(db))[0]).toMatchObject({ status: "handled", error: null });
+	});
+
+	test("onDelivery hears every sent and failed pair with its recipient; a throw in it never fails the delivery", async () => {
+		const events: DeliveryEvent[] = [];
+		const transport = {
+			send: async (message: MailMessage) => {
+				if (message.to === "down@example.test") {
+					throw new Error("SMTP 550");
+				}
+			},
+		};
+		const { cms, db } = await makeCms(undefined, {
+			notifications: {
+				mail: transport,
+				onDelivery: (event) => {
+					events.push(event);
+					throw new Error("listener down");
+				},
+			},
+		});
+		const settings = cms.site().settings;
+		await settings.set("notifications.form.submission.channels", ["mail"]);
+		await settings.set("notifications.mail.recipients", "team@example.test, down@example.test");
+		expect((await cms.handle(post(await contactAction(cms), valid)))?.status).toBe(200);
+		expect(events.map((event) => [event.status, event.channel, event.to.email, event.stage, event.error])).toEqual([
+			["sent", "mail", "team@example.test", "send", null],
+			["failed", "mail", "down@example.test", "send", "SMTP 550"],
+		]);
+		expect(await db.selectFrom("tbtop_notification_log").select(["recipient", "status"]).orderBy("id").execute()).toEqual([
+			{ recipient: "team@example.test", status: "sent" },
+			{ recipient: "down@example.test", status: "failed" },
+		]);
+		expect((await rows(db))[0]?.status).toBe("failed");
 	});
 });
