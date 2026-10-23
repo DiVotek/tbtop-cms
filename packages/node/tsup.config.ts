@@ -6,6 +6,7 @@ export default defineConfig({
 		index: "src/index.ts",
 		catalog: "src/blocks/catalog.ts",
 		react: "src/react/index.ts",
+		"admin-client": "src/admin-client/index.ts",
 	},
 	format: ["esm"],
 	target: "es2022",
@@ -16,6 +17,6 @@ export default defineConfig({
 	clean: true,
 	treeshake: true,
 	// Runtime deps and peers stay external.
-	external: ["zod", "kysely", "@tbtop/admin", /^@tbtop\/admin\//, /^node:/, "react", /^react\//, "react-dom", /^@json-render\//],
+	external: ["zod", "kysely", "@tbtop/admin", "@tbtop/inertia-admin", /^@tbtop\/admin\//, /^node:/, "react", /^react\//, "react-dom", /^@json-render\//],
 	removeNodeProtocol: false,
 });

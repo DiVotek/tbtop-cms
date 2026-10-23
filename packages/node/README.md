@@ -191,11 +191,20 @@ Promo: {
   save with these fields fails on an unknown rule.
 - The pages field is a plain async multi-select on the wire, so the stock
   admin client renders it. The link field is the custom `link` kind: the
-  admin bundle needs the CMS link client (`linkFieldClient`, the PHP
-  package's `resources/js/cms/admin/link`) registered, or the client shows
-  its unknown-field placeholder. Its page picker posts to
+  admin bundle imports its client from `@tbtop/cms/admin-client` (below),
+  or the client shows its unknown-field placeholder. Its page picker posts to
   `{adminPrefix}/link/page-search/select-options/page`, an admin page the
   CMS adds to `cms.admin.pages`.
+
+```tsx
+// The admin bundle's entry. Peers: react 19 and @tbtop/inertia-admin (optional for the other entries).
+import { linkFieldClient } from "@tbtop/cms/admin-client"; // defineFieldClient("link", …): the import registers it
+void linkFieldClient;
+```
+
+The Node page search answers each page with one label, its name in the
+default language, where PHP's sends per-locale names: the link text's
+placeholder shows that label in every locale.
 
 ## React (`@tbtop/cms/react`)
 
@@ -347,5 +356,4 @@ it is ignored with a warning and the built-in template answers.
 Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
 page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
-from the notification settings, owner-only template editing, the link
-field's admin client shipped from this package.
+from the notification settings, owner-only template editing.

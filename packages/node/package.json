@@ -5,7 +5,9 @@
 	"license": "MIT",
 	"private": true,
 	"type": "module",
-	"sideEffects": false,
+	"sideEffects": [
+		"./dist/admin-client.js"
+	],
 	"engines": {
 		"node": ">=20"
 	},
@@ -22,6 +24,10 @@
 			"types": "./dist/react.d.ts",
 			"import": "./dist/react.js"
 		},
+		"./admin-client": {
+			"types": "./dist/admin-client.d.ts",
+			"import": "./dist/admin-client.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"scripts": {
@@ -36,6 +42,7 @@
 	},
 	"peerDependencies": {
 		"@tbtop/admin": "*",
+		"@tbtop/inertia-admin": "^0.7.1",
 		"kysely": "^0.28.0",
 		"@json-render/core": "^0.19.0",
 		"@json-render/react": "^0.19.0",
@@ -46,6 +53,7 @@
 		"@json-render/core": "^0.19.0",
 		"@json-render/react": "^0.19.0",
 		"@tbtop/admin": "file:.tbtop/packages/node",
+		"@tbtop/inertia-admin": "^0.7.1",
 		"@testing-library/react": "^16.3.2",
 		"@types/bun": "^1.3.11",
 		"@types/pg": "^8.23.1",
@@ -69,6 +77,9 @@
 			"optional": true
 		},
 		"@json-render/react": {
+			"optional": true
+		},
+		"@tbtop/inertia-admin": {
 			"optional": true
 		},
 		"react": {
