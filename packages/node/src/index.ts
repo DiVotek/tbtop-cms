@@ -1,6 +1,7 @@
 export { type BlockMeta, type Catalog, cmsBlocks, defineBlocks, type Placement, type PropsOf } from "./blocks/catalog";
 export type { ResolveContext } from "./blocks/context";
 export { resolveForm } from "./blocks/fields";
+export { LinkField, linkField, PagesField, pagesField, type StoredLink } from "./blocks/cmsFields";
 export {
 	type BlockImpl,
 	type BlockKind,
@@ -18,6 +19,8 @@ export type { CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "
 export type { Language } from "./content/languages";
 export { isLive, type Page, type PageStatus, type Translations } from "./content/page";
 export { PageConflictError, type PageInput } from "./content/pages";
+export type { PageRef } from "./content/pageRefs";
+export type { LinkType, ResolvedLink } from "./content/link";
 export { definePageType, type PageType, type PageTypeDef } from "./content/pageTypes";
 export { RedirectError } from "./content/redirects";
 export { richtextHtml } from "./content/richtext";

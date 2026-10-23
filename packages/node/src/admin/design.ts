@@ -4,6 +4,8 @@ import { SLOTS, type Slot } from "../content/layouts";
 import { RedirectError } from "../content/redirects";
 import { SharedBlockConflictError, SharedBlockInUseError } from "../content/sharedBlocks";
 import { type Dict, isDict } from "../support/values";
+import { bindCmsFields } from "../blocks/cmsFields";
+import { fieldBinding } from "./linkFields";
 import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf, trimmedForm } from "./support";
 
 const SLOT_LABELS: Record<Slot, string> = { header: "Header", footer: "Footer" };
@@ -170,7 +172,7 @@ export function sharedBlockEdit(cms: Cms) {
 				.form("sharedBlock", [
 					s.number("lock_version").meta("hidden", true),
 					s.text("shared_name").label("Name").required().rules("max:255"),
-					s.section({ title: cms.config.blocks.get(block.kind).label }, prefixedForm(cms.config.blocks, block.kind, "shared", s)),
+					s.section({ title: cms.config.blocks.get(block.kind).label }, bindCmsFields(prefixedForm(cms.config.blocks, block.kind, "shared", s), fieldBinding(cms))),
 					s.actionsRow([
 						s.action("save").label("Save").color("primary").keybinding("mod+s").submit(),
 						s.action("back").label("Back").url(`${prefix}/shared-blocks`),

@@ -100,3 +100,41 @@ export function isWellFormed(link: LinkValue): boolean {
 function externalIsValid(value: string): boolean {
 	return isPhpHttpUrl(value) || new RegExp(`^(?:${EXTERNAL_SCHEMES.join("|")}):(?://)?\\S+$`, "i").test(value);
 }
+
+export const LINK_TYPES: readonly LinkType[] = TYPES;
+
+const LABEL_MAX = 255;
+
+/**
+ * LinkShapeValidator::passes without the page lookup: null and an empty value
+ * (what an untouched field posts) pass; otherwise a parsable link of an
+ * allowed type, a label within 255 characters keyed by known locales, and a
+ * well-formed target. Returns the parsed link for the caller's page check.
+ */
+export function linkShape(value: unknown, allowedTypes: string[], locales: string[]): { ok: boolean; link: LinkValue | null } {
+	if (value === null || value === undefined || (Array.isArray(value) && value.length === 0) || (isDict(value) && Object.keys(value).length === 0)) {
+		return { ok: true, link: null };
+	}
+	const link = parseLink(value);
+	if (link === null || (allowedTypes.length > 0 && !allowedTypes.includes(link.type))) {
+		return { ok: false, link: null };
+	}
+	const ok = labelIsValid((value as Record<string, unknown>).label, locales) && isWellFormed(link);
+	return { ok, link: ok ? link : null };
+}
+
+/** Read raw, not off LinkValue: the length and known-locale gates are about what was posted. */
+function labelIsValid(label: unknown, locales: string[]): boolean {
+	if (label === null || label === undefined) {
+		return true;
+	}
+	if (typeof label === "string") {
+		return [...label].length <= LABEL_MAX;
+	}
+	if (!isDict(label)) {
+		return false;
+	}
+	return Object.entries(label).every(
+		([locale, text]) => locales.includes(locale) && (text === null || (typeof text === "string" && [...text].length <= LABEL_MAX)),
+	);
+}

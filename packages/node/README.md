@@ -78,7 +78,7 @@ createAdmin({
 	pages: [...cms.admin.pages, ...mine],
 	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
-	hostRules: kyselyRules(db),
+	hostRules: { ...kyselyRules(db), ...cms.admin.hostRules }, // link_shape, page_ref
 	context: cms.admin.context, // content locales = admin-active languages
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
 });
@@ -97,6 +97,43 @@ the page request from the route path (see `workbench/src/server/page.ts`).
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone.
+
+## Link and pages fields
+
+`linkField` and `pagesField` go into a host block's `form()`, as
+`$s->link()` / `$s->pages()` do in PHP:
+
+```ts
+import { linkField, pagesField } from "@tbtop/cms";
+
+Promo: {
+	form: (s) => [
+		s.text("title").label("Title").translatable(),
+		linkField("cta").label("Button").types(["page", "external"]), // default: page, external, email, phone
+		pagesField("related").label("Related").of("article").max(3), // of(type, subtype?); exceptPage(id)
+	],
+},
+```
+
+- A link stores `{ type, page, value, anchor, label }` (never an href, so a
+  page link survives a slug change) and resolves to `{ href, type, label }`
+  or null: a page that is not live or has no slug in the locale, a malformed
+  value. The label is per locale; without one it is the page's name or the
+  typed target.
+- A pages field stores page ids as strings in the order picked and resolves
+  to the live ones as `{ id, name, url }[]`; drafts, trashed and unknown ids
+  drop out.
+- On save the admin checks `link_shape` (type, target format, an existing
+  page, label locales and length) and `page_ref` (each id exists) as host
+  rules: merge `cms.admin.hostRules` into `createAdmin({ hostRules })`, or a
+  save with these fields fails on an unknown rule.
+- The pages field is a plain async multi-select on the wire, so the stock
+  admin client renders it. The link field is the custom `link` kind: the
+  admin bundle needs the CMS link client (`linkFieldClient`, the PHP
+  package's `resources/js/cms/admin/link`) registered, or the client shows
+  its unknown-field placeholder. Its page picker posts to
+  `{adminPrefix}/link/page-search/select-options/page`, an admin page the
+  CMS adds to `cms.admin.pages`.
 
 ## React (`@tbtop/cms/react`)
 
@@ -196,6 +233,7 @@ it is ignored with a warning and the built-in template answers.
 ## Not yet
 
 Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
-page revisions, page refs, audit log, 404 log, roles/abilities, caching, source-backed page types, the
+page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, roles/abilities, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
-from the notification settings, owner-only template editing.
+from the notification settings, owner-only template editing, the link
+field's admin client shipped from this package.
