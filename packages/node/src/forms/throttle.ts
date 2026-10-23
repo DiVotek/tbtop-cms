@@ -34,6 +34,11 @@ export class SubmitThrottle {
 		return null;
 	}
 
+	/** Forgets the key's window (Laravel's RateLimiter::clear, on a successful sign-in). */
+	clear(key: string): void {
+		this.windows.delete(key);
+	}
+
 	private sweep(now: number): void {
 		if (this.windows.size < SWEEP_AT) {
 			return;

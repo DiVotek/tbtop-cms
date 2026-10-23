@@ -11,7 +11,7 @@ import { makeCms, testDialect } from "./support";
 const PASSWORD = "correct-horse";
 
 /** A CMS whose admin signs in through Better Auth on the CMS's own database, with an admin and an editor. */
-async function authPanel() {
+async function authPanel(adapter: Parameters<typeof cmsAuth>[1] = {}) {
 	let auth: CmsAuth | null = null;
 	const { cms, db } = await makeCms(null, { authorize: (user, ability) => auth?.authorize(user, ability) ?? false });
 	const options = {
@@ -27,7 +27,7 @@ async function authPanel() {
 	};
 	await (await getMigrations(options)).runMigrations();
 	const better = betterAuth(options);
-	auth = cmsAuth(better);
+	auth = cmsAuth(better, adapter);
 	const ids: Record<string, string> = {};
 	for (const [name, role] of [
 		["owner", "admin"],
@@ -72,12 +72,19 @@ async function authPanel() {
 	const post = (url: string, body: unknown, referer: string) =>
 		visit(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", referer: `http://x${referer}` } });
 	const page = async (url: string) => (await (await visit(url)).json()) as InertiaPage;
-	const signIn = async (who: string, password = PASSWORD) => post("/admin/login/forms/login", { email: `${who}@site.test`, password }, "/admin/login");
+	const signIn = async (who: string, password = PASSWORD, ip = "203.0.113.9") =>
+		visit("/admin/login/forms/login", {
+			method: "POST",
+			body: JSON.stringify({ email: `${who}@site.test`, password }),
+			headers: { "content-type": "application/json", referer: "http://x/admin/login", "x-forwarded-for": ip },
+		});
+	/** The login page's flashed effects (Inertia's page-level `flash`). */
+	const notice = async () => JSON.stringify((await page("/admin/login")).flash);
 	const rows = async () => {
 		const res = await visit("/admin/users/tables/users", { inertia: false });
 		return ((await res.json()) as { data: { data: Record<string, unknown>[] } }).data.data;
 	};
-	return { cms, better, ids, jar, visit, post, page, signIn, rows };
+	return { cms, better, ids, jar, visit, post, page, signIn, notice, rows };
 }
 
 describe("Better Auth adapter", () => {
@@ -163,5 +170,26 @@ describe("Better Auth adapter", () => {
 		const res = await post("/admin/users/actions/ban", { payload: { row: { id: ids.owner } } }, "/admin/users");
 		expect(JSON.stringify(await res.json())).toContain("You cannot ban yourself");
 		expect(Boolean((await rows()).find((row) => row.id === ids.owner)?.banned)).toBe(false);
+	});
+
+	test("sign-in attempts are throttled per client and email; a success clears the count", async () => {
+		const { signIn, notice, jar } = await authPanel({ signInThrottle: { max: 3, perSeconds: 60 } });
+		const signedIn = () => [...jar.keys()].some((key) => key.includes("session_token"));
+		for (let i = 0; i < 3; i++) {
+			await signIn("owner", "wrong-password");
+		}
+		await signIn("owner");
+		expect(signedIn()).toBe(false);
+		const shown = await notice();
+		expect(shown).toContain("Too many sign-in attempts. Try again in");
+
+		// Another client, and another email from the same client, have their own count.
+		await signIn("editor", "wrong-password");
+		await signIn("editor", "wrong-password");
+		await signIn("editor");
+		expect(signedIn()).toBe(true);
+		jar.clear();
+		await signIn("owner", PASSWORD, "198.51.100.4");
+		expect(signedIn()).toBe(true);
 	});
 });

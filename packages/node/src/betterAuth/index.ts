@@ -1,6 +1,7 @@
 import { cookieSessions, type PageDef, type SessionResolver } from "@tbtop/admin";
 import { CMS_ABILITIES, type CmsAbility } from "../admin/abilities";
 import type { Cms } from "../cms";
+import { SubmitThrottle, type ThrottleLimit } from "../forms/throttle";
 import { type CmsRole, cmsRoles, roleAllows } from "./access";
 import { loginPage, userEdit, userNew, usersIndex } from "./pages";
 import { AuthSession, type CmsAuthUser } from "./session";
@@ -44,6 +45,14 @@ export type CmsAuthOptions = {
 	flash?: SessionResolver;
 	/** The users table: Better Auth's `user.modelName` (default `user`). */
 	usersTable?: string;
+	/**
+	 * Sign-in attempts per client and email on the login page (Laravel's
+	 * login throttle); default 5 a minute, false turns it off. Better Auth's
+	 * own rate limit covers its HTTP routes only, and every attempt costs a
+	 * password hash. Counted in memory, like `forms.throttle`; the client
+	 * comes from `forms.clientIp` or the proxy headers.
+	 */
+	signInThrottle?: ThrottleLimit | false;
 };
 
 export type CmsAuth = {
@@ -119,16 +128,17 @@ export function cmsAuth(auth: BetterAuthLike, options: CmsAuthOptions = {}): Cms
 	};
 
 	const usersTable = options.usersTable ?? auth.options.user?.modelName ?? "user";
+	const throttle = options.signInThrottle === false ? null : new SubmitThrottle(options.signInThrottle ?? { max: 5, perSeconds: 60 });
 	return {
 		authorize: (user, ability) => user !== null && typeof user === "object" && allows(user as CmsAuthUser, ability),
 		session,
 		signIn,
 		loginPath: (cms) => `/${(cms.config.adminPrefix ?? "admin").replace(/^\/+|\/+$/g, "")}/login`,
 		pages: (cms) => {
-			const ctx = { cms, auth, roles, usersTable, signIn };
+			const ctx = { cms, auth, roles, usersTable, signIn, throttle };
 			return [loginPage(ctx), usersIndex(ctx), userNew(ctx), userEdit(ctx)] as PageDef[];
 		},
 	};
 }
 
-export type AdapterCtx = { cms: Cms; auth: BetterAuthLike; roles: Record<string, CmsRole>; usersTable: string; signIn: CmsAuth["signIn"] };
+export type AdapterCtx = { cms: Cms; auth: BetterAuthLike; roles: Record<string, CmsRole>; usersTable: string; signIn: CmsAuth["signIn"]; throttle: SubmitThrottle | null };

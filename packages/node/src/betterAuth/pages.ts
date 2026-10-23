@@ -2,6 +2,7 @@ import { type ActionCtx, Column, Cond, definePage, Effects, HttpError, type S } 
 import type { Kysely } from "kysely";
 import { gated } from "../admin/abilities";
 import { adminPrefix, NAV } from "../admin/support";
+import { clientKey } from "../forms/throttle";
 import type { Dict } from "../support/values";
 import type { AdapterCtx } from "./index";
 import type { CmsAuthUser } from "./session";
@@ -44,7 +45,14 @@ export function loginPage(ctx: AdapterCtx) {
 				])
 				.onSubmit(async (submitted) => {
 					const form = submitted.form as Dict;
-					if (await ctx.signIn(submitted.request, String(form.email ?? ""), String(form.password ?? ""))) {
+					const email = String(form.email ?? "");
+					const key = `${email.toLowerCase()}|${await clientKey(submitted.request, ctx.cms.config.forms?.clientIp)}`;
+					const retryAfter = ctx.throttle?.hit(key) ?? null;
+					if (retryAfter !== null) {
+						return Effects.make().notify(`Too many sign-in attempts. Try again in ${retryAfter} seconds.`, "error");
+					}
+					if (await ctx.signIn(submitted.request, email, String(form.password ?? ""))) {
+						ctx.throttle?.clear(key);
 						return `${prefix}/dashboard`;
 					}
 					return Effects.make().notify("These credentials do not match an admin account.", "error");

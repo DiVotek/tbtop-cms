@@ -225,6 +225,11 @@ const admin = createAdmin({
   name and role (not one's own), set a new password, ban (signs out
   everywhere), unban, delete. Better Auth refuses banning or deleting
   oneself.
+- Sign-in attempts are throttled per client and email (`signInThrottle`,
+  default 5 a minute, `false` turns it off; a success clears the count):
+  Better Auth's own rate limit covers only its HTTP routes, and every
+  attempt costs a password hash. In memory, like `forms.throttle`; the
+  client comes from `forms.clientIp` or the proxy headers.
 - Better Auth's tables live in the CMS's database; run its migrations
   (`getMigrations(options).runMigrations()` or its CLI) next to `migrateCms`.
   Mount `auth.handler` (e.g. `/api/auth/*`) only for the host's own
