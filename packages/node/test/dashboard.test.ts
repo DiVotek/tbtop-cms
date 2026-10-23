@@ -66,6 +66,9 @@ describe("dashboard", () => {
 		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["Pages", "Layouts"]);
 		expect(all.filter((node) => node.kind.startsWith("chart"))).toEqual([]);
 		expect(all.filter((node) => node.kind === "list")).toHaveLength(1);
+		const header = (await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.pages" })).page;
+		expect(JSON.stringify((await header("/admin/dashboard")).props)).not.toContain("dashboardNewPage");
+		expect(JSON.stringify((await (await panel(fixture)).page("/admin/dashboard")).props)).toContain("dashboardNewPage");
 	});
 
 	test("relative times", () => {

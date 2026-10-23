@@ -35,6 +35,8 @@ const LINK_STRINGS = {
 	pagePlaceholder: "Search pages…",
 	pageSearchLabel: "Search pages",
 	pageEmpty: "No pages found.",
+	pageFailed: "Could not load pages.",
+	pageRetry: "Retry",
 	textLabel: "Text",
 };
 

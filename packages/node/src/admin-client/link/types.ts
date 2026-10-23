@@ -34,6 +34,9 @@ export interface LinkOptions {
 	pageSearchLabel?: string;
 	/** Shown in the page picker when the search finds nothing. */
 	pageEmpty?: string;
+	/** Shown in the page picker when the search request fails, next to a retry button. */
+	pageFailed?: string;
+	pageRetry?: string;
 	textLabel?: string;
 }
 

@@ -185,6 +185,13 @@ function PageTarget({ id, link, onChange, disabled, invalid, describedBy, option
 						<div className="flex justify-center py-3">
 							<Spinner />
 						</div>
+					) : remote.isFailed ? (
+						<p role="alert" className="px-2 py-3 text-center text-sm text-destructive">
+							{options?.pageFailed ?? "Could not load pages."}{" "}
+							<button type="button" className="underline" onClick={() => remote.search(term)}>
+								{options?.pageRetry ?? "Retry"}
+							</button>
+						</p>
 					) : remote.options.length === 0 ? (
 						<p className="px-2 py-3 text-center text-sm text-muted-foreground">{options?.pageEmpty ?? "No pages found."}</p>
 					) : (

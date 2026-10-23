@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import type { Kysely, Selectable } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { decodeJson, isDict, parseDate, sqlDate } from "../support/values";
@@ -30,7 +30,7 @@ export type Submission = {
 /** A Pending or Processing row this old is a dead worker's: retryable (SubmissionRetrier::STALE_AFTER_MINUTES). */
 export const STALE_AFTER_MINUTES = 15;
 
-type Row = CmsDatabase["tbtop_form_submissions"] & { id: number };
+type Row = Selectable<CmsDatabase["tbtop_form_submissions"]>;
 
 /**
  * FormSubmission + SubmissionClaim. Every status change is a single
@@ -67,7 +67,7 @@ export class Submissions {
 
 	async find(id: number): Promise<Submission | null> {
 		const row = await this.query().selectAll().where("id", "=", id).executeTakeFirst();
-		return row === undefined ? null : submissionFromRow(row as Row);
+		return row === undefined ? null : submissionFromRow(row);
 	}
 
 	async findOrFail(id: number): Promise<Submission> {

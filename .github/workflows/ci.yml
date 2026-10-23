@@ -185,7 +185,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.2"
 
       # @tbtop/admin is not published yet: build it from DiVotek/tbtop at ADMIN_SHA.
       - name: Build @tbtop/admin
@@ -244,7 +244,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.2"
 
       - name: Build @tbtop/admin
         run: ./scripts/fetch-admin.sh
@@ -267,7 +267,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.2"
 
       # vite preview and better-sqlite3 run on Node.
       - name: Setup Node

@@ -95,6 +95,23 @@ describe("@tbtop/cms/admin-client", () => {
 		expect(bodies[0]).toEqual({ path: ENDPOINT, body: { search: "" } });
 	});
 
+	test("a failed search says so and retries, instead of showing no matches", async () => {
+		let calls = 0;
+		const post = async () => {
+			calls++;
+			if (calls === 1) {
+				throw new Error("offline");
+			}
+			return { options: [{ value: "7", label: "About us" }] };
+		};
+		const { getByRole, getByText, queryByText } = renderForm({ value: page(null, "how"), options: { searchEndpoint: ENDPOINT }, client: stubClient(post) });
+		fireEvent.click(getByRole("button"));
+		await waitFor(() => expect(getByText("Could not load pages.")).toBeTruthy());
+		expect(queryByText("No pages found.")).toBeNull();
+		fireEvent.click(getByText("Retry"));
+		await waitFor(() => expect(getByText("About us")).toBeTruthy());
+	});
+
 	test("a Node search answer has no per-locale names: every locale's placeholder is the page's label", async () => {
 		const post = async (_path: string, body?: unknown) =>
 			(body as { value?: string }).value === "7" ? { option: { value: "7", label: "Contact us" } } : { options: [] };

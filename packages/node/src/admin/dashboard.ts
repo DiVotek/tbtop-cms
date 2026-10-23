@@ -68,6 +68,9 @@ export function ago(date: Date | null, now = new Date()): string {
  * the host's home link). Media and server metrics are the host's, so the
  * PHP media tile and system section have no counterpart.
  */
+/** The view's pages check for its header: @tbtop/admin builds headerActions (sync) right after view, on the same request. */
+const canAddPage = new WeakMap<Request, boolean>();
+
 export function dashboard(cms: Cms) {
 	const db = cms.config.db;
 	const prefix = adminPrefix(cms);
@@ -75,14 +78,15 @@ export function dashboard(cms: Cms) {
 		path: "dashboard",
 		title: "Dashboard",
 		subtitle: "Welcome back",
-		headerActions: (s) => [
+		headerActions: (s, { request }) => [
 			s.action("dashboardRefresh").label("Refresh").icon("refresh-cw").url(`${prefix}/dashboard`),
 			s.action("dashboardViewSite").label("View site").icon("external-link").url(cms.config.url ?? "/").openUrlInNewTab(),
-			s.action("dashboardNewPage").label("New page").color("primary").url(`${prefix}/pages`),
+			...(canAddPage.get(request) === true ? [s.action("dashboardNewPage").label("New page").color("primary").url(`${prefix}/pages`)] : []),
 		],
 		view: async (s, { request }) => {
 			const showSubmissions = await allows(cms, "tbtop-cms.submissions");
 			const showPages = await allows(cms, "tbtop-cms.pages");
+			canAddPage.set(request, showPages);
 			const showDesign = await allows(cms, "tbtop-cms.design");
 			const fallback = await cms.site(request).languages.defaultLocale();
 			return s.stack([
@@ -121,7 +125,7 @@ export function dashboard(cms: Cms) {
 											}
 											const rows = await db.selectFrom("tbtop_form_submissions").selectAll().orderBy("created_at", "desc").orderBy("id", "desc").limit(RECENT).execute();
 											return rows.map((row) => {
-												const submission = submissionFromRow(row as never);
+												const submission = submissionFromRow(row);
 												return {
 													title: leadIdentity(submission.payload) ?? submission.kind,
 													meta: `${submission.kind} · ${ago(submission.createdAt)}`,

@@ -49,6 +49,8 @@ function toOptions(response: unknown): PageOption[] {
 export interface PageOptionsState {
 	options: PageOption[];
 	isLoading: boolean;
+	/** The last search failed (network or server): the list is not "no matches". */
+	isFailed: boolean;
 	/** The currently stored id's option, resolved separately from the list. */
 	selected: PageOption | null;
 	search: (term: string) => void;
@@ -65,6 +67,7 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 	const client = useClient();
 	const [options, setOptions] = useState<PageOption[]>([]);
 	const [isLoading, setLoading] = useState(false);
+	const [isFailed, setFailed] = useState(false);
 	const [known, setKnown] = useState<Record<string, PageOption>>({});
 	const seen = useRef<Record<string, PageOption>>({});
 	const latestSearch = useRef(0);
@@ -83,10 +86,16 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 			const ticket = ++latestSearch.current;
 			const isCurrent = () => ticket === latestSearch.current;
 			setLoading(true);
+			setFailed(false);
 			client
 				.post(endpoint, { search: term })
 				.then((response) => isCurrent() && setOptions(toOptions(response)))
-				.catch(() => isCurrent() && setOptions([]))
+				.catch(() => {
+					if (isCurrent()) {
+						setOptions([]);
+						setFailed(true);
+					}
+				})
 				.finally(() => isCurrent() && setLoading(false));
 		},
 		[client, endpoint],
@@ -117,6 +126,7 @@ export function usePageOptions(endpoint: string | undefined, value: string | nul
 	return {
 		options,
 		isLoading,
+		isFailed,
 		selected: value === null ? null : (known[value] ?? null),
 		search,
 		noteSeen,
