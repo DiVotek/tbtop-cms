@@ -1,10 +1,10 @@
 import { JSONUIProvider } from "@json-render/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { PageProps } from "@tbtop/cms";
-import { CmsRenderer, seoHead } from "@tbtop/cms/react";
+import type { ErrorPageProps } from "@tbtop/cms";
+import { CmsHead, CmsRenderer, seoHead } from "@tbtop/cms/react";
 import { catalog, registry } from "../blocks/registry";
 import { site } from "../server/cms";
-import { loadCmsPage } from "../server/page";
+import { type CmsView, loadCmsPage } from "../server/page";
 
 export const Route = createFileRoute("/$")({
 	// robots.txt, the sitemaps and form posts (/_cms/forms/...) are plain
@@ -17,11 +17,20 @@ export const Route = createFileRoute("/$")({
 	},
 	loader: ({ location }) => loadCmsPage({ data: location.href }),
 	head: ({ loaderData }) => (loaderData === undefined ? {} : seoHead(loaderData.seo)),
-	component: CmsPage,
+	component: () => <CmsPage {...Route.useLoaderData()} />,
+	// A 404 carries the editor's 4xx page (ErrorPageProps); its noindex head comes from CmsHead, which React hoists.
+	notFoundComponent: ({ data }) => {
+		const props = data as ErrorPageProps | undefined;
+		return props === undefined ? <h1>Not found</h1> : (
+			<>
+				<CmsHead seo={props.seo} />
+				<CmsPage {...props} />
+			</>
+		);
+	},
 });
 
-function CmsPage() {
-	const { page, render, breadcrumbs, isPreview, cms: shared }: PageProps = Route.useLoaderData();
+function CmsPage({ page, render, breadcrumbs, isPreview, cms: shared }: CmsView) {
 	return (
 		<>
 			{isPreview ? <div data-testid="preview-banner">{shared.strings.previewBanner}</div> : null}

@@ -41,9 +41,16 @@ bun run e2e                    # production build + vite preview + Playwright
 
 Rerun `bun run setup` after a change to the package. Locally, point
 Playwright at an installed Chromium with `PW_CHROMIUM=/path/to/chrome`.
+E2E serves the build with `NODE_ENV=production` (a block whose props fail
+the catalog is dropped, not thrown) and `CMS_FORMS_THROTTLE=off` (every spec
+posts from one client). The workbench registers the link field's client
+from `@tbtop/cms/admin-client` and has its own `Promo` block with a
+`linkField` CTA.
 
 The workbench is a demo, not a host to copy: it signs every visitor in as an
-admin and opens drafts and scheduled pages to anyone who adds `?preview`.
+admin, so anyone can open the page editor and its signed preview links to
+drafts and scheduled pages (the preview secret has a fixed default,
+`CMS_PREVIEW_SECRET` overrides it).
 The admin `user()` callback decides who gets into the panel, `authorize`
 which CMS sections each user sees, and `canPreview` (or a signed preview
 link) who sees unpublished pages, so a real host must check its own users

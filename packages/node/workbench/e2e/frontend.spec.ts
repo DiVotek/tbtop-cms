@@ -53,12 +53,6 @@ test("unknown, draft and scheduled pages are 404", async ({ request }) => {
 	}
 });
 
-test("a draft previews with a banner and noindex", async ({ page }) => {
-	await page.goto("/work-in-progress?preview=1");
-	await expect(page.getByTestId("preview-banner")).toBeVisible();
-	await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
-});
-
 test("robots.txt and the sitemap", async ({ request }) => {
 	const robots = await request.get("/robots.txt");
 	expect(await robots.text()).toContain("Disallow: /admin");
