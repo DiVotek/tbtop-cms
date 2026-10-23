@@ -54,7 +54,7 @@ export class Site {
 		);
 		this.layouts = new Layouts(db);
 		this.sharedBlocks = new SharedBlocks(db);
-		this.redirects = new Redirects(db);
+		this.redirects = new Redirects(db, config.redirects?.allowedExternalHosts);
 		this.blocks = config.blocks;
 		this.submissions = new Submissions(db);
 		this.notifications = new Notifications(this);

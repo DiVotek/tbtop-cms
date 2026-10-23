@@ -44,9 +44,10 @@ Playwright at an installed Chromium with `PW_CHROMIUM=/path/to/chrome`.
 
 The workbench is a demo, not a host to copy: it signs every visitor in as an
 admin and opens drafts and scheduled pages to anyone who adds `?preview`.
-The package has no access control of its own yet: the admin `user()`
-callback decides who edits and `canPreview` decides who sees unpublished
-pages, so a real host must check its own users in both.
+The admin `user()` callback decides who gets into the panel, `authorize`
+which CMS sections each user sees, and `canPreview` (or a signed preview
+link) who sees unpublished pages, so a real host must check its own users
+there.
 
 ## Host API
 
@@ -67,6 +68,9 @@ const cms = createCms({
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
+	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
+	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
+	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 });
 
 // Frontend
@@ -94,6 +98,24 @@ Like `cms:install`, it then gives a database with no live language its
 default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
 A host that merges `cmsMigrations` into its own Migrator calls
 `ensureDefaultLanguage(db, "en")` after it.
+
+### Access
+
+`authorize(user, ability)` gets the panel user and a section ability, by
+the PHP names: `tbtop-cms.pages` (pages and the page editor),
+`tbtop-cms.submissions` (inbox), `tbtop-cms.redirects`, `tbtop-cms.design`
+(layout and shared blocks; also Share and adding a shared block in the page
+editor), `tbtop-cms.languages` and `tbtop-cms.settings` (site, SEO,
+notifications). A false hides the section from the nav and answers 403 to
+its pages and to every form, action, table and upload on them. Without
+`authorize`, every section is open to any panel user, as before.
+
+With `preview.secret`, the page editor of a page that is not live offers
+a "Preview" link per site locale: an HMAC-signed URL (Web Crypto, so it
+runs on Workers) with `expires` and `signature`, valid for `ttlHours`
+(default 72). `loadPage` previews a request whose signature matches its
+path and has not expired; `canPreview` still grants preview on its own.
+`previewLink(cms.site(), path, locale)` builds one for a host's own UI.
 
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
@@ -141,6 +163,12 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 - `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
   `useCmsForm(action)` is the ContactForm's submit logic for a custom form
   block: JSON post, field errors, a plain form post without JS.
+- The Hero's CTA link is read the way a browser reads it (leading controls
+  and spaces dropped, tabs and newlines removed): a relative link (`/contact`,
+  `blog`, `#form`, `?ref=x`) or an http(s), `mailto:`, `tel:` or messenger
+  (`tg:`, `viber:`, `whatsapp:`, `skype:`, `sms:`) link passes, any other
+  scheme (`javascript:`, `data:`) does not. The editor refuses it, and a
+  stored one resolves to no CTA, so the component renders only a safe href.
 
 ## Forms and notifications
 
@@ -248,6 +276,6 @@ it is ignored with a warning and the built-in template answers.
 ## Not yet
 
 Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
-page revisions, page refs, audit log, 404 log, roles/abilities, caching, source-backed page types, the
+page revisions, page refs, audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

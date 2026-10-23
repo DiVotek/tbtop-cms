@@ -6,12 +6,6 @@ import { flag, sqlDate } from "../support/values";
 const MAX_HOPS = 10;
 /** Longest chain a new or edited rule may extend (RedirectCycle::MAX_HOPS). */
 const MAX_WRITE_HOPS = 20;
-/**
- * External hosts a redirect may point at. PHP reads
- * `tbtop-cms.redirects.allowed_external_hosts` (default `[]`); Node has no
- * such key yet, so every external target is rejected, like PHP's default.
- */
-const ALLOWED_EXTERNAL_HOSTS: readonly string[] = [];
 
 /** A redirect rule that fails RedirectValidator's checks; the message is user-facing. */
 export class RedirectError extends Error {
@@ -34,7 +28,11 @@ export const normalizePath = (path: string): string => path.replace(/^[/\\]+|[/\
 
 /** Redirect rules: locale-specific first, then any-locale; chains followed, cycles dropped (RedirectResolver.php). */
 export class Redirects {
-	constructor(private readonly db: Kysely<CmsDatabase>) {}
+	constructor(
+		private readonly db: Kysely<CmsDatabase>,
+		/** External hosts a rule may point at (`redirects.allowedExternalHosts`); empty rejects every external target. */
+		private readonly allowedExternalHosts: readonly string[] = [],
+	) {}
 
 	/** The final target (a path or an external URL) and status for a missing path, or null. */
 	async resolve(path: string, locale: string): Promise<{ target: string; status: number } | null> {
@@ -105,7 +103,7 @@ export class Redirects {
 			throw new RedirectError("From path must be a local path, not an external URL.");
 		}
 		const toPath = isExternal(rawTo) ? rawTo : normalizePath(rawTo);
-		assertTargetAllowed(toPath);
+		assertTargetAllowed(toPath, this.allowedExternalHosts);
 		const statusCode = input.statusCode ?? 301;
 		if (statusCode !== 301 && statusCode !== 302) {
 			throw new RedirectError("Status code must be 301 or 302.");
@@ -196,7 +194,7 @@ export class Redirects {
 }
 
 /** RedirectValidator::assertToAllowed: an external target needs an http(s) URL with a host on the allowlist. */
-function assertTargetAllowed(to: string): void {
+function assertTargetAllowed(to: string, allowedHosts: readonly string[]): void {
 	if (!isExternal(to)) {
 		return;
 	}
@@ -205,7 +203,7 @@ function assertTargetAllowed(to: string): void {
 	if (host === "") {
 		throw new RedirectError("External redirect target must be a valid http(s) URL with a host.");
 	}
-	if (!ALLOWED_EXTERNAL_HOSTS.map((allowed) => allowed.toLowerCase()).includes(host.toLowerCase())) {
+	if (!allowedHosts.map((allowed) => allowed.toLowerCase()).includes(host.toLowerCase())) {
 		throw new RedirectError("External redirect host is not allowlisted.");
 	}
 }

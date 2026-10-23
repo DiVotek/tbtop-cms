@@ -3,7 +3,10 @@ import type { Cms } from "../cms";
 import { firstText, isLive, type Page, TRANSLATABLE } from "../content/page";
 import { PageConflictError } from "../content/pages";
 import { allowsChild, PageRuleError, subtreeIds } from "../content/pageRules";
+import { previewLink } from "../frontend/previewLink";
+import type { Site } from "../site";
 import { type Dict, isDict } from "../support/values";
+import { allows } from "./abilities";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
 import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf, trimmedForm } from "./support";
 
@@ -268,9 +271,13 @@ export function pageEdit(cms: Cms) {
 					return saveRefusal(error);
 				}
 			};
+			// Shared blocks are design, not page content: sharing and placing one need that ability (PageEditBlockTabs::mayEditShared).
+			const mayShare = await allows(cms, "tbtop-cms.design");
+			const previews = await previewActions(s, site, page, slugs);
 			return s.stack([
 				s.displayText(firstText(page, ["name", "title"], defaultLocale, defaultLocale) || `#${page.id}`).variant("heading"),
 				s.displayText(`${isLive(page) ? "Live" : "Not live"} · /${slugs[defaultLocale] ?? ""}`).variant("muted"),
+				...(previews.length > 0 ? [s.row(previews)] : []),
 				s
 					.form("pageEditor", [
 						s.number("lock_version").meta("hidden", true),
@@ -285,7 +292,7 @@ export function pageEdit(cms: Cms) {
 									sharedNames: shared,
 									problems,
 									skipsValidation: page.status !== "published",
-									sharing: { blocks: sharedBlocks, owner: firstText(page, ["name"], defaultLocale, defaultLocale) || `#${page.id}` },
+									...(mayShare ? { sharing: { blocks: sharedBlocks, owner: firstText(page, ["name"], defaultLocale, defaultLocale) || `#${page.id}` } } : {}),
 								}),
 							{
 								label: "Publishing",
@@ -333,6 +340,26 @@ export function pageEdit(cms: Cms) {
 			]);
 		},
 	});
+}
+
+/**
+ * PageEditStatusBar::previewLinkAction: for a page that is not live, a
+ * signed link per site locale with a saved slug, opened in a new tab. A
+ * live page, an error page and a config without `preview.secret` get none.
+ */
+async function previewActions(s: S, site: Site, page: Page, slugs: Record<string, string>): Promise<unknown[]> {
+	if (isLive(page) || page.errorClass !== null || site.config.preview === undefined) {
+		return [];
+	}
+	const actions: unknown[] = [];
+	for (const { locale } of await site.languages.frontendActive()) {
+		const path = slugs[locale];
+		const url = path === undefined ? null : await previewLink(site, path, locale);
+		if (url !== null) {
+			actions.push(s.action(`pagePreviewLink_${locale}`).label(`Preview (${locale})`).icon("eye").url(url).openUrlInNewTab());
+		}
+	}
+	return actions;
 }
 
 /** A stale form or a broken page rule as an error notice (PageConflictException → pages.conflict.message); anything else rethrows. */

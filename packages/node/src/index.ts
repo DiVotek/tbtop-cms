@@ -14,6 +14,7 @@ export {
 } from "./blocks/registry";
 export { assembleSpec, BlockResolutionError, type RenderSpec, type ResolvedBlock } from "./blocks/resolver";
 export type { CmsAdmin } from "./admin";
+export { CMS_ABILITIES, type CmsAbility } from "./admin/abilities";
 export { type Cms, type CmsTasks, createCms } from "./cms";
 export type { CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
 export type { Language } from "./content/languages";
@@ -31,6 +32,7 @@ export { LEAD_STATUSES, type LeadStatus, type Submission, Submissions, type Subm
 export type { SubmissionEvent } from "./forms/submit";
 export type { Crumb } from "./frontend/breadcrumbs";
 export type { LoadResult, PageProps, SharedProps } from "./frontend/load";
+export { previewLink } from "./frontend/previewLink";
 export { htmlToText } from "./notifications/channels";
 export { formSubmissionType, type FormSubmissionPayload } from "./notifications/formSubmission";
 export {

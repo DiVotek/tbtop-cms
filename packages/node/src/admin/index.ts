@@ -1,5 +1,6 @@
 import type { AdminContext, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
+import { gated } from "./abilities";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
 import { languageEdit, languageNew, languagesIndex } from "./languages";
@@ -19,21 +20,21 @@ export type CmsAdmin = {
 export function adminPages(cms: Cms): CmsAdmin {
 	return {
 		pages: [
-			pagesIndex(cms),
-			pageEdit(cms),
-			submissionsIndex(cms),
-			submissionView(cms),
-			redirectsIndex(cms),
-			layoutIndex(cms),
-			layoutEdit(cms),
-			sharedBlocksIndex(cms),
-			sharedBlockEdit(cms),
-			languagesIndex(cms),
-			languageNew(cms),
-			languageEdit(cms),
-			siteSettings(cms),
-			seoSettings(cms),
-			notificationSettings(cms),
+			gated(cms, "tbtop-cms.pages", pagesIndex(cms)),
+			gated(cms, "tbtop-cms.pages", pageEdit(cms)),
+			gated(cms, "tbtop-cms.submissions", submissionsIndex(cms)),
+			gated(cms, "tbtop-cms.submissions", submissionView(cms)),
+			gated(cms, "tbtop-cms.redirects", redirectsIndex(cms)),
+			gated(cms, "tbtop-cms.design", layoutIndex(cms)),
+			gated(cms, "tbtop-cms.design", layoutEdit(cms)),
+			gated(cms, "tbtop-cms.design", sharedBlocksIndex(cms)),
+			gated(cms, "tbtop-cms.design", sharedBlockEdit(cms)),
+			gated(cms, "tbtop-cms.languages", languagesIndex(cms)),
+			gated(cms, "tbtop-cms.languages", languageNew(cms)),
+			gated(cms, "tbtop-cms.languages", languageEdit(cms)),
+			gated(cms, "tbtop-cms.settings", siteSettings(cms)),
+			gated(cms, "tbtop-cms.settings", seoSettings(cms)),
+			gated(cms, "tbtop-cms.settings", notificationSettings(cms)),
 		] as PageDef[],
 		navigationGroups: [
 			{ key: "content", label: "Content", icon: "files" },

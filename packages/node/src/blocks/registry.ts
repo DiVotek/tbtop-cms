@@ -1,6 +1,7 @@
 import { S } from "@tbtop/admin";
 import type { z } from "zod";
 import type { Page } from "../content/page";
+import { safeHref, safeHrefRule } from "../content/safeHref";
 import type { SchemaContext } from "../seo/schemaContext";
 import type { BlockMeta, Catalog, Placement } from "./catalog";
 import { cmsBlocks } from "./catalog";
@@ -154,11 +155,12 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 			s.textarea("subtitle").label("Subtitle").translatable(),
 			s.text("image").label("Image URL"),
 			s.text("ctaLabel").label("CTA label").translatable(),
-			s.text("ctaHref").label("CTA link"),
+			s.text("ctaHref").label("CTA link").helperText("A relative link (/contact, #form), or an http(s), mailto: or tel: link.").rules(["nullable", safeHrefRule]),
 		],
 		resolve: (input) => {
 			const label = cleanString(input.ctaLabel);
-			const href = cleanString(input.ctaHref);
+			// An unsafe scheme (javascript:, data:) is dropped, so the CTA is too.
+			const href = safeHref(cleanString(input.ctaHref));
 			return {
 				title: typeof input.title === "string" ? input.title : input.title == null ? "" : String(input.title),
 				subtitle: cleanString(input.subtitle),
