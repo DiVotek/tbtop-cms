@@ -45,6 +45,7 @@ export class Site {
 		this.languages = new Languages(db);
 		this.settings = new Settings(db, {
 			secretKeys: config.secretSettings ?? [],
+			secretKey: config.settingsKey,
 			mediaUrl: (ref) => this.mediaUrl(ref),
 		});
 		this.pages = new Pages(

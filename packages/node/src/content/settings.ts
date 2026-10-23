@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
+import { SecretBox } from "../support/secretBox";
 import { sqlDate } from "../support/values";
 
 /** Keys whose values are media references, turned into URLs for the frontend. */
@@ -7,17 +8,20 @@ const MEDIA_KEYS = ["site.logo", "site.favicon", "seo.default_og_image", "seo.id
 const FRONTEND_PREFIXES = ["site.", "seo."];
 
 /**
- * Dotted-key settings (Settings.php): each value is JSON text. Secret keys are
- * Laravel-Crypt encrypted in PHP; this port does not decrypt them yet, so they
- * read as the default and never reach the frontend.
+ * Dotted-key settings (Settings.php): each value is JSON text. A secret key's
+ * JSON is sealed with `settingsKey` (AES-GCM) and never reaches the frontend;
+ * without a key a secret reads as the fallback and cannot be written.
  */
 export class Settings {
 	private raw: Map<string, string | null> | null = null;
+	private readonly box: SecretBox | null;
 
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
-		private readonly options: { secretKeys: string[]; mediaUrl: (ref: string) => string | null },
-	) {}
+		private readonly options: { secretKeys: string[]; secretKey?: string; mediaUrl: (ref: string) => string | null },
+	) {
+		this.box = (options.secretKey ?? "") === "" ? null : new SecretBox(options.secretKey as string);
+	}
 
 	isSecret(key: string): boolean {
 		return this.options.secretKeys.includes(key);
@@ -25,12 +29,16 @@ export class Settings {
 
 	async get<T = unknown>(key: string, fallback: T | null = null): Promise<T | unknown> {
 		const raw = await this.rawAll();
-		if (!raw.has(key) || this.isSecret(key)) {
+		if (!raw.has(key)) {
 			return fallback;
 		}
-		const value = raw.get(key);
-		if (value === null || value === undefined) {
+		const stored = raw.get(key);
+		if (stored === null || stored === undefined) {
 			return null;
+		}
+		const value = this.isSecret(key) ? await this.unseal(key, stored) : stored;
+		if (value === null) {
+			return fallback;
 		}
 		try {
 			return JSON.parse(value);
@@ -46,11 +54,9 @@ export class Settings {
 	}
 
 	async set(key: string, value: unknown): Promise<void> {
-		if (this.isSecret(key)) {
-			throw new Error(`Setting '${key}' is secret; secret settings are not supported yet.`);
-		}
+		const json = JSON.stringify(value ?? null);
+		const encoded = this.isSecret(key) ? await this.seal(key, json) : json;
 		const now = sqlDate(new Date());
-		const encoded = JSON.stringify(value ?? null);
 		const existing = await this.db.selectFrom("tbtop_settings").select("id").where("key", "=", key).executeTakeFirst();
 		if (existing === undefined) {
 			await this.db.insertInto("tbtop_settings").values({ key, value: encoded, created_at: now, updated_at: now }).execute();
@@ -86,6 +92,21 @@ export class Settings {
 			}
 		}
 		return out;
+	}
+
+	private async seal(key: string, json: string): Promise<string> {
+		if (this.box === null) {
+			throw new Error(`Setting '${key}' is secret: set settingsKey in the CMS config to store it.`);
+		}
+		return this.box.seal(json);
+	}
+
+	private async unseal(key: string, stored: string): Promise<string | null> {
+		const plain = this.box === null ? null : await this.box.open(stored);
+		if (plain === null) {
+			console.warn("settings.secret_unreadable", { key });
+		}
+		return plain;
 	}
 
 	private media(value: unknown): string | null {

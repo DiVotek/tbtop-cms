@@ -78,6 +78,7 @@ const cms = createCms({
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
 	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
+	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
 	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
 });
 
@@ -180,6 +181,14 @@ runs on Workers) with `expires` and `signature`, valid for `ttlHours`
 (default 72). `loadPage` previews a request whose signature matches its
 path and has not expired; `canPreview` still grants preview on its own.
 `previewLink(cms.site(), path, locale)` builds one for a host's own UI.
+
+The keys in `secretSettings` are sealed with `settingsKey` (AES-256-GCM over
+Web Crypto, so Workers too): `settings.set` writes `enc:v1:…`, `settings.get`
+opens it, and `cms.settings` never carries them. Without `settingsKey` a
+secret cannot be saved; a value sealed with another key, or stored in plain
+text, reads as the fallback with a `settings.secret_unreadable` warning.
+Changing the key loses the stored secrets. The mail transport and the
+Telegram bot token are host config, not settings.
 
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
@@ -392,7 +401,7 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Secret settings, legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
+Auto-redirects on slug change,
 page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

@@ -24,8 +24,14 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	url?: string;
 	/** A media reference to its public URL; default: absolute URLs and `/…` paths as is, other paths under `/storage/`. */
 	media?: (ref: string) => MediaDetails | null;
-	/** Settings keys holding secrets; never sent to the frontend. */
+	/** Settings keys holding secrets: sealed with `settingsKey`, never sent to the frontend. */
 	secretSettings?: string[];
+	/**
+	 * The key secret settings are sealed with (AES-256-GCM over Web Crypto).
+	 * Keep it in the environment; changing it makes stored secrets unreadable.
+	 * Without it a secret setting reads as its fallback and cannot be saved.
+	 */
+	settingsKey?: string;
 	/** Paths robots.txt disallows besides the admin prefix and `/login`. */
 	robotsDisallow?: string[];
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */
