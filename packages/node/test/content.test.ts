@@ -16,7 +16,7 @@ describe("slugs", () => {
 		const page = await site.pages.find(Number(parent.id));
 		await site.pages.update(Number(parent.id), {}, { slugs: { en: "Updates & more" }, lockVersion: page?.lockVersion });
 		expect((await cms.loadPage(get("/updates-more/item"))).type).toBe("page");
-		expect((await cms.loadPage(get("/news/item"))).type).toBe("notFound");
+		expect((await cms.loadPage(get("/news/item"))).type).toBe("redirect");
 	});
 
 	test("a stale lock version is a conflict", async () => {

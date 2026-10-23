@@ -374,7 +374,8 @@ in `tbtop_notification_templates`.
 - Languages, settings (`site.*`/`seo.*` dotted keys), pages with per-locale
   slugs and paths (collision suffixes, cascade to children), optimistic
   locking, layouts (header/footer), shared blocks, redirects (chains, cycles,
-  query string kept).
+  query string kept; a moved page path leaves a 301 auto rule, repointed on the
+  next move and dropped when a page takes the path again).
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
@@ -401,7 +402,6 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Auto-redirects on slug change,
-page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
+Page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

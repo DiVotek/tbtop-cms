@@ -4,13 +4,15 @@ import { insertId } from "../support/db";
 import { capSlug, slugify } from "../support/slug";
 import { sqlDate } from "../support/values";
 import { type Page, pageFromRow } from "./page";
+import { clearAt, recordMove } from "./slugRedirects";
 
 type SlugRow = { id: number; slug: string; path: string };
 
 /**
  * One slug and full path per page and frontend locale (PageSlugWriter.php).
  * The slug comes from the override, else the stored slug, else the name;
- * a taken path gets `-2`, `-3`…; a change cascades to the children.
+ * a taken path gets `-2`, `-3`…; a change cascades to the children. A moved
+ * path leaves a 301 auto redirect behind (PageSlugRedirects.php).
  */
 export class PageSlugs {
 	constructor(
@@ -136,7 +138,11 @@ export class PageSlugs {
 			);
 		} else {
 			await this.db.updateTable("tbtop_page_slugs").set({ slug, path, updated_at: now }).where("id", "=", existing.id).execute();
+			if (existing.path !== path) {
+				await recordMove(this.db, locale, existing.path, path);
+			}
 		}
+		await clearAt(this.db, locale, path);
 		return true;
 	}
 
