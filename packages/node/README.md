@@ -440,6 +440,9 @@ On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
 `tbtop-cms scheduled` from cron every minute; both read the default export
 of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
+Set `NODE_ENV=production` there (or `strictBlocks: false`): otherwise a
+block whose props fail the catalog throws and its page answers 500, where
+production drops that block with a warning.
 
 On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite: migrate with
 `dialect: "sqlite"`), set `compatibility_flags = ["nodejs_als"]` (or

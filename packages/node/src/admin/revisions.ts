@@ -45,7 +45,7 @@ function row(s: S, cms: Cms, page: Page, revision: PageRevision, isNewest: boole
 		: s
 				.action(`pageRevisionRestore_${revision.id}`)
 				.label("Restore")
-				.confirm("Restore this revision?", "The page content goes back to this snapshot. Status, place in the tree and slugs stay.")
+				.confirm("Restore this revision?", "The page content goes back to this snapshot; unsaved edits in this editor are lost. Status, place in the tree and slugs stay.")
 				.handle(async (ctx) => {
 					try {
 						await siteOf(cms, ctx).pages.restore(page.id, revision.id, { by: actorKey(ctx) });

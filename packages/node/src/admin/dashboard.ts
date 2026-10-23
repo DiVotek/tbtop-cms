@@ -143,28 +143,12 @@ export function dashboard(cms: Cms) {
 async function stats(s: S, cms: Cms, { showPages, showSubmissions, showDesign }: { showPages: boolean; showSubmissions: boolean; showDesign: boolean }) {
 	const db = cms.config.db;
 	const window = since(TREND_DAYS);
-	// Counts in SQL; only the trend window's rows come back.
-	const live = db.selectFrom("tbtop_pages").where("deleted_at", "is", null);
-	const byStatus = await live.select(["status", (eb) => eb.fn.countAll().as("n")]).groupBy("status").execute();
-	const count = (status: string) => Number(byStatus.find((row) => row.status === status)?.n ?? 0);
-	const published = count("published");
-	const draft = count("draft");
-	const pages = await live.select("created_at").where("created_at", ">=", window).execute();
 	const trend = (rows: { created_at: unknown }[]) =>
 		daily(
 			rows.map((row) => row.created_at),
 			TREND_DAYS,
 		).map((day) => day.value);
-	const tiles = showPages
-		? [
-				s
-					.stat("Pages")
-					.value(published + draft)
-					.description(`${published} published · ${draft} draft`)
-					.icon("file-text")
-					.sparkline(trend(pages), "bottom"),
-			]
-		: [];
+	const tiles = showPages ? [await pagesTile(s, cms, window, trend)] : [];
 	if (showSubmissions) {
 		const recent = await db.selectFrom("tbtop_form_submissions").select("created_at").where("created_at", ">=", window).execute();
 		const unread = await db.selectFrom("tbtop_form_submissions").select((eb) => eb.fn.countAll().as("n")).where("lead_status", "=", "new").executeTakeFirst();
@@ -184,6 +168,22 @@ async function stats(s: S, cms: Cms, { showPages, showSubmissions, showDesign }:
 		);
 	}
 	return tiles;
+}
+
+/** Counts in SQL; only the trend window's rows come back. */
+async function pagesTile(s: S, cms: Cms, window: string, trend: (rows: { created_at: unknown }[]) => number[]) {
+	const live = cms.config.db.selectFrom("tbtop_pages").where("deleted_at", "is", null);
+	const byStatus = await live.select(["status", (eb) => eb.fn.countAll().as("n")]).groupBy("status").execute();
+	const count = (status: string) => Number(byStatus.find((row) => row.status === status)?.n ?? 0);
+	const published = count("published");
+	const draft = count("draft");
+	const pages = await live.select("created_at").where("created_at", ">=", window).execute();
+	return s
+		.stat("Pages")
+		.value(published + draft)
+		.description(`${published} published · ${draft} draft`)
+		.icon("file-text")
+		.sparkline(trend(pages), "bottom");
 }
 
 function charts(s: S, cms: Cms) {
