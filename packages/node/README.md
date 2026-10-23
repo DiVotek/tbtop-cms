@@ -2,8 +2,8 @@
 
 The tbtop CMS core for Bun, Node and Cloudflare Workers: pages, blocks and SEO
 over the host's Kysely, edited in [`@tbtop/admin`](https://github.com/DiVotek/tbtop/tree/main/packages/node).
-It reads and writes the same `tbtop_*` tables as the PHP package, so a Node
-host can open a database the Laravel package migrated.
+It is a standalone package for new projects: it owns its `tbtop_*` schema
+and does not share a database with the Laravel package or migrate one.
 
 The frontend is headless: the host framework (TanStack Start, Hono + React,
 Astro…) asks the CMS for a page's props and renders them. `@tbtop/cms/react`
@@ -71,12 +71,14 @@ const cms = createCms({
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
 	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
+	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
 });
 
 // Frontend
 const result = await cms.loadPage(request);
 // { type: "page", status, headers, props: { page, render, seo, breadcrumbs, path, isPreview, cms } }
-// | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms }
+// | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms, props } (props: ErrorPageProps)
+const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the host's own 5xx handler (see Error pages)
 (await cms.handle(request)) ?? ...; // robots.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/...
 
 // Admin
@@ -84,7 +86,7 @@ createAdmin({
 	pages: [...cms.admin.pages, ...mine],
 	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
-	hostRules: { ...kyselyRules(db), ...cms.admin.hostRules }, // link_shape, page_ref
+	hostRules: cms.admin.hostRules, // the config's hostRules + link_shape, page_ref
 	context: cms.admin.context, // content locales = admin-active languages
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
 });
@@ -122,14 +124,37 @@ if (result.type === "page" && result.props.page.type === "recipe") {
 - `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
   or `Cms` keeps `fields` as untyped JSON.
 
-`migrateCms` creates the tables from scratch: run it on a fresh database, not
-on one the Laravel package already migrated (its tables exist and the
-migration fails). A database Laravel migrated is read as it is, without
-`migrateCms`.
+`migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
 default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
 A host that merges `cmsMigrations` into its own Migrator calls
 `ensureDefaultLanguage(db, "en")` after it.
+
+### Error pages
+
+A 404 from `loadPage` and `cms.errorPage(request, status)` carry
+`ErrorPageProps` (ErrorResponse): the live error page of the status class
+(`4xx` or `5xx`, the `error_class` column) or, without one, fallback props
+with no blocks and the package's heading ("Page not found", "Something went
+wrong"). The shape is `PageProps`' (`page`, `render`, `seo`, `breadcrumbs`,
+`cms`) plus `status`, `locale` and `path`; `page.id` is null in the fallback.
+`seo` is always noindex with no canonical, og:url or JSON-LD (`ErrorSeo`;
+`seoTags`/`seoHead`/`CmsHead` take it), and `breadcrumbs` is empty. Render
+it with the page component, inside the host's chrome, and answer the status.
+
+```ts
+const result = await cms.loadPage(request);
+if (result.type === "notFound") return render(<Page {...result.props} />, { status: 404 });
+// the host's 500 handler (TanStack errorComponent, Hono onError):
+return render(<Page {...(await cms.errorPage(request, 500))} />, { status: 500 });
+```
+
+The error pages are system pages an editor edits in the pages list; like
+`cms:install`, `ensureErrorPages(cms)` creates the missing ones (published,
+in the default language) and a fixture page with `errorClass: "4xx"` is one.
+They have no slug and are not in the sitemap. For a 5xx `errorPage` never
+throws: when the database is what failed, it logs and answers fallback
+props built without it (no settings, languages or layout).
 
 ### Access
 
@@ -187,7 +212,7 @@ Promo: {
   drop out.
 - On save the admin checks `link_shape` (type, target format, an existing
   page, label locales and length) and `page_ref` (each id exists) as host
-  rules: merge `cms.admin.hostRules` into `createAdmin({ hostRules })`, or a
+  rules: pass `cms.admin.hostRules` to `createAdmin({ hostRules })`, or a
   save with these fields fails on an unknown rule.
 - The pages field is a plain async multi-select on the wire, so the stock
   admin client renders it. The link field is the custom `link` kind: the
@@ -257,6 +282,14 @@ handler. The block's props carry `action` and `honeypotField`; post the
 fields there as JSON (`{ ok }`, 422 `{ errors }`, 500 `{ errors: { form } }`)
 or as a plain form (303 back to the page with `cms_form_status`).
 
+The rules run with the admin's rule set: the built-in Laravel rules, the
+CMS's `link_shape` and `page_ref`, and the config's `hostRules` (pass
+`kyselyRules(db)` there for `unique`/`exists`, and a rule of the host's
+own, `{ check, message }`, for a block that needs one). The same set is
+`cms.admin.hostRules` for createAdmin. A rule nobody defines, or a `rules`
+that throws, answers `failed` (500 `{ errors: { form } }`, logged as
+`form.submit.validation_failed`) and stores nothing.
+
 A form an editor does not place (one a page type's `template()` or the host
 renders) gets a name: `formName: "service-order"` next to `submit` in its
 implementation (PHP's `HasForm`). It then posts from any live page, and
@@ -316,8 +349,7 @@ and never fails the submit or the delivery.
 
 Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored
-in `tbtop_notification_templates`. A row the PHP package wrote holds Blade;
-it is ignored with a warning and the built-in template answers.
+in `tbtop_notification_templates`.
 
 ## What 0.0 has
 
@@ -353,7 +385,7 @@ it is ignored with a warning and the built-in template answers.
 
 ## Not yet
 
-Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
+Secret settings, legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
 page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

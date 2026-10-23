@@ -16,7 +16,7 @@ export type CmsAdmin = {
 	navigationGroups: { key: string; label: string; icon: string }[];
 	/** Request context for createAdmin({ context }): content locales from the admin-active languages. */
 	context: (request: Request) => Promise<Partial<AdminContext>>;
-	/** The link and pages fields' rules (`link_shape`, `page_ref`): createAdmin({ hostRules: { ...kyselyRules(db), ...cms.admin.hostRules } }). */
+	/** The host's `hostRules` plus the link and pages fields' (`link_shape`, `page_ref`): createAdmin({ hostRules: cms.admin.hostRules }); form submits use the same set. */
 	hostRules: Record<string, HostRule>;
 };
 
@@ -41,7 +41,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			// Any CMS editor, as PHP guards the route with EnsureCmsAdmin only: layout and shared blocks use link fields too.
 			linkPageSearch(cms),
 		] as PageDef[],
-		hostRules: cmsHostRules(cms),
+		hostRules: { ...cms.config.hostRules, ...cmsHostRules(cms) },
 		navigationGroups: [
 			{ key: "content", label: "Content", icon: "files" },
 			{ key: "design", label: "Design", icon: "palette" },

@@ -1,3 +1,4 @@
+import type { ErrorSeo } from "../frontend/errorPage";
 import type { Seo } from "../seo/resolver";
 
 /** One head element: a framework-neutral description a host maps onto its own head API. */
@@ -39,7 +40,7 @@ const meta = (key: "name" | "property", name: string, content: string | null | u
 	content === null || content === undefined || content === "" ? [] : [{ tag: "meta", attrs: { [key]: name, content } }];
 
 /** The `seo` prop as head tags, in the order and with the conditions of the PHP head (head.blade.php / CmsHead). */
-export function seoTags(seo: Seo): HeadTag[] {
+export function seoTags(seo: Seo | ErrorSeo): HeadTag[] {
 	const showAlternates = seo.alternates.length > 1;
 	const image = seo.ogImage;
 	const article = seo.ogType === "article";
@@ -92,7 +93,7 @@ const reactAttrs = (attrs: Record<string, string>): Record<string, string> =>
  * the title as `{ title }` in `meta`. JSON-LD is already escaped; the GTM
  * loader, when set, is the first script and has no `type`.
  */
-export function seoHead(seo: Seo): {
+export function seoHead(seo: Seo | ErrorSeo): {
 	meta: Record<string, string>[];
 	links: Record<string, string>[];
 	scripts: { type?: string; children: string }[];

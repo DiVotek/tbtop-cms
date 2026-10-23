@@ -9,6 +9,7 @@ import { schemaContext } from "../seo/schemaContext";
 import type { Site } from "../site";
 import type { Jsonify } from "../support/values";
 import { ancestorCrumbs, breadcrumbs, type Crumb } from "./breadcrumbs";
+import { type ErrorPageProps, errorPageProps } from "./errorPage";
 
 /** The shared `cms` prop (ShareCmsProps): site settings, locales, the resolved header and footer. */
 export type SharedProps = Jsonify<SharedShape>;
@@ -21,7 +22,7 @@ export type SharedProps = Jsonify<SharedShape>;
  */
 export type PageProps<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = Jsonify<PageShape<PageTypeUnion<T>>>;
 
-type SharedShape = {
+export type SharedShape = {
 	settings: Record<string, unknown>;
 	locale: string;
 	defaultLocale: string;
@@ -56,7 +57,7 @@ type PageColumns = {
 export type LoadResult<P = PageProps> =
 	| { type: "page"; status: 200; headers: Record<string, string>; props: P }
 	| { type: "redirect"; status: number; location: string }
-	| { type: "notFound"; status: 404; locale: string; path: string; cms: SharedProps };
+	| { type: "notFound"; status: 404; locale: string; path: string; cms: SharedProps; props: ErrorPageProps };
 
 /**
  * rawurldecode over the whole path, as Laravel's decodedPath(): `%2F` becomes a
@@ -151,7 +152,8 @@ export async function loadPage(site: Site, request: Request, options: { preview:
 				: headerSafe(await site.url(redirect.target, locale));
 			return { type: "redirect", status: redirect.status, location: withQuery(target, url.search) };
 		}
-		return { type: "notFound", status: 404, locale, path, cms: asJson(await sharedProps(site, locale, null)) };
+		const props = await errorPageProps(site, 404, locale, path);
+		return { type: "notFound", status: 404, locale, path, cms: props.cms, props };
 	}
 	const props = await pageProps(site, page, locale, path);
 	return { type: "page", status: 200, headers: props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}, props: asJson(props) };
