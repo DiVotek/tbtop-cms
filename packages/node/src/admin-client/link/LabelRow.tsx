@@ -27,10 +27,10 @@ export function LabelRow({ link, locales, onChange, onBlur, disabled, selected, 
 					<span className={`w-8 shrink-0 uppercase text-muted-foreground ${inputCompactFontClass}`}>{locale}</span>
 					<Input
 						type="text"
-						value={link.label?.[locale] ?? ""}
+						value={link.label?.[locale] ?? link.label?.["*"] ?? ""}
 						aria-label={`${label} (${locale})`}
 						placeholder={placeholder(link, selected, locale)}
-						onChange={(e) => onChange(withLabel(link, locale, e.target.value))}
+						onChange={(e) => onChange(withLabel(link, locale, e.target.value, locales))}
 						onBlur={onBlur}
 						disabled={disabled}
 					/>

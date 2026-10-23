@@ -91,9 +91,14 @@ export function pickLabel(link: LinkValue, locale?: string, fallback?: string): 
 	return Object.values(link.label).find((text) => text !== null) ?? null;
 }
 
-/** Empty entries collapse the whole map to null, so a blank row stores nothing. */
-export function withLabel(link: LinkValue, locale: string, text: string): LinkValue {
-	const next: LinkLabel = { ...(link.label ?? {}) };
+/**
+ * Empty entries collapse the whole map to null, so a blank row stores nothing.
+ * A flattened `*` label is spread over the `locales` that have none of their
+ * own first: the server's `link_shape` only accepts known locale keys.
+ */
+export function withLabel(link: LinkValue, locale: string, text: string, locales: string[] = []): LinkValue {
+	const { "*": shared, ...own } = link.label ?? {};
+	const next: LinkLabel = { ...(shared === undefined ? {} : Object.fromEntries(locales.map((key) => [key, shared]))), ...own };
 	if (text.trim() === "") {
 		delete next[locale];
 	} else {

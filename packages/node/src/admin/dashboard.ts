@@ -92,6 +92,9 @@ export function dashboard(cms: Cms) {
 						? [
 								s.section({ title: "Recently updated pages", variant: "card", actions: [s.action("dashboardOpenPages").label("All pages").url(`${prefix}/pages`).link().size("sm")] }, [
 									s.list("dashboardRecentPages").items(async () => {
+									if (!(await allows(cms, "tbtop-cms.pages"))) {
+										return [];
+									}
 										const rows = await cms.site(request).pages.query().selectAll("tbtop_pages").orderBy("updated_at", "desc").orderBy("id", "desc").limit(RECENT).execute();
 										return rows.map((row) => {
 											const page = pageFromRow(row);

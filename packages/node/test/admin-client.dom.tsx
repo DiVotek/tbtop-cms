@@ -59,6 +59,15 @@ describe("@tbtop/cms/admin-client", () => {
 		expect(onChange).toHaveBeenCalledWith({ type: "external", page: null, value: null, anchor: null, label: { en: "Read more" } });
 	});
 
+	test("editing one locale of a flattened label spreads it over the other locales, with no * key", () => {
+		const onChange = mock(NOOP);
+		const value: LinkValue = { type: "external", page: null, value: "https://a.test", anchor: null, label: { "*": "Hi" } };
+		const { getByLabelText } = renderForm({ value, onChange, options: { types: ["external"], locales: ["en", "uk"] } });
+		expect((getByLabelText(/\(uk\)/) as HTMLInputElement).value).toBe("Hi");
+		fireEvent.change(getByLabelText(/\(en\)/), { target: { value: "Hello" } });
+		expect(onChange).toHaveBeenCalledWith({ ...value, label: { en: "Hello", uk: "Hi" } });
+	});
+
 	test("renders only the declared types, in the server's copy", () => {
 		const { getByText, queryByText } = renderForm({ options: { types: ["email", "phone"], labels: { email: "Пошта" } } });
 		expect(getByText("Пошта")).toBeTruthy();
