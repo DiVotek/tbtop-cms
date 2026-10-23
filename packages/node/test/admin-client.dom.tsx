@@ -3,7 +3,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import type { AdminClient } from "@tbtop/inertia-admin";
 import type { LinkOptions, LinkValue } from "../src/admin-client";
 
-// A DOM for this file only; the other suites run on Bun's own fetch and Request.
+// A DOM for this file only, in its own `bun test` process (`test:dom`): in CI a second happy-dom register in one process left this suite hanging.
 const realFetch = globalThis.fetch;
 GlobalRegistrator.register();
 const { act, cleanup, fireEvent, render, waitFor } = await import("@testing-library/react");

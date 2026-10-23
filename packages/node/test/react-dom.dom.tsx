@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
-// A DOM for this file only; the other suites run on Bun's own fetch and Request.
+// A DOM for this file only, in its own `bun test` process (`test:dom`): in CI a second happy-dom register in one process left this suite hanging.
 const realFetch = globalThis.fetch;
 GlobalRegistrator.register();
 const { render, fireEvent, findByRole, findByText, waitFor } = await import("@testing-library/react");

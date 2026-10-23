@@ -36,7 +36,8 @@
 	"scripts": {
 		"setup:admin": "./scripts/fetch-admin.sh",
 		"build": "tsup",
-		"test": "bun test ./test",
+		"test": "bun test ./test && bun run test:dom",
+		"test:dom": "bun test ./test/react-dom.dom.tsx && bun test ./test/admin-client.dom.tsx",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
