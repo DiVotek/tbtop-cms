@@ -65,6 +65,7 @@ const cms = createCms({
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
+	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 });
 
 // Frontend

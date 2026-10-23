@@ -42,6 +42,8 @@ export type CmsConfig = {
 	debug?: boolean;
 	forms?: FormsConfig;
 	notifications?: NotificationsConfig;
+	/** `redirects.allowedExternalHosts`: hosts an external redirect target may use, matched case-insensitively (`tbtop-cms.redirects.allowed_external_hosts`); default none. */
+	redirects?: { allowedExternalHosts?: string[] };
 };
 
 export type FormsConfig = {
