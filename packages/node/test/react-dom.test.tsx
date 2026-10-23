@@ -14,10 +14,10 @@ afterAll(async () => {
 
 describe("ContactForm in the browser", () => {
 	test("posts JSON, shows the field errors, then the success message", async () => {
-		const answers = [
-			Response.json({ ok: false, errors: { email: ["The email field must be a valid email address."] } }, { status: 422 }),
-			Response.json({ ok: true }),
-		];
+		// Plain answers, not Response: happy-dom swaps the global Response, and its body reads differ by runner.
+		const answers = [{ ok: false, errors: { email: ["The email field must be a valid email address."] } }, { ok: true }].map((answer) => ({
+			json: async () => answer,
+		}));
 		const bodies: unknown[] = [];
 		const stub = (async (_url: string, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body)));
