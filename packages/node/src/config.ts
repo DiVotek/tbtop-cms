@@ -1,5 +1,6 @@
 import type { NotificationStore } from "@tbtop/admin";
 import type { Kysely } from "kysely";
+import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
 import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
@@ -35,8 +36,22 @@ export type CmsConfig = {
 	rootKind?: string;
 	/** Throw on a broken block row instead of skipping it (`tbtop-cms.blocks.strict`). */
 	strictBlocks?: boolean;
-	/** Can this request see drafts (preview)? Default: never. */
+	/** Can this request see drafts (preview)? Default: never, unless it carries a signed preview link (`preview`). */
 	canPreview?: (request: Request) => boolean | Promise<boolean>;
+	/**
+	 * Signed preview links (`tbtop-cms.preview`): the page editor offers a link
+	 * per locale for a page that is not live, and loadPage previews a request
+	 * whose signature is valid and unexpired. `ttlHours` defaults to 72.
+	 * Without a secret there are no links; keep it out of the source.
+	 */
+	preview?: { secret: string; ttlHours?: number };
+	/**
+	 * Section access in the admin (`tbtop-cms.roles` + the host's gates): the
+	 * panel user and a section ability (`tbtop-cms.pages`, see CMS_ABILITIES).
+	 * False hides the section from the nav and answers 403 to its pages and
+	 * actions. Without it every section is open to any admin user.
+	 */
+	authorize?: (user: unknown, ability: CmsAbility) => boolean | Promise<boolean>;
 	/** Extra frontend strings per locale, over the package's own. */
 	strings?: Record<string, Record<string, string>>;
 	debug?: boolean;

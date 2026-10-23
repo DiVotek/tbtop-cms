@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
-import { type CmsConfig, RedirectError } from "../src";
+import { type CmsAbility, type CmsConfig, previewLink, RedirectError } from "../src";
 import { get, makeCms } from "./support";
 
 type Row = { id: string; kind: string; active?: boolean; sort?: number; data?: Record<string, unknown> };
@@ -40,6 +40,28 @@ async function panel(config: Partial<CmsConfig> = {}, user: () => unknown = () =
 	};
 	return { ...made, admin, visit, page, record, post, rows, setRows };
 }
+
+/** The first wire node named `name` anywhere in `tree`. */
+function findNode(tree: unknown, name: string): unknown {
+	if (Array.isArray(tree)) {
+		for (const item of tree) {
+			const found = findNode(item, name);
+			if (found !== null) return found;
+		}
+		return null;
+	}
+	if (tree === null || typeof tree !== "object") {
+		return null;
+	}
+	if ((tree as { name?: unknown }).name === name) {
+		return tree;
+	}
+	return findNode(Object.values(tree), name);
+}
+
+/** The labels in the panel's sidebar. */
+const navLabels = (props: Record<string, unknown>): string[] =>
+	((props.tbtop as { nav: { items: { label: string }[] }[] }).nav ?? []).flatMap((group) => group.items.map((item) => item.label));
 
 /** The home page's Hero props as the site resolves them. */
 async function heroProps(cms: Awaited<ReturnType<typeof makeCms>>["cms"]): Promise<Record<string, unknown>> {
@@ -118,5 +140,120 @@ describe("Hero ctaHref allows only safe links (q04)", () => {
 		const res = await post(`${url}/forms/pageEditor`, { ...(await record(url, "pageEditor")), [`block_${hero.id}_ctaHref`]: "HTTPS://partner.example/deal" }, url);
 		expect(res.status).toBe(303);
 		expect((await rows(home)).find((row) => row.id === hero.id)?.data?.ctaHref).toBe("HTTPS://partner.example/deal");
+	});
+});
+
+describe("admin section abilities (q02)", () => {
+	const editor = { id: 2, name: "Editor", role: "editor" };
+	/** An editor holds pages and the inbox only. */
+	const editorAuth: CmsConfig["authorize"] = async (user, ability) =>
+		(user as { role?: string } | null)?.role !== "editor" || ["tbtop-cms.pages", "tbtop-cms.submissions"].includes(ability);
+
+	test("a denied section leaves the nav and answers 403 to its pages and actions", async () => {
+		const asked: [unknown, CmsAbility][] = [];
+		const { page, visit, post } = await panel(
+			{
+				authorize: async (user, ability) => {
+					asked.push([user, ability]);
+					return (await editorAuth?.(user, ability)) === true;
+				},
+			},
+			() => editor,
+		);
+		expect(navLabels((await page("/admin/pages")).props)).toEqual(["Pages", "Inbox"]);
+		for (const url of ["/admin/redirects", "/admin/layout", "/admin/layout/header", "/admin/shared-blocks", "/admin/languages", "/admin/settings/site", "/admin/settings/seo", "/admin/notification-settings"]) {
+			expect([url, (await visit(url)).status]).toEqual([url, 403]);
+		}
+		expect((await post("/admin/settings/site/forms/siteSettings", { site_name: "Hijacked" }, "/admin/settings/site")).status).toBe(403);
+		expect((await post("/admin/redirects/actions/redirectCreate", { payload: { form: {} } }, "/admin/redirects")).status).toBe(403);
+		expect(asked.some(([user, ability]) => user === editor && ability === "tbtop-cms.settings")).toBe(true);
+	});
+
+	test("an allowed admin keeps every section, and without authorize nothing changes", async () => {
+		for (const config of [{ authorize: editorAuth }, {}]) {
+			const { page } = await panel(config, () => ({ id: 1, name: "Admin", role: "admin" }));
+			const nav = navLabels((await page("/admin/pages")).props);
+			for (const label of ["Pages", "Inbox", "Redirects", "Layout", "Shared blocks", "Languages", "Site", "SEO", "Notifications"]) {
+				expect(nav).toContain(label);
+			}
+			expect((await page("/admin/settings/site")).component).toBe("admin/page");
+		}
+	});
+
+	test("without the design ability the page editor offers no Share and no shared blocks to add", async () => {
+		const { page, ids } = await panel({ authorize: editorAuth }, () => editor);
+		const url = `/admin/pages/${ids.about}/edit`;
+		const editorProps = JSON.stringify((await page(url)).props);
+		expect(editorProps).toContain("blockAdd");
+		expect(editorProps).not.toContain("blockShare_");
+		expect(editorProps).not.toContain("blockAddShared_");
+		const admin = await panel({ authorize: editorAuth });
+		expect(JSON.stringify((await admin.page(`/admin/pages/${admin.ids.about}/edit`)).props)).toContain("blockAddShared_");
+	});
+});
+
+describe("signed preview links (q02)", () => {
+	const secret = "test-preview-secret";
+	/** The editor's preview link for a locale, read off the page editor. */
+	const linkIn = (props: unknown, locale: string): string | null => {
+		const node = findNode(props, `pagePreviewLink_${locale}`);
+		return node === null ? null : (/"(https:\/\/site\.test\/[^"]*signature=[0-9a-f]+)"/.exec(JSON.stringify(node))?.[1] ?? null);
+	};
+
+	test("the editor of a draft offers a signed link that previews it, the plain URL stays 404", async () => {
+		const { cms, page, ids } = await panel({ preview: { secret } });
+		const link = linkIn((await page(`/admin/pages/${ids.draft}/edit`)).props, "en");
+		expect(link).not.toBeNull();
+		const url = new URL(link as string);
+		expect(url.pathname).toBe("/work-in-progress");
+		const expires = Number(url.searchParams.get("expires")) * 1000;
+		expect(Math.abs(expires - (Date.now() + 72 * 3600 * 1000))).toBeLessThan(60_000);
+		const result = await cms.loadPage(new Request(link as string));
+		expect(result.type).toBe("page");
+		expect(result.type === "page" && result.props.isPreview).toBe(true);
+		expect((await cms.loadPage(get("/work-in-progress"))).type).toBe("notFound");
+		const uk = linkIn((await page(`/admin/pages/${ids.draft}/edit`)).props, "uk") as string;
+		expect(new URL(uk).pathname).toBe("/uk/work-in-progress");
+		expect((await cms.loadPage(new Request(uk))).type).toBe("page");
+	});
+
+	test("a tampered, re-pointed or expired signature does not preview", async () => {
+		const { cms } = await makeCms(undefined, { preview: { secret, ttlHours: 1 } });
+		const site = cms.site();
+		const link = new URL((await previewLink(site, "work-in-progress", "en")) as string);
+		const tampered = new URL(link);
+		const signature = link.searchParams.get("signature") ?? "";
+		tampered.searchParams.set("signature", `${signature.slice(0, -1)}${signature.endsWith("0") ? "1" : "0"}`);
+		const repointed = new URL(link);
+		repointed.pathname = "/blog/scheduled-post";
+		const extended = new URL(link);
+		extended.searchParams.set("expires", String(Number(link.searchParams.get("expires")) + 3600));
+		const expired = (await previewLink(site, "work-in-progress", "en", Date.now() - 2 * 3600 * 1000)) as string;
+		for (const url of [tampered.toString(), repointed.toString(), extended.toString(), expired]) {
+			expect([url, (await cms.loadPage(new Request(url))).type]).toEqual([url, "notFound"]);
+		}
+		expect((await cms.loadPage(new Request(link.toString()))).type).toBe("page");
+	});
+
+	test("a link signed with another secret, or with no secret configured, does not preview", async () => {
+		const other = await makeCms(undefined, { preview: { secret: "another-secret" } });
+		const link = (await previewLink(other.cms.site(), "work-in-progress", "en")) as string;
+		const { cms } = await makeCms(undefined, { preview: { secret } });
+		expect((await cms.loadPage(new Request(link))).type).toBe("notFound");
+		const bare = await makeCms();
+		expect((await bare.cms.loadPage(new Request(link))).type).toBe("notFound");
+		expect(await previewLink(bare.cms.site(), "work-in-progress", "en")).toBeNull();
+	});
+
+	test("a live page, or a config without a secret, gets no preview link in the editor", async () => {
+		const live = await panel({ preview: { secret } });
+		expect(linkIn((await live.page(`/admin/pages/${live.ids.about}/edit`)).props, "en")).toBeNull();
+		const bare = await panel();
+		expect(JSON.stringify((await bare.page(`/admin/pages/${bare.ids.draft}/edit`)).props)).not.toContain("pagePreviewLink_");
+	});
+
+	test("canPreview still opens drafts on its own", async () => {
+		const { cms } = await makeCms(undefined, { preview: { secret }, canPreview: (request) => request.headers.get("x-editor") === "1" });
+		expect((await cms.loadPage(get("/work-in-progress", { headers: { "x-editor": "1" } }))).type).toBe("page");
 	});
 });

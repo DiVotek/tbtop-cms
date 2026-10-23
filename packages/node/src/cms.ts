@@ -4,6 +4,7 @@ import { PageTypes } from "./content/pageTypes";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
 import { type LoadResult, loadPage } from "./frontend/load";
+import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
 import { chunkCount, sitemapChunkXml, sitemapIndexXml } from "./seo/sitemap";
@@ -48,7 +49,12 @@ export function createCms(config: CmsConfig): Cms {
 		pageTypes,
 		schemaTypes,
 		site,
-		loadPage: async (request) => loadPage(site(request), request, { preview: (await config.canPreview?.(request)) === true }),
+		loadPage: async (request) => {
+			const scope = site(request);
+			// An editor (canPreview) or a signed preview link (PageController::hasPreviewAccess).
+			const preview = (await config.canPreview?.(request)) === true || (await hasValidPreviewSignature(scope, request));
+			return loadPage(scope, request, { preview });
+		},
 		handle: async (request) => {
 			if (request.method === "POST") {
 				return submitForm(site(request), request);
