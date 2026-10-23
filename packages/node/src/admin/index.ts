@@ -1,6 +1,7 @@
 import type { AdminContext, HostRule, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { gated } from "./abilities";
+import { dashboard } from "./dashboard";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
 import { languageEdit, languageNew, languagesIndex } from "./languages";
@@ -24,6 +25,8 @@ export type CmsAdmin = {
 export function adminPages(cms: Cms): CmsAdmin {
 	return {
 		pages: [
+			// Any CMS editor (no tbtop-cms.* ability, as PHP); its submission parts check the inbox ability.
+			dashboard(cms),
 			gated(cms, "tbtop-cms.pages", pagesIndex(cms)),
 			gated(cms, "tbtop-cms.pages", pageEdit(cms)),
 			gated(cms, "tbtop-cms.submissions", submissionsIndex(cms)),

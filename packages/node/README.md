@@ -434,7 +434,10 @@ in `tbtop_notification_templates`.
   admin bell with Liquid overrides and a delivery log.
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
   built-in blocks.
-- Admin: pages list and editor (General, SEO, a tab per block, Publishing),
+- Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
+  tiles trended over 14 days, leads-by-status and daily submission charts,
+  the latest pages and submissions; the inbox parts need
+  `tbtop-cms.submissions`), pages list and editor (General, SEO, a tab per block, Publishing),
   redirects, layout, shared blocks, languages (added from the locale
   catalog; trash, restore, delete permanently; the default is not
   deletable), site, SEO and notification
@@ -443,5 +446,5 @@ in `tbtop_notification_templates`.
 ## Not yet
 
 Source-backed page types, the
-remaining admin pages (dashboard, users, health, SEO report), test sends
+remaining admin pages (users, SEO report), test sends
 from the notification settings, owner-only template editing.
