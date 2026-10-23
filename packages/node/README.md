@@ -340,7 +340,7 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
+Secret settings, legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
 page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing, the link
