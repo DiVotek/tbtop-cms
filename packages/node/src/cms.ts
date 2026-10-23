@@ -10,6 +10,7 @@ import { type ErrorPageProps, errorPage } from "./frontend/errorPage";
 import { type LoadResult, loadPage, type PageProps } from "./frontend/load";
 import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { type HealthResult, runHealthChecks, SCHEDULER_HEARTBEAT } from "./health";
+import { runSeoAudit, writeSeoSnapshot } from "./seo/audit";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
 import { chunkCount, sitemapChunkXml, sitemapIndexXml } from "./seo/sitemap";
@@ -60,14 +61,17 @@ export type CmsTasks = {
 	audit(options?: { limit?: number; subjectType?: string; subjectId?: number }): Promise<AuditEntry[]>;
 	/** Deletes audit entries older than `days` (default `audit.retentionDays`, 365); how many went. */
 	pruneAudit(days?: number): Promise<number>;
+	/** Runs the SEO audit and writes today's snapshot (`cms:seo:snapshot`); the issue count. */
+	seoSnapshot(): Promise<number>;
 	/** Rewrites the page references index from every page (`cms:page-refs:rebuild`); the rows written. */
 	rebuildPageRefs(): Promise<number>;
 	/** The health checks (`cms:doctor`): site URL, default language, block rows, page types, notifications, scheduler, secrets. */
 	health(): Promise<HealthResult[]>;
 	/**
 	 * The scheduler's one entry point, for a cron every minute or Workers
-	 * `scheduled()`: delivers the outbox, prunes the 404 log and the audit
-	 * trail once a day, and stamps the heartbeat the health check reads.
+	 * `scheduled()`: delivers the outbox; once a day prunes the 404 log and
+	 * the audit trail and writes the SEO snapshot; stamps the heartbeat the
+	 * health check reads.
 	 */
 	scheduled(): Promise<{ delivered: number; pruned: number | null; auditPruned: number | null }>;
 };
@@ -137,6 +141,12 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			},
 			pruneNotFound: () => site().notFound.prune(),
 			audit: (options) => site().audit.list(options),
+			seoSnapshot: async () => {
+				const scope = site();
+				const result = await runSeoAudit(scope);
+				await writeSeoSnapshot(scope, result);
+				return result.issues.length;
+			},
 			pruneAudit: (days) => site().audit.prune(days ?? config.audit?.retentionDays ?? 365),
 			rebuildPageRefs: () => rebuildPageRefs(config.db, pageTypes),
 			health: () => runHealthChecks(site()),
@@ -147,6 +157,9 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 				const due = typeof lastPrune !== "string" || Date.now() - new Date(lastPrune).getTime() >= DAY_MS || Number.isNaN(new Date(lastPrune).getTime());
 				const pruned = due ? await scope.notFound.prune() : null;
 				const auditPruned = due ? await cms.tasks.pruneAudit() : null;
+				if (due) {
+					await cms.tasks.seoSnapshot();
+				}
 				const now = new Date().toISOString();
 				if (due) {
 					await scope.settings.set(LAST_PRUNE, now);

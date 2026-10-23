@@ -9,10 +9,11 @@ const HELP = `Usage: tbtop-cms <command> [--config cms.config.ts]
 Commands:
   migrate             Run the CMS migrations (dialect from the Kysely adapter; --dialect to override)
   doctor              Run the health checks; exits 1 on an error
-  scheduled           Deliver the outbox, prune the 404 log and audit trail once a day, stamp the heartbeat (run every minute)
+  scheduled           Deliver the outbox, prune logs and snapshot SEO once a day, stamp the heartbeat (run every minute)
   deliver [--limit N] Deliver pending form submissions now
   not-found:prune     Delete 404 log rows past the retention window
   page-refs:rebuild   Rewrite the page references index
+  seo:snapshot        Run the SEO audit and write today's snapshot
   audit [--limit N] [--type page] [--id N]
                       List the admin audit trail, newest first
   audit:prune [--days N]
@@ -104,6 +105,9 @@ export async function runCommand(cms: Cms, args: string[], io: CliIo): Promise<n
 			io.out(entries.length === 0 ? "No audit entries." : `\n${entries.length} entries.`);
 			return 0;
 		}
+		case "seo:snapshot":
+			io.out(`SEO snapshot written: ${await cms.tasks.seoSnapshot()} issues.`);
+			return 0;
 		case "audit:prune":
 			io.out(`Deleted ${await cms.tasks.pruneAudit(positive(flag(args, "days")))} audit entries.`);
 			return 0;

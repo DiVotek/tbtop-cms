@@ -408,12 +408,12 @@ in `tbtop_notification_templates`.
   `cms.tasks.audit({ subjectType, subjectId, limit })` reads it,
   `cms.tasks.pruneAudit(days)` prunes.
 - Tasks and the CLI: `cms.tasks.scheduled()` is the one scheduler entry
-  (outbox delivery, the daily 404 and audit prune, the heartbeat); call it from a
+  (outbox delivery; daily, the 404 and audit prune and the SEO snapshot; the heartbeat); call it from a
   cron every minute or from Workers `scheduled()`. `cms.tasks.health()`
   runs the checks (site URL, default language, block rows, page types,
   notifications, scheduler, secrets). The `tbtop-cms` bin runs the same over
   a `cms.config.ts` whose default export is the host's Cms: `migrate`,
-  `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`,
+  `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`, `seo:snapshot`,
   `audit [--type page] [--id N] [--limit N]`, `audit:prune [--days N]`
   (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
@@ -437,7 +437,10 @@ in `tbtop_notification_templates`.
 - Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
   tiles trended over 14 days, leads-by-status and daily submission charts,
   the latest pages and submissions; the inbox parts need
-  `tbtop-cms.submissions`), pages list and editor (General, SEO, a tab per block, Publishing),
+  `tbtop-cms.submissions`), the SEO report (missing titles, descriptions,
+  translations and OG images, duplicates, noindex, per live page and
+  frontend locale, with a daily history in `tbtop_seo_audit_snapshots`),
+  pages list and editor (General, SEO, a tab per block, Publishing),
   redirects, layout, shared blocks, languages (added from the locale
   catalog; trash, restore, delete permanently; the default is not
   deletable), site, SEO and notification
@@ -446,5 +449,5 @@ in `tbtop_notification_templates`.
 ## Not yet
 
 Source-backed page types, the
-remaining admin pages (users, SEO report), test sends
+the users admin page, test sends
 from the notification settings, owner-only template editing.

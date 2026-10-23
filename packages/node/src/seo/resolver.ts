@@ -226,6 +226,21 @@ async function template(site: Site, page: Page, slot: "title" | "description", l
 	return localized(await site.settings.get(`seo.${slot}_template`), locale);
 }
 
+/**
+ * SeoResolver::renderedTitle / renderedDescription: what `<title>` and the
+ * meta description show, for the report's duplicate checks; the ancestors
+ * are read only when a template uses `{parent}`.
+ */
+export async function renderedTitle(site: Site, page: Page, locale: string, ancestors: () => Promise<Crumb[]>): Promise<string> {
+	const tpl = await template(site, page, "title", locale);
+	return renderTitle(site, page, await ownTitle(site, page, locale), locale, tpl.includes("{parent}") ? await ancestors() : []);
+}
+
+export async function renderedDescription(site: Site, page: Page, locale: string, ancestors: () => Promise<Crumb[]>): Promise<string> {
+	const tpl = await template(site, page, "description", locale);
+	return renderDescription(site, page, await description(site, page, locale), locale, tpl.includes("{parent}") ? await ancestors() : []);
+}
+
 async function renderTitle(site: Site, page: Page, base: string, locale: string, ancestors: Crumb[]): Promise<string> {
 	const tpl = await template(site, page, "title", locale);
 	if (tpl === "") {
