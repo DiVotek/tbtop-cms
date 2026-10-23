@@ -4,7 +4,7 @@ import { formatField, leadIdentity } from "../forms/lead";
 import { retrySubmission } from "../forms/notifier";
 import { isRetryable, LEAD_STATUSES, type LeadStatus, type Submission, submissionFromRow } from "../forms/submissions";
 import type { Site } from "../site";
-import { adminPrefix, NAV, siteOf, trimmedForm } from "./support";
+import { adminPrefix, NAV, siteOf } from "./support";
 
 const LEAD_LABELS: Record<LeadStatus, string> = { new: "New", read: "Read", processed: "Processed", discarded: "Discarded" };
 
@@ -284,8 +284,7 @@ async function commentsSection(s: S, cms: Cms, site: Site, id: number, self: str
 				s.textarea("body").label("Comment").placeholder("Visible to the team only").required().maxLength(5000),
 				s.flex([s.spacer(), s.action("addComment").label("Add comment").color("primary").submit("addCommentForm")], { justify: "end" }),
 			])
-			.onSubmit(async (submitted) => {
-				const ctx = trimmedForm(submitted);
+			.onSubmit(async (ctx) => {
 				const user = ctx.user as { id?: unknown } | null;
 				const userId = typeof user?.id === "number" || typeof user?.id === "string" ? user.id : null;
 				if (userId === null) {

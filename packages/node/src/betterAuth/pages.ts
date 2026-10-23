@@ -1,7 +1,7 @@
 import { type ActionCtx, Column, Cond, definePage, Effects, HttpError, type S } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import { gated } from "../admin/abilities";
-import { adminPrefix, NAV, trimmedForm } from "../admin/support";
+import { adminPrefix, NAV } from "../admin/support";
 import type { Dict } from "../support/values";
 import type { AdapterCtx } from "./index";
 import type { CmsAuthUser } from "./session";
@@ -43,7 +43,7 @@ export function loginPage(ctx: AdapterCtx) {
 					s.actionsRow([s.action("signIn").label("Sign in").color("primary").submit()]),
 				])
 				.onSubmit(async (submitted) => {
-					const form = trimmedForm(submitted).form as Dict;
+					const form = submitted.form as Dict;
 					if (await ctx.signIn(submitted.request, String(form.email ?? ""), String(form.password ?? ""))) {
 						return `${prefix}/dashboard`;
 					}
@@ -137,7 +137,7 @@ export function userNew(ctx: AdapterCtx) {
 					])
 					.record({ role: Object.hasOwn(ctx.roles, "editor") ? "editor" : (Object.keys(ctx.roles)[0] ?? "") })
 					.onSubmit(async (submitted) => {
-						const form = trimmedForm(submitted).form as Dict;
+						const form = submitted.form as Dict;
 						const body = { name: String(form.name ?? ""), email: String(form.email ?? ""), password: String(form.password ?? ""), role: String(form.role ?? "") as never };
 						return (await refused(() => ctx.auth.api.createUser({ body, headers: submitted.request.headers }))) ?? `${prefix}/users`;
 					}),
@@ -166,7 +166,7 @@ export function userEdit(ctx: AdapterCtx) {
 					])
 					.record({ name: row.name, email: row.email, role: row.role ?? "" })
 					.onSubmit(async (submitted) => {
-						const form = trimmedForm(submitted).form as Dict;
+						const form = submitted.form as Dict;
 						const headers = submitted.request.headers;
 						const userId = row.id;
 						const role = String(form.role ?? "");

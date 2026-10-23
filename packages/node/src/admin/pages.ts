@@ -9,7 +9,7 @@ import { type Dict, isDict } from "../support/values";
 import { allows } from "./abilities";
 import { revisionsAction } from "./revisions";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
-import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf, trimmedForm } from "./support";
+import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf } from "./support";
 
 const STATUS = [
 	{ value: "draft", label: "Draft" },
@@ -139,8 +139,7 @@ function createAction(s: S, cms: Cms, categories: Option[]) {
 					parent,
 					s.actionsRow([s.action("pageCreateSave").label("Create").color("primary").submit()]),
 				])
-				.onSubmit(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.onSubmit(async (ctx) => {
 					const form = ctx.form as Dict;
 					const type = String(form.type ?? "page");
 					if (!cms.pageTypes.has(type)) {
@@ -330,8 +329,7 @@ export function pageEdit(cms: Cms) {
 						...seoRecord(page),
 						...blockRecord(cms.config.blocks, rows),
 					})
-					.onSubmit(async (submitted) => {
-						const ctx = trimmedForm(submitted);
+					.onSubmit(async (ctx) => {
 						try {
 							await savePage(cms, ctx, page, rowsFromForm(cms.config.blocks, rows, ctx.form as Dict));
 						} catch (error) {

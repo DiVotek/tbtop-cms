@@ -16,30 +16,6 @@ export const adminPrefix = (cms: Cms): string => `/${(cms.config.adminPrefix ?? 
 /** A page action's per-request Site, from the action's request. */
 export const siteOf = (cms: Cms, ctx: { request: Request }): Site => cms.site(ctx.request);
 
-/**
- * Laravel's TrimStrings + ConvertEmptyStringsToNull over a submitted form, which
- * the PHP admin gets from its global middleware: every string, nested ones
- * included, is trimmed, and a blank one becomes null. `password*` keys stay
- * as typed, as Laravel's `except` list keeps them. A richtext editor state
- * (`{ root }`) is left alone: trimming its text nodes would drop the spaces
- * between differently formatted runs.
- */
-export const trimmedForm = <F>(ctx: ActionCtx<F>): ActionCtx<F> => ctx.withForm(trimStrings(ctx.form) as F);
-
-function trimStrings(value: unknown, key = ""): unknown {
-	if (typeof value === "string") {
-		const trimmed = key.startsWith("password") ? value : value.trim();
-		return trimmed === "" ? null : trimmed;
-	}
-	if (Array.isArray(value)) {
-		return value.map((item) => trimStrings(item));
-	}
-	if (isDict(value) && !isDict(value.root)) {
-		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, trimStrings(v, k)]));
-	}
-	return value;
-}
-
 /** A fresh block id: the PHP editor's 8-character random ids. */
 export const blockId = (): string => crypto.randomUUID().replaceAll("-", "").slice(0, 8);
 
@@ -232,8 +208,7 @@ function removeAction(s: S, cms: Cms, rows: Dict[], id: string, options: BlockTa
 		.color("danger")
 		.confirm("Remove this block?", "Its content is deleted when you confirm.")
 		.withoutValidation(options.skipsValidation)
-		.handle(async (submitted) => {
-			const ctx = trimmedForm(submitted);
+		.handle(async (ctx) => {
 			const kept = rowsFromForm(cms.config.blocks, rows, ctx.form as Dict).filter((row) => row.id !== id);
 			return (await options.save(ctx, kept)) ?? options.back;
 		}, ["form"]);
@@ -259,8 +234,7 @@ function addBlockBody(
 				.label("Add block")
 				.color("primary")
 				.withoutValidation(options.skipsValidation)
-				.handle(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.handle(async (ctx) => {
 					const form = ctx.form as Dict;
 					const kind = typeof form.new_block_kind === "string" ? form.new_block_kind : "";
 					if (!blocks.has(kind) || !placeableIn(blocks.get(kind).placements, options.placement)) {
@@ -302,8 +276,7 @@ function sharedAddRows(s: S, cms: Cms, rows: Dict[], options: BlockTabsOptions):
 					.action(`blockAddShared_${shared.id}`)
 					.label("Add")
 					.withoutValidation(options.skipsValidation)
-					.handle(async (submitted) => {
-						const ctx = trimmedForm(submitted);
+					.handle(async (ctx) => {
 						const current = rowsFromForm(blocks, rows, ctx.form as Dict);
 						return (await options.save(ctx, appendRow(current, { kind: shared.kind, shared: shared.id }))) ?? options.back;
 					}, ["form"]),
@@ -325,8 +298,7 @@ function shareAction(s: S, cms: Cms, rows: Dict[], id: string, options: BlockTab
 		.label("Share")
 		.confirm("Share this block?", "Its content moves to a new shared block that other pages can place too.")
 		.withoutValidation(options.skipsValidation)
-		.handle(async (submitted) => {
-			const ctx = trimmedForm(submitted);
+		.handle(async (ctx) => {
 			const current = rowsFromForm(blocks, rows, ctx.form as Dict);
 			const row = current.find((entry) => entry.id === id && entry.shared === undefined);
 			if (row === undefined || options.sharing === undefined) {

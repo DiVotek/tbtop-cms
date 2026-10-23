@@ -6,7 +6,7 @@ import { SharedBlockConflictError, SharedBlockInUseError } from "../content/shar
 import { type Dict, isDict } from "../support/values";
 import { bindCmsFields } from "../blocks/cmsFields";
 import { fieldBinding } from "./linkFields";
-import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf, trimmedForm } from "./support";
+import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf } from "./support";
 
 const SLOT_LABELS: Record<Slot, string> = { header: "Header", footer: "Footer" };
 
@@ -55,8 +55,7 @@ export function layoutEdit(cms: Cms) {
 					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
 				])
 				.record(blockRecord(cms.config.blocks, rows))
-				.onSubmit(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.onSubmit(async (ctx) => {
 					await save(ctx, rowsFromForm(cms.config.blocks, rows, ctx.form as Dict));
 					return Effects.make().notify("Saved").redirect(back);
 				});
@@ -94,8 +93,7 @@ export function sharedBlocksIndex(cms: Cms) {
 										.options(kinds.map((block) => ({ value: block.kind, label: block.label }))),
 									s.actionsRow([s.action("create").label("Create").color("primary").submit()]),
 								])
-								.onSubmit(async (submitted) => {
-									const ctx = trimmedForm(submitted);
+								.onSubmit(async (ctx) => {
 									const form = ctx.form as Dict;
 									const kind = String(form.kind ?? "");
 									if (!cms.config.blocks.has(kind)) {
@@ -183,8 +181,7 @@ export function sharedBlockEdit(cms: Cms) {
 					shared_name: block.name,
 					...Object.fromEntries(names.filter((name) => name in block.data).map((name) => [`block_shared_${name}`, block.data[name]])),
 				})
-				.onSubmit(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.onSubmit(async (ctx) => {
 					const form = ctx.form as Dict;
 					const data: Dict = {};
 					for (const name of names) {
@@ -242,8 +239,7 @@ export function redirectsIndex(cms: Cms) {
 									s.select("locale").label("Language").options(locales).helperText("Empty: every language."),
 									s.actionsRow([s.action("create").label("Create").color("primary").submit()]),
 								])
-								.onSubmit(async (submitted) => {
-									const ctx = trimmedForm(submitted);
+								.onSubmit(async (ctx) => {
 									const form = ctx.form as Dict;
 									try {
 										await siteOf(cms, ctx).redirects.create({

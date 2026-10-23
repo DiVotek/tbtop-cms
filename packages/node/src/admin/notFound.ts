@@ -4,7 +4,7 @@ import type { Cms } from "../cms";
 import { RedirectError } from "../content/redirects";
 import type { CmsDatabase } from "../db/schema";
 import { flag, isDict } from "../support/values";
-import { NAV, siteOf, trimmedForm } from "./support";
+import { NAV, siteOf } from "./support";
 
 type HitsQuery = SelectQueryBuilder<CmsDatabase, "tbtop_not_found_hits", object>;
 
@@ -114,8 +114,7 @@ function createRedirect(s: S, cms: Cms, locales: { value: string; label: string 
 		.action("notFoundCreateRedirectSave")
 		.label("Create redirect")
 		.color("primary")
-		.handle(async (submitted) => {
-			const ctx = trimmedForm(submitted);
+		.handle(async (ctx) => {
 			const form = isDict(ctx.form) ? ctx.form : {};
 			const locale = String(form.locale ?? ctx.row.locale ?? "");
 			try {

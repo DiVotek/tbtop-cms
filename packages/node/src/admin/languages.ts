@@ -3,7 +3,7 @@ import type { Cms } from "../cms";
 import { LanguageError } from "../content/languages";
 import { localeName, localeOptions } from "../content/localeCatalog";
 import type { Dict } from "../support/values";
-import { adminPrefix, NAV, siteOf, trimmedForm } from "./support";
+import { adminPrefix, NAV, siteOf } from "./support";
 
 /** Languages (LanguagesPage): the list with its trash, add, edit, make default, delete, restore. */
 export function languagesIndex(cms: Cms) {
@@ -172,8 +172,7 @@ export function languageNew(cms: Cms) {
 					s.actionsRow([s.action("save").label("Add").color("primary").submit(), s.action("cancel").label("Cancel").url(`${prefix}/languages`)]),
 				])
 				.record({ is_default: false, is_admin_active: true, is_frontend_active: false, sort_order: 0 })
-				.onSubmit(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
 					const form = ctx.form as Dict;
 					const locale = String(form.locale ?? "");
@@ -218,8 +217,7 @@ export function languageEdit(cms: Cms) {
 					s.actionsRow([s.action("save").label("Save").color("primary").submit(), s.action("cancel").label("Back").url(`${prefix}/languages`)]),
 				])
 				.record({ ...row, is_default: isDefault, is_admin_active: Boolean(row.is_admin_active), is_frontend_active: Boolean(row.is_frontend_active) })
-				.onSubmit(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
 					const wasFrontend = Boolean(row.is_frontend_active);
 					const saved = await refusing(() => site.languages.update(id, values(ctx.form as Dict)));

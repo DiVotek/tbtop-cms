@@ -4,7 +4,7 @@ import type { NotificationType } from "../notifications/types";
 import { runsAsPhp, templateError } from "../notifications/templates";
 import type { Site } from "../site";
 import { sqlDate } from "../support/values";
-import { NAV, siteOf, trimmedForm } from "./support";
+import { NAV, siteOf } from "./support";
 
 type AnyType = NotificationType<Record<string, unknown>>;
 
@@ -66,8 +66,7 @@ export function notificationSettings(cms: Cms) {
 					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
 				])
 				.record(await record(site, all))
-				.onSubmit(async (submitted) => {
-					const ctx = trimmedForm(submitted);
+				.onSubmit(async (ctx) => {
 					const target = siteOf(cms, ctx);
 					const form = ctx.form as Record<string, unknown>;
 					const stored = await storedTemplates(target);
