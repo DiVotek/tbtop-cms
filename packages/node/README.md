@@ -381,6 +381,11 @@ in `tbtop_notification_templates`.
   changes one and on restore, newest `revisions.keep` kept;
   `pages.restore(id, revisionId)` and the editor's Revisions slide-over put
   the content back without touching status, tree or slugs.
+- Page references: a page type's `pagesField` ids are indexed in
+  `tbtop_page_refs` on every save; `site.referencedBy(page, field, { from })`
+  and `site.referencedByLinks(...)` list the live pages that pick a page, and
+  a type's `resolveFields` reads them as `ctx.referencedBy(field, from)`.
+  `rebuildPageRefs(db, site.pageTypes)` rewrites the index.
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
@@ -407,6 +412,6 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-The page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
+Audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

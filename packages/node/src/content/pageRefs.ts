@@ -112,3 +112,34 @@ export async function pageExists(site: Site, id: number, options: { withTrashed?
 	const qb = options.withTrashed === true ? site.config.db.selectFrom("tbtop_pages") : site.pages.query();
 	return (await qb.select("tbtop_pages.id").where("tbtop_pages.id", "=", id).executeTakeFirst()) !== undefined;
 }
+
+const natural = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+
+/**
+ * PageRefIndex::sources: the live pages whose page-type pages field `field`
+ * picks `target`, only those of type or subtype `from` when given; by
+ * sort_order, then name in `locale`, then id.
+ */
+export async function referencedBy(site: Site, target: Page | null, field: string, options: { from?: string; locale: string }): Promise<Page[]> {
+	if (target === null) {
+		return [];
+	}
+	let qb = whereLive(site.pages.query().selectAll("tbtop_pages")).where("tbtop_pages.id", "in", (eb) =>
+		eb.selectFrom("tbtop_page_refs").select("page_id").where("target_id", "=", target.id).where("field", "=", field),
+	);
+	if (options.from !== undefined) {
+		const from = options.from;
+		qb = qb.where((eb) => eb.or([eb("tbtop_pages.type", "=", from), eb("tbtop_pages.subtype", "=", from)]));
+	}
+	const fallback = await site.languages.defaultLocale();
+	const name = (page: Page) => pageNameOf(page, options.locale, fallback) ?? "";
+	return (await qb.execute())
+		.map(pageFromRow)
+		.sort((a, b) => a.sortOrder - b.sortOrder || natural.compare(name(a), name(b)) || a.id - b.id);
+}
+
+/** referencedBy as the `{id, name, url}` list a pages field resolves to; a page without a name or slug in the locale drops out. */
+export async function referencedByLinks(site: Site, target: Page | null, field: string, options: { from?: string; locale: string }): Promise<PageRef[]> {
+	const pages = await referencedBy(site, target, field, options);
+	return resolvePageRefs(site, pages.map((page) => page.id), options.locale);
+}

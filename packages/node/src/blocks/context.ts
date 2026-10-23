@@ -15,6 +15,8 @@ export type ResolveContext = {
 	link(value: unknown): Promise<ResolvedLink | null>;
 	/** A pages field value to its live pages, `{ id, name, url }` in this locale (PageRefList). */
 	pages(value: unknown): Promise<PageRef[]>;
+	/** The live pages whose page-type pages field `field` picks this page (Cms::referencedByLinks), only of type or subtype `from` when given. */
+	referencedBy(field: string, from?: string): Promise<PageRef[]>;
 	/** A translatable page column as text, locale then fallback. */
 	pageText(field: TranslatableField): string | null;
 	/** A package string (`forms.contact.heading`) in this locale. */

@@ -6,7 +6,7 @@ import { Layouts } from "./content/layouts";
 import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from "./content/link";
 import { firstText, type Page, translationText } from "./content/page";
 import { Pages } from "./content/pages";
-import { resolvePageRefs } from "./content/pageRefs";
+import { type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { PageRevisions } from "./content/revisions";
@@ -132,9 +132,28 @@ export class Site {
 			richtextHtml,
 			link: (value) => this.link(value, locale),
 			pages: (value) => resolvePageRefs(this, value, locale),
+			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
 		};
+	}
+
+	/**
+	 * Cms::referencedBy: the live pages whose page-type pages field `field`
+	 * picks `page`, optionally only of type or subtype `from`; by sort order,
+	 * then name. Empty for a null page.
+	 */
+	referencedBy(page: Page | null, field: string, options: { from?: string; locale?: string } = {}): Promise<Page[]> {
+		return this.withLocale(options, (locale) => referencedBy(this, page, field, { ...options, locale }));
+	}
+
+	/** Cms::referencedByLinks: referencedBy as `{id, name, url}` links in the locale. */
+	referencedByLinks(page: Page | null, field: string, options: { from?: string; locale?: string } = {}): Promise<PageRef[]> {
+		return this.withLocale(options, (locale) => referencedByLinks(this, page, field, { ...options, locale }));
+	}
+
+	private async withLocale<R>(options: { locale?: string }, run: (locale: string) => Promise<R>): Promise<R> {
+		return run(options.locale ?? (await this.languages.defaultLocale()));
 	}
 
 	/** Forms::props: `action` (and `honeypotField`) for a named form (`formName`) posted from `page`; the default locale unless given. */

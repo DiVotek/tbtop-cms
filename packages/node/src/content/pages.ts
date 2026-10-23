@@ -5,6 +5,7 @@ import { encodeJson, flag, sqlDate } from "../support/values";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
 import { assertHierarchy, assertTypePair, PageRuleError } from "./pageRules";
 import { PageTypes } from "./pageTypes";
+import { writePageRefs } from "./pageRefIndex";
 import { PageRevisions } from "./revisions";
 import { PageSlugs } from "./slugs";
 
@@ -129,6 +130,7 @@ export class Pages {
 		);
 		const page = await this.mustFind(id);
 		await this.slugs.sync(page, options.slugs ?? {});
+		await writePageRefs(this.db, this.types, page);
 		await this.revisions.snapshot(page, "create", options.by ?? null);
 		return page;
 	}
@@ -197,6 +199,7 @@ export class Pages {
 		}
 		const page = await this.mustFind(id);
 		await this.slugs.sync(page, options.slugs ?? {});
+		await writePageRefs(this.db, this.types, page);
 		return [current, page];
 	}
 
