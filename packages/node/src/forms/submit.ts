@@ -3,6 +3,7 @@ import { honeypotField } from "../blocks/resolver";
 import type { Site } from "../site";
 import { locateForm } from "./locate";
 import { notifySubmission } from "./notifier";
+import { clientKey, type SubmitThrottle } from "./throttle";
 
 const ROUTE = /^\/_cms\/forms\/([^/]+)\/(\d+)\/([^/]+)\/?$/;
 
@@ -15,7 +16,7 @@ type Outcome = "sent" | "invalid" | "failed";
  * back to the page with `cms_form` and `cms_form_status` in the query.
  * Null for any other URL.
  */
-export async function submitForm(site: Site, request: Request): Promise<Response | null> {
+export async function submitForm(site: Site, request: Request, throttle: SubmitThrottle | null = null): Promise<Response | null> {
 	const url = new URL(request.url);
 	const match = ROUTE.exec(url.pathname);
 	if (request.method !== "POST" || match === null) {
@@ -27,6 +28,11 @@ export async function submitForm(site: Site, request: Request): Promise<Response
 	}
 	const [, rawLocale = "", rawPage = "", rawBlock = ""] = match;
 	const blockId = decodeURIComponent(rawBlock);
+	// The `throttle` middleware: every post that reaches the route counts, before the page or form is looked up.
+	const retryAfter = throttle?.hit(await clientKey(request, site.config.forms?.clientIp)) ?? null;
+	if (retryAfter !== null) {
+		return new Response(null, { status: 429, headers: { "Retry-After": String(retryAfter) } });
+	}
 	const allow = site.config.forms?.allow;
 	if (allow !== undefined && !(await allow(request))) {
 		return new Response(null, { status: 429 });

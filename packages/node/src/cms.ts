@@ -3,6 +3,7 @@ import type { CmsConfig } from "./config";
 import { PageTypes } from "./content/pageTypes";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
+import { submitThrottle } from "./forms/throttle";
 import { type LoadResult, loadPage } from "./frontend/load";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
@@ -39,6 +40,7 @@ const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
 export function createCms(config: CmsConfig): Cms {
 	const pageTypes = new PageTypes(config.pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
+	const throttle = submitThrottle(config.forms);
 	const site = (request?: Request): Site => {
 		const origin = (config.url ?? (request === undefined ? "http://localhost" : new URL(request.url).origin)).replace(/\/+$/, "");
 		return new Site(config, pageTypes, schemaTypes, origin);
@@ -51,7 +53,7 @@ export function createCms(config: CmsConfig): Cms {
 		loadPage: async (request) => loadPage(site(request), request, { preview: (await config.canPreview?.(request)) === true }),
 		handle: async (request) => {
 			if (request.method === "POST") {
-				return submitForm(site(request), request);
+				return submitForm(site(request), request, throttle);
 			}
 			if (request.method !== "GET" && request.method !== "HEAD") {
 				return null;

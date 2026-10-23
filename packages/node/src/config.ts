@@ -55,8 +55,21 @@ export type FormsConfig = {
 	 * from a cron, `ctx.waitUntil()` on Workers, or a queue.
 	 */
 	delivery?: "inline" | "outbox";
-	/** A rate limit or bot check before anything runs; false answers 429 (`forms.throttle` in PHP). */
+	/**
+	 * The host's own limiter or bot check before anything runs; false answers
+	 * 429. Given alone it replaces the built-in `throttle`, as a PHP host
+	 * swaps `forms.throttle` for its own limiter; with `throttle` set both run.
+	 */
 	allow?: (request: Request) => boolean | Promise<boolean>;
+	/**
+	 * Built-in rate limit per client (`tbtop-cms.forms.throttle`, `10,1`):
+	 * over it a post answers 429 with Retry-After. Default `{ max: 10,
+	 * perSeconds: 60 }` unless `allow` is given; false turns it off. Counted in
+	 * memory, so per process, and per isolate on Workers.
+	 */
+	throttle?: { max: number; perSeconds: number } | false;
+	/** The client address the throttle counts by; default: proxy headers (see README). */
+	clientIp?: (request: Request) => string | null | undefined | Promise<string | null | undefined>;
 };
 
 export type NotificationsConfig = {

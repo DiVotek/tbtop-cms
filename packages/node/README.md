@@ -141,7 +141,9 @@ or as a plain form (303 back to the page with `cms_form_status`).
 createCms({
 	// ...
 	forms: {
-		allow: (request) => rateLimit(request), // false answers 429
+		throttle: { max: 10, perSeconds: 60 }, // the default; false turns it off
+		clientIp: (request) => server.requestIP(request)?.address, // what the throttle counts by
+		allow: (request) => rateLimit(request), // the host's own limiter; false answers 429
 		delivery: "inline", // or "outbox": run cms.tasks.deliver() from a cron
 	},
 	notifications: {
@@ -151,6 +153,19 @@ createCms({
 	},
 });
 ```
+
+Form posts are rate limited per client, 10 a minute by default (PHP's
+`throttle:10,1`): over it the post answers 429 with `Retry-After`. The count
+lives in memory, so it is per process, and on Cloudflare Workers per isolate,
+which an attacker spread over many isolates gets around; for one count
+across instances pass the host's own limiter (KV, Durable Object, Redis) as
+`allow`. Given alone, `allow` replaces the built-in throttle; with an
+explicit `throttle` both run. A Fetch `Request` has no socket address, so
+without `clientIp` the client is the last `X-Forwarded-For` entry (the one
+the nearest proxy appended; Cloudflare appends too), else `CF-Connecting-IP`,
+else `X-Real-IP`. A host with no proxy in front must pass `clientIp`, or a
+client picks its own key; behind two proxies (a CDN, then a load balancer)
+the last entry is the CDN's, so pass `clientIp` there too.
 
 Every submission is stored (`forms.store: false` turns that off), then
 notified on the channels the merchant enabled in Settings → Notifications
@@ -184,7 +199,7 @@ it is ignored with a warning and the built-in template answers.
   alternates, x-default, verification tokens), JSON-LD (WebSite,
   BreadcrumbList, the WebPage/Article families, CollectionPage, block nodes,
   site identity), robots.txt, chunked sitemap with hreflang alternates.
-- Forms: the submit endpoint, honeypot, stored submissions with D1-safe
+- Forms: the submit endpoint, honeypot, a per-client rate limit, stored submissions with D1-safe
   claims, retries, outbox delivery; notifications over mail, Telegram and the
   admin bell with Liquid overrides and a delivery log.
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
