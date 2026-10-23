@@ -82,25 +82,30 @@ export function dashboard(cms: Cms) {
 		],
 		view: async (s, { request }) => {
 			const showSubmissions = await allows(cms, "tbtop-cms.submissions");
+			const showPages = await allows(cms, "tbtop-cms.pages");
 			const fallback = await cms.site(request).languages.defaultLocale();
 			return s.stack([
-				s.grid({ cols: 3 }, await stats(s, cms, showSubmissions)),
+				s.grid({ cols: 3 }, await stats(s, cms, { showPages, showSubmissions })),
 				...(showSubmissions ? [s.grid({ cols: 2 }, charts(s, cms))] : []),
 				s.grid({ cols: 2 }, [
-					s.section({ title: "Recently updated pages", variant: "card", actions: [s.action("dashboardOpenPages").label("All pages").url(`${prefix}/pages`).link().size("sm")] }, [
-						s.list("dashboardRecentPages").items(async () => {
-							const rows = await cms.site(request).pages.query().selectAll("tbtop_pages").orderBy("updated_at", "desc").orderBy("id", "desc").limit(RECENT).execute();
-							return rows.map((row) => {
-								const page = pageFromRow(row);
-								return {
-									title: firstText(page, ["name"], fallback, fallback) || `#${page.id}`,
-									meta: ago(page.updatedAt),
-									color: isLive(page) ? "success" : "muted",
-									url: `${prefix}/pages/${page.id}/edit`,
-								};
-							});
-						}),
-					]),
+					...(showPages
+						? [
+								s.section({ title: "Recently updated pages", variant: "card", actions: [s.action("dashboardOpenPages").label("All pages").url(`${prefix}/pages`).link().size("sm")] }, [
+									s.list("dashboardRecentPages").items(async () => {
+										const rows = await cms.site(request).pages.query().selectAll("tbtop_pages").orderBy("updated_at", "desc").orderBy("id", "desc").limit(RECENT).execute();
+										return rows.map((row) => {
+											const page = pageFromRow(row);
+											return {
+												title: firstText(page, ["name"], fallback, fallback) || `#${page.id}`,
+												meta: ago(page.updatedAt),
+												color: isLive(page) ? "success" : "muted",
+												url: `${prefix}/pages/${page.id}/edit`,
+											};
+										});
+									}),
+								]),
+							]
+						: []),
 					...(showSubmissions
 						? [
 								s.section(
@@ -131,7 +136,7 @@ export function dashboard(cms: Cms) {
 	});
 }
 
-async function stats(s: S, cms: Cms, showSubmissions: boolean) {
+async function stats(s: S, cms: Cms, { showPages, showSubmissions }: { showPages: boolean; showSubmissions: boolean }) {
 	const db = cms.config.db;
 	const window = since(TREND_DAYS);
 	// Counts in SQL; only the trend window's rows come back.
@@ -146,14 +151,16 @@ async function stats(s: S, cms: Cms, showSubmissions: boolean) {
 			rows.map((row) => row.created_at),
 			TREND_DAYS,
 		).map((day) => day.value);
-	const tiles = [
-		s
-			.stat("Pages")
-			.value(published + draft)
-			.description(`${published} published · ${draft} draft`)
-			.icon("file-text")
-			.sparkline(trend(pages), "bottom"),
-	];
+	const tiles = showPages
+		? [
+				s
+					.stat("Pages")
+					.value(published + draft)
+					.description(`${published} published · ${draft} draft`)
+					.icon("file-text")
+					.sparkline(trend(pages), "bottom"),
+			]
+		: [];
 	if (showSubmissions) {
 		const recent = await db.selectFrom("tbtop_form_submissions").select("created_at").where("created_at", ">=", window).execute();
 		const unread = await db.selectFrom("tbtop_form_submissions").select((eb) => eb.fn.countAll().as("n")).where("lead_status", "=", "new").executeTakeFirst();

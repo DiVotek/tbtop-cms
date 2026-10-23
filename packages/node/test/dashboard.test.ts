@@ -75,4 +75,11 @@ describe("dashboard", () => {
 		expect(ago(new Date("2026-10-22T12:00:00Z"), now)).toBe("1 day ago");
 		expect(ago(null, now)).toBe("");
 	});
+
+	test("without the pages ability the page tile and the recent pages are left out", async () => {
+		const { page } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.pages" });
+		const all = nodes((await page("/admin/dashboard")).props);
+		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["New submissions", "Layouts"]);
+		expect(all.filter((node) => node.kind === "list")).toHaveLength(1);
+	});
 });
