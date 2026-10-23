@@ -16,6 +16,7 @@ export type { CmsAdmin } from "./admin";
 export { type Cms, type CmsTasks, createCms } from "./cms";
 export type { CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
 export type { Language } from "./content/languages";
+export { ensureDefaultLanguage, LanguageError } from "./content/languages";
 export { isLive, type Page, type PageStatus, type Translations } from "./content/page";
 export { PageConflictError, type PageInput } from "./content/pages";
 export { definePageType, type PageType, type PageTypeDef } from "./content/pageTypes";

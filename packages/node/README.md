@@ -88,6 +88,10 @@ createAdmin({
 on one the Laravel package already migrated (its tables exist and the
 migration fails). A database Laravel migrated is read as it is, without
 `migrateCms`.
+Like `cms:install`, it then gives a database with no live language its
+default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
+A host that merges `cmsMigrations` into its own Migrator calls
+`ensureDefaultLanguage(db, "en")` after it.
 
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
@@ -96,7 +100,9 @@ the page request from the route path (see `workbench/src/server/page.ts`).
 
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
-database with pages is left alone.
+database with pages is left alone. A fixture language marked `default` takes over
+from the installed one (which stays, non-default: pass `defaultLanguage` to
+`migrateCms` to install the right one).
 
 ## React (`@tbtop/cms/react`)
 
@@ -190,7 +196,9 @@ it is ignored with a warning and the built-in template answers.
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
   built-in blocks.
 - Admin: pages list and editor (General, SEO, a tab per block, Publishing),
-  redirects, layout, shared blocks, languages, site, SEO and notification
+  redirects, layout, shared blocks, languages (added from the locale
+  catalog; trash, restore, delete permanently; the default is not
+  deletable), site, SEO and notification
   settings, the inbox (list, submission page with status, retry, comments).
 
 ## Not yet
