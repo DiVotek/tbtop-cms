@@ -1,5 +1,5 @@
 import type { Seo } from "../seo/resolver";
-import { seoTags } from "./head";
+import { gtmNoscriptHtml, seoTags } from "./head";
 
 /**
  * The SEO head as React elements. React 19 hoists `<title>`, `<meta>` and
@@ -15,7 +15,7 @@ export function CmsHead({ seo }: { seo: Seo }) {
 					return <title key={key}>{tag.children}</title>;
 				}
 				if (tag.tag === "script") {
-					// Escaped by jsonLdText: no `<` reaches the HTML.
+					// JSON-LD is escaped by jsonLdText; the GTM loader is a fixed snippet around a checked id.
 					return <script key={key} {...tag.attrs} dangerouslySetInnerHTML={{ __html: tag.children }} />;
 				}
 				const { hreflang, ...rest } = tag.attrs;
@@ -23,5 +23,21 @@ export function CmsHead({ seo }: { seo: Seo }) {
 				return tag.tag === "meta" ? <meta key={key} {...attrs} /> : <link key={key} {...attrs} />;
 			})}
 		</>
+	);
+}
+
+/**
+ * The `<noscript>` half of the Tag Manager install, for right after `<body>`
+ * (InjectGtm puts it there in PHP): `<GtmNoscript id={seo.gtmContainerId} />`.
+ * Renders nothing without a well-formed id.
+ */
+export function GtmNoscript({ id }: { id: string | null | undefined }) {
+	if (gtmNoscriptHtml(id) === null) {
+		return null;
+	}
+	return (
+		<noscript>
+			<iframe src={`https://www.googletagmanager.com/ns.html?id=${String(id)}`} height="0" width="0" style={{ display: "none", visibility: "hidden" }} />
+		</noscript>
 	);
 }

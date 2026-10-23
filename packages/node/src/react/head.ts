@@ -14,6 +14,27 @@ export type HeadTag =
 export const jsonLdText = (node: unknown): string =>
 	JSON.stringify(node).replace(/[<>&]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
+const GTM_ID = /^GTM-[A-Z0-9]+$/;
+
+/**
+ * Google's stock Tag Manager loader, verbatim but for the id (InjectGtm::headScript).
+ * The id is checked again here: it lands inside a script.
+ */
+export function gtmScript(id: string | null | undefined): string | null {
+	if (id === null || id === undefined || !GTM_ID.test(id)) {
+		return null;
+	}
+	return `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${id}');`;
+}
+
+/** The `<noscript>` half for right after `<body>` (InjectGtm::bodyNoscript), as HTML for non-React hosts. */
+export function gtmNoscriptHtml(id: string | null | undefined): string | null {
+	if (id === null || id === undefined || !GTM_ID.test(id)) {
+		return null;
+	}
+	return `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${id}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`;
+}
+
 const meta = (key: "name" | "property", name: string, content: string | null | undefined): HeadTag[] =>
 	content === null || content === undefined || content === "" ? [] : [{ tag: "meta", attrs: { [key]: name, content } }];
 
@@ -22,7 +43,10 @@ export function seoTags(seo: Seo): HeadTag[] {
 	const showAlternates = seo.alternates.length > 1;
 	const image = seo.ogImage;
 	const article = seo.ogType === "article";
+	const gtm = gtmScript(seo.gtmContainerId);
 	return [
+		// Google asks for the loader as high in the head as possible.
+		...(gtm === null ? [] : [{ tag: "script", attrs: {}, children: gtm } as HeadTag]),
 		{ tag: "title", children: seo.title },
 		...meta("name", "description", seo.description),
 		...(seo.canonical ? [{ tag: "link", attrs: { rel: "canonical", href: seo.canonical } } as HeadTag] : []),
@@ -65,14 +89,15 @@ const reactAttrs = (attrs: Record<string, string>): Record<string, string> =>
 
 /**
  * The `seo` prop in the shape of TanStack Router's `head()`: `{ meta, links, scripts }`,
- * the title as `{ title }` in `meta`. JSON-LD is already escaped.
+ * the title as `{ title }` in `meta`. JSON-LD is already escaped; the GTM
+ * loader, when set, is the first script and has no `type`.
  */
 export function seoHead(seo: Seo): {
 	meta: Record<string, string>[];
 	links: Record<string, string>[];
-	scripts: { type: string; children: string }[];
+	scripts: { type?: string; children: string }[];
 } {
-	const out = { meta: [] as Record<string, string>[], links: [] as Record<string, string>[], scripts: [] as { type: string; children: string }[] };
+	const out = { meta: [] as Record<string, string>[], links: [] as Record<string, string>[], scripts: [] as { type?: string; children: string }[] };
 	for (const tag of seoTags(seo)) {
 		if (tag.tag === "title") {
 			out.meta.push({ title: tag.children });
@@ -81,7 +106,7 @@ export function seoHead(seo: Seo): {
 		} else if (tag.tag === "link") {
 			out.links.push(reactAttrs(tag.attrs));
 		} else {
-			out.scripts.push({ type: tag.attrs.type ?? "application/ld+json", children: tag.children });
+			out.scripts.push(tag.attrs.type === undefined ? { children: tag.children } : { type: tag.attrs.type, children: tag.children });
 		}
 	}
 	return out;

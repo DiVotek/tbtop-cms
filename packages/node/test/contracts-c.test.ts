@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import type { Kysely } from "kysely";
-import { type Fixture, migrateCms } from "../src";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { type Fixture, migrateCms, type PageProps } from "../src";
+import { GtmNoscript, seoHead, seoTags } from "../src/react";
 import { get, makeCms, testDialect } from "./support";
 
 const en = [{ locale: "en", name: "English", default: true }];
@@ -113,5 +116,54 @@ describe("languages as in PHP (q08)", () => {
 
 		await post(`${url}/forms/language`, { locale: "fr", is_default: true, sort_order: 2 }, url);
 		expect(await cms.site().languages.default()).toMatchObject({ locale: "fr", name: "Français", is_frontend_active: true });
+	});
+});
+
+const SNIPPET = `<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];})(window,document,'script','dataLayer','gtm-ab12cd');</script>
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-AB12CD"></iframe></noscript>`;
+
+async function homeSeo(cms: Awaited<ReturnType<typeof makeCms>>["cms"]): Promise<PageProps["seo"]> {
+	const result = await cms.loadPage(get("/"));
+	if (result.type !== "page") throw new Error(`expected a page, got ${result.type}`);
+	return result.props.seo;
+}
+
+describe("Google Tag Manager (q10)", () => {
+	test("the SEO settings store the id from a pasted install snippet, and the seo prop carries it", async () => {
+		const { cms, post } = await panel();
+		expect((await homeSeo(cms)).gtmContainerId).toBeNull();
+		const url = "/admin/settings/seo";
+		const res = await post(`${url}/forms/settings_seo`, { seo_gtm_container_id: SNIPPET }, url);
+		expect(res.status).toBeLessThan(400);
+		expect(await cms.site().settings.get("seo.gtm_container_id")).toBe("GTM-AB12CD");
+		expect((await homeSeo(cms)).gtmContainerId).toBe("GTM-AB12CD");
+	});
+
+	test("a stored value that is not a container id gives null; a stored snippet still resolves", async () => {
+		const { cms } = await makeCms();
+		await cms.site().settings.setMany({ "seo.gtm_container_id": "not-a-container-GTM-ABC123" });
+		expect((await homeSeo(cms)).gtmContainerId).toBeNull();
+		await cms.site().settings.setMany({ "seo.gtm_container_id": "GTM-X'};alert(1)//" });
+		expect((await homeSeo(cms)).gtmContainerId).toBeNull();
+		await cms.site().settings.setMany({ "seo.gtm_container_id": SNIPPET });
+		expect((await homeSeo(cms)).gtmContainerId).toBe("GTM-AB12CD");
+	});
+
+	test("@tbtop/cms/react puts the loader first in the head and renders the noscript half", async () => {
+		const { cms } = await makeCms();
+		await cms.site().settings.setMany({ "seo.gtm_container_id": "GTM-AB12CD" });
+		const seo = await homeSeo(cms);
+		const [first] = seoTags(seo);
+		expect(first).toMatchObject({ tag: "script", attrs: {} });
+		expect(first?.tag === "script" ? first.children : "").toContain("'dataLayer','GTM-AB12CD'");
+		expect(seoHead(seo).scripts[0]).toEqual({ children: expect.stringContaining("googletagmanager.com/gtm.js") });
+		expect(renderToString(createElement(GtmNoscript, { id: seo.gtmContainerId }))).toBe(
+			'<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-AB12CD" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>',
+		);
+
+		const off = { ...seo, gtmContainerId: null };
+		expect(seoTags(off).some((tag) => tag.tag === "script" && tag.children.includes("googletagmanager"))).toBe(false);
+		expect(renderToString(createElement(GtmNoscript, { id: null }))).toBe("");
 	});
 });

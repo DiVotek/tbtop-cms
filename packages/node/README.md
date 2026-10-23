@@ -126,6 +126,12 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 
 - `seoTags(seo)` is the framework-neutral list behind both; JSON-LD comes out
   escaped (`<`, `>`, `&` as `\u00XX`), so a title cannot close the script.
+- Google Tag Manager (SEO settings → Integrations, `seo.gtmContainerId`,
+  a `GTM-…` id or null): `seoTags`/`seoHead`/`CmsHead` put Google's loader
+  script first; render `<GtmNoscript id={props.seo.gtmContainerId} />` right
+  after `<body>` (`gtmScript`/`gtmNoscriptHtml` give both halves as strings).
+  An inline script only runs from server-rendered HTML, so the tags load on
+  full page loads; count SPA page views with a History Change trigger.
 - `CmsRenderer` drops a block with no component or with props that fail the
   catalog, and one that throws while rendering; with `showErrors` it says so
   in the console. Wrap all of a page's specs (header, body, footer) in one
@@ -187,7 +193,7 @@ it is ignored with a warning and the built-in template answers.
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
-  alternates, x-default, verification tokens), JSON-LD (WebSite,
+  alternates, x-default, verification tokens, the GTM container id), JSON-LD (WebSite,
   BreadcrumbList, the WebPage/Article families, CollectionPage, block nodes,
   site identity), robots.txt, chunked sitemap with hreflang alternates.
 - Forms: the submit endpoint, honeypot, stored submissions with D1-safe
