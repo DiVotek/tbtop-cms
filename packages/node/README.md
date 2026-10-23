@@ -370,6 +370,20 @@ Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored
 in `tbtop_notification_templates`.
 
+## Deploy
+
+On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
+`tbtop-cms scheduled` from cron every minute; both read the default export
+of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
+`node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
+
+On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite: migrate with
+`dialect: "sqlite"`), set `compatibility_flags = ["nodejs_als"]` (or
+`nodejs_compat`) for `node:async_hooks`, add a `* * * * *` cron trigger
+whose `scheduled()` calls `cms.tasks.scheduled()`, and pass
+`{ waitUntil: ctx.waitUntil }` to `loadPage`. The CLI does not reach D1:
+run `migrateCms` from the Worker (a deploy hook or a guarded route).
+
 ## What 0.0 has
 
 - Schema and one baseline migration equal to the PHP migrations (SQLite,
