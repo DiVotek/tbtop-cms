@@ -7,6 +7,7 @@ export default defineConfig({
 		catalog: "src/blocks/catalog.ts",
 		react: "src/react/index.ts",
 		"admin-client": "src/admin-client/index.ts",
+		"better-auth": "src/betterAuth/index.ts",
 		cli: "src/cli/bin.ts",
 	},
 	format: ["esm"],
@@ -18,6 +19,6 @@ export default defineConfig({
 	clean: true,
 	treeshake: true,
 	// Runtime deps and peers stay external.
-	external: ["zod", "kysely", "@tbtop/admin", "@tbtop/inertia-admin", /^@tbtop\/admin\//, /^node:/, "react", /^react\//, "react-dom", /^@json-render\//],
+	external: ["zod", "kysely", "@tbtop/admin", "@tbtop/inertia-admin", /^@tbtop\/admin\//, "better-auth", /^better-auth\//, /^node:/, "react", /^react\//, "react-dom", /^@json-render\//],
 	removeNodeProtocol: false,
 });

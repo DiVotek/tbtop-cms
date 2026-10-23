@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as AdminSplatRouteImport } from './routes/admin/$'
 import { Route as StorageSplatRouteImport } from './routes/storage/$'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const SplatRoute = SplatRouteImport.update({
   id: '/$',
@@ -28,35 +29,44 @@ const StorageSplatRoute = StorageSplatRouteImport.update({
   path: '/storage/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/admin/$': typeof AdminSplatRoute
   '/storage/$': typeof StorageSplatRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/admin/$': typeof AdminSplatRoute
   '/storage/$': typeof StorageSplatRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/$': typeof SplatRoute
   '/admin/$': typeof AdminSplatRoute
   '/storage/$': typeof StorageSplatRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/$' | '/admin/$' | '/storage/$'
+  fullPaths: '/$' | '/admin/$' | '/storage/$' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/$' | '/admin/$' | '/storage/$'
-  id: '__root__' | '/$' | '/admin/$' | '/storage/$'
+  to: '/$' | '/admin/$' | '/storage/$' | '/api/auth/$'
+  id: '__root__' | '/$' | '/admin/$' | '/storage/$' | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AdminSplatRoute: typeof AdminSplatRoute
   StorageSplatRoute: typeof StorageSplatRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StorageSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AdminSplatRoute: AdminSplatRoute,
   StorageSplatRoute: StorageSplatRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

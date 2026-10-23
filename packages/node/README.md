@@ -47,14 +47,13 @@ posts from one client). The workbench registers the link field's client
 from `@tbtop/cms/admin-client` and has its own `Promo` block with a
 `linkField` CTA.
 
-The workbench is a demo, not a host to copy: it signs every visitor in as an
-admin, so anyone can open the page editor and its signed preview links to
-drafts and scheduled pages (the preview secret has a fixed default,
-`CMS_PREVIEW_SECRET` overrides it).
-The admin `user()` callback decides who gets into the panel, `authorize`
-which CMS sections each user sees, and `canPreview` (or a signed preview
-link) who sees unpublished pages, so a real host must check its own users
-there.
+The admin signs in through Better Auth (`@tbtop/cms/better-auth`, below):
+`admin@admin.com` and `editor@editor.com`, password `password`, are seeded.
+E2E signs in as the admin once (the `setup` project) and every spec reuses
+that session. The secrets have fixed defaults (`BETTER_AUTH_SECRET`,
+`CMS_PREVIEW_SECRET` override them), so the workbench is a demo, not a
+deployment. The first request migrates, so Better Auth's start-up check logs
+its tables as missing once.
 
 ## Host API
 
@@ -177,6 +176,62 @@ editor), `tbtop-cms.languages` and `tbtop-cms.settings` (site, SEO,
 notifications). A false hides the section from the nav and answers 403 to
 its pages and to every form, action, table and upload on them. Without
 `authorize`, every section is open to any panel user, as before.
+`tbtop-cms.users` gates the Users page an auth adapter adds.
+
+### Users and sign-in (`@tbtop/cms/better-auth`)
+
+The core asks the host for a panel user (createAdmin's `session` or `user`)
+and `authorize`. `@tbtop/cms/better-auth` answers both from a Better Auth
+instance with email and password and the admin plugin (`better-auth` is an
+optional peer dependency):
+
+```ts
+import { cmsAccess, cmsAuth, cmsRoles } from "@tbtop/cms/better-auth";
+import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
+
+export const auth = betterAuth({
+	database: { db, type: "sqlite" }, // the CMS's Kysely instance
+	emailAndPassword: { enabled: true },
+	user: { modelName: "tbtop_users" }, // and session, account, verification
+	plugins: [admin({ ac: cmsAccess, roles: cmsRoles })],
+});
+const panelAuth = cmsAuth(auth);
+const cms = createCms({ db, blocks, authorize: panelAuth.authorize });
+await migrateCms(db, { dialect: "sqlite", userKey: "string" }); // Better Auth's ids are strings
+const admin = createAdmin({
+	prefix: "/admin",
+	pages: [...cms.admin.pages, ...panelAuth.pages(cms)],
+	session: panelAuth.session,
+	loginPath: panelAuth.loginPath(cms),
+	// driver, context, …
+});
+```
+
+- `session` reads Better Auth's session cookie once per request; the panel's
+  logout signs out in Better Auth. Flashed errors and effects stay in a
+  cookie sealed with Better Auth's secret (`flash` swaps the store).
+- Roles: `cmsStatements` adds a `cms` statement (pages, submissions,
+  redirects, settings, design, languages) to the admin plugin's `user` and
+  `session` ones. A section ability needs `cms:<section>`; the Users page
+  needs `user:list`, and its writes go through the admin plugin's API, so
+  Better Auth checks them again. `cmsRoles` has `admin` (everything),
+  `editor` (pages, submissions, redirects, design) and `user` (no panel);
+  `cmsAccess.newRole({ ... })` makes a host's own, passed to both the plugin
+  and `cmsAuth(auth, { roles })`. A user whose roles grant no section and no
+  `user:list` is a guest: sign-in refuses them and closes the session.
+- Pages: `login` (public), and `users`, `users/new`, `users/{id}/edit`
+  (Settings → Users): name, email, role, banned; add with a password, edit
+  name and role (not one's own), set a new password, ban (signs out
+  everywhere), unban, delete. Better Auth refuses banning or deleting
+  oneself.
+- Better Auth's tables live in the CMS's database; run its migrations
+  (`getMigrations(options).runMigrations()` or its CLI) next to `migrateCms`.
+  Mount `auth.handler` (e.g. `/api/auth/*`) only for the host's own
+  client-side sign-in or OAuth: the panel does not need it.
+- Workers: the build needs `node:crypto` (`nodejs_compat`). Sign-in hashes
+  with scrypt, about 75–90 ms of CPU, over the Free plan's 10 ms per
+  request; on Workers Paid it fits. Session checks are one database read.
 
 With `preview.secret`, the page editor of a page that is not live offers
 a "Preview" link per site locale: an HMAC-signed URL (Web Crypto, so it
@@ -458,10 +513,10 @@ run `migrateCms` from the Worker (a deploy hook or a guarded route).
   redirects, layout, shared blocks, languages (added from the locale
   catalog; trash, restore, delete permanently; the default is not
   deletable), site, SEO and notification
-  settings, the inbox (list, submission page with status, retry, comments).
+  settings, the inbox (list, submission page with status, retry, comments);
+  sign-in and Users through Better Auth (`@tbtop/cms/better-auth`).
 
 ## Not yet
 
-Source-backed page types, the
-the users admin page, test sends
+Source-backed page types, test sends
 from the notification settings, owner-only template editing.

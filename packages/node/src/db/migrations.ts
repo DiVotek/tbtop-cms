@@ -229,7 +229,7 @@ export function baselineMigration(options: MigrationOptions): Migration {
 					.addColumn("subject_id", t.bigint)
 					.addColumn("event", "varchar(255)")
 					.addColumn("causer_type", "varchar(255)")
-					.addColumn("causer_id", t.bigint)
+					.addColumn("causer_id", user)
 					.addColumn("attribute_changes", t.json)
 					.addColumn("properties", t.json),
 			).execute();

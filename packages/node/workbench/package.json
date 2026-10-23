@@ -19,6 +19,7 @@
 		"@tbtop/admin": "file:.packs/tbtop-admin.tgz",
 		"@tbtop/cms": "file:.packs/tbtop-cms.tgz",
 		"@tbtop/inertia-admin": "0.7.1",
+		"better-auth": "^1.7.12",
 		"better-sqlite3": "^13.0.3",
 		"kysely": "^0.28.2",
 		"react": "^19.3.1",
