@@ -278,7 +278,8 @@ export function pageEdit(cms: Cms) {
 							{ label: "General", body: s.stack(generalFields(s, page)) },
 							{ label: "SEO", body: s.stack(seoFields(s, cms, page)) },
 							...blockTabs(s, cms, rows, {
-									placement: "pages",
+									// A block may name the page's type or its subtype in placements (PageEditBlockTabs::placements).
+									placement: page.subtype !== null && page.subtype !== "" ? [page.type, page.subtype] : [page.type],
 									save,
 									back,
 									sharedNames: shared,

@@ -34,7 +34,11 @@ export type CmsConfig = {
 	sitemap?: boolean;
 	/** The json-render root element kind; default `Fragment`. */
 	rootKind?: string;
-	/** Throw on a broken block row instead of skipping it (`tbtop-cms.blocks.strict`). */
+	/**
+	 * Throw on a broken block row instead of skipping it (`tbtop-cms.blocks.strict`).
+	 * Unset: off, except that resolved props failing the catalog's zod schema
+	 * throw in development (on Node/Bun a NODE_ENV other than `production`, unset included; never on Workers).
+	 */
 	strictBlocks?: boolean;
 	/** Can this request see drafts (preview)? Default: never. */
 	canPreview?: (request: Request) => boolean | Promise<boolean>;

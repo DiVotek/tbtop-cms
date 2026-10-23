@@ -1,7 +1,7 @@
 import { definePage, Effects, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
-import { verification } from "../seo/resolver";
+import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
@@ -269,6 +269,10 @@ async function prepareSeo(form: Dict, site: Site): Promise<string | null> {
 	if (typeof form.seo_identity_country === "string") {
 		form.seo_identity_country = form.seo_identity_country.toUpperCase();
 	}
+	// Stored as the bare id, so the reopened page shows it instead of the pasted snippet.
+	if (typeof form.seo_gtm_container_id === "string") {
+		form.seo_gtm_container_id = extractGtmId(form.seo_gtm_container_id);
+	}
 	return null;
 }
 
@@ -305,6 +309,7 @@ export function seoSettings(cms: Cms) {
 			seo_identity_opening_hours: "seo.identity.opening_hours",
 			seo_verification_google: "seo.verification.google",
 			seo_verification_bing: "seo.verification.bing",
+			seo_gtm_container_id: "seo.gtm_container_id",
 			...typeTemplateMap(cms),
 		},
 		prepare: prepareSeo,
@@ -385,8 +390,16 @@ export function seoSettings(cms: Cms) {
 					],
 				},
 				{
-					label: "Verification",
+					label: "Integrations",
 					children: [
+						s
+							.text("seo_gtm_container_id")
+							.label("Google Tag Manager container ID")
+							.placeholder("GTM-XXXXXXX")
+							.helperText(
+								"Paste the container ID (GTM-XXXXXXX) or the full install code from Google Tag Manager — either works. Leave empty and nothing is inserted. Internal navigation does not reload the page: count page views with a History Change trigger in GTM.",
+							)
+							.rules("nullable|max:2000"),
 						s.text("seo_verification_google").label("Google Search Console"),
 						s.text("seo_verification_bing").label("Bing Webmaster Tools"),
 					],

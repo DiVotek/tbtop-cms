@@ -1,6 +1,6 @@
 import { type ActionCtx, Effects, Field, S } from "@tbtop/admin";
 import type { BlockRegistry } from "../blocks/registry";
-import type { Placement } from "../blocks/catalog";
+import { placeableIn } from "../blocks/catalog";
 import { rowProblem } from "../blocks/resolver";
 import type { Cms } from "../cms";
 import type { SharedBlock } from "../content/sharedBlocks";
@@ -137,7 +137,8 @@ export function rowsFromForm(blocks: BlockRegistry, rows: Dict[], form: Dict): D
 }
 
 export type BlockTabsOptions = {
-	placement: Placement;
+	/** Where the list lives: `["layout"]`, or a page's type and its subtype, which picks the kinds the Add tab offers. */
+	placement: string[];
 	/** Persists a structural change (add, remove) outside the editor's Save; an Effects (an error notice) answers instead of `back`. */
 	save: (ctx: ActionCtx, rows: Dict[]) => Promise<Effects | void>;
 	back: string;
@@ -243,7 +244,7 @@ function addBlockBody(
 	options: BlockTabsOptions,
 ): unknown {
 	const blocks = cms.config.blocks;
-	const kinds = blocks.forPlacement(options.placement);
+	const kinds = blocks.all().filter((block) => placeableIn(block.placements, options.placement));
 	if (kinds.length === 0) {
 		return s.displayText("No block kinds are registered for this place.").variant("muted");
 	}
@@ -260,7 +261,7 @@ function addBlockBody(
 					const ctx = trimmedForm(submitted);
 					const form = ctx.form as Dict;
 					const kind = typeof form.new_block_kind === "string" ? form.new_block_kind : "";
-					if (!blocks.has(kind) || !blocks.get(kind).placements.includes(options.placement)) {
+					if (!blocks.has(kind) || !placeableIn(blocks.get(kind).placements, options.placement)) {
 						return Effects.make().notify("Pick a block kind first.", "error");
 					}
 					return (await options.save(ctx, appendRow(rowsFromForm(blocks, rows, form), { kind, data: {} }))) ?? options.back;
@@ -285,7 +286,7 @@ function appendRow(current: Dict[], row: { kind: string; data: Dict } | { kind: 
 function sharedAddRows(s: S, cms: Cms, rows: Dict[], options: BlockTabsOptions): unknown[] {
 	const blocks = cms.config.blocks;
 	const placeable = (options.sharing?.blocks ?? [])
-		.filter((shared) => blocks.has(shared.kind) && blocks.get(shared.kind).placements.includes(options.placement))
+		.filter((shared) => blocks.has(shared.kind) && placeableIn(blocks.get(shared.kind).placements, options.placement))
 		.sort((a, b) => a.name.localeCompare(b.name));
 	if (placeable.length === 0) {
 		return [];

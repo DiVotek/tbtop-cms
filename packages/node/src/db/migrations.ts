@@ -7,6 +7,8 @@ import {
 	Migrator,
 	sql,
 } from "kysely";
+import { ensureDefaultLanguage } from "../content/languages";
+import type { CmsDatabase } from "./schema";
 
 export type Dialect = "sqlite" | "postgres" | "mysql";
 
@@ -327,8 +329,12 @@ export function cmsMigrations(options: MigrationOptions): MigrationProvider {
 	};
 }
 
-/** Runs the package migrations to the latest; throws on the first failure. */
-export async function migrateCms(db: Kysely<unknown>, options: MigrationOptions): Promise<void> {
+/**
+ * Runs the package migrations to the latest, then, like `cms:install`, gives
+ * a database with no live language its default (`defaultLanguage`, a catalog
+ * locale, default `en`; false skips it). Throws on the first failure.
+ */
+export async function migrateCms(db: Kysely<unknown>, options: MigrationOptions & { defaultLanguage?: string | false }): Promise<void> {
 	const migrator = new Migrator({
 		db,
 		provider: cmsMigrations(options),
@@ -338,5 +344,8 @@ export async function migrateCms(db: Kysely<unknown>, options: MigrationOptions)
 	const { error } = await migrator.migrateToLatest();
 	if (error !== undefined) {
 		throw error;
+	}
+	if (options.defaultLanguage !== false) {
+		await ensureDefaultLanguage(db as Kysely<CmsDatabase>, options.defaultLanguage);
 	}
 }

@@ -139,19 +139,37 @@ export const honeypotField = (site: Site): string | null => {
 	return field === undefined ? "website" : field === null || field.trim() === "" ? null : field;
 };
 
-/** The catalog's zod schema is the contract: props that do not match it are dropped, not shipped. */
+/**
+ * The catalog's zod schema is the contract: props that do not match it are
+ * dropped, not shipped. That is a resolver/catalog drift, a code bug, so it
+ * throws under `strictBlocks`, which defaults to on in development.
+ */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
+	const strict = site.config.strictBlocks ?? isDevelopment();
 	return blocks.filter((block) => {
 		const result = site.blocks.get(block.kind).props.safeParse(block.props);
 		if (result.success) {
 			return true;
 		}
-		if (site.config.strictBlocks === true) {
+		if (strict) {
 			throw new BlockResolutionError(`Block [${block.kind}] props do not match the catalog: ${result.error.message}`);
 		}
 		console.warn("block.props_invalid", { kind: block.kind, id: block.id, error: result.error.message });
 		return false;
 	});
+}
+
+/**
+ * Development: a `NODE_ENV` other than `production` (unset included) on Node and Bun. Workers
+ * have no NODE_ENV (and nodejs_compat leaves it unset), so they count as
+ * production, as does any runtime without `process`.
+ */
+function isDevelopment(): boolean {
+	if (typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers") {
+		return false;
+	}
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env !== undefined && env.NODE_ENV !== "production";
 }
 
 /** PageSpecAssembler: blocks in order under the root; a duplicate or reserved id is skipped. */

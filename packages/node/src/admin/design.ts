@@ -49,7 +49,7 @@ export function layoutEdit(cms: Cms) {
 			return s
 				.form(`layout_${slot}`, [
 					s.displayText(SLOT_LABELS[slot]).variant("heading"),
-					s.tabs(blockTabs(s, cms, rows, { placement: "layout", save, back, sharedNames, problems, skipsValidation: false })),
+					s.tabs(blockTabs(s, cms, rows, { placement: ["layout"], save, back, sharedNames, problems, skipsValidation: false })),
 					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
 				])
 				.record(blockRecord(cms.config.blocks, rows))

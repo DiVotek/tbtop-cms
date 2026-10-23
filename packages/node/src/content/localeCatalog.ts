@@ -1,4 +1,55 @@
 /**
+ * ISO 639-1 code to native name (LocaleCatalog::LOCALES): the languages the
+ * admin's "Add language" select offers. Widely used LTR languages only: the
+ * admin layout has no RTL support.
+ */
+const LOCALES: Record<string, string> = {
+	en: "English",
+	uk: "Українська",
+	de: "Deutsch",
+	fr: "Français",
+	es: "Español",
+	it: "Italiano",
+	pl: "Polski",
+	cs: "Čeština",
+	sk: "Slovenčina",
+	ro: "Română",
+	bg: "Български",
+	el: "Ελληνικά",
+	tr: "Türkçe",
+	pt: "Português",
+	nl: "Nederlands",
+	sv: "Svenska",
+	no: "Norsk",
+	da: "Dansk",
+	fi: "Suomi",
+	et: "Eesti",
+	lv: "Latviešu",
+	lt: "Lietuvių",
+	hu: "Magyar",
+	hr: "Hrvatski",
+	sr: "Српски",
+	sl: "Slovenščina",
+	ja: "日本語",
+	zh: "中文",
+	ko: "한국어",
+	hi: "हिन्दी",
+	th: "ไทย",
+	vi: "Tiếng Việt",
+	id: "Bahasa Indonesia",
+};
+
+/** The native name of a catalog locale; null for one the catalog does not list. */
+export function localeName(locale: string): string | null {
+	return Object.hasOwn(LOCALES, locale) ? (LOCALES[locale] ?? null) : null;
+}
+
+/** The catalog as select options, `Deutsch (de)` (LocaleCatalog::options). */
+export function localeOptions(): { value: string; label: string }[] {
+	return Object.entries(LOCALES).map(([value, name]) => ({ value, label: `${name} (${value})` }));
+}
+
+/**
  * The og:locale a new language gets when none is given (LocaleCatalog::OG_LOCALES):
  * the territory a site in that language most often targets. `no` maps to
  * nb_NO because Facebook's scraper rejects the macro-language code.

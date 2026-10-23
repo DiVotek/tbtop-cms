@@ -46,6 +46,8 @@ export type Seo = {
 	favicon: string | null;
 	verificationGoogle: string | null;
 	verificationBing: string | null;
+	/** The Google Tag Manager container (`seo.gtm_container_id`), a well-formed `GTM-…` id or null. */
+	gtmContainerId: string | null;
 	jsonLd: Record<string, unknown>[];
 };
 
@@ -111,6 +113,7 @@ export async function resolveSeo(
 		favicon: await favicon(site),
 		verificationGoogle: verification(await site.settings.get("seo.verification.google", ""), "google-site-verification"),
 		verificationBing: verification(await site.settings.get("seo.verification.bing", ""), "msvalidate.01"),
+		gtmContainerId: gtmContainerId(await site.settings.get("seo.gtm_container_id", "")),
 		jsonLd: await jsonLd(site, page, locale, siteName, ogTitle, schema, ctx, blockNodes),
 	};
 }
@@ -184,6 +187,29 @@ export function verification(raw: unknown, metaName: string): string | null {
 		}
 	}
 	return token !== "" && /^[A-Za-z0-9_\-+/=]{1,512}$/.test(token) ? token : null;
+}
+
+/**
+ * GtmContainerId::extract: a bare `GTM-…` id, or the first one in a pasted
+ * install snippet (recognised by its googletagmanager.com reference),
+ * upper-cased; anything else comes back trimmed, for the admin to see.
+ */
+export function extractGtmId(raw: string): string {
+	const trimmed = raw.trim();
+	if (/^GTM-[A-Z0-9]+$/i.test(trimmed)) {
+		return trimmed.toUpperCase();
+	}
+	const mined = /googletagmanager\.com/i.test(trimmed) ? /GTM-[A-Z0-9]+/i.exec(trimmed)?.[0] : undefined;
+	return mined === undefined ? trimmed : mined.toUpperCase();
+}
+
+/** GtmContainerId::fromSettings: extracted on read too; only a well-formed id reaches the markup. */
+export function gtmContainerId(raw: unknown): string | null {
+	if (typeof raw !== "string") {
+		return null;
+	}
+	const id = extractGtmId(raw);
+	return /^GTM-[A-Z0-9]+$/.test(id) ? id : null;
 }
 
 /** SeoTemplates: the subtype's, then the type's, then the site-wide template. */

@@ -30,8 +30,8 @@ describe("slugs", () => {
 describe("blocks", () => {
 	const fixture = { languages: en, pages: [{ key: "home", system: true, name: { en: "Home" } }] };
 
-	async function render(content: unknown[], blocksConfig = implementBlocks(cmsBlocks, cmsBlockImpls)) {
-		const { cms, ids } = await makeCms(fixture, { blocks: blocksConfig });
+	async function render(content: unknown[], blocksConfig = implementBlocks(cmsBlocks, cmsBlockImpls), strictBlocks?: boolean) {
+		const { cms, ids } = await makeCms(fixture, { blocks: blocksConfig, ...(strictBlocks === undefined ? {} : { strictBlocks }) });
 		await cms.site().pages.update(ids.home ?? 1, { content: content as never });
 		const result = await cms.loadPage(get("/"));
 		if (result.type !== "page") throw new Error(result.type);
@@ -50,7 +50,7 @@ describe("blocks", () => {
 		expect(spec.elements.a?.props.title).toBe("First");
 	});
 
-	test("props that break the catalog schema are dropped, not shipped", async () => {
+	test("props that break the catalog schema are dropped, not shipped (strictBlocks off, as in production)", async () => {
 		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string() }) } });
 		const blocks = implementBlocks(catalog, {
 			Quote: { form: (s) => [s.text("text").translatable()], resolve: (input) => ({ text: (input.text as string) ?? null }) as never },
@@ -61,6 +61,7 @@ describe("blocks", () => {
 				{ id: "bad", kind: "Quote", data: {} },
 			],
 			blocks,
+			false,
 		);
 		expect(spec.elements.$root?.children).toEqual(["ok"]);
 	});

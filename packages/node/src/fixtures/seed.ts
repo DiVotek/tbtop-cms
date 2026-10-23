@@ -1,5 +1,6 @@
 import type { Cms } from "../cms";
 import type { Translations } from "../content/page";
+import { ensureDefaultLanguage } from "../content/languages";
 import { defaultOgLocale } from "../content/localeCatalog";
 import { insertId } from "../support/db";
 import { flag, sqlDate } from "../support/values";
@@ -93,6 +94,14 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 				updated_at: now,
 			}),
 		);
+		site.languages.forget();
+	}
+	// migrateCms installs `en` as the default; a fixture that names another one takes over.
+	const fixtureDefault = fixture.languages.find((language) => language.default === true)?.locale;
+	if (fixtureDefault !== undefined && (await site.languages.defaultLocale()) !== fixtureDefault) {
+		await site.languages.setDefault(fixtureDefault);
+	}
+	if (await ensureDefaultLanguage(db)) {
 		site.languages.forget();
 	}
 	await site.settings.setMany(fixture.settings ?? {});

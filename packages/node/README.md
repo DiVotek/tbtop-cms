@@ -57,6 +57,8 @@ await migrateCms(db, { dialect: "sqlite" }); // fresh database only; or merge cm
 
 // Shared with the client bundle (@tbtop/cms/catalog has only zod):
 export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, placements: ["pages", "layout"] } });
+// placements: "pages" (every page type, the default), "layout", or page type / subtype keys
+// ("article", "news"): the page editor's Add block offers a kind only where it fits.
 
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
@@ -88,6 +90,10 @@ createAdmin({
 on one the Laravel package already migrated (its tables exist and the
 migration fails). A database Laravel migrated is read as it is, without
 `migrateCms`.
+Like `cms:install`, it then gives a database with no live language its
+default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
+A host that merges `cmsMigrations` into its own Migrator calls
+`ensureDefaultLanguage(db, "en")` after it.
 
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
@@ -96,7 +102,9 @@ the page request from the route path (see `workbench/src/server/page.ts`).
 
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
-database with pages is left alone.
+database with pages is left alone. A fixture language marked `default` takes over
+from the installed one (which stays, non-default: pass `defaultLanguage` to
+`migrateCms` to install the right one).
 
 ## React (`@tbtop/cms/react`)
 
@@ -120,6 +128,12 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 
 - `seoTags(seo)` is the framework-neutral list behind both; JSON-LD comes out
   escaped (`<`, `>`, `&` as `\u00XX`), so a title cannot close the script.
+- Google Tag Manager (SEO settings → Integrations, `seo.gtmContainerId`,
+  a `GTM-…` id or null): `seoTags`/`seoHead`/`CmsHead` put Google's loader
+  script first; render `<GtmNoscript id={props.seo.gtmContainerId} />` right
+  after `<body>` (`gtmScript`/`gtmNoscriptHtml` give both halves as strings).
+  An inline script only runs from server-rendered HTML, so the tags load on
+  full page loads; count SPA page views with a History Change trigger.
 - `CmsRenderer` drops a block with no component or with props that fail the
   catalog, and one that throws while rendering; with `showErrors` it says so
   in the console. Wrap all of a page's specs (header, body, footer) in one
@@ -210,11 +224,14 @@ it is ignored with a warning and the built-in template answers.
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
-  field kind), resolved props validated against the catalog's zod schema.
+  field kind), resolved props validated against the catalog's zod schema
+  (a mismatch is dropped with a warning in production and throws
+  `BlockResolutionError` in development: on Node and Bun a `NODE_ENV`
+  other than `production`, unset included; never on Workers; `strictBlocks` true or false overrides it).
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
-  alternates, x-default, verification tokens), JSON-LD (WebSite,
+  alternates, x-default, verification tokens, the GTM container id), JSON-LD (WebSite,
   BreadcrumbList, the WebPage/Article families, CollectionPage, block nodes,
   site identity), robots.txt, chunked sitemap with hreflang alternates.
 - Forms: the submit endpoint, honeypot, a per-client rate limit, stored submissions with D1-safe
@@ -223,7 +240,9 @@ it is ignored with a warning and the built-in template answers.
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
   built-in blocks.
 - Admin: pages list and editor (General, SEO, a tab per block, Publishing),
-  redirects, layout, shared blocks, languages, site, SEO and notification
+  redirects, layout, shared blocks, languages (added from the locale
+  catalog; trash, restore, delete permanently; the default is not
+  deletable), site, SEO and notification
   settings, the inbox (list, submission page with status, retry, comments).
 
 ## Not yet

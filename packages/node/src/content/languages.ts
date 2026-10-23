@@ -2,7 +2,7 @@ import type { Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { bool, flag, sqlDate } from "../support/values";
-import { defaultOgLocale, isOgLocale } from "./localeCatalog";
+import { defaultOgLocale, isOgLocale, localeName } from "./localeCatalog";
 
 export type Language = {
 	id: number;
@@ -105,9 +105,15 @@ export class Languages {
 	 * Adds a language (LanguageForm::save + LanguageObserver). The first one is
 	 * the default; re-adding a soft-deleted locale restores its row, since that
 	 * row still holds the unique locale; a blank og_locale comes from the catalog.
+	 * Without a name the catalog's native name is used; a locale the catalog
+	 * does not list needs one.
 	 */
-	async create(input: LanguageInput & { name: string; locale: string }): Promise<Language> {
+	async create(input: LanguageInput & { locale: string }): Promise<Language> {
 		const ogLocale = guardOgLocale(input.ogLocale);
+		const name = input.name ?? localeName(input.locale);
+		if (name === null || name.trim() === "") {
+			throw new LanguageError("Unknown locale — pick a language from the list.");
+		}
 		const rows = await this.db.selectFrom("tbtop_languages").selectAll().where("locale", "=", input.locale).execute();
 		const trashed = rows.find((row) => row.deleted_at !== null);
 		if (rows.some((row) => row.deleted_at === null)) {
@@ -121,7 +127,7 @@ export class Languages {
 		}
 		const now = sqlDate(new Date());
 		const values = {
-			name: input.name,
+			name,
 			locale: input.locale,
 			og_locale: ogLocale ?? trashed?.og_locale ?? defaultOgLocale(input.locale),
 			is_default: flag(isDefault),
@@ -180,6 +186,50 @@ export class Languages {
 		return this.mustFind(row.locale);
 	}
 
+	/**
+	 * Moves a language to the trash (SoftDeletes): its URLs stop answering, its
+	 * translations stay. The default is refused (LanguageObserver::deleting).
+	 */
+	async delete(id: number): Promise<void> {
+		const row = await this.row(id, false);
+		if (bool(row.is_default)) {
+			throw defaultNotDeletable(row.locale);
+		}
+		await this.db.updateTable("tbtop_languages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
+		this.rows = null;
+	}
+
+	/** Brings a trashed language back with its flags as they were. */
+	async restore(id: number): Promise<Language> {
+		const row = await this.row(id, true);
+		await this.db.updateTable("tbtop_languages").set({ deleted_at: null, updated_at: sqlDate(new Date()) }).where("id", "=", id).execute();
+		return this.mustFind(row.locale);
+	}
+
+	/** Removes a trashed language for good; its translations stay in the page rows, unreachable. */
+	async forceDelete(id: number): Promise<void> {
+		const row = await this.row(id, true);
+		if (bool(row.is_default)) {
+			throw defaultNotDeletable(row.locale);
+		}
+		await this.db.deleteFrom("tbtop_languages").where("id", "=", id).execute();
+		this.rows = null;
+	}
+
+	/** A live (`trashed` false) or trashed row by id, or a LanguageError. */
+	private async row(id: number, trashed: boolean) {
+		const row = await this.db
+			.selectFrom("tbtop_languages")
+			.selectAll()
+			.where("id", "=", id)
+			.where("deleted_at", trashed ? "is not" : "is", null)
+			.executeTakeFirst();
+		if (row === undefined) {
+			throw new LanguageError(`Language #${id} does not exist${trashed ? " in the trash" : ""}.`);
+		}
+		return row;
+	}
+
 	private async mustFind(locale: string): Promise<Language> {
 		this.rows = null;
 		const language = await this.find(locale);
@@ -197,6 +247,8 @@ export class Languages {
 /** A language write LanguageObserver or LanguageForm refuses. */
 export class LanguageError extends Error {}
 
+const defaultNotDeletable = (locale: string) => new LanguageError(`Default language '${locale}' cannot be deleted. Reassign default first.`);
+
 const frontendRequiresAdmin = (locale: string) => new LanguageError(`Language '${locale}' cannot be frontend-active without being admin-active.`);
 
 /** Blank is null; anything else must be language_TERRITORY (LanguageForm::guardOgLocale). */
@@ -209,4 +261,43 @@ function guardOgLocale(value: string | null | undefined): string | null {
 		throw new LanguageError("Open Graph locale: use language_TERRITORY, e.g. en_US.");
 	}
 	return ogLocale;
+}
+
+/**
+ * The install step (`cms:install` running LanguageSeeder): a database with no
+ * live language gets `locale` as its default, named from the catalog. A
+ * trashed row of that locale is revived, since it still holds the unique
+ * locale. Resolves true when it wrote a row.
+ */
+export async function ensureDefaultLanguage(db: Kysely<CmsDatabase>, locale = "en"): Promise<boolean> {
+	const live = await db.selectFrom("tbtop_languages").select("id").where("deleted_at", "is", null).limit(1).executeTakeFirst();
+	if (live !== undefined) {
+		return false;
+	}
+	const name = localeName(locale);
+	if (name === null) {
+		throw new LanguageError(`Unknown locale '${locale}': the default language must be one the catalog lists.`);
+	}
+	const now = sqlDate(new Date());
+	const values = {
+		name,
+		locale,
+		og_locale: defaultOgLocale(locale),
+		is_default: flag(true),
+		is_admin_active: flag(true),
+		is_frontend_active: flag(true),
+		sort_order: 0,
+		updated_at: now,
+	};
+	const trashed = await db.selectFrom("tbtop_languages").select("id").where("locale", "=", locale).executeTakeFirst();
+	if (trashed === undefined) {
+		await insertId(db, db.insertInto("tbtop_languages").values({ ...values, created_at: now }));
+	} else {
+		await db
+			.updateTable("tbtop_languages")
+			.set({ ...values, deleted_at: null })
+			.where("id", "=", trashed.id)
+			.execute();
+	}
+	return true;
 }

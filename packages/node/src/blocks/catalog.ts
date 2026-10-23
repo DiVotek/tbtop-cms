@@ -1,7 +1,21 @@
 import { z } from "zod";
 
-/** Where an editor can place a block: page bodies, the header/footer layout, or both. */
-export type Placement = "pages" | "layout";
+/**
+ * Where an editor can place a block (Block::placements): `pages` is every
+ * page type, including one registered later; `layout` the header/footer
+ * slots; any other string names a page type or subtype key (`article`,
+ * `news`), so the block is offered only on those pages.
+ */
+export type Placement = "pages" | "layout" | (string & {});
+
+/**
+ * BlockRegistry::forPlacements: can a block with `placements` go where
+ * `where` says? A page passes its type and subtype, matched by name or by the
+ * `pages` wildcard; the layout passes `layout`, matched by name only.
+ */
+export function placeableIn(placements: readonly Placement[], where: readonly string[]): boolean {
+	return where.some((place) => placements.includes(place) || (place !== "layout" && placements.includes("pages")));
+}
 
 /** One block kind's shared, client-safe description: its resolved props and its picker copy. */
 export type BlockMeta<P extends z.ZodType = z.ZodType> = {
