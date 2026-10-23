@@ -15,7 +15,7 @@ const db = new Kysely<CmsDatabase>({ dialect: new BunSqliteDialect({ database: n
 await migrateCms(db as Kysely<unknown>, { dialect: "sqlite" });
 
 // Demo only: every visitor may preview drafts. A real host checks its own session here.
-const cms = createCms({ db, blocks: implementBlocks(cmsBlocks, cmsBlockImpls), canPreview: () => true });
+const cms = createCms({ db, hostRules: kyselyRules(db), blocks: implementBlocks(cmsBlocks, cmsBlockImpls), canPreview: () => true });
 await seedFixtures(cms, demoFixture);
 
 const admin = createAdmin({
@@ -24,7 +24,8 @@ const admin = createAdmin({
 	pages: cms.admin.pages,
 	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
-	hostRules: kyselyRules(db),
+	// The config's hostRules plus link_shape and page_ref, which the link and pages fields check on save.
+	hostRules: cms.admin.hostRules,
 	// Demo only: everyone is signed in. A real host passes `session` and `loginPath` (see `@tbtop/cms/better-auth`).
 	user: () => ({ id: 1, name: "Demo" }),
 	context: cms.admin.context,

@@ -198,6 +198,16 @@ describe("admin section abilities (q02)", () => {
 		expect(asked.some(([user, ability]) => user === editor && ability === "tbtop-cms.settings")).toBe(true);
 	});
 
+	test("the link page search needs a section with link fields (pages or design)", async () => {
+		const inboxOnly: CmsConfig["authorize"] = async (_user, ability) => ability === "tbtop-cms.submissions";
+		const designOnly: CmsConfig["authorize"] = async (_user, ability) => ability === "tbtop-cms.design";
+		const search = async (authorize: CmsConfig["authorize"]) =>
+			(await (await panel({ authorize }, () => editor)).post("/admin/link/page-search/select-options/page", { search: "" }, "/admin/link/page-search")).status;
+		expect(await search(inboxOnly)).toBe(403);
+		expect(await search(designOnly)).toBe(200);
+		expect(await search(editorAuth)).toBe(200);
+	});
+
 	test("an allowed admin keeps every section, and without authorize nothing changes", async () => {
 		for (const config of [{ authorize: editorAuth }, {}]) {
 			const { page } = await panel(config, () => ({ id: 1, name: "Admin", role: "admin" }));

@@ -25,6 +25,9 @@ defaults postgres/postgres and root/root on 127.0.0.1). Every test gets its
 own database, `tbtop_test_*`, which is left behind: drop them for a clean
 server. On MySQL, `TIMESTAMP` columns end in 2038, as in the PHP package.
 
+The suites run on Bun (`bun:test`, `bun:sqlite`). The package itself runs on
+Node 20+ too: the workbench's E2E job serves it from Node (`vite preview`).
+
 ## Workbench (TanStack Start)
 
 `workbench/` is a TanStack Start host with the package installed from a
@@ -298,7 +301,8 @@ Promo: {
   admin bundle imports its client from `@tbtop/cms/admin-client` (below),
   or the client shows its unknown-field placeholder. Its page picker posts to
   `{adminPrefix}/link/page-search/select-options/page`, an admin page the
-  CMS adds to `cms.admin.pages`.
+  CMS adds to `cms.admin.pages`, open to admins with `tbtop-cms.pages` or
+  `tbtop-cms.design` (the sections with link fields).
 
 ```tsx
 // The admin bundle's entry. Peers: react 19 and @tbtop/inertia-admin (optional for the other entries).

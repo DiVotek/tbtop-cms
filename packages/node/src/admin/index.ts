@@ -1,6 +1,6 @@
 import type { AdminContext, HostRule, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
-import { gated } from "./abilities";
+import { allows, gated } from "./abilities";
 import { dashboard } from "./dashboard";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
@@ -45,8 +45,8 @@ export function adminPages(cms: Cms): CmsAdmin {
 			gated(cms, "tbtop-cms.settings", siteSettings(cms)),
 			gated(cms, "tbtop-cms.settings", seoSettings(cms)),
 			gated(cms, "tbtop-cms.settings", notificationSettings(cms)),
-			// Any CMS editor, as PHP guards the route with EnsureCmsAdmin only: layout and shared blocks use link fields too.
-			linkPageSearch(cms),
+			// Whoever edits a link field: the page editor, or the layout and shared blocks.
+			{ ...linkPageSearch(cms), authorize: async () => (await allows(cms, "tbtop-cms.pages")) || (await allows(cms, "tbtop-cms.design")) },
 		] as PageDef[],
 		hostRules: { ...cms.config.hostRules, ...cmsHostRules(cms) },
 		navigationGroups: [
