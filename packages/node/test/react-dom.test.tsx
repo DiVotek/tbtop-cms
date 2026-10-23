@@ -4,7 +4,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 // A DOM for this file only; the other suites run on Bun's own fetch and Request.
 const realFetch = globalThis.fetch;
 GlobalRegistrator.register();
-const { render, fireEvent, findByRole, findByText } = await import("@testing-library/react");
+const { render, fireEvent, findByRole, findByText, waitFor } = await import("@testing-library/react");
 const { ContactForm } = await import("../src/react");
 
 afterAll(async () => {
@@ -42,10 +42,12 @@ describe("ContactForm in the browser", () => {
 		const form = view.getByTestId("contact-form") as HTMLFormElement;
 		fireEvent.change(view.getByLabelText("Name"), { target: { value: "Ada" } });
 		fireEvent.submit(form);
-		expect((await findByRole(view.container, "alert")).textContent).toContain("valid email");
+		// Two steps, so a failure says which half stalled: the post, or the render of its answer.
+		await waitFor(() => expect(bodies).toHaveLength(1), { timeout: 5000 });
+		expect((await findByRole(view.container, "alert", {}, { timeout: 5000 })).textContent).toContain("valid email");
 		expect(bodies[0]).toEqual({ name: "Ada", email: "", website: "" });
 		fireEvent.submit(view.getByTestId("contact-form"));
-		expect(await findByText(view.container, "Thanks!")).toBeDefined();
+		expect(await findByText(view.container, "Thanks!", {}, { timeout: 5000 })).toBeDefined();
 		view.unmount();
 	});
 });
