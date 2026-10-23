@@ -30,6 +30,9 @@ const admin = createAdmin({
 
 const esc = (text: unknown) => String(text ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
+// `page.body` is HTML already: the CMS renders the rich text through its
+// allowlist (richtextHtml: known nodes, escaped text, safe link schemes).
+// Every other value is plain text and goes through esc().
 function html({ seo, page, render, breadcrumbs, cms: shared }: PageProps): string {
 	const blocks = (render.elements.$root?.children ?? []).map((id) => render.elements[id]);
 	return `<!doctype html><html lang="${esc(shared.locale)}"><head><meta charset="utf-8">

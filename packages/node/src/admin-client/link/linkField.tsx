@@ -58,11 +58,12 @@ export function LinkForm({ id, value, onChange, onBlur, disabled, invalid, descr
 	// for its per-locale placeholders.
 	const remote = usePageOptions(options?.searchEndpoint, link.type === "page" ? link.page : null);
 
-	// A type switch discards the other half of the value: an email address is
-	// not a page id, and carrying it over would re-submit a stale target.
+	// A type switch discards the target: an email address is not a page id,
+	// and carrying it over would re-submit a stale one. The label is the
+	// editor's text for any type, so it stays.
 	const switchType = (next: string) => {
 		if (next !== "" && next !== link.type) {
-			onChange(emptyLink(next as LinkType));
+			onChange({ ...emptyLink(next as LinkType), label: link.label });
 		}
 	};
 

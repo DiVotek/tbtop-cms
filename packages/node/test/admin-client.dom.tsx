@@ -52,11 +52,11 @@ describe("@tbtop/cms/admin-client", () => {
 		expect(getBlockDescriptor("link")).toBeDefined();
 	});
 
-	test("a type switch clears the other half of the value", () => {
+	test("a type switch clears the target and keeps the label", () => {
 		const onChange = mock(NOOP);
-		const { getByText } = renderForm({ value: page("7", "how"), onChange });
+		const { getByText } = renderForm({ value: { ...page("7", "how"), label: { en: "Read more" } }, onChange });
 		fireEvent.click(getByText("URL"));
-		expect(onChange).toHaveBeenCalledWith({ type: "external", page: null, value: null, anchor: null, label: null });
+		expect(onChange).toHaveBeenCalledWith({ type: "external", page: null, value: null, anchor: null, label: { en: "Read more" } });
 	});
 
 	test("renders only the declared types, in the server's copy", () => {

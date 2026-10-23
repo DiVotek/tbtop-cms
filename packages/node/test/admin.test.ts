@@ -113,6 +113,17 @@ describe("admin pages", () => {
 		expect(await settings.get("site.contacts.phones")).toEqual([{ number: "+1 555 0100" }]);
 	});
 
+	test("retrying a delivered or deleted submission says so", async () => {
+		const { cms, post, ids, db } = await panel();
+		const site = cms.site();
+		const submission = await site.submissions.create({ pageId: ids.home as number, blockId: "fx000002", kind: "ContactForm", locale: "en", payload: { name: "Ada" } });
+		await db.updateTable("tbtop_form_submissions").set({ status: "handled" }).where("id", "=", submission.id).execute();
+		const retry = async () => JSON.stringify(await (await post("/admin/form-submissions/actions/retry", { payload: { row: { id: submission.id } } }, "/admin/form-submissions")).json());
+		expect(await retry()).toContain("Already delivered.");
+		await site.submissions.delete([submission.id]);
+		expect(await retry()).toContain("This submission no longer exists.");
+	});
+
 	test("the inbox lists a submission; opening it marks it read; a comment and a delete work", async () => {
 		const { cms, visit, page, post, ids } = await panel();
 		const site = cms.site();

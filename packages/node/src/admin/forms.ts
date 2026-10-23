@@ -160,7 +160,13 @@ function leadStatusBulk(s: S, cms: Cms, status: LeadStatus, label: string) {
 /** SubmissionRetrier from the admin: a lost claim (double click) reports itself, nothing else runs. */
 async function retryEffects(site: Site, id: number): Promise<Effects> {
 	const submission = await site.submissions.find(id);
-	if (submission === null || !isRetryable(submission)) {
+	if (submission === null) {
+		return Effects.make().notify("This submission no longer exists.", "error");
+	}
+	if (submission.status === "handled") {
+		return Effects.make().notify("Already delivered.", "info");
+	}
+	if (!isRetryable(submission)) {
 		return Effects.make().notify("A retry is already running.", "info");
 	}
 	await retrySubmission(site, submission);
