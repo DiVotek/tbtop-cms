@@ -2,8 +2,8 @@
 
 The tbtop CMS core for Bun, Node and Cloudflare Workers: pages, blocks and SEO
 over the host's Kysely, edited in [`@tbtop/admin`](https://github.com/DiVotek/tbtop/tree/main/packages/node).
-It reads and writes the same `tbtop_*` tables as the PHP package, so a Node
-host can open a database the Laravel package migrated.
+It is a standalone package for new projects: it owns its `tbtop_*` schema
+and does not share a database with the Laravel package or migrate one.
 
 The frontend is headless: the host framework (TanStack Start, Hono + React,
 Astro…) asks the CMS for a page's props and renders them. `@tbtop/cms/react`
@@ -122,10 +122,7 @@ if (result.type === "page" && result.props.page.type === "recipe") {
 - `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
   or `Cms` keeps `fields` as untyped JSON.
 
-`migrateCms` creates the tables from scratch: run it on a fresh database, not
-on one the Laravel package already migrated (its tables exist and the
-migration fails). A database Laravel migrated is read as it is, without
-`migrateCms`.
+`migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
 default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
 A host that merges `cmsMigrations` into its own Migrator calls
@@ -307,8 +304,7 @@ and never fails the submit or the delivery.
 
 Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored
-in `tbtop_notification_templates`. A row the PHP package wrote holds Blade;
-it is ignored with a warning and the built-in template answers.
+in `tbtop_notification_templates`.
 
 ## What 0.0 has
 
