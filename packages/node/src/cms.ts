@@ -4,6 +4,7 @@ import { type PageTypeDef, PageTypes } from "./content/pageTypes";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
 import { submitThrottle } from "./forms/throttle";
+import { type ErrorPageProps, errorPage } from "./frontend/errorPage";
 import { type LoadResult, loadPage, type PageProps } from "./frontend/load";
 import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { robotsTxt } from "./seo/robots";
@@ -28,6 +29,12 @@ export type Cms<T extends readonly PageTypeDef[] = any> = {
 	loadPage(request: Request): Promise<LoadResult<PageProps<T>>>;
 	/** robots.txt, sitemap.xml and its chunks, and form posts to /_cms/forms/...; null for every other URL. */
 	handle(request: Request): Promise<Response | null>;
+	/**
+	 * Props for an error answer at the request URL (ErrorResponse): the live
+	 * error page of the status class (4xx/5xx) or a fallback. For a 5xx it never
+	 * throws: with the database down it answers props built without it.
+	 */
+	errorPage(request: Request, status: number): Promise<ErrorPageProps>;
 	/** Background work for a cron, `ctx.waitUntil()` or a queue: the same functions the `tbtop-cms` CLI runs. */
 	readonly tasks: CmsTasks;
 	/** Admin pages and nav groups to spread into the host's createAdmin(). */
@@ -66,7 +73,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 		},
 		handle: async (request) => {
 			if (request.method === "POST") {
-				return submitForm(site(request), request, throttle);
+				return submitForm(site(request), request, throttle, cms.admin.hostRules);
 			}
 			if (request.method !== "GET" && request.method !== "HEAD") {
 				return null;
@@ -88,6 +95,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			const chunk = Number(SITEMAP_CHUNK.exec(pathname)?.[1]);
 			return chunk > (await chunkCount(scope)) ? new Response(null, { status: 404 }) : xml(await sitemapChunkXml(scope, chunk));
 		},
+		errorPage: (request, status) => errorPage(site(request), request, status),
 		tasks: {
 			deliver: async ({ limit = 50 } = {}) => {
 				const scope = site();

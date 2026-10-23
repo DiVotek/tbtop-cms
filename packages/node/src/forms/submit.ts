@@ -1,4 +1,4 @@
-import { validate } from "@tbtop/admin";
+import { type HostRule, validate, type ValidationResult } from "@tbtop/admin";
 import type { Page } from "../content/page";
 import { honeypotField } from "../blocks/resolver";
 import type { Site } from "../site";
@@ -21,7 +21,12 @@ export type SubmissionEvent = { submission: Submission | null; payload: Record<s
  * back to the page with `cms_form` and `cms_form_status` in the query.
  * Null for any other URL.
  */
-export async function submitForm(site: Site, request: Request, throttle: SubmitThrottle | null = null): Promise<Response | null> {
+export async function submitForm(
+	site: Site,
+	request: Request,
+	throttle: SubmitThrottle | null = null,
+	hostRules: Record<string, HostRule> = {},
+): Promise<Response | null> {
 	const url = new URL(request.url);
 	const match = ROUTE.exec(url.pathname);
 	if (request.method !== "POST" || match === null) {
@@ -56,10 +61,17 @@ export async function submitForm(site: Site, request: Request, throttle: SubmitT
 		console.debug("form.submit.honeypot_tripped", { page: page.id, block: blockId });
 		return reply("sent");
 	}
-	const rules = Object.fromEntries(
-		Object.entries(located.submit.rules(located.data, located.ctx)).map(([field, rule]) => [field, Array.isArray(rule) ? rule : rule.split("|")]),
-	);
-	const result = await validate(input, rules);
+	let result: ValidationResult;
+	try {
+		const rules = Object.fromEntries(
+			Object.entries(located.submit.rules(located.data, located.ctx)).map(([field, rule]) => [field, Array.isArray(rule) ? rule : rule.split("|")]),
+		);
+		// The admin's rules: an unknown one throws (fails closed), which is the site's fault, not the visitor's.
+		result = await validate(input, rules, { hostRules });
+	} catch (error) {
+		console.error("form.submit.validation_failed", { page: page.id, block: blockId, error: error instanceof Error ? error.message : String(error) });
+		return reply("failed", { form: [await site.t("forms.submit_failed", locale)] });
+	}
 	if (!result.ok) {
 		return reply("invalid", result.errors);
 	}
