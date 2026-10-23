@@ -1,8 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import { z } from "zod";
-import { cmsBlockImpls, cmsBlocks, defineBlocks, implementBlocks, linkField, pagesField } from "../src";
+import { type Cms, cmsBlockImpls, cmsBlocks, createCms, defineBlocks, definePageType, implementBlocks, type Json, linkField, type PageProps, pagesField } from "../src";
 import { get, makeCms } from "./support";
 
 const promoCatalog = defineBlocks({
@@ -174,5 +174,88 @@ describe("link and pages fields (q16)", () => {
 		expect(linkField("cta").types(["external"]).ruleEntries()).toEqual(["nullable", "array", "link_shape:external"]);
 		expect(linkField("cta").required().ruleEntries()).toEqual(["required", "array", "link_shape"]);
 		expect(pagesField("related").exceptPage(7).ruleEntries()).toEqual(["nullable", "page_ref:except=7"]);
+	});
+});
+
+const recipeType = definePageType({
+	key: "recipe",
+	fields: z.object({
+		minutes: z.number().nullable(),
+		vegan: z.boolean(),
+		related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })),
+	}),
+	form: (s) => [s.number("minutes").label("Minutes"), s.boolean("vegan").label("Vegan"), pagesField("related").of("article")],
+});
+
+/** A CMS with the recipe type over the demo database: createCms itself, so its page types are inferred. */
+async function recipeCms() {
+	const { db, ids } = await makeCms();
+	const cms = createCms({ db, blocks: implementBlocks(cmsBlocks, cmsBlockImpls), url: "https://site.test", pageTypes: [recipeType] });
+	return { cms, ids };
+}
+
+describe("typed page types (q06)", () => {
+	test("a page type's zod fields type and check page.fields, narrowed by page.type", async () => {
+		const { cms, ids } = await recipeCms();
+		await cms.site().pages.create({
+			type: "recipe",
+			status: "published",
+			name: { en: "Pasta" },
+			fields: { minutes: "25", vegan: "1", related: [String(ids["first-post"]), String(ids.draft)] },
+		});
+		const result = await cms.loadPage(get("/pasta"));
+		if (result.type !== "page") throw new Error(result.type);
+		const { page } = result.props;
+		if (page.type !== "recipe") throw new Error(page.type);
+		expectTypeOf(page.fields.minutes).toEqualTypeOf<number | null>();
+		expectTypeOf(page.fields.related).toEqualTypeOf<{ id: string; name: string; url: string }[]>();
+		expect(page.fields).toEqual({ minutes: 25, vegan: true, related: [{ id: String(ids["first-post"]), name: "First post", url: "/blog/first-post" }] });
+
+		const about = await cms.loadPage(get("/about-us"));
+		if (about.type !== "page") throw new Error(about.type);
+		expectTypeOf(about.props.page.type).toEqualTypeOf<"page" | "category" | "article" | "recipe">();
+		if (about.props.page.type === "page") {
+			// @ts-expect-error a built-in page type declares no fields
+			void about.props.page.fields.minutes;
+		}
+	});
+
+	test("resolved fields that fail the schema are dropped with a warning, or throw under strictBlocks", async () => {
+		const { db } = await makeCms();
+		const loose = definePageType({
+			key: "event",
+			fields: z.object({ starts: z.string() }),
+			form: (s) => [s.text("starts")],
+		});
+		const cms = createCms({ db, blocks: implementBlocks(cmsBlocks, cmsBlockImpls), url: "https://site.test", pageTypes: [loose] });
+		await cms.site().pages.create({ type: "event", status: "published", name: { en: "Launch" }, fields: {} });
+		const result = await cms.loadPage(get("/launch"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(result.props.page.fields).toEqual({});
+		const strict = createCms({ db, blocks: implementBlocks(cmsBlocks, cmsBlockImpls), url: "https://site.test", pageTypes: [loose], strictBlocks: true });
+		await expect(strict.loadPage(get("/launch"))).rejects.toThrow(/event/);
+	});
+
+	test("createCms refuses a page type whose form fields and schema keys differ", async () => {
+		const { db } = await makeCms(null);
+		const blocks = implementBlocks(cmsBlocks, cmsBlockImpls);
+		const mismatched = definePageType({
+			key: "recipe",
+			fields: z.object({ minutes: z.number().nullable(), servings: z.number() }),
+			form: (s) => [s.number("minutes"), s.text("note")],
+		});
+		expect(() => createCms({ db, blocks, pageTypes: [mismatched] })).toThrow(
+			"Page type [recipe]: its form() fields do not match its fields schema: no form field for servings; no schema key for note.",
+		);
+		expect(() => createCms({ db, blocks, pageTypes: [{ key: "bare", fields: z.object({ x: z.string() }) }] })).toThrow(/no form field for x/);
+		expect(() => createCms({ db, blocks, pageTypes: [{ key: "computed", fields: z.object({ x: z.string() }), resolveFields: () => ({ x: "1" }) }] })).not.toThrow();
+	});
+
+	test("PageProps and a bare Cms keep untyped fields; a typed Cms is still a Cms", async () => {
+		const { cms } = await recipeCms();
+		const bare: Cms = cms;
+		expectTypeOf<PageProps["page"]["fields"]>().toEqualTypeOf<Record<string, Json>>();
+		expectTypeOf<Extract<PageProps<[typeof recipeType]>["page"], { type: "recipe" }>["fields"]["vegan"]>().toEqualTypeOf<boolean>();
+		expect(bare.pageTypes.has("recipe")).toBe(true);
 	});
 });

@@ -1,6 +1,7 @@
 import { assembleSpec, bindForms, type RenderSpec, type ResolvedBlock, resolveBlocks, validateProps } from "../blocks/resolver";
 import { SLOTS, type Slot } from "../content/layouts";
 import { isLive, type Page, translation, translationText } from "../content/page";
+import type { PageTypeDef, PageTypeUnion } from "../content/pageTypes";
 import { isExternal } from "../content/redirects";
 import { richtextHtml } from "../content/richtext";
 import { resolveSeo, type Seo } from "../seo/resolver";
@@ -12,8 +13,13 @@ import { ancestorCrumbs, breadcrumbs, type Crumb } from "./breadcrumbs";
 /** The shared `cms` prop (ShareCmsProps): site settings, locales, the resolved header and footer. */
 export type SharedProps = Jsonify<SharedShape>;
 
-/** The props of a CMS page, all JSON: a host passes them through its loader as they are. */
-export type PageProps = Jsonify<PageShape>;
+/**
+ * The props of a CMS page, all JSON: a host passes them through its loader as
+ * they are. `page` is a union by `page.type` over the built-in types and `T`
+ * (createCms infers it from `pageTypes`), so `page.type === "recipe"`
+ * narrows `page.fields` to that type's fields schema.
+ */
+export type PageProps<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = Jsonify<PageShape<PageTypeUnion<T>>>;
 
 type SharedShape = {
 	settings: Record<string, unknown>;
@@ -25,20 +31,8 @@ type SharedShape = {
 	strings: { previewBanner: string };
 };
 
-type PageShape = {
-	page: {
-		id: number;
-		type: string;
-		subtype: string | null;
-		status: string;
-		name: string | null;
-		title: string | null;
-		heading: string | null;
-		summary: string | null;
-		body: string;
-		image: string | null;
-		fields: Record<string, unknown>;
-	};
+type PageShape<P = { type: string; fields: Record<string, unknown> }> = {
+	page: PageColumns & P;
 	render: RenderSpec;
 	seo: Seo;
 	breadcrumbs: Crumb[];
@@ -47,8 +41,20 @@ type PageShape = {
 	cms: SharedShape;
 };
 
-export type LoadResult =
-	| { type: "page"; status: 200; headers: Record<string, string>; props: PageProps }
+type PageColumns = {
+	id: number;
+	subtype: string | null;
+	status: string;
+	name: string | null;
+	title: string | null;
+	heading: string | null;
+	summary: string | null;
+	body: string;
+	image: string | null;
+};
+
+export type LoadResult<P = PageProps> =
+	| { type: "page"; status: 200; headers: Record<string, string>; props: P }
 	| { type: "redirect"; status: number; location: string }
 	| { type: "notFound"; status: 404; locale: string; path: string; cms: SharedProps };
 

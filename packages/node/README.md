@@ -61,7 +61,7 @@ export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, plac
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
-	pageTypes: [], // extra page types next to page, category, article
+	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
@@ -84,6 +84,38 @@ createAdmin({
 });
 ```
 
+### Page types
+
+A page type's custom fields are a zod object (`fields`) next to their admin
+form (`form`); `definePageType` keeps the literal key, and `createCms` infers
+`PageProps` from `pageTypes`, a union by `page.type`:
+
+```ts
+import { definePageType, pagesField } from "@tbtop/cms";
+
+export const recipeType = definePageType({
+	key: "recipe",
+	fields: z.object({ minutes: z.number().nullable(), related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
+	form: (s) => [s.number("minutes").label("Minutes"), pagesField("related").of("article")],
+});
+
+const cms = createCms({ db, blocks, pageTypes: [recipeType] });
+const result = await cms.loadPage(request);
+if (result.type === "page" && result.props.page.type === "recipe") {
+	result.props.page.fields.minutes; // number | null
+}
+```
+
+- `createCms` throws when a type's form field names and schema keys differ
+  (a schema without a form needs its own `resolveFields`).
+- The resolved fields (FormResolver over `form`, or `resolveFields`) are
+  parsed with the schema; fields that fail it are left out with a
+  `page.fields_resolve_failed` warning, or throw under `strictBlocks`.
+- A subtype's fields are optional on its base type's member. A page whose
+  type is not registered still renders, outside the union.
+- `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
+  or `Cms` keeps `fields` as untyped JSON.
+
 `migrateCms` creates the tables from scratch: run it on a fresh database, not
 on one the Laravel package already migrated (its tables exist and the
 migration fails). A database Laravel migrated is read as it is, without
@@ -100,8 +132,8 @@ database with pages is left alone.
 
 ## Link and pages fields
 
-`linkField` and `pagesField` go into a host block's `form()`, as
-`$s->link()` / `$s->pages()` do in PHP:
+`linkField` and `pagesField` go into a host block's `form()` (or a page
+type's), as `$s->link()` / `$s->pages()` do in PHP:
 
 ```ts
 import { linkField, pagesField } from "@tbtop/cms";
