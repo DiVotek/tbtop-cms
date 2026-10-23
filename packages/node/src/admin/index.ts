@@ -5,6 +5,7 @@ import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksI
 import { submissionsIndex, submissionView } from "./forms";
 import { languageEdit, languageNew, languagesIndex } from "./languages";
 import { cmsHostRules, linkPageSearch } from "./linkFields";
+import { notFoundLog } from "./notFound";
 import { notificationSettings } from "./notifications";
 import { pageEdit, pagesIndex } from "./pages";
 import { seoSettings, siteSettings } from "./settings";
@@ -28,6 +29,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			gated(cms, "tbtop-cms.submissions", submissionsIndex(cms)),
 			gated(cms, "tbtop-cms.submissions", submissionView(cms)),
 			gated(cms, "tbtop-cms.redirects", redirectsIndex(cms)),
+			gated(cms, "tbtop-cms.redirects", notFoundLog(cms)),
 			gated(cms, "tbtop-cms.design", layoutIndex(cms)),
 			gated(cms, "tbtop-cms.design", layoutEdit(cms)),
 			gated(cms, "tbtop-cms.design", sharedBlocksIndex(cms)),

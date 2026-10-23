@@ -25,8 +25,12 @@ export type Cms<T extends readonly PageTypeDef[] = any> = {
 	readonly schemaTypes: SchemaTypes;
 	/** A fresh per-request view of the stores; the origin comes from `url` or the request. */
 	site(request?: Request): Site;
-	/** The page at the request URL: props for the host to render, a redirect, or not found. */
-	loadPage(request: Request): Promise<LoadResult<PageProps<T>>>;
+	/**
+	 * The page at the request URL: props for the host to render, a redirect, or
+	 * not found. A miss is counted in the 404 log; pass `waitUntil` (Workers'
+	 * `ctx.waitUntil`) to write it after the answer instead of before.
+	 */
+	loadPage(request: Request, options?: { waitUntil?: (task: Promise<unknown>) => void }): Promise<LoadResult<PageProps<T>>>;
 	/** robots.txt, sitemap.xml and its chunks, and form posts to /_cms/forms/...; null for every other URL. */
 	handle(request: Request): Promise<Response | null>;
 	/**
@@ -47,6 +51,8 @@ export type CmsTasks = {
 	 * the ones a dead worker left processing. Returns how many it took.
 	 */
 	deliver(options?: { limit?: number }): Promise<number>;
+	/** Deletes 404 log rows not seen within `seo.not_found.retention_days` (default 90); how many went. */
+	pruneNotFound(): Promise<number>;
 };
 
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
@@ -65,11 +71,11 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 		schemaTypes,
 		site,
 		// The props match T only as far as the page types' schemas checked them: resolved fields that fail one are dropped.
-		loadPage: async (request) => {
+		loadPage: async (request, { waitUntil } = {}) => {
 			const scope = site(request);
 			// An editor (canPreview) or a signed preview link (PageController::hasPreviewAccess).
 			const preview = (await config.canPreview?.(request)) === true || (await hasValidPreviewSignature(scope, request));
-			return (await loadPage(scope, request, { preview })) as LoadResult<PageProps<T>>;
+			return (await loadPage(scope, request, { preview, ...(waitUntil === undefined ? {} : { waitUntil }) })) as LoadResult<PageProps<T>>;
 		},
 		handle: async (request) => {
 			if (request.method === "POST") {
@@ -109,6 +115,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 				}
 				return ids.length;
 			},
+			pruneNotFound: () => site().notFound.prune(),
 		},
 		admin: undefined as unknown as CmsAdmin,
 	};

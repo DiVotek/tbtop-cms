@@ -386,6 +386,12 @@ in `tbtop_notification_templates`.
   and `site.referencedByLinks(...)` list the live pages that pick a page, and
   a type's `resolveFields` reads them as `ctx.referencedBy(field, from)`.
   `rebuildPageRefs(db, site.pageTypes)` rewrites the index.
+- 404 log: `loadPage` counts each miss per locale and path (scanner probes
+  in `notFound.ignore` and redirected paths left out); pass
+  `{ waitUntil: ctx.waitUntil }` on Workers to write it after the answer.
+  `seo.not_found.enabled` and `retention_days` are in the SEO settings,
+  `cms.tasks.pruneNotFound()` prunes, and the admin's 404 log turns a miss
+  into a redirect or ignores it.
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
@@ -412,6 +418,6 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Audit log, 404 log, caching, source-backed page types, the
+Audit log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

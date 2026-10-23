@@ -136,7 +136,11 @@ function canonical(segments: string[], search: string): string {
 }
 
 /** PageController: the page at the request URL, a redirect, or not found. */
-export async function loadPage(site: Site, request: Request, options: { preview: boolean }): Promise<LoadResult> {
+export async function loadPage(
+	site: Site,
+	request: Request,
+	options: { preview: boolean; waitUntil?: (task: Promise<unknown>) => void },
+): Promise<LoadResult> {
 	const url = new URL(request.url);
 	const route = await routeLocale(site, url);
 	if (route.type === "redirect") {
@@ -152,6 +156,7 @@ export async function loadPage(site: Site, request: Request, options: { preview:
 				: headerSafe(await site.url(redirect.target, locale));
 			return { type: "redirect", status: redirect.status, location: withQuery(target, url.search) };
 		}
+		await logMiss(site, request, { path, locale }, options.waitUntil);
 		const props = await errorPageProps(site, 404, locale, path);
 		return { type: "notFound", status: 404, locale, path, cms: props.cms, props };
 	}
@@ -238,4 +243,16 @@ function withQuery(url: string, search: string): string {
 	}
 	const hash = url.indexOf("#");
 	return hash === -1 ? `${url}${search}` : `${url.slice(0, hash)}${search}${url.slice(hash)}`;
+}
+
+/** PageNotFound → RecordsNotFoundHit: a failed write never turns the 404 into an error. */
+async function logMiss(site: Site, request: Request, at: { path: string; locale: string }, waitUntil?: (task: Promise<unknown>) => void): Promise<void> {
+	const task = site.notFound
+		.record({ ...at, referer: request.headers.get("referer"), userAgent: request.headers.get("user-agent") })
+		.catch((error: unknown) => console.warn("not_found.record_failed", { path: at.path, error: String(error) }));
+	if (waitUntil === undefined) {
+		await task;
+	} else {
+		waitUntil(task);
+	}
 }

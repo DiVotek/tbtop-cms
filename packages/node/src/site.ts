@@ -3,6 +3,7 @@ import type { BlockRegistry } from "./blocks/registry";
 import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
 import { Languages } from "./content/languages";
 import { Layouts } from "./content/layouts";
+import { NotFoundLog } from "./content/notFoundLog";
 import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from "./content/link";
 import { firstText, type Page, translationText } from "./content/page";
 import { Pages } from "./content/pages";
@@ -34,6 +35,7 @@ export class Site {
 	readonly blocks: BlockRegistry;
 	readonly submissions: Submissions;
 	readonly notifications: Notifications;
+	readonly notFound: NotFoundLog;
 
 	constructor(
 		readonly config: CmsConfig,
@@ -61,6 +63,7 @@ export class Site {
 		this.redirects = new Redirects(db, config.redirects?.allowedExternalHosts);
 		this.blocks = config.blocks;
 		this.submissions = new Submissions(db);
+		this.notFound = new NotFoundLog(db, this.settings, config.notFound?.ignore);
 		this.notifications = new Notifications(this);
 	}
 

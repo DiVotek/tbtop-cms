@@ -281,7 +281,7 @@ export function seoSettings(cms: Cms) {
 		path: "settings/seo",
 		title: "SEO",
 		nav: { label: "SEO", icon: "search", order: 30 },
-		defaults: { seo_indexing_enabled: true, seo_twitter_card: "auto", seo_identity_type: "none" },
+		defaults: { seo_indexing_enabled: true, seo_twitter_card: "auto", seo_identity_type: "none", seo_not_found_enabled: true },
 		map: {
 			seo_indexing_enabled: "seo.indexing_enabled",
 			seo_sitemap_per_chunk: "seo.sitemap_per_chunk",
@@ -310,6 +310,8 @@ export function seoSettings(cms: Cms) {
 			seo_verification_google: "seo.verification.google",
 			seo_verification_bing: "seo.verification.bing",
 			seo_gtm_container_id: "seo.gtm_container_id",
+			seo_not_found_enabled: "seo.not_found.enabled",
+			seo_not_found_retention_days: "seo.not_found.retention_days",
 			...typeTemplateMap(cms),
 		},
 		prepare: prepareSeo,
@@ -402,6 +404,17 @@ export function seoSettings(cms: Cms) {
 							.rules("nullable|max:2000"),
 						s.text("seo_verification_google").label("Google Search Console"),
 						s.text("seo_verification_bing").label("Bing Webmaster Tools"),
+					],
+				},
+				{
+					label: "404 log",
+					children: [
+						s.boolean("seo_not_found_enabled").label("Count 404s").helperText("Misses on the site go to the 404 log; scanner probes are left out."),
+						s
+							.number("seo_not_found_retention_days")
+							.label("Keep entries for (days)")
+							.rules("nullable|integer|min:1|max:3650")
+							.helperText("Entries not seen for this long are pruned (default 90)."),
 					],
 				},
 			]),
