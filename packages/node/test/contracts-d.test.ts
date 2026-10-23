@@ -130,6 +130,12 @@ describe("link and pages fields (q16)", () => {
 		expect(await search("незаб")).toEqual([]);
 	});
 
+	test("a host rule named link_shape or page_ref is refused, not silently replaced", async () => {
+		for (const name of ["link_shape", "page_ref"]) {
+			await expect(makeCms(null, { hostRules: { [name]: { check: () => true, message: "x" } } })).rejects.toThrow(`hostRules.${name}`);
+		}
+	});
+
 	test("the link page search answers {search} and {value} under the admin", async () => {
 		const { post, ids } = await panel();
 		const endpoint = "/admin/link/page-search/select-options/page";

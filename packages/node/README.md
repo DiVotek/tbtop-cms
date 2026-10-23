@@ -368,7 +368,8 @@ or as a plain form (303 back to the page with `cms_form_status`).
 The rules run with the admin's rule set: the built-in Laravel rules, the
 CMS's `link_shape` and `page_ref`, and the config's `hostRules` (pass
 `kyselyRules(db)` there for `unique`/`exists`, and a rule of the host's
-own, `{ check, message }`, for a block that needs one). The same set is
+own, `{ check, message }`, for a block that needs one; `createCms` refuses
+a host rule named `link_shape` or `page_ref`). The same set is
 `cms.admin.hostRules` for createAdmin. A rule nobody defines, or a `rules`
 that throws, answers `failed` (500 `{ errors: { form } }`, logged as
 `form.submit.validation_failed`) and stores nothing.

@@ -24,6 +24,12 @@ export type CmsAdmin = {
 };
 
 export function adminPages(cms: Cms): CmsAdmin {
+	const own = cmsHostRules(cms);
+	for (const name of Object.keys(cms.config.hostRules ?? {})) {
+		if (Object.hasOwn(own, name)) {
+			throw new TypeError(`hostRules.${name} is the CMS's own rule (the link and pages fields'): give the host's rule another name.`);
+		}
+	}
 	return {
 		pages: [
 			// Any CMS editor (no tbtop-cms.* ability, as PHP); its submission parts check the inbox ability.
@@ -48,7 +54,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			// Whoever edits a link field: the page editor, or the layout and shared blocks.
 			{ ...linkPageSearch(cms), authorize: async () => (await allows(cms, "tbtop-cms.pages")) || (await allows(cms, "tbtop-cms.design")) },
 		] as PageDef[],
-		hostRules: { ...cms.config.hostRules, ...cmsHostRules(cms) },
+		hostRules: { ...cms.config.hostRules, ...own },
 		navigationGroups: [
 			{ key: "content", label: "Content", icon: "files" },
 			{ key: "design", label: "Design", icon: "palette" },
