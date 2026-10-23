@@ -7,6 +7,7 @@ import type { PageTypeDef } from "./content/pageTypes";
 import type { SubmissionEvent } from "./forms/submit";
 import type { Channel, DeliveryEvent, MailTransport, NotificationType } from "./notifications/types";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
+import type { CmsCacheStore } from "./support/cache";
 
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
 export type MediaDetails = { url: string; alt?: string | null; mime?: string | null; width?: number | null; height?: number | null };
@@ -77,6 +78,14 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	notifications?: NotificationsConfig;
 	/** `redirects.allowedExternalHosts`: hosts an external redirect target may use, matched case-insensitively (`tbtop-cms.redirects.allowed_external_hosts`); default none. */
 	redirects?: { allowedExternalHosts?: string[] };
+	/**
+	 * Cross-request cache of the settings and languages that frontend reads
+	 * hit on every request (`tbtop-cms.cache`): `memoryCache()` on one server,
+	 * `kvCache(env.KV)` on Workers. Admin reads stay live; any write through
+	 * the CMS bumps the content version. `ttl` in seconds, default 3600. Off
+	 * without a store.
+	 */
+	cache?: { store: CmsCacheStore; ttl?: number };
 	/** The 404 log's noise filter (`tbtop-cms.not_found.ignore`): case-insensitive path fragments; default scanner probes (`.php`, `wp-`, …). */
 	notFound?: { ignore?: string[] };
 	/** Content snapshots kept per page (`tbtop-cms.revisions.keep`); default 25, 0 turns revisions off. */

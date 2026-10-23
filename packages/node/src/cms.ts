@@ -61,18 +61,18 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 	const pageTypes = new PageTypes(config.pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
 	const throttle = submitThrottle(config.forms);
-	const site = (request?: Request): Site => {
+	const site = (request?: Request, options: { cached?: boolean } = {}): Site => {
 		const origin = (config.url ?? (request === undefined ? "http://localhost" : new URL(request.url).origin)).replace(/\/+$/, "");
-		return new Site(config, pageTypes, schemaTypes, origin);
+		return new Site(config, pageTypes, schemaTypes, origin, options);
 	};
 	const cms: Cms<T> = {
 		config,
 		pageTypes,
 		schemaTypes,
-		site,
+		site: (request) => site(request),
 		// The props match T only as far as the page types' schemas checked them: resolved fields that fail one are dropped.
 		loadPage: async (request, { waitUntil } = {}) => {
-			const scope = site(request);
+			const scope = site(request, { cached: true });
 			// An editor (canPreview) or a signed preview link (PageController::hasPreviewAccess).
 			const preview = (await config.canPreview?.(request)) === true || (await hasValidPreviewSignature(scope, request));
 			return (await loadPage(scope, request, { preview, ...(waitUntil === undefined ? {} : { waitUntil }) })) as LoadResult<PageProps<T>>;
@@ -85,7 +85,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 				return null;
 			}
 			const { pathname } = new URL(request.url);
-			const scope = site(request);
+			const scope = site(request, { cached: true });
 			if (pathname === "/robots.txt") {
 				return new Response(await robotsTxt(scope), { headers: { "Content-Type": "text/plain" } });
 			}
@@ -101,7 +101,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			const chunk = Number(SITEMAP_CHUNK.exec(pathname)?.[1]);
 			return chunk > (await chunkCount(scope)) ? new Response(null, { status: 404 }) : xml(await sitemapChunkXml(scope, chunk));
 		},
-		errorPage: (request, status) => errorPage(site(request), request, status),
+		errorPage: (request, status) => errorPage(site(request, { cached: true }), request, status),
 		tasks: {
 			deliver: async ({ limit = 50 } = {}) => {
 				const scope = site();

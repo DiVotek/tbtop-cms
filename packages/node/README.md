@@ -79,6 +79,7 @@ const cms = createCms({
 	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
+	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
 	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
 });
@@ -392,6 +393,11 @@ in `tbtop_notification_templates`.
   `seo.not_found.enabled` and `retention_days` are in the SEO settings,
   `cms.tasks.pruneNotFound()` prunes, and the admin's 404 log turns a miss
   into a redirect or ignores it.
+- Cache: with `cache: { store: memoryCache() }` (one server) or
+  `kvCache(env.KV)` (Workers), frontend reads of settings and languages go
+  through a content-versioned cache (`ttl` default 3600 s). Admin reads stay
+  live and every write through the CMS bumps the version; a write made
+  around the CMS shows once the entry expires.
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
@@ -418,6 +424,6 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Audit log, caching, source-backed page types, the
+Audit log, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

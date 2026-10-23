@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
+import type { ContentCache } from "../support/cache";
 import { insertId } from "../support/db";
 import { bool, flag, sqlDate } from "../support/values";
 import { defaultOgLocale, isOgLocale, localeName } from "./localeCatalog";
@@ -24,14 +25,25 @@ export type LanguageInput = {
 	sortOrder?: number;
 };
 
-/** The languages table, read once per Languages instance (Languages.php). */
+/**
+ * The languages table, read once per Languages instance (Languages.php);
+ * with `cache` its reads go through it and every write bumps it.
+ */
 export class Languages {
 	private rows: Language[] | null = null;
 
-	constructor(private readonly db: Kysely<CmsDatabase>) {}
+	constructor(
+		private readonly db: Kysely<CmsDatabase>,
+		private readonly cache: { store: ContentCache; read: boolean } | null = null,
+	) {}
 
 	async all(): Promise<Language[]> {
-		this.rows ??= (
+		this.rows ??= this.cache?.read === true ? await this.cache.store.remember("languages", () => this.query()) : await this.query();
+		return this.rows;
+	}
+
+	private async query(): Promise<Language[]> {
+		return (
 			await this.db
 				.selectFrom("tbtop_languages")
 				.selectAll()
@@ -49,7 +61,6 @@ export class Languages {
 			is_frontend_active: bool(row.is_frontend_active),
 			sort_order: Number(row.sort_order),
 		}));
-		return this.rows;
 	}
 
 	async default(): Promise<Language | null> {
@@ -97,7 +108,7 @@ export class Languages {
 				.execute();
 			return !bool(target.is_frontend_active);
 		});
-		this.rows = null;
+		await this.changed();
 		return activated;
 	}
 
@@ -196,7 +207,7 @@ export class Languages {
 			throw defaultNotDeletable(row.locale);
 		}
 		await this.db.updateTable("tbtop_languages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
-		this.rows = null;
+		await this.changed();
 	}
 
 	/** Brings a trashed language back with its flags as they were. */
@@ -213,7 +224,7 @@ export class Languages {
 			throw defaultNotDeletable(row.locale);
 		}
 		await this.db.deleteFrom("tbtop_languages").where("id", "=", id).execute();
-		this.rows = null;
+		await this.changed();
 	}
 
 	/** A live (`trashed` false) or trashed row by id, or a LanguageError. */
@@ -230,8 +241,9 @@ export class Languages {
 		return row;
 	}
 
+	/** After a write: create, update and restore read their row back through here. */
 	private async mustFind(locale: string): Promise<Language> {
-		this.rows = null;
+		await this.changed();
 		const language = await this.find(locale);
 		if (language === null) {
 			throw new LanguageError(`Language ${locale} does not exist.`);
@@ -241,6 +253,11 @@ export class Languages {
 
 	forget(): void {
 		this.rows = null;
+	}
+
+	private async changed(): Promise<void> {
+		this.rows = null;
+		await this.cache?.store.bump();
 	}
 }
 

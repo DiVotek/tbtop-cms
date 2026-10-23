@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
+import type { ContentCache } from "../support/cache";
 import { SecretBox } from "../support/secretBox";
 import { sqlDate } from "../support/values";
 
@@ -18,7 +19,13 @@ export class Settings {
 
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
-		private readonly options: { secretKeys: string[]; secretKey?: string; mediaUrl: (ref: string) => string | null },
+		private readonly options: {
+			secretKeys: string[];
+			secretKey?: string;
+			mediaUrl: (ref: string) => string | null;
+			/** Frontend reads go through `store` when `read`; every write bumps it. */
+			cache?: { store: ContentCache; read: boolean } | null;
+		},
 	) {
 		this.box = (options.secretKey ?? "") === "" ? null : new SecretBox(options.secretKey as string);
 	}
@@ -63,7 +70,7 @@ export class Settings {
 		} else {
 			await this.db.updateTable("tbtop_settings").set({ value: encoded, updated_at: now }).where("id", "=", existing.id).execute();
 		}
-		this.raw = null;
+		await this.changed();
 	}
 
 	async setMany(values: Record<string, unknown>): Promise<void> {
@@ -74,7 +81,7 @@ export class Settings {
 
 	async forget(key: string): Promise<void> {
 		await this.db.deleteFrom("tbtop_settings").where("key", "=", key).execute();
-		this.raw = null;
+		await this.changed();
 	}
 
 	/** Every `site.*` and `seo.*` key that is not secret, media keys as URLs (`cms.settings`). */
@@ -114,9 +121,20 @@ export class Settings {
 	}
 
 	private async rawAll(): Promise<Map<string, string | null>> {
-		this.raw ??= new Map(
-			(await this.db.selectFrom("tbtop_settings").select(["key", "value"]).execute()).map((row) => [row.key, row.value]),
-		);
+		if (this.raw === null) {
+			const cache = this.options.cache;
+			const rows = cache?.read === true ? await cache.store.remember("settings", () => this.query()) : await this.query();
+			this.raw = new Map(rows);
+		}
 		return this.raw;
+	}
+
+	private async query(): Promise<[string, string | null][]> {
+		return (await this.db.selectFrom("tbtop_settings").select(["key", "value"]).execute()).map((row) => [row.key, row.value]);
+	}
+
+	private async changed(): Promise<void> {
+		this.raw = null;
+		await this.options.cache?.store.bump();
 	}
 }

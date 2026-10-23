@@ -18,6 +18,7 @@ import { namedFormProps } from "./forms/locate";
 import { Submissions } from "./forms/submissions";
 import { Notifications } from "./notifications";
 import type { SchemaTypes } from "./seo/schemaTypes";
+import { ContentCache } from "./support/cache";
 import { translate } from "./support/strings";
 
 /**
@@ -43,10 +44,14 @@ export class Site {
 		readonly schemaTypes: SchemaTypes,
 		/** The site origin without a trailing slash: `https://example.com`. */
 		readonly origin: string,
+		/** Read settings and languages through `config.cache` (frontend requests); writes bump it either way. */
+		options: { cached?: boolean } = {},
 	) {
 		const db = config.db;
-		this.languages = new Languages(db);
+		const cache = config.cache === undefined ? null : { store: new ContentCache(config.cache.store, config.cache.ttl ?? 3600), read: options.cached === true };
+		this.languages = new Languages(db, cache);
 		this.settings = new Settings(db, {
+			cache,
 			secretKeys: config.secretSettings ?? [],
 			secretKey: config.settingsKey,
 			mediaUrl: (ref) => this.mediaUrl(ref),
