@@ -39,7 +39,8 @@ describe("q12: a built-in rate limit on form posts", () => {
 		expect(over?.status).toBe(429);
 		expect(Number(over?.headers.get("Retry-After"))).toBeGreaterThan(0);
 		expect(await rows(db)).toHaveLength(10);
-	});
+		// Eleven stored submissions on a fresh server database: past 5 s on a slow CI runner.
+	}, 20_000);
 
 	test("clients count apart, and a spoofed first X-Forwarded-For entry does not open a new window", async () => {
 		const { cms } = await makeCms(undefined, { forms: { throttle: { max: 2, perSeconds: 60 } } });
