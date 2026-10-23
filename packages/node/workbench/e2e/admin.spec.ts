@@ -34,9 +34,12 @@ test("the languages page lists both locales", async ({ page }) => {
 test("an uploaded page image becomes the social image", async ({ page }) => {
 	await page.goto("/admin/pages");
 	await page.getByRole("row", { name: /First post/ }).getByText("Edit").click();
+	// The upload posts on its own; saving before it answers would store no image.
+	const uploaded = page.waitForResponse((res) => res.request().method() === "POST" && /\/uploads\/[^/]+$/.test(new URL(res.url()).pathname));
 	await page.locator('input[type="file"]').first().setInputFiles("e2e/pixel.png");
+	expect((await uploaded).ok()).toBe(true);
 	await page.getByRole("button", { name: "Save" }).click();
-	await expect(page.getByText(/saved/i).first()).toBeVisible();
+	await expect(page.getByText(/^Saved/).first()).toBeVisible();
 
 	await page.goto("/blog/first-post");
 	const image = await page.locator('meta[property="og:image"]').getAttribute("content");
