@@ -56,6 +56,20 @@ export class PageSlugs {
 		return Object.fromEntries(rows.map((row) => [row.locale, row.path]));
 	}
 
+	/** Every locale's path of each page, in one query. */
+	async allForMany(pageIds: number[]): Promise<Map<number, Record<string, string>>> {
+		const paths = new Map<number, Record<string, string>>();
+		if (pageIds.length === 0) {
+			return paths;
+		}
+		const rows = await this.db.selectFrom("tbtop_page_slugs").select(["page_id", "locale", "path"]).where("page_id", "in", pageIds).execute();
+		for (const row of rows) {
+			const id = Number(row.page_id);
+			paths.set(id, { ...paths.get(id), [row.locale]: row.path });
+		}
+		return paths;
+	}
+
 	/** The page id at a path; null when none. */
 	async pageAt(path: string, locale: string): Promise<number | null> {
 		const row = await this.db

@@ -32,15 +32,14 @@ const leadLabel = (payload: Record<string, unknown>): string => leadIdentity(pay
  * "Page #id"; a deleted page says so.
  */
 async function pageLabels(site: Site, ids: number[], options: { slug?: boolean } = {}): Promise<Map<number, string>> {
+	const unique = [...new Set(ids)];
+	const pages = new Map((await site.pages.findMany(unique)).map((page) => [page.id, page]));
+	const slugs = options.slug === false ? new Map<number, Record<string, string>>() : await site.pages.slugs.allForMany(unique);
+	const fallback = await site.languages.defaultLocale();
 	const labels = new Map<number, string>();
-	for (const id of new Set(ids)) {
-		const page = await site.pages.find(id);
-		if (page === null) {
-			labels.set(id, "Deleted page");
-			continue;
-		}
-		const path = options.slug === false ? null : await slugPath(site, id);
-		labels.set(id, firstLocaleText(page.name) ?? firstLocaleText(page.title) ?? path ?? `Page #${id}`);
+	for (const id of unique) {
+		const page = pages.get(id);
+		labels.set(id, page === undefined ? "Deleted page" : (firstLocaleText(page.name) ?? firstLocaleText(page.title) ?? slugPath(slugs.get(id) ?? {}, fallback) ?? `Page #${id}`));
 	}
 	return labels;
 }
@@ -49,11 +48,8 @@ const firstLocaleText = (values: Record<string, unknown>): string | null =>
 	Object.values(values).find((value): value is string => typeof value === "string" && value.trim() !== "") ?? null;
 
 /** The default locale's path, else any locale's. */
-async function slugPath(site: Site, id: number): Promise<string | null> {
-	const paths = await site.pages.slugs.allFor(id);
-	const fallback = await site.languages.defaultLocale();
-	return [paths[fallback], ...Object.values(paths)].find((path): path is string => typeof path === "string" && path !== "") ?? null;
-}
+const slugPath = (paths: Record<string, string>, fallback: string): string | null =>
+	[paths[fallback], ...Object.values(paths)].find((path): path is string => typeof path === "string" && path !== "") ?? null;
 
 const selected = (ctx: ActionCtx): number[] => ctx.selection.map(Number).filter(Number.isInteger);
 

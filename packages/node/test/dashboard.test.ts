@@ -57,8 +57,12 @@ describe("dashboard", () => {
 	});
 
 	test("without the inbox ability the submission tiles, charts and list are left out", async () => {
-		const { page } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.submissions" });
+		const { page, visit } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.submissions" });
 		const all = nodes((await page("/admin/dashboard")).props);
+		// The view is built per request, so the data endpoints cannot reach what it left out.
+		for (const name of ["leads-by-status", "submissions-daily"]) {
+			expect((await visit(`/admin/dashboard/data/${name}`, { inertia: false })).status).toBe(404);
+		}
 		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["Pages", "Layouts"]);
 		expect(all.filter((node) => node.kind.startsWith("chart"))).toEqual([]);
 		expect(all.filter((node) => node.kind === "list")).toHaveLength(1);
