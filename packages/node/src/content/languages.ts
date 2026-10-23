@@ -3,6 +3,7 @@ import type { CmsDatabase } from "../db/schema";
 import type { ContentCache } from "../support/cache";
 import { insertId } from "../support/db";
 import { bool, flag, sqlDate } from "../support/values";
+import { AUDIT_SUBJECTS, AuditLog } from "./audit";
 import { defaultOgLocale, isOgLocale, localeName } from "./localeCatalog";
 
 export type Language = {
@@ -35,6 +36,7 @@ export class Languages {
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
 		private readonly cache: { store: ContentCache; read: boolean } | null = null,
+		private readonly audit: AuditLog = new AuditLog(db),
 	) {}
 
 	async all(): Promise<Language[]> {
@@ -94,7 +96,14 @@ export class Languages {
 	 * its slugs (`pages.slugs.backfillLocale`), as ContentEventsWiring does on save in PHP.
 	 */
 	async setDefault(locale: string): Promise<boolean> {
-		const activated = await this.db.transaction().execute(async (trx) => {
+		const target = await this.db.selectFrom("tbtop_languages").select("id").where("locale", "=", locale).executeTakeFirst();
+		const activated = await this.audit.track(AUDIT_SUBJECTS.language, target === undefined ? null : Number(target.id), () => this.makeDefault(locale));
+		await this.changed();
+		return activated;
+	}
+
+	private makeDefault(locale: string): Promise<boolean> {
+		return this.db.transaction().execute(async (trx) => {
 			const target = await trx.selectFrom("tbtop_languages").select(["id", "is_frontend_active"]).where("locale", "=", locale).executeTakeFirst();
 			if (target === undefined) {
 				throw new Error(`Language '${locale}' does not exist.`);
@@ -108,8 +117,6 @@ export class Languages {
 				.execute();
 			return !bool(target.is_frontend_active);
 		});
-		await this.changed();
-		return activated;
 	}
 
 	/**
@@ -120,6 +127,11 @@ export class Languages {
 	 * does not list needs one.
 	 */
 	async create(input: LanguageInput & { locale: string }): Promise<Language> {
+		const trashed = await this.db.selectFrom("tbtop_languages").select("id").where("locale", "=", input.locale).where("deleted_at", "is not", null).executeTakeFirst();
+		return this.audit.track(AUDIT_SUBJECTS.language, trashed === undefined ? null : Number(trashed.id), () => this.insert(input), { idOf: (language) => language.id });
+	}
+
+	private async insert(input: LanguageInput & { locale: string }): Promise<Language> {
 		const ogLocale = guardOgLocale(input.ogLocale);
 		const name = input.name ?? localeName(input.locale);
 		if (name === null || name.trim() === "") {
@@ -165,6 +177,10 @@ export class Languages {
 	 * site on while the admin stays off is refused. The locale never changes.
 	 */
 	async update(id: number, input: LanguageInput): Promise<Language> {
+		return this.audit.track(AUDIT_SUBJECTS.language, id, () => this.write(id, input));
+	}
+
+	private async write(id: number, input: LanguageInput): Promise<Language> {
 		const row = await this.db.selectFrom("tbtop_languages").selectAll().where("id", "=", id).where("deleted_at", "is", null).executeTakeFirst();
 		if (row === undefined) {
 			throw new LanguageError(`Language #${id} does not exist.`);
@@ -206,14 +222,16 @@ export class Languages {
 		if (bool(row.is_default)) {
 			throw defaultNotDeletable(row.locale);
 		}
-		await this.db.updateTable("tbtop_languages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
+		await this.audit.track(AUDIT_SUBJECTS.language, id, () => this.db.updateTable("tbtop_languages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute());
 		await this.changed();
 	}
 
 	/** Brings a trashed language back with its flags as they were. */
 	async restore(id: number): Promise<Language> {
 		const row = await this.row(id, true);
-		await this.db.updateTable("tbtop_languages").set({ deleted_at: null, updated_at: sqlDate(new Date()) }).where("id", "=", id).execute();
+		await this.audit.track(AUDIT_SUBJECTS.language, id, () =>
+			this.db.updateTable("tbtop_languages").set({ deleted_at: null, updated_at: sqlDate(new Date()) }).where("id", "=", id).execute(),
+		);
 		return this.mustFind(row.locale);
 	}
 
@@ -223,7 +241,7 @@ export class Languages {
 		if (bool(row.is_default)) {
 			throw defaultNotDeletable(row.locale);
 		}
-		await this.db.deleteFrom("tbtop_languages").where("id", "=", id).execute();
+		await this.audit.track(AUDIT_SUBJECTS.language, id, () => this.db.deleteFrom("tbtop_languages").where("id", "=", id).execute());
 		await this.changed();
 	}
 

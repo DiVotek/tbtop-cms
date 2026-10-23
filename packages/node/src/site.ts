@@ -1,6 +1,7 @@
 import type { ResolveContext } from "./blocks/context";
 import type { BlockRegistry } from "./blocks/registry";
 import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
+import { AuditLog } from "./content/audit";
 import { Languages } from "./content/languages";
 import { Layouts } from "./content/layouts";
 import { NotFoundLog } from "./content/notFoundLog";
@@ -37,6 +38,8 @@ export class Site {
 	readonly submissions: Submissions;
 	readonly notifications: Notifications;
 	readonly notFound: NotFoundLog;
+	/** Admin writes by a signed-in user (`activity_log`). */
+	readonly audit: AuditLog;
 
 	constructor(
 		readonly config: CmsConfig,
@@ -48,8 +51,9 @@ export class Site {
 		options: { cached?: boolean } = {},
 	) {
 		const db = config.db;
+		this.audit = new AuditLog(db);
 		const cache = config.cache === undefined ? null : { store: new ContentCache(config.cache.store, config.cache.ttl ?? 3600), read: options.cached === true };
-		this.languages = new Languages(db, cache);
+		this.languages = new Languages(db, cache, this.audit);
 		this.settings = new Settings(db, {
 			cache,
 			secretKeys: config.secretSettings ?? [],
@@ -62,10 +66,11 @@ export class Site {
 			() => this.languages.defaultLocale(),
 			pageTypes,
 			new PageRevisions(db, config.revisions?.keep ?? 25),
+			this.audit,
 		);
-		this.layouts = new Layouts(db);
-		this.sharedBlocks = new SharedBlocks(db);
-		this.redirects = new Redirects(db, config.redirects?.allowedExternalHosts);
+		this.layouts = new Layouts(db, this.audit);
+		this.sharedBlocks = new SharedBlocks(db, this.audit);
+		this.redirects = new Redirects(db, config.redirects?.allowedExternalHosts ?? [], this.audit);
 		this.blocks = config.blocks;
 		this.submissions = new Submissions(db);
 		this.notFound = new NotFoundLog(db, this.settings, config.notFound?.ignore);

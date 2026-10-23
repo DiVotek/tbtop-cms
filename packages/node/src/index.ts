@@ -25,6 +25,7 @@ export { ensureDefaultLanguage, LanguageError } from "./content/languages";
 export { isLive, type Page, type PageStatus, type Translations } from "./content/page";
 export { PageConflictError, type PageInput } from "./content/pages";
 export { rebuildPageRefs } from "./content/pageRefIndex";
+export { AUDIT_SUBJECTS, type AuditEntry, AuditLog, type AuditSubject } from "./content/audit";
 export type { PageRef } from "./content/pageRefs";
 export type { LinkType, ResolvedLink } from "./content/link";
 export { definePageType, type PageType, type PageTypeDef } from "./content/pageTypes";

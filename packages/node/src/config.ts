@@ -90,6 +90,8 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	notFound?: { ignore?: string[] };
 	/** Content snapshots kept per page (`tbtop-cms.revisions.keep`); default 25, 0 turns revisions off. */
 	revisions?: { keep?: number };
+	/** The admin audit trail: entries older than `retentionDays` (default 365) go in the daily prune. */
+	audit?: { retentionDays?: number };
 };
 
 export type FormsConfig = {

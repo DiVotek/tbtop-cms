@@ -1,5 +1,6 @@
 import { adminPages, type CmsAdmin } from "./admin";
 import type { CmsConfig } from "./config";
+import type { AuditEntry } from "./content/audit";
 import { rebuildPageRefs } from "./content/pageRefIndex";
 import { type PageTypeDef, PageTypes } from "./content/pageTypes";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
@@ -55,16 +56,20 @@ export type CmsTasks = {
 	deliver(options?: { limit?: number }): Promise<number>;
 	/** Deletes 404 log rows not seen within `seo.not_found.retention_days` (default 90); how many went. */
 	pruneNotFound(): Promise<number>;
+	/** The audit trail, newest first (`limit` default 50), narrowed to a subject type or one row of it. */
+	audit(options?: { limit?: number; subjectType?: string; subjectId?: number }): Promise<AuditEntry[]>;
+	/** Deletes audit entries older than `days` (default `audit.retentionDays`, 365); how many went. */
+	pruneAudit(days?: number): Promise<number>;
 	/** Rewrites the page references index from every page (`cms:page-refs:rebuild`); the rows written. */
 	rebuildPageRefs(): Promise<number>;
 	/** The health checks (`cms:doctor`): site URL, default language, block rows, page types, notifications, scheduler, secrets. */
 	health(): Promise<HealthResult[]>;
 	/**
 	 * The scheduler's one entry point, for a cron every minute or Workers
-	 * `scheduled()`: delivers the outbox, prunes the 404 log once a day, and
-	 * stamps the heartbeat the health check reads.
+	 * `scheduled()`: delivers the outbox, prunes the 404 log and the audit
+	 * trail once a day, and stamps the heartbeat the health check reads.
 	 */
-	scheduled(): Promise<{ delivered: number; pruned: number | null }>;
+	scheduled(): Promise<{ delivered: number; pruned: number | null; auditPruned: number | null }>;
 };
 
 const LAST_PRUNE = "system.scheduler.not_found_pruned_at";
@@ -131,6 +136,8 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 				return ids.length;
 			},
 			pruneNotFound: () => site().notFound.prune(),
+			audit: (options) => site().audit.list(options),
+			pruneAudit: (days) => site().audit.prune(days ?? config.audit?.retentionDays ?? 365),
 			rebuildPageRefs: () => rebuildPageRefs(config.db, pageTypes),
 			health: () => runHealthChecks(site()),
 			scheduled: async () => {
@@ -139,12 +146,13 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 				const lastPrune = await scope.settings.get(LAST_PRUNE);
 				const due = typeof lastPrune !== "string" || Date.now() - new Date(lastPrune).getTime() >= DAY_MS || Number.isNaN(new Date(lastPrune).getTime());
 				const pruned = due ? await scope.notFound.prune() : null;
+				const auditPruned = due ? await cms.tasks.pruneAudit() : null;
 				const now = new Date().toISOString();
 				if (due) {
 					await scope.settings.set(LAST_PRUNE, now);
 				}
 				await scope.settings.set(SCHEDULER_HEARTBEAT, now);
-				return { delivered, pruned };
+				return { delivered, pruned, auditPruned };
 			},
 		},
 		admin: undefined as unknown as CmsAdmin,

@@ -79,6 +79,7 @@ const cms = createCms({
 	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
+	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
 	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
@@ -398,13 +399,22 @@ in `tbtop_notification_templates`.
   through a content-versioned cache (`ttl` default 3600 s). Admin reads stay
   live and every write through the CMS bumps the version; a write made
   around the CMS shows once the entry expires.
+- Audit log: a write to a page, redirect, language, shared block or layout
+  made by a signed-in admin records the event (created, updated, deleted,
+  restored, revision_restored), the user and the changed fields with old
+  and new values in `activity_log`; large fields (body, content, fields,
+  seo) are named without their values, layout blocks as `{id, kind}`.
+  Writes outside the admin (seeders, the frontend, a cron) record nothing.
+  `cms.tasks.audit({ subjectType, subjectId, limit })` reads it,
+  `cms.tasks.pruneAudit(days)` prunes.
 - Tasks and the CLI: `cms.tasks.scheduled()` is the one scheduler entry
-  (outbox delivery, the daily 404 prune, the heartbeat); call it from a
+  (outbox delivery, the daily 404 and audit prune, the heartbeat); call it from a
   cron every minute or from Workers `scheduled()`. `cms.tasks.health()`
   runs the checks (site URL, default language, block rows, page types,
   notifications, scheduler, secrets). The `tbtop-cms` bin runs the same over
   a `cms.config.ts` whose default export is the host's Cms: `migrate`,
-  `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`
+  `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`,
+  `audit [--type page] [--id N] [--limit N]`, `audit:prune [--days N]`
   (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
@@ -432,6 +442,6 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Audit log, source-backed page types, the
+Source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

@@ -2,6 +2,7 @@ import { type Kysely, type SelectQueryBuilder, sql } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { encodeJson, flag, sqlDate } from "../support/values";
+import { AUDIT_SUBJECTS, AuditLog } from "./audit";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
 import { assertHierarchy, assertTypePair, PageRuleError } from "./pageRules";
 import { PageTypes } from "./pageTypes";
@@ -37,6 +38,8 @@ export class Pages {
 		private readonly types: PageTypes = new PageTypes(),
 		/** Content snapshots (`revisions.keep`, default 25). */
 		readonly revisions: PageRevisions = new PageRevisions(db, 25),
+		/** The admin's audit trail; records nothing outside a signed-in admin request. */
+		private readonly audit: AuditLog = new AuditLog(db),
 	) {
 		this.slugs = new PageSlugs(db, frontendLocales, defaultLocale);
 	}
@@ -110,6 +113,10 @@ export class Pages {
 
 	/** Creates a page; the type's tree rules (PageHierarchy) throw PageRuleError. */
 	async create(input: PageInput & { type: string }, options: { slugs?: Record<string, string>; by?: string | number | null } = {}): Promise<Page> {
+		return this.audit.track(AUDIT_SUBJECTS.page, null, () => this.insert(input, options), { idOf: (page) => page.id });
+	}
+
+	private async insert(input: PageInput & { type: string }, options: { slugs?: Record<string, string>; by?: string | number | null }): Promise<Page> {
 		assertTypePair(this.types, input.type, input.subtype ?? null);
 		await assertHierarchy(this.db, this.types, { id: null, type: input.type, subtype: input.subtype ?? null, parentId: input.parentId ?? null });
 		const now = sqlDate(new Date());
@@ -145,7 +152,7 @@ export class Pages {
 		input: PageInput,
 		options: { slugs?: Record<string, string>; lockVersion?: number; by?: string | number | null } = {},
 	): Promise<Page> {
-		const [before, page] = await this.write(id, input, options);
+		const [before, page] = await this.audit.track(AUDIT_SUBJECTS.page, id, () => this.write(id, input, options));
 		if (PageRevisions.changed(before, page)) {
 			await this.revisions.snapshot(page, "save", options.by ?? null);
 		}
@@ -162,7 +169,10 @@ export class Pages {
 		if (revision === null) {
 			throw new PageRuleError("The revision does not belong to this page.");
 		}
-		const [, page] = await this.write(id, PageRevisions.restoreInput(revision), options);
+		const [, page] = await this.audit.track(AUDIT_SUBJECTS.page, id, () => this.write(id, PageRevisions.restoreInput(revision), options), {
+			event: "revision_restored",
+			context: { revision_id: revisionId },
+		});
 		await this.revisions.snapshot(page, "restore", options.by ?? null);
 		return page;
 	}
@@ -212,8 +222,10 @@ export class Pages {
 		if ((await this.query().select("id").where("parent_id", "=", id).executeTakeFirst()) !== undefined) {
 			throw new PageRuleError("This page has child pages — move or delete them first.");
 		}
-		await this.db.updateTable("tbtop_pages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
-		await this.slugs.remove(id);
+		await this.audit.track(AUDIT_SUBJECTS.page, id, async () => {
+			await this.db.updateTable("tbtop_pages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute();
+			await this.slugs.remove(id);
+		});
 	}
 
 	/** PageObserver::updating's checks, before anything is written. */

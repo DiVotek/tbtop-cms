@@ -280,7 +280,7 @@ export function redirectsIndex(cms: Cms) {
 							.color("danger")
 							.confirm("Delete this redirect?")
 							.handle(async (ctx) => {
-								await cms.config.db.deleteFrom("tbtop_redirects").where("id", "=", Number(ctx.key())).execute();
+								await siteOf(cms, ctx).redirects.delete(Number(ctx.key()));
 								return Effects.make().notify("Deleted").refreshTable("redirects");
 							}, ["row"]),
 					])

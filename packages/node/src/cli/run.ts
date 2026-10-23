@@ -9,10 +9,14 @@ const HELP = `Usage: tbtop-cms <command> [--config cms.config.ts]
 Commands:
   migrate             Run the CMS migrations (dialect from the Kysely adapter; --dialect to override)
   doctor              Run the health checks; exits 1 on an error
-  scheduled           Deliver the outbox, prune the 404 log once a day, stamp the heartbeat (run every minute)
+  scheduled           Deliver the outbox, prune the 404 log and audit trail once a day, stamp the heartbeat (run every minute)
   deliver [--limit N] Deliver pending form submissions now
   not-found:prune     Delete 404 log rows past the retention window
   page-refs:rebuild   Rewrite the page references index
+  audit [--limit N] [--type page] [--id N]
+                      List the admin audit trail, newest first
+  audit:prune [--days N]
+                      Delete audit entries older than N days (default audit.retentionDays, 365)
 
 The config module's default export is the host's Cms (or a function returning one).`;
 
@@ -42,6 +46,11 @@ function flag(args: string[], name: string): string | undefined {
 	return index === -1 ? undefined : args[index + 1];
 }
 
+function positive(raw: string | undefined): number | undefined {
+	const value = Number(raw);
+	return raw !== undefined && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 const MARK = { ok: "[OK]", warning: "[WARN]", error: "[ERROR]" } as const;
 
 /** One CLI run over a loaded Cms; the exit code. */
@@ -65,8 +74,8 @@ export async function runCommand(cms: Cms, args: string[], io: CliIo): Promise<n
 			return count("error") > 0 ? 1 : 0;
 		}
 		case "scheduled": {
-			const { delivered, pruned } = await cms.tasks.scheduled();
-			io.out(`Delivered ${delivered} submissions${pruned === null ? "" : `; pruned ${pruned} 404 log rows`}.`);
+			const { delivered, pruned, auditPruned } = await cms.tasks.scheduled();
+			io.out(`Delivered ${delivered} submissions${pruned === null ? "" : `; pruned ${pruned} 404 log rows and ${auditPruned} audit entries`}.`);
 			return 0;
 		}
 		case "deliver": {
@@ -79,6 +88,24 @@ export async function runCommand(cms: Cms, args: string[], io: CliIo): Promise<n
 			return 0;
 		case "page-refs:rebuild":
 			io.out(`Wrote ${await cms.tasks.rebuildPageRefs()} page reference rows.`);
+			return 0;
+		case "audit": {
+			const id = positive(flag(args, "id"));
+			const type = flag(args, "type");
+			const entries = await cms.tasks.audit({
+				limit: positive(flag(args, "limit")) ?? 50,
+				...(type === undefined ? {} : { subjectType: type }),
+				...(id === undefined ? {} : { subjectId: id }),
+			});
+			for (const entry of entries) {
+				const fields = entry.changedFields.length === 0 ? "" : ` (${entry.changedFields.join(", ")})`;
+				io.out(`${entry.createdAt ?? "-"}  user ${entry.causerId ?? "-"}  ${entry.event} ${entry.subjectType ?? "?"} #${entry.subjectId ?? "?"} ${entry.label}${fields}`);
+			}
+			io.out(entries.length === 0 ? "No audit entries." : `\n${entries.length} entries.`);
+			return 0;
+		}
+		case "audit:prune":
+			io.out(`Deleted ${await cms.tasks.pruneAudit(positive(flag(args, "days")))} audit entries.`);
 			return 0;
 		case undefined:
 		case "help":

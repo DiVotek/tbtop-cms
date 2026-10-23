@@ -2,6 +2,7 @@ import type { Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { flag, sqlDate } from "../support/values";
+import { AUDIT_SUBJECTS, AuditLog } from "./audit";
 
 const MAX_HOPS = 10;
 /** Longest chain a new or edited rule may extend (RedirectCycle::MAX_HOPS). */
@@ -32,6 +33,7 @@ export class Redirects {
 		private readonly db: Kysely<CmsDatabase>,
 		/** External hosts a rule may point at (`redirects.allowedExternalHosts`); empty rejects every external target. */
 		private readonly allowedExternalHosts: readonly string[] = [],
+		private readonly audit: AuditLog = new AuditLog(db),
 	) {}
 
 	/** The final target (a path or an external URL) and status for a missing path, or null. */
@@ -63,7 +65,14 @@ export class Redirects {
 
 	/** Validates (see `validate`) and stores a rule; throws RedirectError when it is invalid. */
 	async create(input: RedirectInput): Promise<number> {
-		return this.insert({ ...input, ...(await this.validate(input)) });
+		const rule = { ...input, ...(await this.validate(input)) };
+		return this.audit.track(AUDIT_SUBJECTS.redirect, null, () => this.insert(rule), { idOf: (id) => id });
+	}
+
+	async delete(id: number): Promise<void> {
+		await this.audit.track(AUDIT_SUBJECTS.redirect, id, async () => {
+			await this.db.deleteFrom("tbtop_redirects").where("id", "=", id).execute();
+		});
 	}
 
 	/**

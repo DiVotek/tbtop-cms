@@ -37,8 +37,8 @@ describe("tbtop-cms CLI", () => {
 
 	test("scheduled prunes the 404 log once a day; the other commands answer with counts", async () => {
 		const { cms } = await makeCms(fixture);
-		expect(await cms.tasks.scheduled()).toEqual({ delivered: 0, pruned: 0 });
-		expect(await cms.tasks.scheduled()).toEqual({ delivered: 0, pruned: null });
+		expect(await cms.tasks.scheduled()).toEqual({ delivered: 0, pruned: 0, auditPruned: 0 });
+		expect(await cms.tasks.scheduled()).toEqual({ delivered: 0, pruned: null, auditPruned: null });
 
 		await cms.loadPage(get("/gone"));
 		const run = capture();

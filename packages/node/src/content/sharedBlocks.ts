@@ -2,6 +2,7 @@ import { type Kysely, sql } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { type Dict, decodeJson, isDict, sqlDate } from "../support/values";
+import { AUDIT_SUBJECTS, AuditLog } from "./audit";
 
 export type SharedBlock = { id: number; name: string; kind: string; data: Dict; lockVersion: number };
 
@@ -9,7 +10,10 @@ export type SharedBlock = { id: number; name: string; kind: string; data: Dict; 
 export class SharedBlocks {
 	private byId: Map<number, SharedBlock> | null = null;
 
-	constructor(private readonly db: Kysely<CmsDatabase>) {}
+	constructor(
+		private readonly db: Kysely<CmsDatabase>,
+		private readonly audit: AuditLog = new AuditLog(db),
+	) {}
 
 	async all(): Promise<SharedBlock[]> {
 		return [...(await this.load()).values()];
@@ -30,6 +34,10 @@ export class SharedBlocks {
 	}
 
 	async create(input: { name: string; kind: string; data: Dict }): Promise<number> {
+		return this.audit.track(AUDIT_SUBJECTS.sharedBlock, null, () => this.insert(input), { idOf: (id) => id });
+	}
+
+	private async insert(input: { name: string; kind: string; data: Dict }): Promise<number> {
 		const now = sqlDate(new Date());
 		const id = await insertId(
 			this.db,
@@ -50,6 +58,10 @@ export class SharedBlocks {
 	 * row still has it (SharedBlockForm::update); a stale one throws SharedBlockConflictError.
 	 */
 	async update(id: number, input: { name?: string; data?: Dict }, options: { lockVersion?: number } = {}): Promise<void> {
+		await this.audit.track(AUDIT_SUBJECTS.sharedBlock, id, () => this.write(id, input, options));
+	}
+
+	private async write(id: number, input: { name?: string; data?: Dict }, options: { lockVersion?: number }): Promise<void> {
 		let qb = this.db
 			.updateTable("tbtop_shared_blocks")
 			.set({
@@ -71,13 +83,15 @@ export class SharedBlocks {
 
 	/** Deletes an unplaced block; one still placed anywhere throws SharedBlockInUseError (SharedBlocksPage::deleteAction). */
 	async delete(id: number): Promise<void> {
-		await this.db.transaction().execute(async (trx) => {
-			const inUse = (await placements(trx)).get(id) ?? 0;
-			if (inUse > 0) {
-				throw new SharedBlockInUseError(id, inUse);
-			}
-			await trx.deleteFrom("tbtop_shared_blocks").where("id", "=", id).execute();
-		});
+		await this.audit.track(AUDIT_SUBJECTS.sharedBlock, id, () =>
+			this.db.transaction().execute(async (trx) => {
+				const inUse = (await placements(trx)).get(id) ?? 0;
+				if (inUse > 0) {
+					throw new SharedBlockInUseError(id, inUse);
+				}
+				await trx.deleteFrom("tbtop_shared_blocks").where("id", "=", id).execute();
+			}),
+		);
 		this.byId = null;
 	}
 
