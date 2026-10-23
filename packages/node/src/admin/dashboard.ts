@@ -107,6 +107,9 @@ export function dashboard(cms: Cms) {
 									{ title: "Latest submissions", variant: "card", actions: [s.action("dashboardOpenSubmissions").label("Inbox").url(`${prefix}/form-submissions`).link().size("sm")] },
 									[
 										s.list("dashboardLatestSubmissions").items(async () => {
+											if (!(await allows(cms, "tbtop-cms.submissions"))) {
+												return [];
+											}
 											const rows = await db.selectFrom("tbtop_form_submissions").selectAll().orderBy("created_at", "desc").orderBy("id", "desc").limit(RECENT).execute();
 											return rows.map((row) => {
 												const submission = submissionFromRow(row as never);
@@ -178,7 +181,11 @@ function charts(s: S, cms: Cms) {
 			.set("title", "Leads by status")
 			.set("nameKey", "label")
 			.set("series", [{ dataKey: "value" }])
+			// Each submission closure checks the ability itself too, not only the view that leaves it out.
 			.query(async () => {
+				if (!(await allows(cms, "tbtop-cms.submissions"))) {
+					return [];
+				}
 				const rows = await db
 					.selectFrom("tbtop_form_submissions")
 					.select(["lead_status", (eb) => eb.fn.countAll().as("n")])
@@ -200,6 +207,9 @@ function charts(s: S, cms: Cms) {
 					.options(PERIODS.map((days) => ({ value: String(days), label: `Last ${days} days` }))),
 			])
 			.query(async (_request, params) => {
+				if (!(await allows(cms, "tbtop-cms.submissions"))) {
+					return [];
+				}
 				const asked = Number(params.period);
 				const days = (PERIODS as readonly number[]).includes(asked) ? asked : PERIODS[1];
 				const rows = await db.selectFrom("tbtop_form_submissions").select("created_at").where("created_at", ">=", since(days)).execute();
