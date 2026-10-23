@@ -2,8 +2,8 @@
 
 The tbtop CMS core for Bun, Node and Cloudflare Workers: pages, blocks and SEO
 over the host's Kysely, edited in [`@tbtop/admin`](https://github.com/DiVotek/tbtop/tree/main/packages/node).
-It reads and writes the same `tbtop_*` tables as the PHP package, so a Node
-host can open a database the Laravel package migrated.
+It is a standalone package for new projects: it owns its `tbtop_*` schema
+and does not share a database with the Laravel package or migrate one.
 
 The frontend is headless: the host framework (TanStack Start, Hono + React,
 Astro…) asks the CMS for a page's props and renders them. `@tbtop/cms/react`
@@ -84,10 +84,7 @@ createAdmin({
 });
 ```
 
-`migrateCms` creates the tables from scratch: run it on a fresh database, not
-on one the Laravel package already migrated (its tables exist and the
-migration fails). A database Laravel migrated is read as it is, without
-`migrateCms`.
+`migrateCms` creates the tables on a fresh database.
 
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
@@ -163,8 +160,7 @@ config, so set it when you deliver from a cron.
 
 Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored
-in `tbtop_notification_templates`. A row the PHP package wrote holds Blade;
-it is ignored with a warning and the built-in template answers.
+in `tbtop_notification_templates`.
 
 ## What 0.0 has
 
@@ -195,7 +191,7 @@ it is ignored with a warning and the built-in template answers.
 
 ## Not yet
 
-Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
+Secret settings, auto-redirects on slug change,
 page revisions, page refs, audit log, 404 log, roles/abilities, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.
