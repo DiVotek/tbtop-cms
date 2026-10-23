@@ -125,7 +125,7 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 			s.textarea("subtitle").label("Subtitle").translatable(),
 			s.text("image").label("Image URL"),
 			s.text("ctaLabel").label("CTA label").translatable(),
-			s.text("ctaHref").label("CTA link").helperText("A /path, #anchor, http(s), mailto: or tel: link.").rules(["nullable", safeHrefRule]),
+			s.text("ctaHref").label("CTA link").helperText("A relative link (/contact, #form), or an http(s), mailto: or tel: link.").rules(["nullable", safeHrefRule]),
 		],
 		resolve: (input) => {
 			const label = cleanString(input.ctaLabel);

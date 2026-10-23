@@ -1,31 +1,42 @@
 import { EXTERNAL_SCHEMES } from "./link";
 
-/** `[hH][tT]…`: the rule goes to the admin client without its flags, so the pattern carries its own case-insensitivity. */
-const anyCase = (word: string): string => [...word].map((ch) => `[${ch.toLowerCase()}${ch.toUpperCase()}]`).join("");
-
-/** No whitespace or control characters anywhere: browsers strip them, so `java\tscript:` would still run. */
-const CH = "[^\\s\\x00-\\x1f\\x7f]";
+/** SafeHref::SCHEMES: the schemes a free-text link may carry besides ExternalSchemes. */
+const SCHEMES = ["http", "https", "mailto", "tel"];
 
 /**
- * A link a visitor may click: http(s) with a host, a site-relative `/…` (not
- * `//host` or `/\host`), a `#…` anchor, `mailto:`, `tel:` or a messenger
- * scheme (ExternalSchemes). An allowlist: `javascript:`, `data:`, `vbscript:`
- * and anything unknown fail.
+ * SafeHref::passes: what a browser parses (leading C0 controls and spaces
+ * dropped, tabs and newlines removed anywhere, so `java\tscript:` is
+ * `javascript:`). Without a scheme it is a relative URL (`blog`,
+ * `contact#form`, `?ref=x`) and passes; with one, only http(s), mailto, tel
+ * or an ExternalSchemes deep link pass.
  */
-export const SAFE_HREF = [
-	`${anyCase("http")}${anyCase("s")}?://[^\\s\\x00-\\x1f\\x7f/?#\\\\]+${CH}*`,
-	`/(?![/\\\\])${CH}*`,
-	`#${CH}*`,
-	`(?:${["mailto", "tel"].map(anyCase).join("|")}):${CH}+`,
-	`(?:${EXTERNAL_SCHEMES.map(anyCase).join("|")}):(?://)?${CH}+`,
-]
-	.map((branch) => `(?:${branch})`)
-	.join("|");
+export function safeHref(value: string | null): string | null {
+	if (value === null) {
+		return null;
+	}
+	const parsed = value.replace(/^[\x00-\x20]+/, "").replace(/[\t\n\r]/g, "");
+	const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(parsed)?.[1]?.toLowerCase();
+	if (scheme === undefined) {
+		return value;
+	}
+	const external = new RegExp(`^(?:${EXTERNAL_SCHEMES.join("|")}):(?://)?[^\\t\\n\\v\\f\\r ]+$`, "i");
+	return SCHEMES.includes(scheme) || external.test(parsed) ? value : null;
+}
 
-const SAFE = new RegExp(`^(?:${SAFE_HREF})$`);
+/*
+ * The same check as one regex over the raw value, for the admin's `regex:`
+ * rule (the validator has no closure rules, and a host rule would need every
+ * host to register it). Tabs and newlines may sit between any two
+ * characters of the scheme, as the browser drops them; the admin client
+ * gets the pattern without flags, so it spells out its own case-insensitivity.
+ */
+const GAP = "[\\t\\n\\r]*";
+const anyCase = (word: string): string => [...word].map((ch) => `[${ch.toLowerCase()}${ch.toUpperCase()}]`).join(GAP);
+const LEAD = "[\\x00-\\x20]*";
+const ANY_SCHEME = `${LEAD}[a-zA-Z](?:${GAP}[a-zA-Z0-9+.\\-])*${GAP}:`;
+const SAFE_SCHEME = `${LEAD}(?:${SCHEMES.map(anyCase).join("|")})${GAP}:[\\s\\S]*`;
+/** ExternalSchemes::matches on the parsed value: `\S` there is PCRE's ASCII whitespace, tabs and newlines being already gone. */
+const DEEP_LINK = `${LEAD}(?:${EXTERNAL_SCHEMES.map(anyCase).join("|")})${GAP}:(?:/${GAP}/)?${GAP}(?:[^\\t\\n\\v\\f\\r ]${GAP})+`;
 
-/** The Laravel `regex:` rule for an admin field that takes such a link. */
-export const safeHrefRule = `regex:/^(?:${SAFE_HREF})$/`;
-
-/** The href when it is safe to render (see SAFE_HREF), else null. */
-export const safeHref = (value: string | null): string | null => (value !== null && SAFE.test(value) ? value : null);
+/** The Laravel `regex:` rule for an admin field that takes such a link (SafeHref::RULE). */
+export const safeHrefRule = `regex:/^(?:(?!${ANY_SCHEME})[\\s\\S]*|${SAFE_SCHEME}|${DEEP_LINK})$/`;

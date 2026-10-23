@@ -112,34 +112,63 @@ describe("Hero ctaHref allows only safe links (q04)", () => {
 		return { ...made, home, hero };
 	};
 
-	for (const href of ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,<script>1</script>", "//evil.example/x", "/\\evil.example"]) {
+	/** HeroBlockTest's script links, plus the browser-normalized spellings SafeHref catches. */
+	const unsafe = [
+		"javascript:alert(1)",
+		"JavaScript:alert(1)",
+		"java\tscript:alert(1)",
+		"data:text/html,x",
+		"vbscript:x",
+		"\u0001javascript:alert(1)",
+		"jav\na\rscript:alert(1)",
+		"javascript\t:alert(1)",
+		"tg:// x",
+		"httpx://site.test",
+	];
+	/** HeroBlockTest's relative, web, mail, phone and messenger links: a value without a scheme is relative. */
+	const safe = [
+		"/contact",
+		"contact#form",
+		"#form",
+		"?ref=hero",
+		"https://example.test/a:b",
+		"mailto:a@example.test",
+		"tel:+380441234567",
+		"tg://resolve?domain=tbtop",
+		"blog",
+		"HTTPS://partner.example/deal",
+		"ht\ttps://partner.example",
+		"viber:chat",
+		"/a:b",
+		"//cdn.example/x",
+	];
+
+	for (const href of unsafe) {
 		test(`a stored ${JSON.stringify(href)} resolves to no CTA`, async () => {
 			const { cms } = await withHref(href);
 			expect((await heroProps(cms)).cta).toBeNull();
 		});
 	}
 
-	for (const href of ["/blog", "#contact", "https://partner.example/deal", "mailto:hi@site.test", "tel:+380441234567", "tg://resolve?domain=site"]) {
-		test(`a stored ${JSON.stringify(href)} keeps its CTA`, async () => {
+	for (const href of safe) {
+		test(`a stored ${JSON.stringify(href)} keeps its CTA as written`, async () => {
 			const { cms } = await withHref(href);
 			expect((await heroProps(cms)).cta).toEqual({ label: "Read the blog", href });
 		});
 	}
 
-	test("the page editor refuses a javascript: CTA link and keeps the stored one", async () => {
+	test("the page editor refuses exactly the links the site drops", async () => {
 		const { record, post, page, rows, home, hero } = await withHref("/blog");
 		const url = `/admin/pages/${home}/edit`;
-		await post(`${url}/forms/pageEditor`, { ...(await record(url, "pageEditor")), [`block_${hero.id}_ctaHref`]: "javascript:alert(1)" }, url);
-		expect(Object.keys((await page(url)).props.errors as Record<string, unknown>)).toContain(`block_${hero.id}_ctaHref`);
-		expect((await rows(home)).find((row) => row.id === hero.id)?.data?.ctaHref).toBe("/blog");
-	});
-
-	test("the page editor saves a safe CTA link", async () => {
-		const { record, post, rows, home, hero } = await withHref("/blog");
-		const url = `/admin/pages/${home}/edit`;
-		const res = await post(`${url}/forms/pageEditor`, { ...(await record(url, "pageEditor")), [`block_${hero.id}_ctaHref`]: "HTTPS://partner.example/deal" }, url);
-		expect(res.status).toBe(303);
-		expect((await rows(home)).find((row) => row.id === hero.id)?.data?.ctaHref).toBe("HTTPS://partner.example/deal");
+		const field = `block_${hero.id}_ctaHref`;
+		const verdicts: [string, boolean][] = [];
+		for (const href of [...unsafe, ...safe]) {
+			await post(`${url}/forms/pageEditor`, { ...(await record(url, "pageEditor")), [field]: href }, url);
+			const refused = Object.keys((await page(url)).props.errors as Record<string, unknown>).includes(field);
+			verdicts.push([href, !refused]);
+		}
+		expect(verdicts).toEqual([...unsafe.map((href) => [href, false] as [string, boolean]), ...safe.map((href) => [href, true] as [string, boolean])]);
+		expect((await rows(home)).find((row) => row.id === hero.id)?.data?.ctaHref).toBe(safe.at(-1));
 	});
 });
 
