@@ -57,6 +57,8 @@ await migrateCms(db, { dialect: "sqlite" }); // fresh database only; or merge cm
 
 // Shared with the client bundle (@tbtop/cms/catalog has only zod):
 export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, placements: ["pages", "layout"] } });
+// placements: "pages" (every page type, the default), "layout", or page type / subtype keys
+// ("article", "news"): the page editor's Add block offers a kind only where it fits.
 
 const cms = createCms({
 	db, // Kysely<CmsDatabase>

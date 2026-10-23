@@ -3,8 +3,9 @@ import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import type { Kysely } from "kysely";
 import { createElement } from "react";
+import { z } from "zod";
 import { renderToString } from "react-dom/server";
-import { type Fixture, migrateCms, type PageProps } from "../src";
+import { cmsBlockImpls, cmsBlocks, type Fixture, implementBlocks, migrateCms, type PageProps } from "../src";
 import { GtmNoscript, seoHead, seoTags } from "../src/react";
 import { get, makeCms, testDialect } from "./support";
 
@@ -165,5 +166,45 @@ describe("Google Tag Manager (q10)", () => {
 		const off = { ...seo, gtmContainerId: null };
 		expect(seoTags(off).some((tag) => tag.tag === "script" && tag.children.includes("googletagmanager"))).toBe(false);
 		expect(renderToString(createElement(GtmNoscript, { id: null }))).toBe("");
+	});
+});
+
+describe("placements by page type and subtype (q17)", () => {
+	const text = z.object({ text: z.string().nullable() });
+	const form = { form: (s: import("@tbtop/admin").S) => [s.text("text").label("Text")] };
+	const blocks = () =>
+		implementBlocks(
+			{
+				...cmsBlocks,
+				ArticleOnly: { props: text, placements: ["article"] },
+				NewsOnly: { props: text, placements: ["news"] },
+				Banner: { props: text, placements: ["layout"] },
+			},
+			{ ...cmsBlockImpls, ArticleOnly: form, NewsOnly: form, Banner: form },
+		);
+
+	test("the Add block picker offers a kind on the page types and subtypes it names, and blockAdd refuses the others", async () => {
+		const { cms, ids, page, post } = await panel(undefined, { blocks: blocks(), pageTypes: [{ key: "news", base: "article" }] });
+		const pages = cms.site().pages;
+		const article = await pages.create({ type: "article", parentId: ids.blog as number, name: { en: "Plain" } });
+		const news = await pages.create({ type: "article", subtype: "news", parentId: ids.blog as number, name: { en: "News" } });
+		const offered = async (id: number) => {
+			const props = JSON.stringify((await page(`/admin/pages/${id}/edit`)).props);
+			return ["Hero", "ContactForm", "ArticleOnly", "NewsOnly", "Banner"].filter((kind) => props.includes(`"value":"${kind}"`));
+		};
+		expect(await offered(ids.about as number)).toEqual(["Hero", "ContactForm"]);
+		expect(await offered(article.id)).toEqual(["Hero", "ContactForm", "ArticleOnly"]);
+		expect(await offered(news.id)).toEqual(["Hero", "ContactForm", "ArticleOnly", "NewsOnly"]);
+		const header = JSON.stringify((await page("/admin/layout/header")).props);
+		expect(header).toContain('"value":"Banner"');
+		expect(header).not.toContain('"value":"ArticleOnly"');
+
+		const url = `/admin/pages/${article.id}/edit`;
+		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).pageEditor ?? {};
+		const refused = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "NewsOnly" } } }, url);
+		expect(JSON.stringify(await refused.json())).toContain("Pick a block kind first.");
+		const added = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "ArticleOnly" } } }, url);
+		expect(added.status).toBe(200);
+		expect(((await cms.site().pages.find(article.id))?.content ?? []).map((row) => (row as { kind: string }).kind)).toEqual(["ArticleOnly"]);
 	});
 });
