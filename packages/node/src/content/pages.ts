@@ -5,6 +5,7 @@ import { encodeJson, flag, sqlDate } from "../support/values";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
 import { assertHierarchy, assertTypePair, PageRuleError } from "./pageRules";
 import { PageTypes } from "./pageTypes";
+import { PageRevisions } from "./revisions";
 import { PageSlugs } from "./slugs";
 
 type PagesQuery = SelectQueryBuilder<CmsDatabase, "tbtop_pages", object>;
@@ -33,6 +34,8 @@ export class Pages {
 		defaultLocale: () => Promise<string>,
 		/** The tree rules every write checks; the built-ins when omitted. */
 		private readonly types: PageTypes = new PageTypes(),
+		/** Content snapshots (`revisions.keep`, default 25). */
+		readonly revisions: PageRevisions = new PageRevisions(db, 25),
 	) {
 		this.slugs = new PageSlugs(db, frontendLocales, defaultLocale);
 	}
@@ -126,6 +129,7 @@ export class Pages {
 		);
 		const page = await this.mustFind(id);
 		await this.slugs.sync(page, options.slugs ?? {});
+		await this.revisions.snapshot(page, "create", options.by ?? null);
 		return page;
 	}
 
@@ -139,6 +143,33 @@ export class Pages {
 		input: PageInput,
 		options: { slugs?: Record<string, string>; lockVersion?: number; by?: string | number | null } = {},
 	): Promise<Page> {
+		const [before, page] = await this.write(id, input, options);
+		if (PageRevisions.changed(before, page)) {
+			await this.revisions.snapshot(page, "save", options.by ?? null);
+		}
+		return page;
+	}
+
+	/**
+	 * Puts a revision's editorial fields back (PageRevisionWriter::restore);
+	 * status, type, tree and slugs stay. Recorded as a `restore` revision even
+	 * when nothing changed. An unknown revision throws PageRuleError.
+	 */
+	async restore(id: number, revisionId: number, options: { by?: string | number | null } = {}): Promise<Page> {
+		const revision = await this.revisions.find(id, revisionId);
+		if (revision === null) {
+			throw new PageRuleError("The revision does not belong to this page.");
+		}
+		const [, page] = await this.write(id, PageRevisions.restoreInput(revision), options);
+		await this.revisions.snapshot(page, "restore", options.by ?? null);
+		return page;
+	}
+
+	private async write(
+		id: number,
+		input: PageInput,
+		options: { slugs?: Record<string, string>; lockVersion?: number; by?: string | number | null },
+	): Promise<[Page, Page]> {
 		const current = await this.find(id);
 		if (current === null) {
 			throw new PageConflictError(id);
@@ -166,7 +197,7 @@ export class Pages {
 		}
 		const page = await this.mustFind(id);
 		await this.slugs.sync(page, options.slugs ?? {});
-		return page;
+		return [current, page];
 	}
 
 	/** Soft delete; the slugs go, so the path frees up. A system page or one with live children throws PageRuleError. */

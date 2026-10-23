@@ -7,6 +7,7 @@ import { previewLink } from "../frontend/previewLink";
 import type { Site } from "../site";
 import { type Dict, isDict } from "../support/values";
 import { allows } from "./abilities";
+import { revisionsAction } from "./revisions";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
 import { adminPrefix, blockId, blockRecord, blockRows, blockTabs, NAV, rowProblems, rowsFromForm, siteOf, trimmedForm } from "./support";
 
@@ -273,7 +274,8 @@ export function pageEdit(cms: Cms) {
 			};
 			// Shared blocks are design, not page content: sharing and placing one need that ability (PageEditBlockTabs::mayEditShared).
 			const mayShare = await allows(cms, "tbtop-cms.design");
-			const previews = await previewActions(s, site, page, slugs);
+			const revisions = await revisionsAction(s, cms, site, page, back);
+			const previews = [...(await previewActions(s, site, page, slugs)), ...(revisions === null ? [] : [revisions])];
 			return s.stack([
 				s.displayText(firstText(page, ["name", "title"], defaultLocale, defaultLocale) || `#${page.id}`).variant("heading"),
 				s.displayText(`${isLive(page) ? "Live" : "Not live"} · /${slugs[defaultLocale] ?? ""}`).variant("muted"),

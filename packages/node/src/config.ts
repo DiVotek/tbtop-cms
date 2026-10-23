@@ -77,6 +77,8 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	notifications?: NotificationsConfig;
 	/** `redirects.allowedExternalHosts`: hosts an external redirect target may use, matched case-insensitively (`tbtop-cms.redirects.allowed_external_hosts`); default none. */
 	redirects?: { allowedExternalHosts?: string[] };
+	/** Content snapshots kept per page (`tbtop-cms.revisions.keep`); default 25, 0 turns revisions off. */
+	revisions?: { keep?: number };
 };
 
 export type FormsConfig = {

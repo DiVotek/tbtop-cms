@@ -78,6 +78,7 @@ const cms = createCms({
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
 	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
+	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
 	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
 });
@@ -376,6 +377,10 @@ in `tbtop_notification_templates`.
   locking, layouts (header/footer), shared blocks, redirects (chains, cycles,
   query string kept; a moved page path leaves a 301 auto rule, repointed on the
   next move and dropped when a page takes the path again).
+- Revisions: a snapshot of the editorial fields on create, on each save that
+  changes one and on restore, newest `revisions.keep` kept;
+  `pages.restore(id, revisionId)` and the editor's Revisions slide-over put
+  the content back without touching status, tree or slugs.
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
@@ -402,6 +407,6 @@ in `tbtop_notification_templates`.
 
 ## Not yet
 
-Page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
+The page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
 from the notification settings, owner-only template editing.

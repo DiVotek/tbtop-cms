@@ -9,6 +9,7 @@ import { Pages } from "./content/pages";
 import { resolvePageRefs } from "./content/pageRefs";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
+import { PageRevisions } from "./content/revisions";
 import { richtextHtml } from "./content/richtext";
 import { Settings } from "./content/settings";
 import { SharedBlocks } from "./content/sharedBlocks";
@@ -53,6 +54,7 @@ export class Site {
 			async () => (await this.languages.frontendActive()).map((row) => row.locale),
 			() => this.languages.defaultLocale(),
 			pageTypes,
+			new PageRevisions(db, config.revisions?.keep ?? 25),
 		);
 		this.layouts = new Layouts(db);
 		this.sharedBlocks = new SharedBlocks(db);
