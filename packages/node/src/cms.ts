@@ -1,10 +1,10 @@
 import { adminPages, type CmsAdmin } from "./admin";
 import type { CmsConfig } from "./config";
-import { PageTypes } from "./content/pageTypes";
+import { type PageTypeDef, PageTypes } from "./content/pageTypes";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
 import { submitThrottle } from "./forms/throttle";
-import { type LoadResult, loadPage } from "./frontend/load";
+import { type LoadResult, loadPage, type PageProps } from "./frontend/load";
 import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
@@ -12,14 +12,20 @@ import { chunkCount, sitemapChunkXml, sitemapIndexXml } from "./seo/sitemap";
 import { indexingEnabled } from "./seo/resolver";
 import { Site } from "./site";
 
-export type Cms = {
-	readonly config: CmsConfig;
+/**
+ * `T`: the host's page types, which type `page.fields` in loadPage()'s props
+ * per `page.type`. A bare `Cms` takes any CMS (its props are untyped JSON
+ * fields): the props type is not covariant in `T`, so the default is `any`.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: the bare Cms accepts a Cms of any page types.
+export type Cms<T extends readonly PageTypeDef[] = any> = {
+	readonly config: CmsConfig<T>;
 	readonly pageTypes: PageTypes;
 	readonly schemaTypes: SchemaTypes;
 	/** A fresh per-request view of the stores; the origin comes from `url` or the request. */
 	site(request?: Request): Site;
 	/** The page at the request URL: props for the host to render, a redirect, or not found. */
-	loadPage(request: Request): Promise<LoadResult>;
+	loadPage(request: Request): Promise<LoadResult<PageProps<T>>>;
 	/** robots.txt, sitemap.xml and its chunks, and form posts to /_cms/forms/...; null for every other URL. */
 	handle(request: Request): Promise<Response | null>;
 	/** Background work for a cron, `ctx.waitUntil()` or a queue: the same functions the `tbtop-cms` CLI runs. */
@@ -38,7 +44,7 @@ export type CmsTasks = {
 
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
 
-export function createCms(config: CmsConfig): Cms {
+export function createCms<const T extends readonly PageTypeDef[] = []>(config: CmsConfig<T>): Cms<T> {
 	const pageTypes = new PageTypes(config.pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
 	const throttle = submitThrottle(config.forms);
@@ -46,16 +52,17 @@ export function createCms(config: CmsConfig): Cms {
 		const origin = (config.url ?? (request === undefined ? "http://localhost" : new URL(request.url).origin)).replace(/\/+$/, "");
 		return new Site(config, pageTypes, schemaTypes, origin);
 	};
-	const cms: Cms = {
+	const cms: Cms<T> = {
 		config,
 		pageTypes,
 		schemaTypes,
 		site,
+		// The props match T only as far as the page types' schemas checked them: resolved fields that fail one are dropped.
 		loadPage: async (request) => {
 			const scope = site(request);
 			// An editor (canPreview) or a signed preview link (PageController::hasPreviewAccess).
 			const preview = (await config.canPreview?.(request)) === true || (await hasValidPreviewSignature(scope, request));
-			return loadPage(scope, request, { preview });
+			return (await loadPage(scope, request, { preview })) as LoadResult<PageProps<T>>;
 		},
 		handle: async (request) => {
 			if (request.method === "POST") {

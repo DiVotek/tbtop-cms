@@ -1,4 +1,5 @@
 import { type ActionCtx, Effects, Field, S } from "@tbtop/admin";
+import { bindCmsFields } from "../blocks/cmsFields";
 import type { BlockRegistry } from "../blocks/registry";
 import { placeableIn } from "../blocks/catalog";
 import { rowProblem } from "../blocks/resolver";
@@ -6,6 +7,7 @@ import type { Cms } from "../cms";
 import type { SharedBlock } from "../content/sharedBlocks";
 import type { Site } from "../site";
 import { type Dict, isDict } from "../support/values";
+import { fieldBinding } from "./linkFields";
 
 export const NAV = { content: "content", design: "design", settings: "settings" } as const;
 
@@ -182,7 +184,7 @@ export function blockTabs(
 		const shared = typeof row.shared === "number" || typeof row.shared === "string" ? Number(row.shared) : null;
 		const body = s.stack([
 			...(shared === null
-				? prefixedForm(blocks, kind, id, s, `block_${id}_active`)
+				? bindCmsFields(prefixedForm(blocks, kind, id, s, `block_${id}_active`), fieldBinding(cms))
 				: [
 						s
 							.displayText(`Shared block “${options.sharedNames?.get(shared) ?? `#${shared}`}”: edit it under Design → Shared blocks.`)

@@ -64,7 +64,7 @@ export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, plac
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
-	pageTypes: [], // extra page types next to page, category, article
+	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
@@ -84,11 +84,43 @@ createAdmin({
 	pages: [...cms.admin.pages, ...mine],
 	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
-	hostRules: kyselyRules(db),
+	hostRules: { ...kyselyRules(db), ...cms.admin.hostRules }, // link_shape, page_ref
 	context: cms.admin.context, // content locales = admin-active languages
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
 });
 ```
+
+### Page types
+
+A page type's custom fields are a zod object (`fields`) next to their admin
+form (`form`); `definePageType` keeps the literal key, and `createCms` infers
+`PageProps` from `pageTypes`, a union by `page.type`:
+
+```ts
+import { definePageType, pagesField } from "@tbtop/cms";
+
+export const recipeType = definePageType({
+	key: "recipe",
+	fields: z.object({ minutes: z.number().nullable(), related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
+	form: (s) => [s.number("minutes").label("Minutes"), pagesField("related").of("article")],
+});
+
+const cms = createCms({ db, blocks, pageTypes: [recipeType] });
+const result = await cms.loadPage(request);
+if (result.type === "page" && result.props.page.type === "recipe") {
+	result.props.page.fields.minutes; // number | null
+}
+```
+
+- `createCms` throws when a type's form field names and schema keys differ
+  (a schema without a form needs its own `resolveFields`).
+- The resolved fields (FormResolver over `form`, or `resolveFields`) are
+  parsed with the schema; fields that fail it are left out with a
+  `page.fields_resolve_failed` warning, or throw under `strictBlocks`.
+- A subtype's fields are optional on its base type's member. A page whose
+  type is not registered still renders, outside the union.
+- `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
+  or `Cms` keeps `fields` as untyped JSON.
 
 `migrateCms` creates the tables from scratch: run it on a fresh database, not
 on one the Laravel package already migrated (its tables exist and the
@@ -127,6 +159,43 @@ package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone. A fixture language marked `default` takes over
 from the installed one (which stays, non-default: pass `defaultLanguage` to
 `migrateCms` to install the right one).
+
+## Link and pages fields
+
+`linkField` and `pagesField` go into a host block's `form()` (or a page
+type's), as `$s->link()` / `$s->pages()` do in PHP:
+
+```ts
+import { linkField, pagesField } from "@tbtop/cms";
+
+Promo: {
+	form: (s) => [
+		s.text("title").label("Title").translatable(),
+		linkField("cta").label("Button").types(["page", "external"]), // default: page, external, email, phone
+		pagesField("related").label("Related").of("article").max(3), // of(type, subtype?); exceptPage(id)
+	],
+},
+```
+
+- A link stores `{ type, page, value, anchor, label }` (never an href, so a
+  page link survives a slug change) and resolves to `{ href, type, label }`
+  or null: a page that is not live or has no slug in the locale, a malformed
+  value. The label is per locale; without one it is the page's name or the
+  typed target.
+- A pages field stores page ids as strings in the order picked and resolves
+  to the live ones as `{ id, name, url }[]`; drafts, trashed and unknown ids
+  drop out.
+- On save the admin checks `link_shape` (type, target format, an existing
+  page, label locales and length) and `page_ref` (each id exists) as host
+  rules: merge `cms.admin.hostRules` into `createAdmin({ hostRules })`, or a
+  save with these fields fails on an unknown rule.
+- The pages field is a plain async multi-select on the wire, so the stock
+  admin client renders it. The link field is the custom `link` kind: the
+  admin bundle needs the CMS link client (`linkFieldClient`, the PHP
+  package's `resources/js/cms/admin/link`) registered, or the client shows
+  its unknown-field placeholder. Its page picker posts to
+  `{adminPrefix}/link/page-search/select-options/page`, an admin page the
+  CMS adds to `cms.admin.pages`.
 
 ## React (`@tbtop/cms/react`)
 
@@ -276,6 +345,7 @@ it is ignored with a warning and the built-in template answers.
 ## Not yet
 
 Secret settings (Laravel Crypt), legacy HTML richtext conversion (escaped instead), auto-redirects on slug change,
-page revisions, page refs, audit log, 404 log, caching, source-backed page types, the
+page revisions, the page-refs reverse index (`referencedBy`), audit log, 404 log, caching, source-backed page types, the
 remaining admin pages (dashboard, users, health, SEO report), test sends
-from the notification settings, owner-only template editing.
+from the notification settings, owner-only template editing, the link
+field's admin client shipped from this package.

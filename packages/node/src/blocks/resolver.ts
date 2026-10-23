@@ -54,10 +54,10 @@ async function resolveFields(site: Site, page: Page, locale: string, locales: st
 	let out: Record<string, unknown> = {};
 	for (const [i, type] of types.entries()) {
 		try {
-			const later = new Set(types.slice(i + 1).flatMap((next) => fieldNames(next.fields(new S()))));
+			const later = new Set(types.slice(i + 1).flatMap((next) => fieldNames(next.form(new S()))));
 			const own = Object.fromEntries(Object.entries(stored).filter(([key]) => !later.has(key)));
 			const ctx = await site.resolveContext(locale, page, out);
-			const input = flattenLocales(own, locale, ctx.fallbackLocale, locales, translatablePaths(type.fields(new S())));
+			const input = flattenLocales(own, locale, ctx.fallbackLocale, locales, translatablePaths(type.form(new S())));
 			out = { ...out, ...(await type.resolveFields(input, ctx)) };
 		} catch (error) {
 			if (site.config.strictBlocks === true) {

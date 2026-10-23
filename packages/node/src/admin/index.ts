@@ -1,9 +1,10 @@
-import type { AdminContext, PageDef } from "@tbtop/admin";
+import type { AdminContext, HostRule, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { gated } from "./abilities";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
 import { languageEdit, languageNew, languagesIndex } from "./languages";
+import { cmsHostRules, linkPageSearch } from "./linkFields";
 import { notificationSettings } from "./notifications";
 import { pageEdit, pagesIndex } from "./pages";
 import { seoSettings, siteSettings } from "./settings";
@@ -15,6 +16,8 @@ export type CmsAdmin = {
 	navigationGroups: { key: string; label: string; icon: string }[];
 	/** Request context for createAdmin({ context }): content locales from the admin-active languages. */
 	context: (request: Request) => Promise<Partial<AdminContext>>;
+	/** The link and pages fields' rules (`link_shape`, `page_ref`): createAdmin({ hostRules: { ...kyselyRules(db), ...cms.admin.hostRules } }). */
+	hostRules: Record<string, HostRule>;
 };
 
 export function adminPages(cms: Cms): CmsAdmin {
@@ -35,7 +38,9 @@ export function adminPages(cms: Cms): CmsAdmin {
 			gated(cms, "tbtop-cms.settings", siteSettings(cms)),
 			gated(cms, "tbtop-cms.settings", seoSettings(cms)),
 			gated(cms, "tbtop-cms.settings", notificationSettings(cms)),
+			gated(cms, "tbtop-cms.pages", linkPageSearch(cms)),
 		] as PageDef[],
+		hostRules: cmsHostRules(cms),
 		navigationGroups: [
 			{ key: "content", label: "Content", icon: "files" },
 			{ key: "design", label: "Design", icon: "palette" },

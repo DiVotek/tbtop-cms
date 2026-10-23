@@ -1,5 +1,6 @@
 import type { ResolvedLink } from "../content/link";
 import type { Page, TranslatableField } from "../content/page";
+import type { PageRef } from "../content/pageRefs";
 
 /** What a block's or page type's resolve() reads besides its own input (ResolveContext.php). */
 export type ResolveContext = {
@@ -12,6 +13,8 @@ export type ResolveContext = {
 	mediaUrl(ref: string): string | null;
 	richtextHtml(value: unknown): string;
 	link(value: unknown): Promise<ResolvedLink | null>;
+	/** A pages field value to its live pages, `{ id, name, url }` in this locale (PageRefList). */
+	pages(value: unknown): Promise<PageRef[]>;
 	/** A translatable page column as text, locale then fallback. */
 	pageText(field: TranslatableField): string | null;
 	/** A package string (`forms.contact.heading`) in this locale. */

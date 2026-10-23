@@ -6,6 +6,7 @@ import { Layouts } from "./content/layouts";
 import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from "./content/link";
 import { firstText, type Page, translationText } from "./content/page";
 import { Pages } from "./content/pages";
+import { resolvePageRefs } from "./content/pageRefs";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { richtextHtml } from "./content/richtext";
@@ -127,6 +128,7 @@ export class Site {
 			mediaUrl: (ref) => this.mediaUrl(ref),
 			richtextHtml,
 			link: (value) => this.link(value, locale),
+			pages: (value) => resolvePageRefs(this, value, locale),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
 		};

@@ -11,13 +11,13 @@ import type { SchemaTypeDef } from "./seo/schemaTypes";
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
 export type MediaDetails = { url: string; alt?: string | null; mime?: string | null; width?: number | null; height?: number | null };
 
-export type CmsConfig = {
+export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = {
 	/** The host's Kysely instance over a database the package migrations ran on. */
 	db: Kysely<CmsDatabase>;
 	/** The block kinds: `implementBlocks({ ...cmsBlocks, ...mine }, { ...cmsBlockImpls, ...myImpls })`. */
 	blocks: BlockRegistry;
 	/** Extra page types next to the built-in page, category and article. */
-	pageTypes?: PageTypeDef[];
+	pageTypes?: T;
 	/** Extra JSON-LD schema types next to the built-in WebPage family, Article family and CollectionPage. */
 	schemaTypes?: SchemaTypeDef[];
 	/** The public site origin (`https://example.com`); default: the request's origin. */
