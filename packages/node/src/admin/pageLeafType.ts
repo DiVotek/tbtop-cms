@@ -44,13 +44,10 @@ export function subtypeOptions(types: PageTypes, base: string): { value: string;
 	return options.length === 0 ? [] : [{ value: "", label: "None" }, ...options];
 }
 
-/** A form's parent id: blank, "none" or not a number is no parent. */
+/** A form's parent id: anything but a positive decimal id (blank, "none", "1e3") is no parent. */
 export function formParentId(value: unknown): number | null {
-	if (value === null || value === undefined || value === "" || value === "none") {
-		return null;
-	}
-	const id = Number(value);
-	return Number.isInteger(id) ? id : null;
+	const text = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";
+	return /^[1-9]\d*$/.test(text) ? Number(text) : null;
 }
 
 /** A form's subtype: blank is the plain base type. */

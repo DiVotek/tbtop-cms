@@ -92,6 +92,9 @@
 		"@tbtop/inertia-admin": {
 			"optional": true
 		},
+		"better-auth": {
+			"optional": true
+		},
 		"react": {
 			"optional": true
 		}

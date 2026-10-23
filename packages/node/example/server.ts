@@ -45,7 +45,9 @@ ${blocks.map((block) => `<section data-kind="${esc(block?.type)}"><pre>${esc(JSO
 }
 
 const port = Number(process.env.PORT ?? 3100);
+// A local demo: everyone is signed in and sees drafts, so it listens on loopback only.
 Bun.serve({
+	hostname: "127.0.0.1",
 	port,
 	async fetch(request) {
 		const handled = (await cms.handle(request)) ?? (await admin.handle(request));

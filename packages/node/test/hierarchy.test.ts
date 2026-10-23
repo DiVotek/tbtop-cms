@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createAdmin } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import { get, makeCms } from "./support";
+import { formParentId } from "../src/admin/pageLeafType";
 
 const en = (name: string) => ({ en: name });
 
@@ -153,5 +154,12 @@ describe("page guards (PageObserver)", () => {
 		expect(await options(ids.about as number)).toEqual([ids.blog as number, inner.id]);
 		expect(await options(ids["first-post"] as number)).toEqual([ids.blog as number, inner.id]);
 		expect(await options(ids.blog as number)).toEqual([]);
+	});
+});
+
+describe("a submitted parent id", () => {
+	test("only a positive decimal id names a parent", () => {
+		expect(["7", 7, " 12 "].map(formParentId)).toEqual([7, 7, 12]);
+		expect(["", "  ", "none", "0", "1e3", "0x10", "-3", "2.5", null, undefined].map(formParentId)).toEqual(Array(10).fill(null));
 	});
 });
