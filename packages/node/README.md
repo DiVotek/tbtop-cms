@@ -15,7 +15,7 @@ has the React half: the SEO head, the block renderer and the built-in blocks.
 cd packages/node
 ./scripts/fetch-admin.sh   # builds @tbtop/admin from DiVotek/tbtop at ADMIN_SHA
 bun install
-bun run test && bun run typecheck   # `bun test` alone also runs the workbench specs
+bun run test && bun run typecheck
 bun example/server.ts      # demo site on :3100, admin JSON under /admin
 ```
 
@@ -511,7 +511,8 @@ run `migrateCms` from the Worker (a deploy hook or a guarded route).
 - Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
   tiles trended over 14 days, leads-by-status and daily submission charts,
   the latest pages and submissions; the page parts need
-  `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`), the SEO report (missing titles, descriptions,
+  `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`, the layout tile
+  `tbtop-cms.design`), the SEO report (missing titles, descriptions,
   translations and OG images, duplicates, noindex, per live page and
   frontend locale, with a daily history in `tbtop_seo_audit_snapshots`),
   pages list and editor (General, SEO, a tab per block, Publishing),

@@ -83,9 +83,10 @@ export function dashboard(cms: Cms) {
 		view: async (s, { request }) => {
 			const showSubmissions = await allows(cms, "tbtop-cms.submissions");
 			const showPages = await allows(cms, "tbtop-cms.pages");
+			const showDesign = await allows(cms, "tbtop-cms.design");
 			const fallback = await cms.site(request).languages.defaultLocale();
 			return s.stack([
-				s.grid({ cols: 3 }, await stats(s, cms, { showPages, showSubmissions })),
+				s.grid({ cols: 3 }, await stats(s, cms, { showPages, showSubmissions, showDesign })),
 				...(showSubmissions ? [s.grid({ cols: 2 }, charts(s, cms))] : []),
 				s.grid({ cols: 2 }, [
 					...(showPages
@@ -139,7 +140,7 @@ export function dashboard(cms: Cms) {
 	});
 }
 
-async function stats(s: S, cms: Cms, { showPages, showSubmissions }: { showPages: boolean; showSubmissions: boolean }) {
+async function stats(s: S, cms: Cms, { showPages, showSubmissions, showDesign }: { showPages: boolean; showSubmissions: boolean; showDesign: boolean }) {
 	const db = cms.config.db;
 	const window = since(TREND_DAYS);
 	// Counts in SQL; only the trend window's rows come back.
@@ -171,15 +172,17 @@ async function stats(s: S, cms: Cms, { showPages, showSubmissions }: { showPages
 		const tile = s.stat("New submissions").value(needsReview).icon("inbox").sparkline(trend(recent), "bottom");
 		tiles.push(needsReview > 0 ? tile.description("Need review").color("warning") : tile);
 	}
-	const layouts = await db.selectFrom("tbtop_layouts").select("created_at").execute();
-	tiles.push(
-		s
-			.stat("Layouts")
-			.value(layouts.length)
-			.description(`${layouts.length} of 2 slots set`)
-			.icon("layout-template")
-			.sparkline(trend(layouts), "bottom"),
-	);
+	if (showDesign) {
+		const layouts = await db.selectFrom("tbtop_layouts").select("created_at").execute();
+		tiles.push(
+			s
+				.stat("Layouts")
+				.value(layouts.length)
+				.description(`${layouts.length} of 2 slots set`)
+				.icon("layout-template")
+				.sparkline(trend(layouts), "bottom"),
+		);
+	}
 	return tiles;
 }
 

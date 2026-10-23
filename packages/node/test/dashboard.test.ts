@@ -82,4 +82,10 @@ describe("dashboard", () => {
 		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["New submissions", "Layouts"]);
 		expect(all.filter((node) => node.kind === "list")).toHaveLength(1);
 	});
+
+	test("without the design ability the layout tile is left out", async () => {
+		const { page } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.design" });
+		const all = nodes((await page("/admin/dashboard")).props);
+		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["Pages", "New submissions"]);
+	});
 });
