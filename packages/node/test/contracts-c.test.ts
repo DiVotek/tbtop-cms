@@ -5,7 +5,7 @@ import type { Kysely } from "kysely";
 import { createElement } from "react";
 import { z } from "zod";
 import { renderToString } from "react-dom/server";
-import { cmsBlockImpls, cmsBlocks, type Fixture, implementBlocks, migrateCms, type PageProps } from "../src";
+import { BlockResolutionError, cmsBlockImpls, cmsBlocks, type Fixture, implementBlocks, migrateCms, type PageProps } from "../src";
 import { GtmNoscript, seoHead, seoTags } from "../src/react";
 import { get, makeCms, testDialect } from "./support";
 
@@ -206,5 +206,67 @@ describe("placements by page type and subtype (q17)", () => {
 		const added = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "ArticleOnly" } } }, url);
 		expect(added.status).toBe(200);
 		expect(((await cms.site().pages.find(article.id))?.content ?? []).map((row) => (row as { kind: string }).kind)).toEqual(["ArticleOnly"]);
+	});
+});
+
+describe("props that fail the catalog schema (q05)", () => {
+	const quote = () =>
+		implementBlocks(
+			{ ...cmsBlocks, Quote: { props: z.object({ text: z.string() }) } },
+			{ ...cmsBlockImpls, Quote: { form: (s) => [s.text("text").translatable()], resolve: (input) => ({ text: (input.text as string) ?? null }) as never } },
+		);
+
+	async function home(config: { strictBlocks?: boolean } = {}, content: unknown[] = [{ id: "bad", kind: "Quote", data: {} }]) {
+		const { cms, ids } = await makeCms({ languages: en, pages: [{ key: "home", system: true, name: { en: "Home" } }] }, { blocks: quote(), ...config });
+		await cms.site().pages.update(ids.home as number, { content: [{ id: "ok", kind: "Quote", data: { text: { en: "Hi" } } }, ...content] as never });
+		return () => cms.loadPage(get("/"));
+	}
+
+	/** Runs `fn` with NODE_ENV (or the Workers user agent) as given, then puts them back. */
+	async function under<T>(env: { nodeEnv?: string; workers?: boolean }, fn: () => Promise<T>): Promise<T> {
+		const nodeEnv = process.env.NODE_ENV;
+		const nav = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+		if (env.nodeEnv !== undefined) process.env.NODE_ENV = env.nodeEnv;
+		if (env.workers === true) Object.defineProperty(globalThis, "navigator", { value: { userAgent: "Cloudflare-Workers" }, configurable: true });
+		try {
+			return await fn();
+		} finally {
+			if (nodeEnv === undefined) delete process.env.NODE_ENV;
+			else process.env.NODE_ENV = nodeEnv;
+			if (nav !== undefined) Object.defineProperty(globalThis, "navigator", nav);
+		}
+	}
+
+	const children = async (load: () => ReturnType<Awaited<ReturnType<typeof makeCms>>["cms"]["loadPage"]>) => {
+		const result = await load();
+		if (result.type !== "page") throw new Error(result.type);
+		return result.props.render.elements.$root?.children;
+	};
+
+	test("in development the page load throws; in production the block is dropped", async () => {
+		const load = await home();
+		await under({ nodeEnv: "development" }, async () => {
+			await expect(load()).rejects.toBeInstanceOf(BlockResolutionError);
+		});
+		expect(await under({ nodeEnv: "production" }, () => children(load))).toEqual(["ok"]);
+	});
+
+	test("on Workers (no NODE_ENV) the default is to drop", async () => {
+		const load = await home();
+		expect(await under({ nodeEnv: "development", workers: true }, () => children(load))).toEqual(["ok"]);
+	});
+
+	test("strictBlocks set either way wins over the environment", async () => {
+		const strict = await home({ strictBlocks: true });
+		await under({ nodeEnv: "production" }, async () => {
+			await expect(strict()).rejects.toThrow("props do not match the catalog");
+		});
+		const lenient = await home({ strictBlocks: false });
+		expect(await under({ nodeEnv: "development" }, () => children(lenient))).toEqual(["ok"]);
+	});
+
+	test("rows the editor can break (an unknown kind) are still skipped in development", async () => {
+		const load = await home({}, [{ id: "gone", kind: "Nope", data: {} }]);
+		expect(await under({ nodeEnv: "development" }, () => children(load))).toEqual(["ok"]);
 	});
 });

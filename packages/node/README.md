@@ -191,7 +191,10 @@ it is ignored with a warning and the built-in template answers.
 - Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
-  field kind), resolved props validated against the catalog's zod schema.
+  field kind), resolved props validated against the catalog's zod schema
+  (a mismatch is dropped with a warning in production and throws
+  `BlockResolutionError` in development: on Node and Bun a `NODE_ENV`
+  other than `production`, unset included; never on Workers; `strictBlocks` true or false overrides it).
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
