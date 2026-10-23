@@ -1,4 +1,4 @@
-import type { NotificationStore } from "@tbtop/admin";
+import type { HostRule, NotificationStore } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
@@ -61,6 +61,13 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	strings?: Record<string, Record<string, string>>;
 	debug?: boolean;
 	forms?: FormsConfig;
+	/**
+	 * The host's validation rules (`kyselyRules(db)` for `unique`/`exists`,
+	 * its own). Form submits and `cms.admin.hostRules` both carry them next
+	 * to the CMS's `link_shape` and `page_ref`, so a block's `submit.rules`
+	 * and the admin validate with one set. The CMS's own rules win a name clash.
+	 */
+	hostRules?: Record<string, HostRule>;
 	notifications?: NotificationsConfig;
 	/** `redirects.allowedExternalHosts`: hosts an external redirect target may use, matched case-insensitively (`tbtop-cms.redirects.allowed_external_hosts`); default none. */
 	redirects?: { allowedExternalHosts?: string[] };

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { demoFixture, ensureErrorPages, type ErrorPageProps, type LoadResult } from "../src";
+import type { HostRule } from "@tbtop/admin";
+import { kyselyRules } from "@tbtop/admin/kysely";
+import { cmsBlockImpls, cmsBlocks, type CmsConfig, demoFixture, ensureErrorPages, type ErrorPageProps, implementBlocks, type LoadResult } from "../src";
 import { seoTags } from "../src/react";
 import { get, makeCms } from "./support";
 
@@ -81,5 +83,73 @@ describe("error pages (q09)", () => {
 		});
 		expect(notFound(await cms.loadPage(get("/nope"))).page.heading).toBe("Nothing here");
 		expect(await ensureErrorPages(cms)).toEqual(["5xx"]);
+	});
+});
+
+describe("form validation host rules (q13)", () => {
+	type Made = Awaited<ReturnType<typeof makeCms>>;
+	const late: { db?: Made["db"] } = {};
+	/** kyselyRules over the test's own database, which exists only once makeCms ran. */
+	const lateKysely = (name: string): HostRule => ({
+		message: "The :attribute has already been taken.",
+		check: (value, params, key) => {
+			const rule = late.db === undefined ? undefined : kyselyRules(late.db)[name];
+			if (rule === undefined) {
+				throw new Error(`no ${name} rule`);
+			}
+			return rule.check(value, params, key);
+		},
+	});
+	const even: HostRule = { message: "The :attribute must be even.", check: (value) => Number(value) % 2 === 0 };
+
+	async function site(rules: Record<string, string>, hostRules?: CmsConfig["hostRules"]) {
+		const made = await makeCms(undefined, {
+			blocks: implementBlocks(cmsBlocks, { ...cmsBlockImpls, ContactForm: { ...cmsBlockImpls.ContactForm, submit: { rules: () => rules } } }),
+			...(hostRules === undefined ? {} : { hostRules }),
+		});
+		late.db = made.db;
+		const home = await made.cms.loadPage(get("/"));
+		if (home.type !== "page") {
+			throw new Error("no home");
+		}
+		const form = Object.values(home.props.render.elements).find((element) => element.type === "ContactForm");
+		const action = (form?.props as { action: string }).action;
+		const submit = async (body: Record<string, unknown>) => {
+			const res = await made.cms.handle(new Request(new URL(action, "https://site.test"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+			if (res === null) {
+				throw new TypeError("the submit fell through");
+			}
+			return { status: res.status, body: (await res.json()) as { ok: boolean; errors?: Record<string, string[]> } };
+		};
+		return { ...made, submit };
+	}
+
+	test("a block's rules run with the host's rules: unique/exists from kyselyRules and the host's own", async () => {
+		const { submit, db } = await site({ locale: "required|unique:tbtop_languages,locale", count: "required|even" }, { unique: lateKysely("unique"), even });
+		expect(await submit({ locale: "en", count: 3 })).toMatchObject({ status: 422, body: { ok: false, errors: { locale: [expect.any(String)], count: ["The count must be even."] } } });
+		expect(await submit({ locale: "fr", count: 4 })).toEqual({ status: 200, body: { ok: true } });
+		expect(await db.selectFrom("tbtop_form_submissions").select("id").execute()).toHaveLength(1);
+	});
+
+	test("the CMS's own rules (page_ref) validate a form too, and cms.admin.hostRules carries the host's", async () => {
+		const { submit, cms, ids } = await site({ page: "required|page_ref" }, { even });
+		expect((await submit({ page: String(ids.about) })).status).toBe(200);
+		expect((await submit({ page: "999999" })).status).toBe(422);
+		expect(await cms.admin.hostRules.even?.check("2", [], "n")).toBe(true);
+	});
+
+	test("an unknown rule answers failed with a form error instead of an unhandled 500", async () => {
+		const { submit, db } = await site({ email: "required|unique:users,email" });
+		const errors: unknown[] = [];
+		const original = console.error;
+		console.error = (...args: unknown[]) => void errors.push(args);
+		try {
+			const res = await submit({ email: "ada@example.test" });
+			expect(res).toEqual({ status: 500, body: { ok: false, errors: { form: [expect.any(String)] } } });
+		} finally {
+			console.error = original;
+		}
+		expect(errors).toHaveLength(1);
+		expect(await db.selectFrom("tbtop_form_submissions").select("id").execute()).toHaveLength(0);
 	});
 });

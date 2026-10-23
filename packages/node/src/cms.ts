@@ -73,7 +73,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 		},
 		handle: async (request) => {
 			if (request.method === "POST") {
-				return submitForm(site(request), request, throttle);
+				return submitForm(site(request), request, throttle, cms.admin.hostRules);
 			}
 			if (request.method !== "GET" && request.method !== "HEAD") {
 				return null;

@@ -71,6 +71,7 @@ const cms = createCms({
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
 	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
+	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
 });
 
 // Frontend
@@ -85,7 +86,7 @@ createAdmin({
 	pages: [...cms.admin.pages, ...mine],
 	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
-	hostRules: { ...kyselyRules(db), ...cms.admin.hostRules }, // link_shape, page_ref
+	hostRules: cms.admin.hostRules, // the config's hostRules + link_shape, page_ref
 	context: cms.admin.context, // content locales = admin-active languages
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
 });
@@ -214,7 +215,7 @@ Promo: {
   drop out.
 - On save the admin checks `link_shape` (type, target format, an existing
   page, label locales and length) and `page_ref` (each id exists) as host
-  rules: merge `cms.admin.hostRules` into `createAdmin({ hostRules })`, or a
+  rules: pass `cms.admin.hostRules` to `createAdmin({ hostRules })`, or a
   save with these fields fails on an unknown rule.
 - The pages field is a plain async multi-select on the wire, so the stock
   admin client renders it. The link field is the custom `link` kind: the
@@ -274,6 +275,14 @@ for the host's own work (a CRM call). `ContactForm` ships with rules and no
 handler. The block's props carry `action` and `honeypotField`; post the
 fields there as JSON (`{ ok }`, 422 `{ errors }`, 500 `{ errors: { form } }`)
 or as a plain form (303 back to the page with `cms_form_status`).
+
+The rules run with the admin's rule set: the built-in Laravel rules, the
+CMS's `link_shape` and `page_ref`, and the config's `hostRules` (pass
+`kyselyRules(db)` there for `unique`/`exists`, and a rule of the host's
+own, `{ check, message }`, for a block that needs one). The same set is
+`cms.admin.hostRules` for createAdmin. A rule nobody defines, or a `rules`
+that throws, answers `failed` (500 `{ errors: { form } }`, logged as
+`form.submit.validation_failed`) and stores nothing.
 
 A form an editor does not place (one a page type's `template()` or the host
 renders) gets a name: `formName: "service-order"` next to `submit` in its
