@@ -99,3 +99,28 @@ it('still resolves a title when a sibling locale key belongs to a since-deleted 
         ->assertOk()
         ->assertJsonPath('props.render.elements.hero-1.props.title', 'Welcome');
 });
+
+it('drops a cta whose link runs script', function (string $href): void {
+    $props = (new HeroBlock)->resolve(
+        ['title' => 'Welcome', 'ctaLabel' => 'Go', 'ctaHref' => $href],
+        new ResolveContext('en', 'en'),
+    );
+
+    expect($props['cta'])->toBeNull();
+})->with(['javascript:alert(1)', 'JavaScript:alert(1)', "java\tscript:alert(1)", 'data:text/html,x', 'vbscript:x']);
+
+it('keeps a cta with a relative, web, mail, phone or messenger link', function (string $href): void {
+    $props = (new HeroBlock)->resolve(
+        ['title' => 'Welcome', 'ctaLabel' => 'Go', 'ctaHref' => $href],
+        new ResolveContext('en', 'en'),
+    );
+
+    expect($props['cta'])->toBe(['label' => 'Go', 'href' => $href]);
+})->with(['/contact', 'contact#form', '#form', '?ref=hero', 'https://example.test/a:b', 'mailto:a@example.test', 'tel:+380441234567', 'tg://resolve?domain=tbtop']);
+
+it('rejects a script link when the editor saves it', function (): void {
+    $validator = validator(['ctaHref' => 'javascript:alert(1)'], ['ctaHref' => ['safe_href']]);
+
+    expect($validator->fails())->toBeTrue()
+        ->and(validator(['ctaHref' => '/contact'], ['ctaHref' => ['safe_href']])->passes())->toBeTrue();
+});
