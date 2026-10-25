@@ -5,6 +5,7 @@ import { LEAD_STATUSES, type LeadStatus, submissionFromRow } from "../forms/subm
 import { leadIdentity } from "../forms/lead";
 import { parseDate, sqlDate } from "../support/values";
 import { allows } from "./abilities";
+import { environmentCards, systemMetrics } from "./dashboardSystem";
 import { adminPrefix } from "./support";
 
 const TREND_DAYS = 14;
@@ -63,10 +64,10 @@ export function ago(date: Date | null, now = new Date()): string {
 
 /**
  * DashboardPage: KPI tiles trended over 14 days, the inbox charts, the
- * latest pages and submissions. Open to every admin; the submission parts
- * need `tbtop-cms.submissions`. Off the nav, like PHP (reached by URL or
- * the host's home link). Media and server metrics are the host's, so the
- * PHP media tile and system section have no counterpart.
+ * latest pages and submissions, and the System section (machine metrics,
+ * versions, database). Open to every admin; the submission parts need
+ * `tbtop-cms.submissions`. Off the nav, like PHP (reached by URL or the
+ * host's home link). Node has no media library, so no Media tile.
  */
 /** The view's pages check for its header: @tbtop/admin builds headerActions (sync) right after view, on the same request. */
 const canAddPage = new WeakMap<Request, boolean>();
@@ -77,7 +78,7 @@ export function dashboard(cms: Cms) {
 	return definePage({
 		path: "dashboard",
 		title: "Dashboard",
-		subtitle: "Welcome back",
+		subtitle: "Welcome to TableTop CMS.",
 		headerActions: (s, { request }) => [
 			s.action("dashboardRefresh").label("Refresh").icon("refresh-cw").url(`${prefix}/dashboard`),
 			s.action("dashboardViewSite").label("View site").icon("external-link").url(cms.config.url ?? "/").openUrlInNewTab(),
@@ -89,13 +90,14 @@ export function dashboard(cms: Cms) {
 			canAddPage.set(request, showPages);
 			const showDesign = await allows(cms, "tbtop-cms.design");
 			const fallback = await cms.site(request).languages.defaultLocale();
+			const tiles = await stats(s, cms, { showPages, showSubmissions, showDesign });
 			return s.stack([
-				s.grid({ cols: 3 }, await stats(s, cms, { showPages, showSubmissions, showDesign })),
+				s.grid({ cols: Math.max(1, tiles.length) }, tiles),
 				...(showSubmissions ? [s.grid({ cols: 2 }, charts(s, cms))] : []),
 				s.grid({ cols: 2 }, [
 					...(showPages
 						? [
-								s.section({ title: "Recently updated pages", variant: "card", actions: [s.action("dashboardOpenPages").label("All pages").url(`${prefix}/pages`).link().size("sm")] }, [
+								s.section({ title: "Recently updated pages", variant: "card", actions: [s.action("dashboardOpenPages").label("Open pages").url(`${prefix}/pages`).link().size("sm")] }, [
 									s.list("dashboardRecentPages").items(async () => {
 									if (!(await allows(cms, "tbtop-cms.pages"))) {
 										return [];
@@ -117,7 +119,7 @@ export function dashboard(cms: Cms) {
 					...(showSubmissions
 						? [
 								s.section(
-									{ title: "Latest submissions", variant: "card", actions: [s.action("dashboardOpenSubmissions").label("Inbox").url(`${prefix}/form-submissions`).link().size("sm")] },
+									{ title: "Latest submissions", variant: "card", actions: [s.action("dashboardOpenSubmissions").label("Open submissions").url(`${prefix}/form-submissions`).link().size("sm")] },
 									[
 										s.list("dashboardLatestSubmissions").items(async () => {
 											if (!(await allows(cms, "tbtop-cms.submissions"))) {
@@ -139,6 +141,7 @@ export function dashboard(cms: Cms) {
 							]
 						: []),
 				]),
+				s.section({ title: "System" }, [s.grid({ cols: 3 }, await systemMetrics(s)), s.grid({ cols: 2 }, environmentCards(s, cms))]),
 			]);
 		},
 	});
@@ -166,7 +169,7 @@ async function stats(s: S, cms: Cms, { showPages, showSubmissions, showDesign }:
 			s
 				.stat("Layouts")
 				.value(layouts.length)
-				.description(`${layouts.length} of 2 slots set`)
+				.description(`${layouts.length} layouts`)
 				.icon("layout-template")
 				.sparkline(trend(layouts), "bottom"),
 		);
@@ -195,7 +198,7 @@ function charts(s: S, cms: Cms) {
 	return [
 		s
 			.chart("leads-by-status", "donut")
-			.set("title", "Leads by status")
+			.set("title", "Submissions by status")
 			.set("nameKey", "label")
 			.set("series", [{ dataKey: "value" }])
 			// Each submission closure checks the ability itself too, not only the view that leaves it out.
@@ -213,7 +216,7 @@ function charts(s: S, cms: Cms) {
 			}),
 		s
 			.chart("submissions-daily", "area")
-			.set("title", "Submissions per day")
+			.set("title", "Submissions over time")
 			.set("xKey", "date")
 			.set("series", [{ dataKey: "value", label: "Submissions" }])
 			.params([

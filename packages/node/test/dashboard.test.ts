@@ -11,7 +11,12 @@ const fixture = {
 	],
 };
 
-type Wire = { kind: string; options: Record<string, unknown> };
+type Wire = { kind: string; name?: string; options: Record<string, unknown> };
+
+/** The System section's own tiles and lists, apart from the KPI row and the recent lists. */
+const SYSTEM_STATS = ["CPU load", "Memory", "Disk"];
+const kpis = (all: Wire[]) => all.filter((node) => node.kind === "stat" && !SYSTEM_STATS.includes(String(node.options.label)));
+const recentLists = (all: Wire[]) => all.filter((node) => node.kind === "list" && !String(node.name).startsWith("dashboardSystem"));
 
 /** Every `{kind, options}` node of a serialized tree, depth first. */
 function nodes(tree: unknown): Wire[] {
@@ -34,13 +39,13 @@ describe("dashboard", () => {
 
 		const props = (await page("/admin/dashboard")).props as Record<string, unknown>;
 		const all = nodes(props);
-		const stats = all.filter((node) => node.kind === "stat").map((node) => [node.options.label, node.options.value]);
+		const stats = kpis(all).map((node) => [node.options.label, node.options.value]);
 		expect(stats).toEqual([
 			["Pages", 2],
 			["New submissions", 1],
 			["Layouts", 0],
 		]);
-		const lists = all.filter((node) => node.kind === "list");
+		const lists = recentLists(all);
 		const items = lists.map((list) => (list.options.items as { title: string; color: string }[]).map((item) => `${item.title}:${item.color}`));
 		expect(items.map((list) => list.toSorted())).toEqual([["Draft page:muted", "Home:success"], ["Ada · ada@example.com:danger"]]);
 
@@ -63,12 +68,25 @@ describe("dashboard", () => {
 		for (const name of ["leads-by-status", "submissions-daily"]) {
 			expect((await visit(`/admin/dashboard/data/${name}`, { inertia: false })).status).toBe(404);
 		}
-		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["Pages", "Layouts"]);
+		expect(kpis(all).map((node) => node.options.label)).toEqual(["Pages", "Layouts"]);
 		expect(all.filter((node) => node.kind.startsWith("chart"))).toEqual([]);
-		expect(all.filter((node) => node.kind === "list")).toHaveLength(1);
+		expect(recentLists(all)).toHaveLength(1);
 		const header = (await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.pages" })).page;
 		expect(JSON.stringify((await header("/admin/dashboard")).props)).not.toContain("dashboardNewPage");
 		expect(JSON.stringify((await (await panel(fixture)).page("/admin/dashboard")).props)).toContain("dashboardNewPage");
+	});
+
+	test("the System section: machine tiles, versions and the database", async () => {
+		const all = nodes((await (await panel(fixture)).page("/admin/dashboard")).props);
+		const system = all.filter((node) => node.kind === "stat" && SYSTEM_STATS.includes(String(node.options.label)));
+		expect(system.map((node) => node.options.label)).toEqual(SYSTEM_STATS);
+		const lists = Object.fromEntries(
+			all.filter((node) => String(node.name).startsWith("dashboardSystem")).map((node) => [node.name, (node.options.items as { title: string; meta: string }[]).map((item) => [item.title, item.meta])]),
+		);
+		expect(lists.dashboardSystemVersions?.map(([title]) => title)).toEqual(["Runtime", "@tbtop/admin version", "@tbtop/cms version"]);
+		expect(lists.dashboardSystemVersions?.[0]?.[1]).toStartWith("Bun ");
+		expect(lists.dashboardSystemInfrastructure?.[0]).toEqual(["Database driver", process.env.TBTOP_TEST_DB ?? "sqlite"]);
+		expect(lists.dashboardSystemInfrastructure?.[1]?.[1]).toMatch(/^\d+(\.\d)? (B|KB|MB|GB)$/);
 	});
 
 	test("relative times", () => {
@@ -82,13 +100,13 @@ describe("dashboard", () => {
 	test("without the pages ability the page tile and the recent pages are left out", async () => {
 		const { page } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.pages" });
 		const all = nodes((await page("/admin/dashboard")).props);
-		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["New submissions", "Layouts"]);
-		expect(all.filter((node) => node.kind === "list")).toHaveLength(1);
+		expect(kpis(all).map((node) => node.options.label)).toEqual(["New submissions", "Layouts"]);
+		expect(recentLists(all)).toHaveLength(1);
 	});
 
 	test("without the design ability the layout tile is left out", async () => {
 		const { page } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.design" });
 		const all = nodes((await page("/admin/dashboard")).props);
-		expect(all.filter((node) => node.kind === "stat").map((node) => node.options.label)).toEqual(["Pages", "New submissions"]);
+		expect(kpis(all).map((node) => node.options.label)).toEqual(["Pages", "New submissions"]);
 	});
 });
