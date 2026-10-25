@@ -128,20 +128,21 @@ export function pagesIndex(cms: Cms) {
 					// No edit page for a trashed row: it is not clickable.
 					.recordUrl((row) => (row.deleted_at === null || row.deleted_at === undefined ? `${prefix}/pages/${String(row.id)}/edit` : null))
 					.rowActions(rowActions(s, cms))
-					// A derived table under the same alias: the JSON name gets a text twin that LIKE accepts on Postgres.
+					// A derived table under the same alias holds every computed column (the JSON name's text twin
+					// that LIKE accepts on Postgres, the path, the display state): the panel adds only `*` on top,
+					// and MySQL refuses a bare `*` after other select items.
 					.query(() =>
-						db
-							.selectFrom(
-								db
-									.selectFrom("tbtop_pages")
-									.selectAll()
-									.select(sql<string>`cast(tbtop_pages.name as ${sql.raw(textType(db))})`.as("name_text"))
-									.as("tbtop_pages"),
-							)
-							.select((eb) => [
-								eb.selectFrom("tbtop_page_slugs").select("tbtop_page_slugs.path").whereRef("tbtop_page_slugs.page_id", "=", "tbtop_pages.id").where("tbtop_page_slugs.locale", "=", locale).limit(1).as("path"),
-								sql<string>`case when tbtop_pages.status <> 'published' then 'draft' when tbtop_pages.published_at is not null and tbtop_pages.published_at > ${now} then 'scheduled' when tbtop_pages.unpublish_at is not null and tbtop_pages.unpublish_at <= ${now} then 'expired' else 'published' end`.as("display_state"),
-							]),
+						db.selectFrom(
+							db
+								.selectFrom("tbtop_pages")
+								.selectAll()
+								.select((eb) => [
+									sql<string>`cast(tbtop_pages.name as ${sql.raw(textType(db))})`.as("name_text"),
+									eb.selectFrom("tbtop_page_slugs").select("tbtop_page_slugs.path").whereRef("tbtop_page_slugs.page_id", "=", "tbtop_pages.id").where("tbtop_page_slugs.locale", "=", locale).limit(1).as("path"),
+									sql<string>`case when tbtop_pages.status <> 'published' then 'draft' when tbtop_pages.published_at is not null and tbtop_pages.published_at > ${now} then 'scheduled' when tbtop_pages.unpublish_at is not null and tbtop_pages.unpublish_at <= ${now} then 'expired' else 'published' end`.as("display_state"),
+								])
+								.as("tbtop_pages"),
+						),
 					),
 			]);
 		},
