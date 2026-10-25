@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { safeHref } from "../content/safeHref";
 
 /**
  * Where an editor can place a block (Block::placements): `pages` is every
@@ -49,7 +50,8 @@ export const cmsBlocks = defineBlocks({
 			title: z.string(),
 			subtitle: z.string().nullable(),
 			image: z.string().nullable(),
-			cta: z.object({ label: z.string(), href: z.string() }).nullable(),
+			// The resolver already runs safeHref; the schema also refuses javascript:/data: from any other source of props.
+			cta: z.object({ label: z.string(), href: z.string().refine((href) => safeHref(href) !== null, "Unsafe link scheme.") }).nullable(),
 		}),
 	},
 	ContactForm: {

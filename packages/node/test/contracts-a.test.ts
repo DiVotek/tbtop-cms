@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
-import { type CmsAbility, type CmsConfig, previewLink, RedirectError } from "../src";
+import { type CmsAbility, type CmsConfig, cmsBlocks, previewLink, RedirectError } from "../src";
 import { get, makeCms } from "./support";
 
 type Row = { id: string; kind: string; active?: boolean; sort?: number; data?: Record<string, unknown> };
@@ -169,6 +169,14 @@ describe("Hero ctaHref allows only safe links (q04)", () => {
 		}
 		expect(verdicts).toEqual([...unsafe.map((href) => [href, false] as [string, boolean]), ...safe.map((href) => [href, true] as [string, boolean])]);
 		expect((await rows(home)).find((row) => row.id === hero.id)?.data?.ctaHref).toBe(safe.at(-1));
+	});
+
+	test("the catalog's Hero schema refuses an unsafe cta href from any source of props", () => {
+		const props = (href: string) => ({ title: "T", subtitle: null, image: null, cta: { label: "Go", href } });
+		for (const href of unsafe) {
+			expect([href, cmsBlocks.Hero.props.safeParse(props(href)).success]).toEqual([href, false]);
+		}
+		expect(cmsBlocks.Hero.props.safeParse(props("/contact#form")).success).toBe(true);
 	});
 });
 
