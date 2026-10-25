@@ -4,7 +4,7 @@ import { firstText, type Page } from "../content/page";
 import { PageRuleError } from "../content/pageRules";
 import { type Dict, isDict } from "../support/values";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
-import { adminPrefix, blockId, NAV, siteOf } from "./support";
+import { adminPrefix, blockId, listHeader, NAV, siteOf } from "./support";
 
 export const STATUS = [
 	{ value: "draft", label: "Draft" },
@@ -18,7 +18,7 @@ export function pagesIndex(cms: Cms) {
 	const prefix = adminPrefix(cms);
 	return definePage({
 		path: "pages",
-		title: "Pages",
+		...listHeader("content", "Pages"),
 		nav: { group: NAV.content, label: "Pages", icon: "files", order: 10 },
 		view: async (s, { request }) => {
 			const site = cms.site(request);

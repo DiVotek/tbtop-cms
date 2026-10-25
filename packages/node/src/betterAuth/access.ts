@@ -3,7 +3,7 @@ import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
 import type { CmsAbility } from "../admin/abilities";
 
 /** The CMS sections a role may open, next to the admin plugin's own `user` and `session` statements. */
-export const CMS_SECTIONS = ["pages", "submissions", "redirects", "settings", "design", "languages"] as const;
+export const CMS_SECTIONS = ["pages", "submissions", "redirects", "settings", "design", "languages", "audit"] as const;
 
 export const cmsStatements = { ...defaultStatements, cms: CMS_SECTIONS } as const;
 

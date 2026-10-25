@@ -11,6 +11,24 @@ import { fieldBinding } from "./linkFields";
 
 export const NAV = { content: "content", design: "design", settings: "settings" } as const;
 
+const GROUP_LABELS: Record<keyof typeof NAV, string> = { content: "Content", design: "Design", settings: "Settings" };
+
+/** A CMS list page's header as PHP sets it: the title, its subtitle, and the crumbs "Group > Title". */
+export const listHeader = (group: keyof typeof NAV, title: string, subtitle?: string) => ({
+	title,
+	...(subtitle === undefined ? {} : { subtitle }),
+	breadcrumbs: [{ label: GROUP_LABELS[group] }, { label: title }],
+});
+
+/** EditFooter: [delete?] … [Cancel] [Save], right-aligned; Cancel is a plain visit back. */
+export function editFooter(s: S, cancelUrl: string, save: unknown, remove?: unknown) {
+	const cancel = s.action("cancel").label("Cancel").url(cancelUrl);
+	return s.flex(remove === undefined ? [s.spacer(), cancel, save] : [remove, s.spacer(), cancel, save], { justify: "end" });
+}
+
+/** A record page's crumbs "Group > List > Record" (the list linked). */
+export const recordCrumbs = (group: keyof typeof NAV, list: { label: string; url: string }, title: string) => [{ label: GROUP_LABELS[group] }, list, { label: title }];
+
 export const adminPrefix = (cms: Cms): string => `/${(cms.config.adminPrefix ?? "admin").replace(/^\/+|\/+$/g, "")}`;
 
 /** A page action's per-request Site, from the action's request. */

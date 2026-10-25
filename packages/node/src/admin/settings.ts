@@ -5,7 +5,7 @@ import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
-import { NAV, siteOf } from "./support";
+import { adminPrefix, editFooter, listHeader, NAV, siteOf } from "./support";
 
 /** A settings page (SettingsPageBase): form fields mapped to dotted settings keys. */
 function settingsPage(
@@ -13,6 +13,7 @@ function settingsPage(
 	options: {
 		path: string;
 		title: string;
+		subtitle: string;
 		nav: { label: string; icon: string; order: number };
 		map: Record<string, string>;
 		fields: (s: S) => unknown[];
@@ -25,7 +26,7 @@ function settingsPage(
 ) {
 	return definePage({
 		path: options.path,
-		title: options.title,
+		...listHeader("settings", options.title, options.subtitle),
 		nav: { group: NAV.settings, ...options.nav },
 		view: async (s, { request }) => {
 			const settings = cms.site(request).settings;
@@ -39,7 +40,8 @@ function settingsPage(
 			return s
 				.form(options.path.replaceAll("/", "_"), [
 					...options.fields(s),
-					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
+					// No list to go back to: Cancel reloads this page (SettingsPageBase).
+					editFooter(s, `${adminPrefix(cms)}/${options.path}`, s.action("save").label("Save").color("primary").keybinding("mod+s").submit()),
 				])
 				.record(record)
 				.onSubmit(async (ctx) => {
@@ -117,8 +119,9 @@ function socialsComplete(form: Dict): string | null {
 export function siteSettings(cms: Cms) {
 	return settingsPage(cms, {
 		path: "settings/site",
-		title: "Site",
-		nav: { label: "Site", icon: "settings", order: 20 },
+		title: "Site settings",
+		subtitle: "General site identity: name, logo, and favicon.",
+		nav: { label: "Site settings", icon: "settings", order: 20 },
 		map: {
 			site_name: "site.name",
 			site_logo: "site.logo",
@@ -278,8 +281,9 @@ async function prepareSeo(form: Dict, site: Site): Promise<string | null> {
 export function seoSettings(cms: Cms) {
 	return settingsPage(cms, {
 		path: "settings/seo",
-		title: "SEO",
-		nav: { label: "SEO", icon: "search", order: 30 },
+		title: "SEO settings",
+		subtitle: "Default metadata used across the site unless a page overrides it.",
+		nav: { label: "SEO settings", icon: "search", order: 30 },
 		defaults: { seo_indexing_enabled: true, seo_twitter_card: "auto", seo_identity_type: "none", seo_not_found_enabled: true },
 		map: {
 			seo_indexing_enabled: "seo.indexing_enabled",

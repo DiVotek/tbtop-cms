@@ -4,7 +4,7 @@ import type { Cms } from "../cms";
 import { RedirectError } from "../content/redirects";
 import type { CmsDatabase } from "../db/schema";
 import { flag, isDict } from "../support/values";
-import { NAV, siteOf } from "./support";
+import { listHeader, NAV, siteOf } from "./support";
 
 type HitsQuery = SelectQueryBuilder<CmsDatabase, "tbtop_not_found_hits", object>;
 
@@ -19,7 +19,7 @@ const keys = (ctx: ActionCtx): number[] => ctx.selection.map(Number);
 export function notFoundLog(cms: Cms) {
 	return definePage({
 		path: "not-found",
-		title: "404 log",
+		...listHeader("content", "404 log", "Paths visitors requested that resolved to nothing — no page, no redirect."),
 		nav: { group: NAV.content, label: "404 log", icon: "file-question", order: 30 },
 		view: async (s, { request }) => {
 			const site = cms.site(request);

@@ -5,7 +5,7 @@ import type { Cms } from "../cms";
  * The section abilities CMS admin pages ask `authorize(user, ability)` for,
  * by their PHP names (CmsAbilities::ALL, minus sections Node has no pages
  * for yet). Design covers the layout and shared blocks; settings covers
- * site, SEO and notification settings; submissions is the inbox; users is
+ * site, SEO and notification settings and site health; submissions is the inbox; audit is the audit log; users is
  * the Users page that an auth adapter (`@tbtop/cms/better-auth`) adds.
  */
 export const CMS_ABILITIES = [
@@ -15,6 +15,7 @@ export const CMS_ABILITIES = [
 	"tbtop-cms.settings",
 	"tbtop-cms.design",
 	"tbtop-cms.languages",
+	"tbtop-cms.audit",
 	"tbtop-cms.users",
 ] as const;
 

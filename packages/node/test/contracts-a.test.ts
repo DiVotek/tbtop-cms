@@ -197,8 +197,8 @@ describe("admin section abilities (q02)", () => {
 			},
 			() => editor,
 		);
-		expect(navLabels((await page("/admin/pages")).props)).toEqual(["Pages", "Inbox"]);
-		for (const url of ["/admin/redirects", "/admin/layout", "/admin/layout/header", "/admin/shared-blocks", "/admin/languages", "/admin/settings/site", "/admin/settings/seo", "/admin/notification-settings"]) {
+		expect(navLabels((await page("/admin/pages")).props)).toEqual(["Pages"]);
+		for (const url of ["/admin/redirects", "/admin/layout", "/admin/blocks", "/admin/site-health", "/admin/audit", "/admin/layout/header", "/admin/shared-blocks", "/admin/languages", "/admin/settings/site", "/admin/settings/seo", "/admin/notification-settings"]) {
 			expect([url, (await visit(url)).status]).toEqual([url, 403]);
 		}
 		expect((await post("/admin/settings/site/forms/siteSettings", { site_name: "Hijacked" }, "/admin/settings/site")).status).toBe(403);
@@ -220,7 +220,7 @@ describe("admin section abilities (q02)", () => {
 		for (const config of [{ authorize: editorAuth }, {}]) {
 			const { page } = await panel(config, () => ({ id: 1, name: "Admin", role: "admin" }));
 			const nav = navLabels((await page("/admin/pages")).props);
-			for (const label of ["Pages", "Inbox", "Redirects", "Layout", "Shared blocks", "Languages", "Site", "SEO", "Notifications"]) {
+			for (const label of ["Pages", "Redirects", "Layouts", "Blocks", "Shared blocks", "Languages", "Site settings", "SEO settings", "Notifications", "Audit log", "Site health"]) {
 				expect(nav).toContain(label);
 			}
 			expect((await page("/admin/settings/site")).component).toBe("admin/page");

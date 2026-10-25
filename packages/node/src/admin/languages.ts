@@ -3,14 +3,14 @@ import type { Cms } from "../cms";
 import { LanguageError } from "../content/languages";
 import { localeName, localeOptions } from "../content/localeCatalog";
 import type { Dict } from "../support/values";
-import { adminPrefix, NAV, siteOf } from "./support";
+import { adminPrefix, listHeader, NAV, siteOf } from "./support";
 
 /** Languages (LanguagesPage): the list with its trash, add, edit, make default, delete, restore. */
 export function languagesIndex(cms: Cms) {
 	const prefix = adminPrefix(cms);
 	return definePage({
 		path: "languages",
-		title: "Languages",
+		...listHeader("settings", "Languages", "Languages available in the admin panel and on the site."),
 		nav: { group: NAV.settings, label: "Languages", icon: "languages", order: 10 },
 		view: (s, { request }) => {
 			const db = cms.site(request).config.db;
