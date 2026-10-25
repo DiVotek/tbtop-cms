@@ -56,12 +56,59 @@ function gateRequired(field: Field, rule: string): void {
 	}
 }
 
-const fieldNames = (blocks: BlockRegistry, kind: string): string[] =>
+const formFields = (blocks: BlockRegistry, kind: string): Field[] =>
 	blocks
 		.get(kind)
 		.form(new S())
-		.filter((field): field is Field => field instanceof Field)
-		.map((field) => field.name);
+		.filter((field): field is Field => field instanceof Field);
+
+const fieldNames = (blocks: BlockRegistry, kind: string): string[] => formFields(blocks, kind).map((field) => field.name);
+
+/** A block's stored data as editor values, by field name: what the form has a field for, lists translated whole made per-cell. */
+export function editorValues(fields: Field[], data: Dict): Dict {
+	return Object.fromEntries(fields.filter((field) => field.name in data).map((field) => [field.name, editorValue(field, data[field.name])]));
+}
+
+/**
+ * The frontend reads a repeater stored as one list per locale
+ * (`{ uk: [...], en: [...] }`) as well as one list with translated cells;
+ * the editor edits only the second. A per-locale value becomes per-cell,
+ * row by row: translatable sub-fields keep every locale's value, the others
+ * take the first locale's. The next save stores it that way.
+ */
+export function editorValue(field: Field, value: unknown): unknown {
+	if (field.kind !== "repeater") {
+		return value;
+	}
+	const children = field.childFields().filter((child): child is Field => child instanceof Field);
+	const rows = perLocaleRows(children, value) ?? value;
+	return Array.isArray(rows) ? rows.map((row) => (isDict(row) ? { ...row, ...editorValues(children, row) } : row)) : rows;
+}
+
+/** `{ locale: rows }` merged row by row; null for anything else. */
+function perLocaleRows(children: Field[], value: unknown): Dict[] | null {
+	if (!isDict(value) || Object.keys(value).length === 0 || !Object.values(value).every(Array.isArray)) {
+		return null;
+	}
+	const lists = value as Record<string, unknown[]>;
+	const length = Math.max(...Object.values(lists).map((list) => list.length));
+	return Array.from({ length }, (_, index) => mergeRow(children, lists, index));
+}
+
+function mergeRow(children: Field[], perLocale: Record<string, unknown[]>, index: number): Dict {
+	const row: Dict = {};
+	for (const child of children) {
+		const byLocale = Object.entries(perLocale)
+			.map(([locale, list]) => [locale, list[index]] as const)
+			.filter((entry): entry is readonly [string, Dict] => isDict(entry[1]) && child.name in entry[1])
+			.map(([locale, item]) => [locale, item[child.name]] as const);
+		if (byLocale.length === 0) {
+			continue;
+		}
+		row[child.name] = child.isTranslatableField() ? Object.fromEntries(byLocale) : byLocale[0]?.[1];
+	}
+	return row;
+}
 
 /** Form values of the editable rows: `block_{id}_{field}`, `_active`, `_sort` (PageEditBlockTabs::recordValues). */
 export function blockRecord(blocks: BlockRegistry, rows: Dict[]): Dict {
@@ -73,11 +120,9 @@ export function blockRecord(blocks: BlockRegistry, rows: Dict[]): Dict {
 		if (!blocks.has(row.kind as string) || row.shared !== undefined) {
 			continue;
 		}
-		const data = isDict(row.data) ? row.data : {};
-		for (const name of fieldNames(blocks, row.kind as string)) {
-			if (name in data) {
-				out[`block_${id}_${name}`] = data[name];
-			}
+		const values = editorValues(formFields(blocks, row.kind as string), isDict(row.data) ? row.data : {});
+		for (const [name, value] of Object.entries(values)) {
+			out[`block_${id}_${name}`] = value;
 		}
 	}
 	return out;

@@ -1,4 +1,4 @@
-import { type ActionCtx, Column, definePage, Effects, HttpError, S } from "@tbtop/admin";
+import { type ActionCtx, Column, definePage, Effects, Field, HttpError, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { SLOTS, type Slot } from "../content/layouts";
 import { RedirectError } from "../content/redirects";
@@ -6,7 +6,7 @@ import { SharedBlockConflictError, SharedBlockInUseError } from "../content/shar
 import { type Dict, isDict } from "../support/values";
 import { bindCmsFields } from "../blocks/cmsFields";
 import { fieldBinding } from "./linkFields";
-import { adminPrefix, blockRecord, blockRows, blockTabs, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf } from "./support";
+import { adminPrefix, blockRecord, blockRows, blockTabs, editorValues, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf } from "./support";
 
 const SLOT_LABELS: Record<Slot, string> = { header: "Header", footer: "Footer" };
 
@@ -161,11 +161,11 @@ export function sharedBlockEdit(cms: Cms) {
 			if (!cms.config.blocks.has(block.kind)) {
 				return s.displayText(`Block kind ${block.kind} is not registered.`);
 			}
-			const names = cms.config.blocks
+			const fields = cms.config.blocks
 				.get(block.kind)
 				.form(new S())
-				.map((field) => (field as { name?: string }).name)
-				.filter((name): name is string => typeof name === "string");
+				.filter((field): field is Field => field instanceof Field);
+			const names = fields.map((field) => field.name);
 			return s
 				.form("sharedBlock", [
 					s.number("lock_version").meta("hidden", true),
@@ -179,7 +179,9 @@ export function sharedBlockEdit(cms: Cms) {
 				.record({
 					lock_version: block.lockVersion,
 					shared_name: block.name,
-					...Object.fromEntries(names.filter((name) => name in block.data).map((name) => [`block_shared_${name}`, block.data[name]])),
+					...Object.fromEntries(
+						Object.entries(editorValues(fields, block.data)).map(([name, value]) => [`block_shared_${name}`, value]),
+					),
 				})
 				.onSubmit(async (ctx) => {
 					const form = ctx.form as Dict;

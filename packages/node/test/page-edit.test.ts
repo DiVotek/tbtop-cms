@@ -91,3 +91,28 @@ describe("the page editor's layout (PageEditPage)", () => {
 		expect(JSON.stringify((await page(`/admin/pages/${ids.home}/edit`)).props.structure)).not.toContain("pageEditDelete");
 	});
 });
+
+describe("a list translated whole (PageEditTypeFields + editorValue)", () => {
+	const faqType = definePageType({
+		key: "faq",
+		form: (s) => [s.repeater("items").label("Items").fields([s.text("q").label("Question").translatable(), s.text("icon").label("Icon")])],
+	});
+
+	test("one list per locale opens as one list with translated cells, and saves that way", async () => {
+		const { cms, record, save } = await panel({ pageTypes: [faqType] });
+		const created = await cms.site().pages.create({
+			type: "faq",
+			name: { en: "FAQ" },
+			fields: { items: { uk: [{ q: "Що?", icon: "a" }, { q: "Як?", icon: "b" }], en: [{ q: "What?", icon: "a" }] } },
+		});
+		expect((await record(created.id)).field_items).toEqual([
+			{ q: { uk: "Що?", en: "What?" }, icon: "a" },
+			{ q: { uk: "Як?" }, icon: "b" },
+		]);
+		expect((await save(created.id, {})).status).toBe(303);
+		expect((await cms.site().pages.find(created.id))?.fields?.items).toEqual([
+			{ q: { uk: "Що?", en: "What?" }, icon: "a" },
+			{ q: { uk: "Як?" }, icon: "b" },
+		]);
+	});
+});

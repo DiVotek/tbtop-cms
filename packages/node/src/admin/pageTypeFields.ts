@@ -5,6 +5,7 @@ import type { Page } from "../content/page";
 import type { PageType } from "../content/pageTypes";
 import { type Dict, isDict } from "../support/values";
 import { fieldBinding } from "./linkFields";
+import { editorValues } from "./support";
 
 const PREFIX = "field_";
 
@@ -42,10 +43,9 @@ export function typeFieldRecord(cms: Cms, page: Page): Dict {
 	const stored = isDict(page.fields) ? page.fields : {};
 	const out: Dict = {};
 	for (const { type, subtype } of sections(cms, page)) {
-		for (const name of names(type)) {
-			if (name in stored) {
-				out[inputName(subtype, name)] = stored[name];
-			}
+		const fields = type.form(new S()).filter((field): field is Field => field instanceof Field);
+		for (const [name, value] of Object.entries(editorValues(fields, stored))) {
+			out[inputName(subtype, name)] = value;
 		}
 	}
 	return out;
