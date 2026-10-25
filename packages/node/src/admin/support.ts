@@ -373,8 +373,12 @@ function addAction(s: S, cms: Cms, rows: Dict[], kind: string, sharedId: number 
 		.label("Add")
 		.withoutValidation(options.skipsValidation)
 		.handle(async (ctx) => {
+			// The view registers only placeable kinds; the handler re-checks so a stale registration cannot write another.
+			if (!cms.config.blocks.has(kind) || !placeableIn(cms.config.blocks.get(kind).placements, options.placement)) {
+				return Effects.make().notify("Pick a block kind first.", "error");
+			}
 			const current = rowsFromForm(cms.config.blocks, rows, ctx.form as Dict);
-			const sort = Math.max(-1, ...current.map((entry) => entry.sort as number)) + 1;
+			const sort =Math.max(-1, ...current.map((entry) => entry.sort as number)) + 1;
 			const row = sharedId === null ? { kind, data: {} } : { kind, shared: sharedId };
 			const refused = await options.save(ctx, [...current, { id: blockId(), active: false, sort, ...row }]);
 			return refused ?? Effects.make().notify("Block added (inactive) and saved. Configure and activate it when ready.").redirect(options.back);
