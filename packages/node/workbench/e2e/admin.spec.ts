@@ -1,15 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-test("the pages table lists the seeded pages with their paths", async ({ page }) => {
+test("the pages table lists the seeded pages with their state", async ({ page }) => {
 	await page.goto("/admin/pages");
 	const about = page.getByRole("row", { name: /About us/ });
-	await expect(about).toContainText("/about-us");
+	await expect(about).toContainText("Published");
 	await expect(page.getByRole("row", { name: /Work in progress/ })).toContainText("Draft");
 });
 
 test("an edit in the admin shows on the site, per locale", async ({ page }) => {
 	await page.goto("/admin/pages");
-	await page.getByRole("row", { name: /About us/ }).getByText("Edit").click();
+	await page.getByRole("row", { name: /About us/ }).getByRole("cell").first().click();
 	await expect(page.getByRole("heading", { name: "About us" })).toBeVisible();
 
 	// A translatable field's label points at "heading", its inputs are "heading.<locale>".
@@ -34,7 +34,7 @@ test("the languages page lists both locales", async ({ page }) => {
 
 test("an uploaded page image becomes the social image", async ({ page }) => {
 	await page.goto("/admin/pages");
-	await page.getByRole("row", { name: /First post/ }).getByText("Edit").click();
+	await page.getByRole("row", { name: /First post/ }).getByRole("cell").first().click();
 	// The upload posts on its own; saving before it answers would store no image.
 	const uploaded = page.waitForResponse((res) => res.request().method() === "POST" && /\/uploads\/[^/]+$/.test(new URL(res.url()).pathname));
 	await page.locator('input[type="file"]').first().setInputFiles("e2e/pixel.png");
@@ -50,7 +50,7 @@ test("an uploaded page image becomes the social image", async ({ page }) => {
 
 test("a block edit shows on the home page", async ({ page }) => {
 	await page.goto("/admin/pages");
-	await page.getByRole("row", { name: /Home/ }).getByText("Edit").click();
+	await page.getByRole("row", { name: /Home/ }).getByRole("cell").first().click();
 	await page.getByRole("tab", { name: /Hero/ }).click();
 	// The subtitle, so the frontend specs keep the seeded title.
 	await page.locator('[id$="_subtitle.en"]').fill("A fresh subtitle");

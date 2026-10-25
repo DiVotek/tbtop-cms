@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("a link field picked in the admin becomes the CTA href on the site", async ({ page }) => {
 	await page.goto("/admin/pages");
-	await page.getByRole("row", { name: /Home/ }).getByText("Edit").click();
+	await page.getByRole("row", { name: /Home/ }).getByRole("cell").first().click();
 	await page.getByRole("tab", { name: /Promo/ }).click();
 	const panel = page.getByRole("tabpanel");
 
@@ -31,7 +31,7 @@ test("a draft opens through the page editor's signed preview link, and only thro
 	expect((await request.get("/work-in-progress?preview=1")).status()).toBe(404);
 
 	await page.goto("/admin/pages");
-	await page.getByRole("row", { name: /Work in progress/ }).getByText("Edit").click();
+	await page.getByRole("row", { name: /Work in progress/ }).getByRole("cell").first().click();
 	const href = await page.getByRole("link", { name: "Preview (en)" }).getAttribute("href");
 	expect(href).toMatch(/\/work-in-progress\?expires=\d+&signature=[0-9a-f]+$/);
 
@@ -45,7 +45,7 @@ test("a draft opens through the page editor's signed preview link, and only thro
 
 test("an editor-made 404 page answers unknown URLs with noindex", async ({ page, request }) => {
 	await page.goto("/admin/pages");
-	await page.getByRole("row", { name: /Page not found/ }).getByText("Edit").click();
+	await page.getByRole("row", { name: /Page not found/ }).getByRole("cell").first().click();
 	await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
 	const heading = page.locator('[id="heading.en"]');
 	await expect(heading).toHaveValue("Page not found");
