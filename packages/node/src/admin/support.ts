@@ -250,7 +250,8 @@ function sharedTab(s: S, cms: Cms, rows: Dict[], row: Dict, source: SharedBlock 
 		rowControls(s, id),
 		s.flex([removeAction(s, cms, rows, id, options), s.spacer()]),
 	]);
-	return { label: `${label} · ${name}`, body };
+	// A shared block named after its kind ("CTA banner" of kind CTA banner) would read the name twice.
+	return { label: name === label ? label : `${label} · ${name}`, body };
 }
 
 /** PageEditBlockTabs::handleDetach: the row keeps its id, order and active flag; the pointer becomes a copy of the content. */

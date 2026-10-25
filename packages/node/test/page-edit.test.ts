@@ -116,3 +116,17 @@ describe("a list translated whole (PageEditTypeFields + editorValue)", () => {
 		]);
 	});
 });
+
+describe("a shared block's tab (PageEditBlockTabs::sharedTab)", () => {
+	test("is labelled kind · name, and once when the name is the kind's label", async () => {
+		const { cms, db, page, ids } = await panel();
+		const blocks = cms.site().sharedBlocks;
+		const same = await blocks.create({ name: "Hero", kind: "Hero", data: {} });
+		const other = await blocks.create({ name: "Top hero", kind: "Hero", data: {} });
+		const content = [same, other].map((shared, sort) => ({ id: `row${sort}`, kind: "Hero", active: true, sort, shared }));
+		await db.updateTable("tbtop_pages").set({ content: JSON.stringify(content) }).where("id", "=", ids.about as number).execute();
+		const tree = JSON.stringify((await page(`/admin/pages/${ids.about}/edit`)).props.structure);
+		expect(tree).toContain('"label":"Hero · Top hero"');
+		expect(tree).not.toContain("Hero · Hero");
+	});
+});
