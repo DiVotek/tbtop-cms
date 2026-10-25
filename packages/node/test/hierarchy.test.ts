@@ -147,8 +147,9 @@ describe("page guards (PageObserver)", () => {
 		const options = async (id: number) => {
 			const res = await admin.handle(new Request(`http://x/admin/pages/${id}/edit`, { headers: { "x-inertia": "true" } }));
 			const tree = JSON.stringify(await res?.json());
-			const match = tree.match(/"label":"Parent","options":(\[.*?\])\},"meta":\{\},"name":"parent_id"/);
-			return match === null ? null : (JSON.parse(match[1] ?? "[]") as { value: string }[]).map((o) => Number(o.value));
+			const match = tree.match(/"label":"Parent","options":(\[.*?\])/);
+			// In sort order, as PageForm::parentQuery; compared as a set.
+			return match === null ? null : (JSON.parse(match[1] ?? "[]") as { value: string }[]).map((o) => Number(o.value)).sort((a, b) => a - b);
 		};
 		// A page is offered categories too: under one it becomes an article (PageLeafType).
 		expect(await options(ids.about as number)).toEqual([ids.blog as number, inner.id]);

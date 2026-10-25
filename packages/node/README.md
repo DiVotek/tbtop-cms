@@ -96,8 +96,8 @@ const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the 
 
 // Admin
 createAdmin({
+	...cms.admin.panel, // brand, topbar-sidebar, compact, nav groups, chrome (bell, inbox, view site): PHP's CmsPanel
 	pages: [...cms.admin.pages, ...mine],
-	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
 	hostRules: cms.admin.hostRules, // the config's hostRules + link_shape, page_ref
 	context: cms.admin.context, // content locales = admin-active languages

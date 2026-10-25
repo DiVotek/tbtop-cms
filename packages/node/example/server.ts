@@ -19,10 +19,9 @@ const cms = createCms({ db, hostRules: kyselyRules(db), blocks: implementBlocks(
 await seedFixtures(cms, demoFixture);
 
 const admin = createAdmin({
+	...cms.admin.panel, // brand, layout, nav groups and chrome, as PHP's CmsPanel
 	prefix: "/admin",
-	brand: "tbtop cms",
 	pages: cms.admin.pages,
-	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
 	// The config's hostRules plus link_shape and page_ref, which the link and pages fields check on save.
 	hostRules: cms.admin.hostRules,

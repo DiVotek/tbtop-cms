@@ -10,13 +10,14 @@ test("the pages table lists the seeded pages with their paths", async ({ page })
 test("an edit in the admin shows on the site, per locale", async ({ page }) => {
 	await page.goto("/admin/pages");
 	await page.getByRole("row", { name: /About us/ }).getByText("Edit").click();
-	await expect(page.getByRole("heading", { name: "Edit page" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "About us" })).toBeVisible();
 
 	// A translatable field's label points at "heading", its inputs are "heading.<locale>".
 	await page.locator('[id="heading.en"]').fill("We build small sites");
 	await page.getByRole("tab", { name: "uk" }).click();
 	await page.locator('[id="heading.uk"]').fill("Ми робимо сайти");
-	await page.getByRole("button", { name: "Save" }).click();
+	// The status bar and the footer both save; the footer one carries mod+s.
+	await page.getByRole("button", { name: "Save" }).last().click();
 	await expect(page.getByText(/saved/i).first()).toBeVisible();
 
 	await page.goto("/about-us");
@@ -38,8 +39,8 @@ test("an uploaded page image becomes the social image", async ({ page }) => {
 	const uploaded = page.waitForResponse((res) => res.request().method() === "POST" && /\/uploads\/[^/]+$/.test(new URL(res.url()).pathname));
 	await page.locator('input[type="file"]').first().setInputFiles("e2e/pixel.png");
 	expect((await uploaded).ok()).toBe(true);
-	await page.getByRole("button", { name: "Save" }).click();
-	await expect(page.getByText(/^Saved/).first()).toBeVisible();
+	await page.getByRole("button", { name: "Save" }).last().click();
+	await expect(page.getByText(/^Page saved/).first()).toBeVisible();
 
 	await page.goto("/blog/first-post");
 	const image = await page.locator('meta[property="og:image"]').getAttribute("content");
@@ -53,7 +54,7 @@ test("a block edit shows on the home page", async ({ page }) => {
 	await page.getByRole("tab", { name: /Hero/ }).click();
 	// The subtitle, so the frontend specs keep the seeded title.
 	await page.locator('[id$="_subtitle.en"]').fill("A fresh subtitle");
-	await page.getByRole("button", { name: "Save" }).click();
+	await page.getByRole("button", { name: "Save" }).last().click();
 	await expect(page.getByText(/saved/i).first()).toBeVisible();
 
 	await page.goto("/");

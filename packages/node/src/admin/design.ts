@@ -46,12 +46,12 @@ export function layoutEdit(cms: Cms) {
 			const rows = blockRows((await site.layouts.content())[slot]);
 			const back = `${prefix}/layout/${slot}`;
 			const save = async (ctx: ActionCtx, content: Dict[]) => siteOf(cms, ctx).layouts.save(slot, content);
-			const sharedNames = new Map((await site.sharedBlocks.all()).map((block) => [block.id, block.name]));
+			const sharedBlocks = await site.sharedBlocks.all();
 			const problems = await rowProblems(site, rows);
 			return s
 				.form(`layout_${slot}`, [
 					s.displayText(SLOT_LABELS[slot]).variant("heading"),
-					s.tabs(blockTabs(s, cms, rows, { placement: ["layout"], save, back, sharedNames, problems, skipsValidation: false })),
+					s.tabs(blockTabs(s, cms, rows, { placement: ["layout"], save, back, sharedBlocks, problems, skipsValidation: false })),
 					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
 				])
 				.record(blockRecord(cms.config.blocks, rows))

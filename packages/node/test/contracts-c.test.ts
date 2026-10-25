@@ -190,20 +190,21 @@ describe("placements by page type and subtype (q17)", () => {
 		const news = await pages.create({ type: "article", subtype: "news", parentId: ids.blog as number, name: { en: "News" } });
 		const offered = async (id: number) => {
 			const props = JSON.stringify((await page(`/admin/pages/${id}/edit`)).props);
-			return ["Hero", "ContactForm", "ArticleOnly", "NewsOnly", "Banner"].filter((kind) => props.includes(`"value":"${kind}"`));
+			return ["Hero", "ContactForm", "ArticleOnly", "NewsOnly", "Banner"].filter((kind) => props.includes(`"blockAdd_${kind}"`));
 		};
 		expect(await offered(ids.about as number)).toEqual(["Hero", "ContactForm"]);
 		expect(await offered(article.id)).toEqual(["Hero", "ContactForm", "ArticleOnly"]);
 		expect(await offered(news.id)).toEqual(["Hero", "ContactForm", "ArticleOnly", "NewsOnly"]);
 		const header = JSON.stringify((await page("/admin/layout/header")).props);
-		expect(header).toContain('"value":"Banner"');
-		expect(header).not.toContain('"value":"ArticleOnly"');
+		expect(header).toContain('"blockAdd_Banner"');
+		expect(header).not.toContain('"blockAdd_ArticleOnly"');
 
 		const url = `/admin/pages/${article.id}/edit`;
 		const record = ((await page(url)).props.data as Record<string, Record<string, unknown>>).pageEditor ?? {};
-		const refused = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "NewsOnly" } } }, url);
-		expect(JSON.stringify(await refused.json())).toContain("Pick a block kind first.");
-		const added = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "ArticleOnly" } } }, url);
+		// A kind the page cannot place has no Add action to post to.
+		const refused = await post(`${url}/actions/blockAdd_NewsOnly`, { payload: { form: record } }, url);
+		expect(refused.status).toBe(404);
+		const added = await post(`${url}/actions/blockAdd_ArticleOnly`, { payload: { form: record } }, url);
 		expect(added.status).toBe(200);
 		expect(((await cms.site().pages.find(article.id))?.content ?? []).map((row) => (row as { kind: string }).kind)).toEqual(["ArticleOnly"]);
 	});

@@ -94,10 +94,10 @@ async function boot() {
 	// The 404 and 5xx pages an editor keeps in the pages list, as cms:install creates them.
 	await ensureErrorPages(cms);
 	const admin = createAdmin({
+		// The CMS panel's look: brand, topbar-sidebar, compact, nav groups, chrome (as PHP's CmsPanel).
+		...cms.admin.panel,
 		prefix: "/admin",
-		brand: "tbtop cms",
 		pages: [...cms.admin.pages, ...panelAuth.pages(cms)],
-		navigationGroups: cms.admin.navigationGroups,
 		driver: kyselyDriver(db),
 		// The config's hostRules plus link_shape and page_ref, which check the link and pages fields on save.
 		hostRules: cms.admin.hostRules,

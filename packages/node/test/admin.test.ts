@@ -94,7 +94,7 @@ describe("admin pages", () => {
 		const url = `/admin/pages/${ids.about}/edit`;
 		// A published page validates the editor form before a structural action, so the action carries it.
 		const record = ((await open(url)).props.data as Record<string, Record<string, unknown>>).pageEditor ?? {};
-		const added = await post(`${url}/actions/blockAdd`, { payload: { form: { ...record, new_block_kind: "Hero" } } }, url);
+		const added = await post(`${url}/actions/blockAdd_Hero`, { payload: { form: record } }, url);
 		expect(added.status).toBeLessThan(400);
 		const page = await cms.site().pages.find(ids.about as number);
 		expect(page?.content?.map((row) => (row as { kind: string }).kind)).toEqual(["Hero"]);

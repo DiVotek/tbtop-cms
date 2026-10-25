@@ -1,4 +1,4 @@
-import type { AdminContext, HostRule, PageDef } from "@tbtop/admin";
+import type { AdminContext, HostRule, NavGroupDef, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { allows, gated } from "./abilities";
 import { dashboard } from "./dashboard";
@@ -9,14 +9,22 @@ import { cmsHostRules, linkPageSearch } from "./linkFields";
 import { notFoundLog } from "./notFound";
 import { notificationSettings } from "./notifications";
 import { seoReport } from "./seoReport";
-import { pageEdit, pagesIndex } from "./pages";
+import { pageEdit } from "./pageEdit";
+import { pagesIndex } from "./pages";
+import { CMS_NAV_GROUPS, type CmsPanelLook, cmsPanel } from "./panel";
 import { seoSettings, siteSettings } from "./settings";
 
 export type CmsAdmin = {
 	/** Spread into createAdmin({ pages: [...cms.admin.pages, ...mine] }). */
 	pages: PageDef[];
 	/** The CMS nav groups (content, design, settings), in CmsPanel order. */
-	navigationGroups: { key: string; label: string; icon: string }[];
+	navigationGroups: NavGroupDef[];
+	/**
+	 * The CMS panel's look as PHP's CmsPanel sets it: brand, topbar-sidebar
+	 * layout, compact full-width appearance, the nav groups and the chrome
+	 * (bell, inbox, view site, user menu). createAdmin({ ...cms.admin.panel, … }).
+	 */
+	panel: CmsPanelLook;
 	/** Request context for createAdmin({ context }): content locales from the admin-active languages. */
 	context: (request: Request) => Promise<Partial<AdminContext>>;
 	/** The host's `hostRules` plus the link and pages fields' (`link_shape`, `page_ref`): createAdmin({ hostRules: cms.admin.hostRules }); form submits use the same set. */
@@ -55,11 +63,8 @@ export function adminPages(cms: Cms): CmsAdmin {
 			{ ...linkPageSearch(cms), authorize: async () => (await allows(cms, "tbtop-cms.pages")) || (await allows(cms, "tbtop-cms.design")) },
 		] as PageDef[],
 		hostRules: { ...cms.config.hostRules, ...own },
-		navigationGroups: [
-			{ key: "content", label: "Content", icon: "files" },
-			{ key: "design", label: "Design", icon: "palette" },
-			{ key: "settings", label: "Settings", icon: "settings" },
-		],
+		navigationGroups: [...CMS_NAV_GROUPS],
+		panel: cmsPanel(cms),
 		context: async (request) => {
 			const languages = cms.site(request).languages;
 			const locales = (await languages.adminActive()).map((row) => row.locale);
