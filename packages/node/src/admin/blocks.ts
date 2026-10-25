@@ -101,7 +101,7 @@ function placementLabel(cms: Cms, placement: string): string {
 	return cms.pageTypes.has(placement) ? cms.pageTypes.get(placement).label : placement;
 }
 
-/** BlockUsage::index: the live pages whose content places each kind, in tree order. Layout slots are not counted. */
+/** BlockUsage::index: the pages not in the trash (drafts included, as PHP) whose content places each kind, in tree order. Layout slots are not counted. */
 async function blockUsage(cms: Cms, request: Request, prefix: string): Promise<Map<string, Usage[]>> {
 	const site = cms.site(request);
 	const locale = await site.languages.defaultLocale();
