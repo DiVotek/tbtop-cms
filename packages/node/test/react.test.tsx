@@ -53,6 +53,13 @@ describe("@tbtop/cms/react", () => {
 		expect(html).toContain('name="website"');
 	});
 
+	test("the Hero component renders no link for an unsafe cta href it is handed directly", () => {
+		const Hero = cmsComponents.Hero as unknown as (input: { props: unknown }) => ReactNode;
+		const html = (href: string) => renderToString(<Hero props={{ title: "T", subtitle: null, image: null, cta: { label: "Go", href } }} />);
+		expect(html("javascript:alert(1)")).not.toContain("<a");
+		expect(html("/contact")).toContain('href="/contact"');
+	});
+
 	test("a block kind without a component renders nothing instead of breaking the page", async () => {
 		const props = await home();
 		const { Hero: _, ...withoutHero } = registry as Record<string, unknown>;
