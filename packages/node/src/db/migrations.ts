@@ -9,6 +9,7 @@ import {
 } from "kysely";
 import { ensureDefaultLanguage } from "../content/languages";
 import type { CmsDatabase } from "./schema";
+import { withSqliteMasterIntrospection } from "./sqliteIntrospector";
 
 export type Dialect = "sqlite" | "postgres" | "mysql";
 
@@ -336,7 +337,8 @@ export function cmsMigrations(options: MigrationOptions): MigrationProvider {
  */
 export async function migrateCms(db: Kysely<unknown>, options: MigrationOptions & { defaultLanguage?: string | false }): Promise<void> {
 	const migrator = new Migrator({
-		db,
+		// SQLite (D1 included) through sqlite_master: D1 refuses Kysely's pragma_table_info join.
+		db: options.dialect === "sqlite" ? withSqliteMasterIntrospection(db) : db,
 		provider: cmsMigrations(options),
 		migrationTableName: "tbtop_cms_migrations",
 		migrationLockTableName: "tbtop_cms_migrations_lock",

@@ -96,8 +96,8 @@ const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the 
 
 // Admin
 createAdmin({
+	...cms.admin.panel, // brand, topbar-sidebar, compact, nav groups, chrome (bell, inbox, view site): PHP's CmsPanel
 	pages: [...cms.admin.pages, ...mine],
-	navigationGroups: cms.admin.navigationGroups,
 	driver: kyselyDriver(db),
 	hostRules: cms.admin.hostRules, // the config's hostRules + link_shape, page_ref
 	context: cms.admin.context, // content locales = admin-active languages
@@ -194,7 +194,7 @@ import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
 
 export const auth = betterAuth({
-	database: { db, type: "sqlite" }, // the CMS's Kysely instance
+	database: { db, type: "sqlite" }, // the CMS's Kysely instance; on D1 pass the binding itself (`database: env.DB`)
 	emailAndPassword: { enabled: true },
 	user: { modelName: "tbtop_users" }, // and session, account, verification
 	plugins: [admin({ ac: cmsAccess, roles: cmsRoles })],
@@ -451,6 +451,10 @@ On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite: migrate with
 whose `scheduled()` calls `cms.tasks.scheduled()`, and pass
 `{ waitUntil: ctx.waitUntil }` to `loadPage`. The CLI does not reach D1:
 run `migrateCms` from the Worker (a deploy hook or a guarded route).
+`migrateCms` needs no transaction and reads tables from `sqlite_master`, as
+D1 refuses the `pragma_table_info` join Kysely's own introspector uses.
+Better Auth introspects through that join too: give it the raw binding
+(`database: env.DB`), not the Kysely instance.
 
 ## What 0.0 has
 

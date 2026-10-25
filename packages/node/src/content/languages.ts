@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import type { ExpressionBuilder, Kysely } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import type { ContentCache } from "../support/cache";
 import { insertId } from "../support/db";
@@ -102,21 +102,28 @@ export class Languages {
 		return activated;
 	}
 
-	private makeDefault(locale: string): Promise<boolean> {
-		return this.db.transaction().execute(async (trx) => {
-			const target = await trx.selectFrom("tbtop_languages").select(["id", "is_frontend_active"]).where("locale", "=", locale).executeTakeFirst();
-			if (target === undefined) {
-				throw new Error(`Language '${locale}' does not exist.`);
-			}
-			const now = sqlDate(new Date());
-			await trx.updateTable("tbtop_languages").set({ is_default: 0, updated_at: now }).where("is_default", "=", 1).execute();
-			await trx
-				.updateTable("tbtop_languages")
-				.set({ is_default: 1, is_admin_active: 1, is_frontend_active: 1, updated_at: now })
-				.where("id", "=", target.id)
-				.execute();
-			return !bool(target.is_frontend_active);
-		});
+	/**
+	 * One UPDATE flips the default, so no reader sees two defaults or none,
+	 * without a transaction: D1 has none (kysely-d1 refuses to open one).
+	 * TRUE/FALSE literals are a boolean on Postgres and 1/0 on SQLite and MySQL.
+	 */
+	private async makeDefault(locale: string): Promise<boolean> {
+		const target = await this.db.selectFrom("tbtop_languages").select(["id", "is_frontend_active"]).where("locale", "=", locale).executeTakeFirst();
+		if (target === undefined) {
+			throw new Error(`Language '${locale}' does not exist.`);
+		}
+		const isTarget = (eb: ExpressionBuilder<CmsDatabase, "tbtop_languages">) => eb("id", "=", target.id);
+		await this.db
+			.updateTable("tbtop_languages")
+			.set((eb) => ({
+				is_default: eb.case().when(isTarget(eb)).then(eb.lit(true)).else(eb.lit(false)).end().$castTo<0 | 1>(),
+				is_admin_active: eb.case().when(isTarget(eb)).then(eb.lit(true)).else(eb.ref("is_admin_active")).end().$castTo<0 | 1>(),
+				is_frontend_active: eb.case().when(isTarget(eb)).then(eb.lit(true)).else(eb.ref("is_frontend_active")).end().$castTo<0 | 1>(),
+				updated_at: sqlDate(new Date()),
+			}))
+			.where((eb) => eb.or([eb("is_default", "=", 1), isTarget(eb)]))
+			.execute();
+		return !bool(target.is_frontend_active);
 	}
 
 	/**

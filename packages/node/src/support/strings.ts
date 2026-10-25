@@ -73,6 +73,28 @@ export const STRINGS: Record<string, Record<string, string>> = {
 		"form-submissions.errors.retry_unfinished": "Повторну спробу не завершено.",
 		"form-submissions.errors.page_missing": "Сторінки більше не існує.",
 		"form-submissions.errors.block_missing": "Блоку форми більше немає на сторінці.",
+		// Laravel's lang/uk/validation.php for the rules a form block uses; English comes from @tbtop/admin.
+		"validation.accepted": "Поле :attribute повинно бути прийняте.",
+		"validation.boolean": "Поле :attribute повинно мати значення «так» або «ні».",
+		"validation.date": "Поле :attribute повинно містити дійсну дату.",
+		"validation.email": "Поле :attribute повинно містити дійсну адресу електронної пошти.",
+		"validation.in": "Вибране значення поля :attribute недійсне.",
+		"validation.integer": "Поле :attribute повинно бути цілим числом.",
+		"validation.max.array": "Поле :attribute не може містити більше ніж :max елементів.",
+		"validation.max.numeric": "Поле :attribute не може бути більшим за :max.",
+		"validation.max.string": "Поле :attribute не може бути довшим за :max символів.",
+		"validation.min.array": "Поле :attribute повинно містити щонайменше :min елементів.",
+		"validation.min.numeric": "Поле :attribute повинно бути не менше :min.",
+		"validation.min.string": "Поле :attribute повинно містити щонайменше :min символів.",
+		"validation.numeric": "Поле :attribute повинно бути числом.",
+		"validation.regex": "Поле :attribute має неправильний формат.",
+		"validation.required": "Поле :attribute є обов’язковим.",
+		"validation.string": "Поле :attribute повинно бути рядком.",
+		"validation.url": "Поле :attribute повинно містити дійсну URL-адресу.",
+		"validation.attributes.name": "ім’я",
+		"validation.attributes.email": "електронна пошта",
+		"validation.attributes.message": "повідомлення",
+		"validation.attributes.phone": "телефон",
 	},
 };
 
@@ -101,3 +123,23 @@ const fill = (text: string, params: Record<string, string | number>): string =>
 	Object.keys(params)
 		.sort((a, b) => b.length - a.length)
 		.reduce((out, name) => out.replaceAll(`:${name}`, String(params[name])), text);
+
+/**
+ * Laravel's validation lang for one locale: `validation.<rule>` message
+ * templates and `validation.attributes.<field>` names, the host's strings
+ * over the package's. Only the locale's own: a rule it does not translate
+ * keeps @tbtop/admin's English, never another locale's text.
+ */
+export function validationLang(locale: string, extra: Record<string, Record<string, string>> = {}): { messages: Record<string, string>; attributes: Record<string, string> } {
+	const own = { ...STRINGS[locale], ...extra[locale] };
+	const messages: Record<string, string> = {};
+	const attributes: Record<string, string> = {};
+	for (const [key, text] of Object.entries(own)) {
+		if (key.startsWith("validation.attributes.")) {
+			attributes[key.slice("validation.attributes.".length)] = text;
+		} else if (key.startsWith("validation.")) {
+			messages[key.slice("validation.".length)] = text;
+		}
+	}
+	return { messages, attributes };
+}

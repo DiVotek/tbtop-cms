@@ -15,7 +15,7 @@ test("a link field picked in the admin becomes the CTA href on the site", async 
 	await page.getByRole("button", { name: "About us" }).click();
 	await expect(picker).toHaveText("About us");
 	await panel.getByLabel("Text (en)").fill("Meet the team");
-	await page.getByRole("button", { name: "Save" }).click();
+	await page.getByRole("button", { name: "Save" }).last().click();
 	await expect(page.getByText(/saved/i).first()).toBeVisible();
 
 	await page.goto("/");
@@ -46,11 +46,11 @@ test("a draft opens through the page editor's signed preview link, and only thro
 test("an editor-made 404 page answers unknown URLs with noindex", async ({ page, request }) => {
 	await page.goto("/admin/pages");
 	await page.getByRole("row", { name: /Page not found/ }).getByText("Edit").click();
-	await expect(page.getByRole("heading", { name: "Edit page" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
 	const heading = page.locator('[id="heading.en"]');
 	await expect(heading).toHaveValue("Page not found");
 	await heading.fill("Nothing lives here");
-	await page.getByRole("button", { name: "Save" }).click();
+	await page.getByRole("button", { name: "Save" }).last().click();
 	await expect(page.getByText(/saved/i).first()).toBeVisible();
 
 	const response = await request.get("/no-such-page");

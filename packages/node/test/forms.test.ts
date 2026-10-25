@@ -68,6 +68,20 @@ describe("form submissions", () => {
 		expect(await rows(db)).toHaveLength(0);
 	});
 
+	test("field errors speak the page's language; the host's strings override the package's", async () => {
+		const { cms } = await makeCms(undefined, { strings: { uk: { "validation.attributes.message": "текст заявки" } } });
+		const errors = async (path: string) => {
+			const { action } = await contactAction(cms, path);
+			return ((await (await cms.handle(post(action, { name: "", email: "x" })))?.json()) as { errors: Record<string, string[]> }).errors;
+		};
+		expect(await errors("/uk")).toEqual({
+			name: ["Поле ім’я є обов’язковим."],
+			email: ["Поле електронна пошта повинно містити дійсну адресу електронної пошти."],
+			message: ["Поле текст заявки є обов’язковим."],
+		});
+		expect((await errors("/")).name).toEqual(["The name field is required."]);
+	});
+
 	test("a filled honeypot looks like success and stores nothing", async () => {
 		const { cms, db } = await makeCms();
 		const { action } = await contactAction(cms);

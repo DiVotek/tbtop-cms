@@ -1,6 +1,7 @@
 import { type HostRule, validate, type ValidationResult } from "@tbtop/admin";
 import type { Page } from "../content/page";
 import { honeypotField } from "../blocks/resolver";
+import { validationLang } from "../support/strings";
 import type { Site } from "../site";
 import { locateForm } from "./locate";
 import type { Submission } from "./submissions";
@@ -67,7 +68,9 @@ export async function submitForm(
 			Object.entries(located.submit.rules(located.data, located.ctx)).map(([field, rule]) => [field, Array.isArray(rule) ? rule : rule.split("|")]),
 		);
 		// The admin's rules: an unknown one throws (fails closed), which is the site's fault, not the visitor's.
-		result = await validate(input, rules, { hostRules });
+		// The visitor's language: Laravel validates in the app locale the page set.
+		const { messages, attributes } = validationLang(locale, site.config.strings);
+		result = await validate(input, rules, { hostRules, attributes, ...(Object.keys(messages).length > 0 ? { messages } : {}) });
 	} catch (error) {
 		console.error("form.submit.validation_failed", { page: page.id, block: blockId, error: error instanceof Error ? error.message : String(error) });
 		return reply("failed", { form: [await site.t("forms.submit_failed", locale)] });

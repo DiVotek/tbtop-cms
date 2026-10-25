@@ -55,7 +55,7 @@ describe("R3-blocks-1: a new block is added inactive", () => {
 	test("Add block on a published page stores an inactive row the site does not render", async () => {
 		const { cms, record, action, rows, ids } = await panel();
 		const url = `/admin/pages/${ids.about}/edit`;
-		const res = await action(url, "blockAdd", { ...(await record(url, "pageEditor")), new_block_kind: "Hero" });
+		const res = await action(url, "blockAdd_Hero", { ...(await record(url, "pageEditor")) });
 		expect(res.status).toBe(200);
 		const stored = await rows(ids.about as number);
 		expect(stored.map((row) => [row.kind, row.active])).toEqual([["Hero", false]]);
@@ -66,7 +66,7 @@ describe("R3-blocks-1: a new block is added inactive", () => {
 
 	test("Add block in the header layout stores an inactive row", async () => {
 		const { cms, action } = await panel({ blocks: withBanner() });
-		const res = await action("/admin/layout/header", "blockAdd", { new_block_kind: "Banner" });
+		const res = await action("/admin/layout/header", "blockAdd_Banner", {});
 		expect(res.status).toBe(200);
 		const header = (await cms.site().layouts.content()).header as Row[];
 		expect(header.map((row) => [row.kind, row.active])).toEqual([["Banner", false]]);
@@ -77,7 +77,7 @@ describe("R3-blocks-2: structural actions keep the stored status and validate pu
 	test("Add block on a draft page does not publish it, even with status flipped in the form", async () => {
 		const { cms, record, action, ids } = await panel();
 		const url = `/admin/pages/${ids.draft}/edit`;
-		const res = await action(url, "blockAdd", { ...(await record(url, "pageEditor")), new_block_kind: "Hero", status: "published" });
+		const res = await action(url, "blockAdd_Hero", { ...(await record(url, "pageEditor")), status: "published" });
 		expect(res.status).toBe(200);
 		const page = await cms.site().pages.find(ids.draft as number);
 		expect(page?.status).toBe("draft");
@@ -96,7 +96,7 @@ describe("R3-blocks-2: structural actions keep the stored status and validate pu
 	test("Add block on a published page runs the form rules first", async () => {
 		const { record, action, rows, ids } = await panel();
 		const url = `/admin/pages/${ids.about}/edit`;
-		const res = await action(url, "blockAdd", { ...(await record(url, "pageEditor")), name: { en: "" }, new_block_kind: "Hero" });
+		const res = await action(url, "blockAdd_Hero", { ...(await record(url, "pageEditor")), name: { en: "" } });
 		expect(res.status).toBe(422);
 		expect(await rows(ids.about as number)).toEqual([]);
 	});
@@ -104,11 +104,10 @@ describe("R3-blocks-2: structural actions keep the stored status and validate pu
 	test("Add block in the layout editor runs the form rules", async () => {
 		const { cms, action } = await panel({ blocks: withBanner() });
 		await cms.site().layouts.save("header", [{ id: "hhhh1111", kind: "Banner", active: true, sort: 0, data: { text: "Top" } }]);
-		const res = await action("/admin/layout/header", "blockAdd", {
+		const res = await action("/admin/layout/header", "blockAdd_Banner", {
 			block_hhhh1111_active: true,
 			block_hhhh1111_sort: 0,
 			block_hhhh1111_text: "",
-			new_block_kind: "Banner",
 		});
 		expect(res.status).toBe(422);
 		expect(((await cms.site().layouts.content()).header as Row[]).length).toBe(1);
@@ -142,7 +141,7 @@ describe("R3-blocks-4: a stale form or a bad schedule is a notice, not a 500", (
 	test("blockAdd with a stale lock_version answers an error notice", async () => {
 		const { record, action, rows, ids } = await panel();
 		const url = `/admin/pages/${ids.about}/edit`;
-		const res = await action(url, "blockAdd", { ...(await record(url, "pageEditor")), lock_version: 99, new_block_kind: "Hero" });
+		const res = await action(url, "blockAdd_Hero", { ...(await record(url, "pageEditor")), lock_version: 99 });
 		expect(res.status).toBe(200);
 		expect((await effects(res)).find((effect) => effect.kind === "notify")?.level).toBe("error");
 		expect(await rows(ids.about as number)).toEqual([]);

@@ -1,7 +1,8 @@
 import { S } from "@tbtop/admin";
 import type { Page } from "../content/page";
 import { refOf } from "../content/sharedBlocks";
-import type { Site } from "../site";
+import { linkedPageIds } from "../content/link";
+import type { LinkTargets, Site } from "../site";
 import { type Dict, isDict } from "../support/values";
 import { flattenLocales, translatablePaths } from "./locale";
 
@@ -36,8 +37,10 @@ export async function resolveBlocks(
 	page: Page | null,
 ): Promise<{ blocks: ResolvedBlock[]; fields: Record<string, unknown> }> {
 	const locales = (await site.languages.all()).map((row) => row.locale);
-	const fields = page === null ? {} : await resolveFields(site, page, locale, locales);
-	const ctx = await site.resolveContext(locale, page, fields);
+	// Every page link of the pass in two queries, instead of two per link.
+	const targets = await site.linkTargets(await linkedIds(site, content, page), locale);
+	const fields = page === null ? {} : await resolveFields(site, page, locale, locales, targets);
+	const ctx = await site.resolveContext(locale, page, fields, targets);
 	const blocks: ResolvedBlock[] = [];
 	for (const raw of sorted(content)) {
 		const block = await resolveOne(site, raw, ctx, locales);
@@ -48,7 +51,17 @@ export async function resolveBlocks(
 	return { blocks, fields };
 }
 
-async function resolveFields(site: Site, page: Page, locale: string, locales: string[]): Promise<Record<string, unknown>> {
+/** The pages the rows (their shared blocks' data included) and the page's own fields link to. */
+async function linkedIds(site: Site, content: unknown[], page: Page | null): Promise<number[]> {
+	const ids = linkedPageIds(page?.fields ?? null);
+	for (const raw of content) {
+		const ref = isDict(raw) ? refOf(raw) : null;
+		linkedPageIds(ref === null ? raw : (await site.sharedBlocks.find(ref))?.data, ids);
+	}
+	return ids;
+}
+
+async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets): Promise<Record<string, unknown>> {
 	const stored = page.fields ?? {};
 	const types = site.pageTypes.forPage(page);
 	let out: Record<string, unknown> = {};
@@ -56,7 +69,7 @@ async function resolveFields(site: Site, page: Page, locale: string, locales: st
 		try {
 			const later = new Set(types.slice(i + 1).flatMap((next) => fieldNames(next.form(new S()))));
 			const own = Object.fromEntries(Object.entries(stored).filter(([key]) => !later.has(key)));
-			const ctx = await site.resolveContext(locale, page, out);
+			const ctx = await site.resolveContext(locale, page, out, targets);
 			const input = flattenLocales(own, locale, ctx.fallbackLocale, locales, translatablePaths(type.form(new S())));
 			out = { ...out, ...(await type.resolveFields(input, ctx)) };
 		} catch (error) {
