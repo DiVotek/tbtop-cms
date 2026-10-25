@@ -179,7 +179,9 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 	const ctx = await schemaContext(site, page, locale);
 	const blockNodes = resolved
 		.map((block) => site.blocks.get(block.kind).toSchema(block.props, ctx))
-		.filter((node): node is Record<string, unknown> => node !== null);
+		.filter((node): node is Record<string, unknown> => node !== null)
+		// Each node is a JSON-LD document of its own: one without @context is not schema.org to a crawler.
+		.map((node) => ("@context" in node ? node : { "@context": "https://schema.org", ...node }));
 	const seo = await resolveSeo(site, page, locale, await ancestorCrumbs(site, page, locale), ctx, blockNodes);
 	if (isPreview) {
 		seo.noindex = true;

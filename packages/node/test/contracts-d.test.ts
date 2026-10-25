@@ -293,3 +293,17 @@ describe("page links resolve in a batch", () => {
 		}
 	});
 });
+
+describe("block JSON-LD", () => {
+	test("a block's schema node gets the schema.org @context when it names none", async () => {
+		const blocks = implementBlocks(promoCatalog, {
+			...cmsBlockImpls,
+			Promo: { form: () => [linkField("cta"), pagesField("related")], toSchema: () => ({ "@type": "FAQPage", mainEntity: [] }) },
+		});
+		const { cms, ids } = await makeCms(undefined, { blocks });
+		await cms.site().pages.update(ids.about as number, { content: [{ id: "faq1", kind: "Promo", active: true, sort: 0, data: {} }] });
+		const result = await cms.loadPage(get("/about-us"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(result.props.seo.jsonLd).toContainEqual({ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: [] });
+	});
+});
