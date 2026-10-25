@@ -3,6 +3,9 @@ import type { Cms } from "../cms";
 import { allows } from "./abilities";
 import { adminPrefix } from "./support";
 
+/** The product brand (CmsPanel ->brand()): the topbar and the login screen. */
+export const CMS_BRAND = "TableTop CMS";
+
 /** CmsPanel::navigationGroups: content open, design and settings collapsed. */
 export const CMS_NAV_GROUPS = [
 	{ key: "content", label: "Content", icon: "file-text", collapsible: true },
@@ -21,7 +24,7 @@ export type CmsPanelLook = {
 
 export function cmsPanel(cms: Cms): CmsPanelLook {
 	return {
-		brand: "TableTop CMS",
+		brand: CMS_BRAND,
 		navigation: "topbar-sidebar",
 		navigationGroups: [...CMS_NAV_GROUPS],
 		appearance: { density: "compact", maxContentWidth: "full" },
