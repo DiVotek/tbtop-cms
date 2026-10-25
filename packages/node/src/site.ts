@@ -6,8 +6,8 @@ import { Languages } from "./content/languages";
 import { Layouts } from "./content/layouts";
 import { NotFoundLog } from "./content/notFoundLog";
 import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from "./content/link";
-import { firstText, type Page, translationText } from "./content/page";
-import { Pages } from "./content/pages";
+import { firstText, type Page, pageFromRow, translationText } from "./content/page";
+import { Pages, whereLive } from "./content/pages";
 import { type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
@@ -112,17 +112,22 @@ export class Site {
 		return path === null ? null : this.url(path, locale);
 	}
 
-	/** LinkResolver: a link field value to `{ href, type, label }`, or null when it points nowhere live. */
-	async link(value: unknown, locale: string): Promise<ResolvedLink | null> {
+	/**
+	 * LinkResolver: a link field value to `{ href, type, label }`, or null when
+	 * it points nowhere live. `targets` (linkTargets) answers a page link
+	 * without a query; a page it does not hold is looked up.
+	 */
+	async link(value: unknown, locale: string, targets?: LinkTargets): Promise<ResolvedLink | null> {
 		const link = parseLink(value);
 		if (link === null || !isWellFormed(link)) {
 			return null;
 		}
 		const fallback = await this.languages.defaultLocale();
-		const page = link.type === "page" ? await this.pages.find(Number(link.page), { live: true }) : null;
+		const target = link.type === "page" ? (targets?.get(Number(link.page)) ?? (await this.linkTarget(Number(link.page), locale))) : null;
+		const page = target?.page ?? null;
 		let href: string | null = null;
 		if (link.type === "page") {
-			const url = page === null ? null : await this.pageUrl(page, locale);
+			const url = target?.url ?? null;
 			href = url === null ? null : link.anchor === null ? url : `${url}#${link.anchor}`;
 		} else if (link.value !== null) {
 			href = link.type === "external" ? link.value : link.type === "email" ? `mailto:${link.value}` : `tel:${telNumber(link.value)}`;
@@ -134,7 +139,35 @@ export class Site {
 		return label === null ? null : { href, type: link.type, label };
 	}
 
-	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}): Promise<ResolveContext> {
+	/**
+	 * The live pages of `ids` with their URL in `locale`, in two queries: what
+	 * a resolve pass loads up front so its page links cost no query each. A
+	 * page that is gone or not live maps to `{ page: null, url: null }`.
+	 */
+	async linkTargets(ids: number[], locale: string): Promise<LinkTargets> {
+		const unique = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+		const targets: LinkTargets = new Map(unique.map((id) => [id, { page: null, url: null }]));
+		if (unique.length === 0) {
+			return targets;
+		}
+		const pages = (await whereLive(this.pages.query().selectAll("tbtop_pages").where("tbtop_pages.id", "in", unique)).execute()).map(pageFromRow);
+		const paths = await this.pages.slugs.pathsFor(
+			pages.map((page) => page.id),
+			locale,
+		);
+		for (const page of pages) {
+			const path = paths.get(page.id);
+			targets.set(page.id, { page, url: path === undefined ? null : await this.url(path, locale) });
+		}
+		return targets;
+	}
+
+	private async linkTarget(id: number, locale: string): Promise<LinkTarget> {
+		const page = await this.pages.find(id, { live: true });
+		return { page, url: page === null ? null : await this.pageUrl(page, locale) };
+	}
+
+	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}, targets?: LinkTargets): Promise<ResolveContext> {
 		const fallback = await this.languages.defaultLocale();
 		return {
 			locale,
@@ -143,7 +176,7 @@ export class Site {
 			fields,
 			mediaUrl: (ref) => this.mediaUrl(ref),
 			richtextHtml,
-			link: (value) => this.link(value, locale),
+			link: (value) => this.link(value, locale, targets),
 			pages: (value) => resolvePageRefs(this, value, locale),
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
@@ -178,6 +211,11 @@ export class Site {
 		return translate(key, locale, await this.languages.defaultLocale(), this.config.strings, params);
 	}
 }
+
+type LinkTarget = { page: Page | null; url: string | null };
+
+/** Page link targets by page id (Site.linkTargets). */
+export type LinkTargets = Map<number, LinkTarget>;
 
 function pageName(page: Page, locale: string, fallback: string): string | null {
 	const name = firstText(page, ["name"], locale, fallback);

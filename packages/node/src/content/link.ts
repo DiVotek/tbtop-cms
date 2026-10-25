@@ -138,3 +138,24 @@ function labelIsValid(label: unknown, locales: string[]): boolean {
 		([locale, text]) => locales.includes(locale) && (text === null || (typeof text === "string" && [...text].length <= LABEL_MAX)),
 	);
 }
+
+/** The page ids of every stored page link anywhere in `value`, nested lists and locale maps included. */
+export function linkedPageIds(value: unknown, out: number[] = []): number[] {
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			linkedPageIds(item, out);
+		}
+		return out;
+	}
+	if (!isDict(value)) {
+		return out;
+	}
+	const link = parseLink(value);
+	if (link?.type === "page" && link.page !== null && /^[1-9]\d*$/.test(link.page)) {
+		out.push(Number(link.page));
+	}
+	for (const item of Object.values(value)) {
+		linkedPageIds(item, out);
+	}
+	return out;
+}

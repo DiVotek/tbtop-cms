@@ -265,3 +265,31 @@ describe("typed page types (q06)", () => {
 		expect(bare.pageTypes.has("recipe")).toBe(true);
 	});
 });
+
+describe("page links resolve in a batch", () => {
+	test("a page with many page links looks the targets up once, not twice per link", async () => {
+		const { cms, ids } = await makeCms(undefined, { blocks: promoBlocks() });
+		const link = (page: unknown) => ({ cta: { type: "page", page: String(page), label: { en: "Go" } } });
+		const content = [ids.about, ids.blog, ids["first-post"], ids.draft, 9999].map((page, sort) => ({ id: `p${sort}`, kind: "Promo", active: true, sort, data: link(page) }));
+		await cms.site().pages.update(ids.home as number, { content });
+		const proto = Object.getPrototypeOf(cms.site().pages) as { find: (...args: unknown[]) => unknown };
+		const find = proto.find;
+		let finds = 0;
+		proto.find = function (this: unknown, ...args: unknown[]) {
+			finds++;
+			return find.apply(this, args);
+		};
+		try {
+			const result = await cms.loadPage(get("/"));
+			if (result.type !== "page") throw new Error(result.type);
+			const hrefs = Object.values(result.props.render.elements)
+				.filter((element) => element.type === "Promo")
+				.map((element) => (element.props.cta as { href: string } | null)?.href ?? null);
+			// The draft and the missing page link nowhere.
+			expect(hrefs).toEqual(["/about-us", "/blog", "/blog/first-post", null, null]);
+			expect(finds).toBeLessThan(3);
+		} finally {
+			proto.find = find;
+		}
+	});
+});
