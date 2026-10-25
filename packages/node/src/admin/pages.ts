@@ -1,8 +1,10 @@
 import { type ActionCtx, Column, Cond, definePage, Effects, type S, Tab } from "@tbtop/admin";
+import { type SelectQueryBuilder, sql } from "kysely";
 import type { Cms } from "../cms";
+import type { CmsDatabase } from "../db/schema";
 import { firstText, type Page } from "../content/page";
 import { PageRuleError } from "../content/pageRules";
-import { type Dict, isDict } from "../support/values";
+import { type Dict, decodeJson, isDict, sqlDate } from "../support/values";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
 import { adminPrefix, blockId, listHeader, NAV, siteOf } from "./support";
 
@@ -13,39 +15,73 @@ export const STATUS = [
 
 const typeLabel = (cms: Cms, key: string) => (cms.pageTypes.has(key) ? cms.pageTypes.get(key).label : key);
 
-/** Pages list (PagesPage): a tab per base type, the create modal. */
+const DISPLAY_STATES: Record<string, { label: string; color: string }> = {
+	published: { label: "Published", color: "success" },
+	draft: { label: "Draft", color: "warning" },
+	scheduled: { label: "Scheduled", color: "gray" },
+	expired: { label: "Expired", color: "gray" },
+};
+
+const SEO_STATES = { fail: { label: "Missing", color: "danger" }, warn: { label: "Needs work", color: "warning" }, pass: { label: "Good", color: "success" } } as const;
+
+const badges = (states: Record<string, { label: string; color: string }>) => Object.fromEntries(Object.values(states).map((state) => [state.label, { color: state.color }]));
+
+/** A translatable column with no non-blank value in any locale. */
+const blank = (raw: unknown): boolean => {
+	const value = decodeJson(raw);
+	return !(isDict(value) ? Object.values(value) : [value]).some((text) => typeof text === "string" && text.trim() !== "");
+};
+
+/** PageListState::seoState and seoTooltip: what the badge says, and why. */
+function seoState(row: Dict): { state: keyof typeof SEO_STATES; reasons: string[] } {
+	const noTitle = blank(row.name) && blank(row.title);
+	const noSummary = blank(row.summary);
+	const hidden = !truthy(row.is_indexable);
+	const reasons = [...(noTitle ? ["No name and no title"] : []), ...(noSummary ? ["No summary"] : []), ...(hidden ? ["Excluded from indexing"] : [])];
+	return { state: noTitle ? "fail" : noSummary || hidden ? "warn" : "pass", reasons };
+}
+
+const truthy = (value: unknown): boolean => value === true || value === 1 || value === "1" || value === "t" || value === "true";
+
+/** The categories of the create form's parent select, from the view to the header (built right after it, on the same request). */
+const createParents = new WeakMap<Request, Option[]>();
+
+/**
+ * Pages list (PagesPage): New page in the header; a tab per type with live
+ * pages and Deleted, each counted; search on the name; the display state
+ * and an SEO badge; view on site and duplicate on a live row, restore and
+ * delete permanently on a trashed one. Deleting a live page is the editor's.
+ */
 export function pagesIndex(cms: Cms) {
 	const prefix = adminPrefix(cms);
 	return definePage({
 		path: "pages",
 		...listHeader("content", "Pages"),
 		nav: { group: NAV.content, label: "Pages", icon: "files", order: 10 },
+		headerActions: (s, { request }) => [createAction(s, cms, createParents.get(request) ?? [])],
 		view: async (s, { request }) => {
 			const site = cms.site(request);
+			const db = site.config.db;
 			const locale = await site.languages.defaultLocale();
-			const all = await site.pages.query().select(["id", "name"]).execute();
+			const all = await db.selectFrom("tbtop_pages").select(["id", "name"]).execute();
 			const names = new Map(all.map((row) => [Number(row.id), row.name]));
-			const paths = await site.pages.slugs.pathsFor(
-				all.map((row) => Number(row.id)),
-				locale,
-			);
-			const nameOf = (raw: unknown) => {
-				try {
-					const map = typeof raw === "string" ? JSON.parse(raw) : raw;
-					return isDict(map) ? String(map[locale] ?? Object.values(map)[0] ?? "") : "";
-				} catch {
-					return "";
-				}
-			};
 			const categories = await site.pages.query().select(["id", "name"]).where("type", "=", "category").orderBy("sort_order").orderBy("id").execute();
+			createParents.set(request, parentOptions(categories, locale));
+			const present = (await site.pages.query().select("type").distinct().execute()).map((row) => row.type);
+			const keys = cms.pageTypes.bases().map((type) => type.key);
+			const tabTypes = [...keys.filter((key) => present.includes(key)), ...present.filter((key) => !keys.includes(key)).sort()];
+			const live = (qb: unknown) => (qb as PagesTable).where("tbtop_pages.deleted_at", "is", null);
+			const now = sqlDate(new Date());
+			const tab = (name: string, label: string) => Tab.make(name).label(label).count().description(`${label} — categories group content, pages stand alone, articles live under a category.`);
 			return s.stack([
-				s.row([createAction(s, cms, parentOptions(categories, locale))]),
 				s
 					.table("pages")
 					.columns([
-						Column.make("name").label("Title").translatable().emphasized().searchable(),
+						Column.make("name").label("Title").translatable().emphasized(),
 						Column.make("type")
 							.label("Type")
+							.muted()
+							.uppercase()
 							.formatUsing((value) => typeLabel(cms, String(value))),
 						// Only once a host registers a subtype: before that every row would be blank (PagesPage::columns).
 						...(cms.pageTypes.all().some((type) => type.base !== type.key)
@@ -53,64 +89,123 @@ export function pagesIndex(cms: Cms) {
 									Column.make("subtype")
 										.label("Subtype")
 										.muted()
+										.uppercase()
 										.formatUsing((value) => (typeof value === "string" && value !== "" ? typeLabel(cms, value) : "")),
 								]
 							: []),
 						Column.make("parent_id")
 							.label("Parent")
 							.muted()
-							.formatUsing((value) => (value === null ? "" : nameOf(names.get(Number(value))))),
-						Column.make("status")
+							.formatUsing((value) => (value === null ? "" : firstText(pageLabel({ name: (names.get(Number(value)) as string | null) ?? null }), ["name"], locale, locale))),
+						Column.make("display_state")
 							.label("Status")
-							.badge({ published: { label: "Published", color: "success" }, draft: { label: "Draft" } }),
-						Column.make("path")
-							.label("Path")
-							.muted()
-							.formatUsing((_, row) => `/${paths.get(Number(row.id)) ?? ""}`),
-						Column.make("updated_at").label("Updated").datetime().sortable(),
+							.formatUsing((value) => DISPLAY_STATES[String(value)]?.label ?? String(value))
+							.badge(badges(DISPLAY_STATES)),
+						Column.make("seo_state")
+							.label("SEO")
+							.formatUsing((_, row) => SEO_STATES[seoState(row as Dict).state].label)
+							.tooltip((row) => seoState(row as Dict).reasons.join("\n"))
+							.badge(badges(SEO_STATES))
+							.toggleable(),
+						Column.make("updated_at").label("Updated").date("M j, Y").muted().sortable(),
+						// Projected for the row actions' conditions and the view link, not shown.
+						Column.make("deleted_at").label("Deleted").date("M j, Y").toggleable(true, true),
+						Column.make("path").label("Path").muted().toggleable(true, true),
 					])
 					.tabs([
-						Tab.make("all").label("All"),
-						...cms.pageTypes.bases().map((type) =>
-							Tab.make(type.key)
-								.label(type.label)
-								.query((qb) => (qb as ReturnType<typeof site.pages.query>).where("type", "=", type.key)),
-						),
+						tab("all", "All").query(live),
+						...tabTypes.map((type) => tab(type, typeLabel(cms, type)).query((qb) => live(qb).where("tbtop_pages.type", "=", type))),
+						Tab.make("deleted")
+							.label("Deleted")
+							.count()
+							.description("Pages moved to the trash — restore them or delete permanently.")
+							.query((qb) => (qb as PagesTable).where("tbtop_pages.deleted_at", "is not", null)),
 					])
+					.searchable(["tbtop_pages.name_text"])
 					.defaultSort("id", "asc")
 					.paginate(25, [25, 50, 100])
-					.recordUrl((row) => `${prefix}/pages/${String(row.id)}/edit`)
-					.rowActions([
-						s
-							.action("edit")
-							.label("Edit")
-							.icon("pencil")
-							.handle((ctx) => `${prefix}/pages/${String(ctx.key())}/edit`, ["row"]),
-						s
-							.action("delete")
-							.label("Delete")
-							.color("danger")
-							.confirm("Delete this page?", "The page goes to the trash and its URL stops working.")
-							.handle(async (ctx) => {
-								const page = await siteOf(cms, ctx).pages.find(Number(ctx.key()));
-								if (page === null) {
-									return Effects.make().notify("The page is already gone.", "error");
-								}
-								try {
-									await siteOf(cms, ctx).pages.delete(page.id);
-								} catch (error) {
-									if (error instanceof PageRuleError) {
-										return Effects.make().notify(error.message, "error");
-									}
-									throw error;
-								}
-								return Effects.make().notify("Page deleted").refreshTable("pages");
-							}, ["row"]),
-					])
-					.query(() => site.pages.query()),
+					.emptyState("Nothing here yet", "Create your first page to get started.", "files")
+					// No edit page for a trashed row: it is not clickable.
+					.recordUrl((row) => (row.deleted_at === null || row.deleted_at === undefined ? `${prefix}/pages/${String(row.id)}/edit` : null))
+					.rowActions(rowActions(s, cms))
+					// A derived table under the same alias: the JSON name gets a text twin that LIKE accepts on Postgres.
+					.query(() =>
+						db
+							.selectFrom(
+								db
+									.selectFrom("tbtop_pages")
+									.selectAll()
+									.select(sql<string>`cast(tbtop_pages.name as ${sql.raw(textType(db))})`.as("name_text"))
+									.as("tbtop_pages"),
+							)
+							.select((eb) => [
+								eb.selectFrom("tbtop_page_slugs").select("tbtop_page_slugs.path").whereRef("tbtop_page_slugs.page_id", "=", "tbtop_pages.id").where("tbtop_page_slugs.locale", "=", locale).limit(1).as("path"),
+								sql<string>`case when tbtop_pages.status <> 'published' then 'draft' when tbtop_pages.published_at is not null and tbtop_pages.published_at > ${now} then 'scheduled' when tbtop_pages.unpublish_at is not null and tbtop_pages.unpublish_at <= ${now} then 'expired' else 'published' end`.as("display_state"),
+							]),
+					),
 			]);
 		},
 	});
+}
+
+type PagesTable = SelectQueryBuilder<CmsDatabase, "tbtop_pages", object>;
+
+/** MySQL casts to CHAR, not TEXT. */
+function textType(db: { getExecutor(): { adapter: object } }): string {
+	return db.getExecutor().adapter.constructor.name.toLowerCase().includes("mysql") ? "char" : "text";
+}
+
+/** PagesRowActions: view on site and duplicate for a live row, restore and delete permanently for a trashed one. */
+function rowActions(s: S, cms: Cms) {
+	const refused = (error: unknown) => {
+		if (error instanceof PageRuleError) {
+			return Effects.make().notify(error.message, "error");
+		}
+		throw error;
+	};
+	return [
+		// An error page has no path, and a trashed one lost its slugs: no link for either.
+		s.action("pageView").label("").link().icon("external-link").tooltip("View on site").url("/{row.path}").openUrlInNewTab().hiddenIf(Cond.any(Cond.notEmpty("deleted_at"), Cond.eq("path", null))),
+		s
+			.action("pageDuplicate")
+			.label("Duplicate")
+			.handle(async (ctx) => {
+				try {
+					await siteOf(cms, ctx).pages.duplicate(Number(ctx.key()), { by: userKey(ctx) });
+				} catch (error) {
+					return refused(error);
+				}
+				return Effects.make().notify("Page duplicated").refreshTable("pages");
+			}, ["row"])
+			.hiddenIf(Cond.notEmpty("deleted_at")),
+		s
+			.action("pageRestore")
+			.label("Restore")
+			.color("gray")
+			.handle(async (ctx) => {
+				try {
+					await siteOf(cms, ctx).pages.untrash(Number(ctx.key()));
+				} catch (error) {
+					return refused(error);
+				}
+				return Effects.make().notify("Page restored").refreshTable("pages");
+			}, ["row"])
+			.hiddenIf(Cond.empty("deleted_at")),
+		s
+			.action("pageForceDelete")
+			.label("Delete permanently")
+			.color("danger")
+			.confirm("Delete permanently?", "This cannot be undone.")
+			.handle(async (ctx) => {
+				try {
+					await siteOf(cms, ctx).pages.forceDelete(Number(ctx.key()));
+				} catch (error) {
+					return refused(error);
+				}
+				return Effects.make().notify("Page deleted permanently").refreshTable("pages");
+			}, ["row"])
+			.hiddenIf(Cond.empty("deleted_at")),
+	];
 }
 
 function createAction(s: S, cms: Cms, categories: Option[]) {
@@ -141,7 +236,7 @@ function createAction(s: S, cms: Cms, categories: Option[]) {
 					s.select("type").label("Type").options(types).required().default("page"),
 					...subtypes,
 					parent,
-					s.actionsRow([s.action("pageCreateSave").label("Create").color("primary").submit()]),
+					s.flex([s.spacer(), s.action("pageCreateCancel").label("Cancel").handle(() => Effects.make().closeModal()), s.action("pageCreateSave").label("Create").color("primary").submit()], { justify: "end" }),
 				])
 				.onSubmit(async (ctx) => {
 					const form = ctx.form as Dict;

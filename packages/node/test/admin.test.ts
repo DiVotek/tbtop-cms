@@ -74,8 +74,8 @@ describe("admin pages", () => {
 		const { visit } = await panel();
 		const res = await visit("/admin/pages/tables/pages", { inertia: false });
 		const rows = ((await res.json()) as { data: { data: Record<string, unknown>[] } }).data.data;
-		expect(rows.map((row) => row.path)).toContain("/blog/first-post");
-		expect(rows.find((row) => row.path === "/blog/first-post")?.type).toBe("Article");
+		expect(rows.map((row) => row.path)).toContain("blog/first-post");
+		expect(rows.find((row) => row.path === "blog/first-post")?.type).toBe("Article");
 	});
 
 	test("editing a page saves its fields, block data and slug, then the site shows it", async () => {

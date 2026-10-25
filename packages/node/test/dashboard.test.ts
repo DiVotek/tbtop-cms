@@ -80,7 +80,7 @@ describe("dashboard", () => {
 		const all = nodes((await (await panel(fixture)).page("/admin/dashboard")).props);
 		const system = all.filter((node) => node.kind === "stat" && SYSTEM_STATS.includes(String(node.options.label)));
 		expect(system.map((node) => node.options.label)).toEqual(SYSTEM_STATS);
-		const lists = Object.fromEntries(
+		const lists: Record<string, string[][]> = Object.fromEntries(
 			all.filter((node) => String(node.name).startsWith("dashboardSystem")).map((node) => [node.name, (node.options.items as { title: string; meta: string }[]).map((item) => [item.title, item.meta])]),
 		);
 		expect(lists.dashboardSystemVersions?.map(([title]) => title)).toEqual(["Runtime", "@tbtop/admin version", "@tbtop/cms version"]);

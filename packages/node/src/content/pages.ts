@@ -228,6 +228,94 @@ export class Pages {
 		});
 	}
 
+	/**
+	 * Takes a page out of the trash (Page::restore + PageObserver::restoring):
+	 * the tree rules run again, a trashed parent refuses it (PageRuleError),
+	 * and the slugs come back from the name, suffixed if the path was taken.
+	 */
+	async untrash(id: number): Promise<Page> {
+		const row = await this.db.selectFrom("tbtop_pages").selectAll().where("id", "=", id).where("deleted_at", "is not", null).executeTakeFirst();
+		if (row === undefined) {
+			throw new PageRuleError("The page is not in the trash.");
+		}
+		const trashed = pageFromRow(row);
+		if (trashed.parentId !== null) {
+			const parent = await this.db.selectFrom("tbtop_pages").select("deleted_at").where("id", "=", trashed.parentId).executeTakeFirst();
+			if (parent !== undefined && parent.deleted_at !== null) {
+				throw new PageRuleError("Restore the parent page first.");
+			}
+		}
+		await assertHierarchy(this.db, this.types, { id, type: trashed.type, subtype: trashed.subtype, parentId: trashed.parentId }, { type: true, parent: true });
+		await this.audit.track(AUDIT_SUBJECTS.page, id, async () => {
+			await this.db
+				.updateTable("tbtop_pages")
+				.set((eb) => ({ deleted_at: null, lock_version: eb("lock_version", "+", 1), updated_at: sqlDate(new Date()) }))
+				.where("id", "=", id)
+				.execute();
+		});
+		const page = await this.mustFind(id);
+		await this.slugs.sync(page);
+		return page;
+	}
+
+	/**
+	 * Deletes a trashed page for good, with its slugs, revisions and link
+	 * index; its form submissions keep their rows without the page. A page
+	 * still parenting another one (trashed included) throws PageRuleError.
+	 */
+	async forceDelete(id: number): Promise<void> {
+		const row = await this.db.selectFrom("tbtop_pages").select("id").where("id", "=", id).where("deleted_at", "is not", null).executeTakeFirst();
+		if (row === undefined) {
+			throw new PageRuleError("Only a page in the trash can be deleted permanently.");
+		}
+		if ((await this.db.selectFrom("tbtop_pages").select("id").where("parent_id", "=", id).executeTakeFirst()) !== undefined) {
+			throw new PageRuleError("This page has child pages — move or delete them first.");
+		}
+		await this.audit.track(
+			AUDIT_SUBJECTS.page,
+			id,
+			async () => {
+				// One by one rather than by foreign keys: SQLite enforces them only with PRAGMA foreign_keys.
+				await this.slugs.remove(id);
+				await this.db.deleteFrom("tbtop_page_revisions").where("page_id", "=", id).execute();
+				await this.db.deleteFrom("tbtop_page_refs").where("page_id", "=", id).execute();
+				await this.db.updateTable("tbtop_form_submissions").set({ page_id: null }).where("page_id", "=", id).execute();
+				await this.db.deleteFrom("tbtop_pages").where("id", "=", id).execute();
+			},
+			{ event: "force_deleted" },
+		);
+	}
+
+	/**
+	 * PageDuplicator: a draft copy next to the original (same parent, last
+	 * among its siblings), " (copy)" after each name. Not copied: children,
+	 * revisions (the copy starts its own), slugs (derived from the new name),
+	 * the system flag and the error class.
+	 */
+	async duplicate(id: number, options: { by?: string | number | null } = {}): Promise<Page> {
+		const source = await this.find(id);
+		if (source === null) {
+			throw new PageRuleError("The page is already gone.");
+		}
+		const last = await this.db
+			.selectFrom("tbtop_pages")
+			.select((eb) => eb.fn.max("sort_order").as("max"))
+			.where((eb) => (source.parentId === null ? eb("parent_id", "is", null) : eb("parent_id", "=", source.parentId)))
+			.executeTakeFirst();
+		const name = Object.fromEntries(Object.entries(source.name).map(([locale, value]) => [locale, typeof value === "string" && value !== "" ? `${value} (copy)` : value]));
+		const { id: _id, createdAt: _created, updatedAt: _updated, lockVersion: _lock, createdBy: _createdBy, updatedBy: _updatedBy, ...copy } = source;
+		return this.audit.track(
+			AUDIT_SUBJECTS.page,
+			null,
+			() =>
+				this.insert(
+					{ ...copy, name, status: "draft", publishedAt: null, unpublishAt: null, isSystem: false, errorClass: null, sortOrder: last?.max === null || last?.max === undefined ? 0 : Number(last.max) + 1 },
+					options,
+				),
+			{ idOf: (page) => page.id, event: "duplicated", context: { source_page_id: id } },
+		);
+	}
+
 	/** PageObserver::updating's checks, before anything is written. */
 	private async guardUpdate(current: Page, input: PageInput): Promise<void> {
 		const type = input.type ?? current.type;
