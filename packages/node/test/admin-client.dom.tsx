@@ -68,6 +68,12 @@ describe("@tbtop/cms/admin-client", () => {
 		expect(onChange).toHaveBeenCalledWith({ ...value, label: { en: "Hello", uk: "Hi" } });
 	});
 
+	test("without locales a flattened label stays shared on edit", async () => {
+		const { withLabel } = await import("../src/admin-client/link/types");
+		const link: LinkValue = { type: "external", value: "https://x.test", page: null, anchor: null, label: { "*": "Read" } };
+		expect(withLabel(link, "en", "Open", []).label).toEqual({ "*": "Read", en: "Open" });
+	});
+
 	test("renders only the declared types, in the server's copy", () => {
 		const { getByText, queryByText } = renderForm({ options: { types: ["email", "phone"], labels: { email: "Пошта" } } });
 		expect(getByText("Пошта")).toBeTruthy();

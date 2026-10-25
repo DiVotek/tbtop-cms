@@ -48,6 +48,16 @@ describe("tbtop-cms CLI", () => {
 		expect(run.lines.slice(0, 2)).toEqual(["Wrote 0 page reference rows.", "Deleted 0 404 log rows."]);
 	});
 
+	test("a minified adapter (renamed classes) still gives its dialect", () => {
+		const minified = (adapter: { supportsReturning: boolean; supportsTransactionalDdl: boolean }) => {
+			class a {}
+			return { getExecutor: () => ({ adapter: Object.assign(new a(), adapter) }) } as unknown as Kysely<unknown>;
+		};
+		expect(dialectOf(minified({ supportsReturning: true, supportsTransactionalDdl: true }))).toBe("postgres");
+		expect(dialectOf(minified({ supportsReturning: false, supportsTransactionalDdl: false }))).toBe("mysql");
+		expect(dialectOf(minified({ supportsReturning: true, supportsTransactionalDdl: false }))).toBe("sqlite");
+	});
+
 	test("migrate reads the dialect from the Kysely adapter and is idempotent", async () => {
 		const { cms, db } = await makeCms(fixture);
 		expect(dialectOf(db as Kysely<unknown>)).toBe(testDialect);

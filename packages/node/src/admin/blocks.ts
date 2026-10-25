@@ -1,9 +1,7 @@
 import { definePage, Field, S } from "@tbtop/admin";
 import type { BlockKind } from "../blocks/registry";
 import type { Cms } from "../cms";
-import { firstText } from "../content/page";
-import { pageFromRow } from "../content/page";
-import { isDict } from "../support/values";
+import { decodeJson, isDict } from "../support/values";
 import { adminPrefix, listHeader, NAV } from "./support";
 
 type FieldInfo = { name: string; label: string; type: string; required: boolean; translatable: boolean };
@@ -107,13 +105,16 @@ function placementLabel(cms: Cms, placement: string): string {
 async function blockUsage(cms: Cms, request: Request, prefix: string): Promise<Map<string, Usage[]>> {
 	const site = cms.site(request);
 	const locale = await site.languages.defaultLocale();
-	const rows = await site.pages.query().selectAll("tbtop_pages").orderBy("sort_order").orderBy("id").execute();
+	// Only the columns usage needs: the content is scanned in full, as PHP's BlockUsage does.
+	const rows = await site.pages.query().select(["tbtop_pages.id", "tbtop_pages.name", "tbtop_pages.content"]).orderBy("sort_order").orderBy("id").execute();
 	const index = new Map<string, Usage[]>();
 	for (const row of rows) {
-		const page = pageFromRow(row);
-		const kinds = new Set((Array.isArray(page.content) ? page.content : []).filter(isDict).map((entry) => entry.kind).filter((kind): kind is string => typeof kind === "string" && kind !== ""));
+		const content = decodeJson(row.content);
+		const kinds = new Set((Array.isArray(content) ? content : []).filter(isDict).map((entry) => entry.kind).filter((kind): kind is string => typeof kind === "string" && kind !== ""));
+		const names = decodeJson(row.name);
+		const name = isDict(names) && typeof names[locale] === "string" && names[locale].trim() !== "" ? names[locale] : `#${row.id}`;
 		for (const kind of kinds) {
-			index.set(kind, [...(index.get(kind) ?? []), { name: firstText(page, ["name"], locale, locale) || `#${page.id}`, url: `${prefix}/pages/${page.id}/edit` }]);
+			index.set(kind, [...(index.get(kind) ?? []), { name, url: `${prefix}/pages/${row.id}/edit` }]);
 		}
 	}
 	return index;

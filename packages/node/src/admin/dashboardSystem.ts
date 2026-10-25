@@ -1,5 +1,6 @@
 import type { S } from "@tbtop/admin";
 import { sql } from "kysely";
+import { dialectOfDb } from "../support/db";
 import cmsPackage from "../../package.json" with { type: "json" };
 import type { Cms } from "../cms";
 
@@ -148,8 +149,7 @@ async function adminVersion(): Promise<string> {
 
 /** The Kysely adapter's dialect: sqlite, postgres or mysql. */
 function driver(cms: Cms): string {
-	const name = cms.config.db.getExecutor().adapter.constructor.name.replace(/Adapter$/, "").toLowerCase();
-	return name === "" ? NA : name;
+	return dialectOfDb(cms.config.db) ?? NA;
 }
 
 async function databaseSize(cms: Cms): Promise<string> {

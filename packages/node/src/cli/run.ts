@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 import type { Cms } from "../cms";
 import { type Dialect, migrateCms } from "../db/migrations";
+import { dialectOfDb } from "../support/db";
 
 export type CliIo = { out: (line: string) => void; err: (line: string) => void };
 
@@ -21,25 +22,13 @@ Commands:
 
 The config module's default export is the host's Cms (or a function returning one).`;
 
-/**
- * The Kysely dialect behind a db, for the migrations' column types: by the
- * adapter's class name up its prototype chain, since a dialect package may
- * bring its own copy of kysely (instanceof would miss it). D1 is SQLite.
- */
+/** The Kysely dialect behind a db, for the migrations' column types (see dialectOfDb). */
 export function dialectOf(db: Kysely<unknown>): Dialect {
-	for (let proto = Object.getPrototypeOf(db.getExecutor().adapter); proto !== null; proto = Object.getPrototypeOf(proto)) {
-		const name = String(proto.constructor?.name ?? "");
-		if (/postgres/i.test(name)) {
-			return "postgres";
-		}
-		if (/mysql/i.test(name)) {
-			return "mysql";
-		}
-		if (/sqlite/i.test(name)) {
-			return "sqlite";
-		}
+	const dialect = dialectOfDb(db);
+	if (dialect === null) {
+		throw new Error("Unknown Kysely dialect: pass --dialect sqlite|postgres|mysql.");
 	}
-	throw new Error("Unknown Kysely dialect: pass --dialect sqlite|postgres|mysql.");
+	return dialect;
 }
 
 function flag(args: string[], name: string): string | undefined {

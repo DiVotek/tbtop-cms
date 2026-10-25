@@ -101,7 +101,9 @@ export function pickLabel(link: LinkValue, locale?: string, fallback?: string): 
  */
 export function withLabel(link: LinkValue, locale: string, text: string, locales: string[] = []): LinkValue {
 	const { "*": shared, ...own } = link.label ?? {};
-	const next: LinkLabel = { ...(shared === undefined ? {} : Object.fromEntries(locales.map((key) => [key, shared]))), ...own };
+	// No locales to spread over (a field without them): the shared label stays shared.
+	const spread = shared === undefined ? {} : locales.length === 0 ? { "*": shared } : Object.fromEntries(locales.map((key) => [key, shared]));
+	const next: LinkLabel = { ...spread, ...own };
 	if (text.trim() === "") {
 		delete next[locale];
 	} else {

@@ -5,6 +5,7 @@ import type { CmsDatabase } from "../db/schema";
 import { firstText, type Page } from "../content/page";
 import { PageRuleError } from "../content/pageRules";
 import { type Dict, decodeJson, isDict, sqlDate } from "../support/values";
+import { dialectOfDb } from "../support/db";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
 import { adminPrefix, blockId, listHeader, NAV, siteOf } from "./support";
 
@@ -153,7 +154,7 @@ type PagesTable = SelectQueryBuilder<CmsDatabase, "tbtop_pages", object>;
 
 /** MySQL casts to CHAR, not TEXT. */
 function textType(db: { getExecutor(): { adapter: object } }): string {
-	return db.getExecutor().adapter.constructor.name.toLowerCase().includes("mysql") ? "char" : "text";
+	return dialectOfDb(db) === "mysql" ? "char" : "text";
 }
 
 /** PagesRowActions: view on site and duplicate for a live row, restore and delete permanently for a trashed one. */
