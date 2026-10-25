@@ -206,6 +206,13 @@ describe("admin section abilities (q02)", () => {
 		expect(asked.some(([user, ability]) => user === editor && ability === "tbtop-cms.settings")).toBe(true);
 	});
 
+	test("the audit log needs tbtop-cms.audit, not settings", async () => {
+		const settingsOnly: CmsConfig["authorize"] = async (_user, ability) => ability === "tbtop-cms.settings";
+		const auditOnly: CmsConfig["authorize"] = async (_user, ability) => ability === "tbtop-cms.audit";
+		expect((await (await panel({ authorize: settingsOnly }, () => editor)).visit("/admin/audit")).status).toBe(403);
+		expect((await (await panel({ authorize: auditOnly }, () => editor)).visit("/admin/audit")).status).toBe(200);
+	});
+
 	test("the link page search needs a section with link fields (pages or design)", async () => {
 		const inboxOnly: CmsConfig["authorize"] = async (_user, ability) => ability === "tbtop-cms.submissions";
 		const designOnly: CmsConfig["authorize"] = async (_user, ability) => ability === "tbtop-cms.design";

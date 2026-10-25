@@ -175,8 +175,8 @@ props built without it (no settings, languages or layout).
 the PHP names: `tbtop-cms.pages` (pages and the page editor),
 `tbtop-cms.submissions` (inbox), `tbtop-cms.redirects`, `tbtop-cms.design`
 (layout and shared blocks; also Share and adding a shared block in the page
-editor), `tbtop-cms.languages` and `tbtop-cms.settings` (site, SEO,
-notifications). A false hides the section from the nav and answers 403 to
+editor), `tbtop-cms.languages`, `tbtop-cms.settings` (site, SEO,
+notifications) and `tbtop-cms.audit` (the audit log). A false hides the section from the nav and answers 403 to
 its pages and to every form, action, table and upload on them. Without
 `authorize`, every section is open to any panel user, as before.
 `tbtop-cms.users` gates the Users page an auth adapter adds.
@@ -524,7 +524,8 @@ Better Auth introspects through that join too: give it the raw binding
   tiles trended over 14 days, leads-by-status and daily submission charts,
   the latest pages and submissions; the page parts need
   `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`, the layout tile
-  `tbtop-cms.design`), the SEO report (missing titles, descriptions,
+  `tbtop-cms.design`; the System section, with host metrics and versions,
+  shows to every admin, as in PHP), the SEO report (missing titles, descriptions,
   translations and OG images, duplicates, noindex, per live page and
   frontend locale, with a daily history in `tbtop_seo_audit_snapshots`),
   pages list and editor (General, SEO, a tab per block, Publishing),
