@@ -107,6 +107,26 @@ describe("Better Auth adapter", () => {
 		expect(JSON.stringify(dashboard.props)).toContain("owner@site.test");
 	});
 
+	test("the login page is the PHP login screen: chrome-less center layout, product mark, site name on the card; unchecked Remember me ends with the browser", async () => {
+		const { cms, page, signIn, jar } = await authPanel();
+		const login = await page("/admin/login");
+		expect(login.props.layout).toBe("center");
+		const structure = JSON.stringify(login.props.structure);
+		expect(structure).toContain('aria-label=\\"TableTop CMS\\"');
+		expect(structure).toContain("Sign in to the control panel");
+		expect(structure).toContain("Remember me");
+		expect(structure).toContain("Go to site");
+		expect(structure).toContain(`TableTop CMS © ${new Date().getFullYear()}`);
+		expect(structure).toContain('"content":"TableTop CMS"');
+
+		await cms.site().settings.set("site.name", "Acme");
+		expect(JSON.stringify((await page("/admin/login")).props.structure)).toContain('"content":"Acme"');
+
+		await signIn("owner");
+		const persistent = [...jar.keys()].some((key) => key.includes("dont_remember"));
+		expect(persistent).toBe(true);
+	});
+
 	test("a role without any CMS section stays a guest, and its session is closed", async () => {
 		const { signIn, visit, jar } = await authPanel();
 		await signIn("member");

@@ -1,1 +1,3 @@
 @import "@tbtop/inertia-admin/styles.css";
+/* The CMS admin pages (the login screen among them) use Tailwind classes the admin client does not. */
+@source "../node_modules/@tbtop/cms/dist";

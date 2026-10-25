@@ -2,7 +2,6 @@ import { type ActionCtx, Column, Cond, definePage, Effects, HttpError, type S } 
 import type { Kysely } from "kysely";
 import { gated } from "../admin/abilities";
 import { adminPrefix, NAV } from "../admin/support";
-import { clientKey } from "../forms/throttle";
 import type { Dict } from "../support/values";
 import type { AdapterCtx } from "./index";
 import type { CmsAuthUser } from "./session";
@@ -27,37 +26,6 @@ async function refused(call: () => Promise<unknown>): Promise<Effects | null> {
 		}
 		throw error;
 	}
-}
-
-/** Sign in (LoginPage): email and password through Better Auth, the only page a guest reaches. */
-export function loginPage(ctx: AdapterCtx) {
-	const prefix = adminPrefix(ctx.cms);
-	return definePage({
-		path: "login",
-		title: "Sign in",
-		public: true,
-		view: (s) =>
-			s
-				.form("login", [
-					s.text("email").label("Email").required().rules("email|max:255"),
-					s.password("password").label("Password").required(),
-					s.actionsRow([s.action("signIn").label("Sign in").color("primary").submit()]),
-				])
-				.onSubmit(async (submitted) => {
-					const form = submitted.form as Dict;
-					const email = String(form.email ?? "");
-					const key = `${email.toLowerCase()}|${await clientKey(submitted.request, ctx.cms.config.forms?.clientIp)}`;
-					const retryAfter = ctx.throttle?.hit(key) ?? null;
-					if (retryAfter !== null) {
-						return Effects.make().notify(`Too many sign-in attempts. Try again in ${retryAfter} seconds.`, "error");
-					}
-					if (await ctx.signIn(submitted.request, email, String(form.password ?? ""))) {
-						ctx.throttle?.clear(key);
-						return `${prefix}/dashboard`;
-					}
-					return Effects.make().notify("These credentials do not match an admin account.", "error");
-				}),
-	});
 }
 
 /** Users (UsersPage): Better Auth's users with their role; add, edit, ban, delete. */

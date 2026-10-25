@@ -223,7 +223,9 @@ const admin = createAdmin({
   `cmsAccess.newRole({ ... })` makes a host's own, passed to both the plugin
   and `cmsAuth(auth, { roles })`. A user whose roles grant no section and no
   `user:list` is a guest: sign-in refuses them and closes the session.
-- Pages: `login` (public), and `users`, `users/new`, `users/{id}/edit`
+- Pages: `login` (public; PHP's login screen: center layout without the
+  chrome, the product mark, a card headed by the Site name, Remember me,
+  a link to the site), and `users`, `users/new`, `users/{id}/edit`
   (Settings → Users): name, email, role, banned; add with a password, edit
   name and role (not one's own), set a new password, ban (signs out
   everywhere), unban, delete. Better Auth refuses banning or deleting
@@ -308,6 +310,14 @@ Promo: {
 // The admin bundle's entry. Peers: react 19 and @tbtop/inertia-admin (optional for the other entries).
 import { linkFieldClient } from "@tbtop/cms/admin-client"; // defineFieldClient("link", …): the import registers it
 void linkFieldClient;
+```
+
+The CMS admin pages (the login screen among them) carry Tailwind classes the
+admin client's stylesheet lacks, so the admin bundle's CSS scans the package:
+
+```css
+@import "@tbtop/inertia-admin/styles.css";
+@source "../node_modules/@tbtop/cms/dist"; /* relative to this file */
 ```
 
 The Node page search answers each page with one label, its name in the

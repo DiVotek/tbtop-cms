@@ -3,7 +3,8 @@ import { CMS_ABILITIES, type CmsAbility } from "../admin/abilities";
 import type { Cms } from "../cms";
 import { SubmitThrottle, type ThrottleLimit } from "../forms/throttle";
 import { type CmsRole, cmsRoles, roleAllows } from "./access";
-import { loginPage, userEdit, userNew, usersIndex } from "./pages";
+import { loginPage } from "./login";
+import { userEdit, userNew, usersIndex } from "./pages";
 import { AuthSession, type CmsAuthUser } from "./session";
 
 export { CMS_SECTIONS, cmsAccess, cmsRoles, cmsStatements, type CmsRole, permissionFor } from "./access";
@@ -24,7 +25,7 @@ type RoleName = never;
 export type BetterAuthLike = {
 	api: {
 		getSession(input: { headers: Headers }): Promise<{ user: object } | null>;
-		signInEmail(input: Call<{ email: string; password: string }> & { asResponse: true }): Promise<Response>;
+		signInEmail(input: Call<{ email: string; password: string; rememberMe?: boolean }> & { asResponse: true }): Promise<Response>;
 		signOut(input: { headers: Headers; asResponse: true }): Promise<Response>;
 		createUser(input: Call<{ email: string; password: string; name: string; role: RoleName }>): Promise<unknown>;
 		setRole(input: Call<{ userId: string; role: RoleName }>): Promise<unknown>;
@@ -64,8 +65,8 @@ export type CmsAuth = {
 	loginPath: (cms: Cms) => string;
 	/** The sign-in page and the Users pages: createAdmin({ pages: [...cms.admin.pages, ...auth.pages(cms)] }). */
 	pages: (cms: Cms) => PageDef[];
-	/** Signs in with email and password: the cookies go on the panel's response; false for wrong credentials, a ban or no CMS role. */
-	signIn: (request: Request, email: string, password: string) => Promise<boolean>;
+	/** Signs in with email and password (remember: Better Auth's rememberMe, default false): the cookies go on the panel's response; false for wrong credentials, a ban or no CMS role. */
+	signIn: (request: Request, email: string, password: string, remember?: boolean) => Promise<boolean>;
 };
 
 const asUser = (raw: object): CmsAuthUser => {
@@ -104,12 +105,12 @@ export function cmsAuth(auth: BetterAuthLike, options: CmsAuthOptions = {}): Cms
 		return store;
 	};
 
-	const signIn = async (request: Request, email: string, password: string): Promise<boolean> => {
+	const signIn = async (request: Request, email: string, password: string, remember = false): Promise<boolean> => {
 		const store = stores.get(request);
 		if (store === undefined) {
 			throw new TypeError("signIn() runs inside a panel request: pass createAdmin({ session: auth.session }).");
 		}
-		const response = await auth.api.signInEmail({ body: { email, password }, headers: request.headers, asResponse: true });
+		const response = await auth.api.signInEmail({ body: { email, password, rememberMe: remember }, headers: request.headers, asResponse: true });
 		if (!response.ok) {
 			return false;
 		}
