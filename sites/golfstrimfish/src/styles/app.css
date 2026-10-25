@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+	--color-ocean-950: #042f3a;
+	--color-ocean-900: #064e5e;
+	--color-ocean-800: #0a7088;
+	--color-ocean-600: #1496b3;
+	--color-ocean-100: #e8f6fa;
+	--color-sand-50: #faf8f5;
+	--color-sand-100: #f3efe8;
+	--font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+	@apply bg-sand-50 text-ocean-950 antialiased;
+}
+
+.cms-prose p {
+	@apply mb-4 leading-relaxed text-ocean-900/90;
+}

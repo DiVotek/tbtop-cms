@@ -1,0 +1,12 @@
+# Future Cloudflare Workers + D1 deployment sketch (not wired in this dogfood pass).
+name = "golfstrimfish"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat", "nodejs_als"]
+
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "golfstrimfish"
+# database_id = "<create-in-dashboard>"
+
+# [vars]
+# CMS_URL = "https://golfstrimfish.example"

@@ -1,0 +1,10 @@
+.packs/
+node_modules/
+dist/
+public/admin-build/
+*.sqlite
+*.jsonl
+e2e/.auth/
+test-results/
+playwright-report/
+.tanstack/
