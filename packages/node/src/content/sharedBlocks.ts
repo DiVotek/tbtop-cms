@@ -83,15 +83,14 @@ export class SharedBlocks {
 
 	/** Deletes an unplaced block; one still placed anywhere throws SharedBlockInUseError (SharedBlocksPage::deleteAction). */
 	async delete(id: number): Promise<void> {
-		await this.audit.track(AUDIT_SUBJECTS.sharedBlock, id, () =>
-			this.db.transaction().execute(async (trx) => {
-				const inUse = (await placements(trx)).get(id) ?? 0;
-				if (inUse > 0) {
-					throw new SharedBlockInUseError(id, inUse);
-				}
-				await trx.deleteFrom("tbtop_shared_blocks").where("id", "=", id).execute();
-			}),
-		);
+		// No transaction: D1 has none. A placement saved between the check and the delete is a problem row the editor lists.
+		await this.audit.track(AUDIT_SUBJECTS.sharedBlock, id, async () => {
+			const inUse = (await placements(this.db)).get(id) ?? 0;
+			if (inUse > 0) {
+				throw new SharedBlockInUseError(id, inUse);
+			}
+			await this.db.deleteFrom("tbtop_shared_blocks").where("id", "=", id).execute();
+		});
 		this.byId = null;
 	}
 
