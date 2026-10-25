@@ -109,7 +109,7 @@ describe("page guards (PageObserver)", () => {
 		expect(ok.subtype).toBe("news");
 	});
 
-	test("the admin delete action reports the refusal as a notification", async () => {
+	test("the pages list's delete-permanently action reports the refusal as a notification", async () => {
 		const { cms, db, ids } = await makeCms();
 		const admin = createAdmin({
 			prefix: "/admin",
@@ -120,15 +120,22 @@ describe("page guards (PageObserver)", () => {
 			user: () => ({ id: 1, name: "Admin" }),
 			context: cms.admin.context,
 		});
+		// The blog's posts go to the trash first, then the blog: its trashed children still hold it.
+		const pages = cms.site().pages;
+		for (const id of [ids["first-post"], ids["scheduled-post"], ids.blog]) {
+			if (id !== undefined) {
+				await pages.delete(id);
+			}
+		}
 		const res = await admin.handle(
-			new Request("http://x/admin/pages/actions/delete", {
+			new Request("http://x/admin/pages/actions/pageForceDelete", {
 				method: "POST",
 				body: JSON.stringify({ payload: { row: { _key: ids.blog } } }),
 				headers: { "content-type": "application/json", "x-inertia": "true", referer: "http://x/admin/pages" },
 			}),
 		);
 		expect(JSON.stringify(await res?.json())).toContain("has child pages");
-		expect(await cms.site().pages.find(ids.blog as number)).not.toBeNull();
+		expect(await db.selectFrom("tbtop_pages").select("id").where("id", "=", ids.blog as number).executeTakeFirst()).toBeDefined();
 	});
 
 	test("the parent select offers categories and parents that accept the page's type", async () => {

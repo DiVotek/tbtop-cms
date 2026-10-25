@@ -53,22 +53,29 @@ describe("admin pages", () => {
 			"/admin/settings/seo",
 			"/admin/form-submissions",
 			"/admin/notification-settings",
+			"/admin/blocks",
+			"/admin/site-health",
+			"/admin/audit",
 		]) {
 			const res = await page(url);
 			expect([url, res.component]).toEqual([url, "admin/page"]);
 		}
 		const nav = JSON.stringify((await page("/admin/pages")).props);
-		for (const label of ["Pages", "Inbox", "Redirects", "Layout", "Shared blocks", "Languages", "Site", "SEO", "Notifications"]) {
-			expect(nav).toContain(`"${label}"`);
-		}
+		const items = (JSON.parse(nav) as { tbtop: { nav: { key: string; items: { label: string }[] }[] } }).tbtop.nav.map((group) => [group.key, group.items.map((item) => item.label)]);
+		// CmsPanel's items, minus the media library (Node has none); the inbox is a header link, not a nav item.
+		expect(items).toEqual([
+			["content", ["Pages", "Redirects", "404 log", "SEO report"]],
+			["design", ["Layouts", "Blocks", "Shared blocks"]],
+			["settings", ["Languages", "Site settings", "SEO settings", "Notifications", "Audit log", "Site health"]],
+		]);
 	});
 
 	test("the pages table lists pages with their type and path", async () => {
 		const { visit } = await panel();
 		const res = await visit("/admin/pages/tables/pages", { inertia: false });
 		const rows = ((await res.json()) as { data: { data: Record<string, unknown>[] } }).data.data;
-		expect(rows.map((row) => row.path)).toContain("/blog/first-post");
-		expect(rows.find((row) => row.path === "/blog/first-post")?.type).toBe("Article");
+		expect(rows.map((row) => row.path)).toContain("blog/first-post");
+		expect(rows.find((row) => row.path === "blog/first-post")?.type).toBe("Article");
 	});
 
 	test("editing a page saves its fields, block data and slug, then the site shows it", async () => {

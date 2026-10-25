@@ -3,40 +3,70 @@ import type { Cms } from "../cms";
 import { SLOTS, type Slot } from "../content/layouts";
 import { RedirectError } from "../content/redirects";
 import { SharedBlockConflictError, SharedBlockInUseError } from "../content/sharedBlocks";
-import { type Dict, isDict } from "../support/values";
+import { type Dict, decodeJson, isDict, parseDate } from "../support/values";
 import { bindCmsFields } from "../blocks/cmsFields";
+import { ago } from "./dashboard";
 import { fieldBinding } from "./linkFields";
-import { adminPrefix, blockRecord, blockRows, blockTabs, editorValues, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf } from "./support";
+import { adminPrefix, blockRecord, editFooter, listHeader, recordCrumbs, blockRows, blockTabs, editorValues, NAV, prefixedForm, rowProblems, rowsFromForm, siteOf } from "./support";
 
 const SLOT_LABELS: Record<Slot, string> = { header: "Header", footer: "Footer" };
+
+const SLOT_DESCRIPTIONS: Record<Slot, string> = {
+	header: "Blocks rendered above the page content on every page.",
+	footer: "Blocks rendered below the page content on every page.",
+};
 
 /** Layout (LayoutPage + LayoutEditPage): the header and footer block lists. */
 export function layoutIndex(cms: Cms) {
 	const prefix = adminPrefix(cms);
 	return definePage({
 		path: "layout",
-		title: "Layout",
-		nav: { group: NAV.design, label: "Layout", icon: "panels-top-left", order: 20 },
+		...listHeader("design", "Layouts", "Header and footer blocks shared across every page."),
+		nav: { group: NAV.design, label: "Layouts", icon: "panels-top-left", order: 20 },
 		view: async (s, { request }) => {
-			const content = await cms.site(request).layouts.content();
-			return s.stack(
-				SLOTS.map((slot) =>
-					s.section({ title: SLOT_LABELS[slot] }, [
-						s.displayText(`${content[slot].length} block(s)`).variant("muted"),
-						s.row([s.action(`edit_${slot}`).label(`Edit ${SLOT_LABELS[slot].toLowerCase()}`).url(`${prefix}/layout/${slot}`)]),
-					]),
-				),
-			);
+			const rows = await cms.site(request).config.db.selectFrom("tbtop_layouts").select(["slot", "content", "updated_at"]).execute();
+			const cards = SLOTS.map((slot) => {
+				const row = rows.find((entry) => entry.slot === slot);
+				return slotCard(s, cms, slot, row === undefined ? [] : blockRows(asList(decodeJson(row.content))), row === undefined ? null : parseDate(row.updated_at), `${prefix}/layout/${slot}`);
+			});
+			return s.stack([s.grid({ cols: { md: 2 }, gap: 4 }, cards)]);
 		},
 	});
 }
 
+const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+/** LayoutSlotCard: the slot, its blocks in render order (an inactive one marked Off), the count, when it changed, and Edit. */
+function slotCard(s: S, cms: Cms, slot: Slot, rows: Dict[], updatedAt: Date | null, url: string) {
+	const blocks = cms.config.blocks;
+	const list =
+		rows.length === 0
+			? [s.displayText("No blocks yet").variant("muted")]
+			: rows.map((row, index) => {
+					const kind = String(row.kind ?? "");
+					const text = s.displayText(`${index + 1}. ${blocks.has(kind) ? blocks.get(kind).label : kind}`).variant(row.active === false ? "muted" : "body");
+					return row.active === false ? s.flex([text, s.displayValue("Off").badge({ Off: { color: "gray" } })], { align: "center" }) : text;
+				});
+	const edit = s.action(`edit-${slot}`).label("Edit").url(url);
+	const meta = `${rows.length} block${rows.length === 1 ? "" : "s"} · Updated ${ago(updatedAt)}`;
+	return s.stack(
+		[
+			s.displayText(SLOT_LABELS[slot]).variant("subheading"),
+			s.displayText(SLOT_DESCRIPTIONS[slot]).variant("muted"),
+			s.stack(list, { class: "gap-1" }),
+			rows.length === 0 ? s.flex([edit], { justify: "end", align: "center" }) : s.flex([s.displayText(meta).variant("muted"), edit], { justify: "between", align: "center" }),
+		],
+		{ class: "rounded-lg border bg-card p-4 gap-3" },
+	);
+}
+
 export function layoutEdit(cms: Cms) {
 	const prefix = adminPrefix(cms);
+	const title = (slot: unknown) => `Edit ${SLOT_LABELS[slot as Slot] ?? String(slot)} layout`;
 	return definePage({
 		path: "layout/$slot",
-		title: "Edit layout",
-		breadcrumbs: [{ label: "Design" }, { label: "Layout", url: `${prefix}/layout` }, { label: "Edit" }],
+		title: ({ params }) => title(params.slot),
+		breadcrumbs: ({ params }) => recordCrumbs("design", { label: "Layouts", url: `${prefix}/layout` }, title(params.slot)),
 		view: async (s, { params, request }) => {
 			const slot = params.slot as Slot;
 			if (!(SLOTS as readonly string[]).includes(slot)) {
@@ -50,14 +80,13 @@ export function layoutEdit(cms: Cms) {
 			const problems = await rowProblems(site, rows);
 			return s
 				.form(`layout_${slot}`, [
-					s.displayText(SLOT_LABELS[slot]).variant("heading"),
 					s.tabs(blockTabs(s, cms, rows, { placement: ["layout"], save, back, sharedBlocks, problems, skipsValidation: false })),
-					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
+					editFooter(s, `${prefix}/layout`, s.action("save").label("Save").color("primary").keybinding("mod+s").submit()),
 				])
 				.record(blockRecord(cms.config.blocks, rows))
 				.onSubmit(async (ctx) => {
 					await save(ctx, rowsFromForm(cms.config.blocks, rows, ctx.form as Dict));
-					return Effects.make().notify("Saved").redirect(back);
+					return Effects.make().notify("Layout saved").redirect(back);
 				});
 		},
 	});
@@ -70,7 +99,7 @@ export function sharedBlocksIndex(cms: Cms) {
 	const kinds = [...cms.config.blocks.all()].sort((a, b) => a.label.localeCompare(b.label));
 	return definePage({
 		path: "shared-blocks",
-		title: "Shared blocks",
+		...listHeader("design", "Shared blocks", "A block edited once and placed on any number of pages."),
 		nav: { group: NAV.design, label: "Shared blocks", icon: "copy", order: 45 },
 		view: async (s, { request }) => {
 			const usage = await cms.site(request).sharedBlocks.usageCounts();
@@ -213,7 +242,7 @@ export function sharedBlockEdit(cms: Cms) {
 export function redirectsIndex(cms: Cms) {
 	return definePage({
 		path: "redirects",
-		title: "Redirects",
+		...listHeader("content", "Redirects", "Redirects from old URLs to new ones — created automatically on slug changes or added manually."),
 		nav: { group: NAV.content, label: "Redirects", icon: "corner-up-right", order: 20 },
 		view: async (s, { request }) => {
 			const locales = (await cms.site(request).languages.frontendActive()).map((row) => ({ value: row.locale, label: row.name }));

@@ -4,7 +4,7 @@ import { formatField, leadIdentity } from "../forms/lead";
 import { retrySubmission } from "../forms/notifier";
 import { isRetryable, LEAD_STATUSES, type LeadStatus, type Submission, submissionFromRow } from "../forms/submissions";
 import type { Site } from "../site";
-import { adminPrefix, NAV, siteOf } from "./support";
+import { adminPrefix, siteOf } from "./support";
 
 const LEAD_LABELS: Record<LeadStatus, string> = { new: "New", read: "Read", processed: "Processed", discarded: "Discarded" };
 
@@ -58,8 +58,10 @@ export function submissionsIndex(cms: Cms) {
 	const prefix = adminPrefix(cms);
 	return definePage({
 		path: "form-submissions",
-		title: "Inbox",
-		nav: { group: NAV.content, label: "Inbox", icon: "inbox", order: 50 },
+		title: "Form submissions",
+		subtitle: "Submissions from the site's forms.",
+		// No nav entry: the header's Inbox link opens it (FormSubmissionsPage::nav).
+		breadcrumbs: [{ label: "Inbox" }],
 		view: async (s, { request }) => {
 			const site = cms.site(request);
 			const pageIds = await site.submissions.query().select("page_id").distinct().execute();

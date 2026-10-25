@@ -4,7 +4,7 @@ import type { NotificationType } from "../notifications/types";
 import { runsAsPhp, templateError } from "../notifications/templates";
 import type { Site } from "../site";
 import { sqlDate } from "../support/values";
-import { NAV, siteOf } from "./support";
+import { adminPrefix, editFooter, listHeader, NAV, siteOf } from "./support";
 
 type AnyType = NotificationType<Record<string, unknown>>;
 
@@ -48,7 +48,7 @@ const tagValues = (raw: unknown): string[] =>
 export function notificationSettings(cms: Cms) {
 	return definePage({
 		path: "notification-settings",
-		title: "Notifications",
+		...listHeader("settings", "Notification settings", "Channels and templates per notification type, plus mail transport and Telegram delivery."),
 		nav: { group: NAV.settings, label: "Notifications", icon: "bell", order: 40 },
 		view: async (s, { request }) => {
 			const site = cms.site(request);
@@ -63,7 +63,7 @@ export function notificationSettings(cms: Cms) {
 							children: types.map((type) => typeSection(s, site, type, locales)),
 						})),
 					]),
-					s.actionsRow([s.action("save").label("Save").color("primary").keybinding("mod+s").submit()]),
+					editFooter(s, `${adminPrefix(cms)}/notification-settings`, s.action("save").label("Save").color("primary").keybinding("mod+s").submit()),
 				])
 				.record(await record(site, all))
 				.onSubmit(async (ctx) => {

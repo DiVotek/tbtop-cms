@@ -1,9 +1,12 @@
 import type { AdminContext, HostRule, NavGroupDef, PageDef } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { allows, gated } from "./abilities";
+import { auditActivity, auditLog } from "./audit";
+import { blocksShowcase } from "./blocks";
 import { dashboard } from "./dashboard";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
+import { siteHealth } from "./health";
 import { languageEdit, languageNew, languagesIndex } from "./languages";
 import { cmsHostRules, linkPageSearch } from "./linkFields";
 import { notFoundLog } from "./notFound";
@@ -53,12 +56,16 @@ export function adminPages(cms: Cms): CmsAdmin {
 			gated(cms, "tbtop-cms.design", layoutEdit(cms)),
 			gated(cms, "tbtop-cms.design", sharedBlocksIndex(cms)),
 			gated(cms, "tbtop-cms.design", sharedBlockEdit(cms)),
+			gated(cms, "tbtop-cms.design", blocksShowcase(cms)),
 			gated(cms, "tbtop-cms.languages", languagesIndex(cms)),
 			gated(cms, "tbtop-cms.languages", languageNew(cms)),
 			gated(cms, "tbtop-cms.languages", languageEdit(cms)),
 			gated(cms, "tbtop-cms.settings", siteSettings(cms)),
 			gated(cms, "tbtop-cms.settings", seoSettings(cms)),
 			gated(cms, "tbtop-cms.settings", notificationSettings(cms)),
+			gated(cms, "tbtop-cms.settings", siteHealth(cms)),
+			gated(cms, "tbtop-cms.audit", auditLog(cms)),
+			gated(cms, "tbtop-cms.audit", auditActivity(cms)),
 			// Whoever edits a link field: the page editor, or the layout and shared blocks.
 			{ ...linkPageSearch(cms), authorize: async () => (await allows(cms, "tbtop-cms.pages")) || (await allows(cms, "tbtop-cms.design")) },
 		] as PageDef[],

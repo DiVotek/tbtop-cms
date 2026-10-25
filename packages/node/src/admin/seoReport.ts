@@ -1,7 +1,7 @@
 import { definePage, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { runSeoAudit, type SeoIssue, seoSnapshots, writeSeoSnapshot } from "../seo/audit";
-import { NAV } from "./support";
+import { listHeader, NAV } from "./support";
 
 const fails = (issues: SeoIssue[]): number => issues.filter((issue) => issue.severity === "fail").length;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -15,8 +15,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export function seoReport(cms: Cms) {
 	return definePage({
 		path: "seo-report",
-		title: "SEO report",
-		subtitle: "Site-wide SEO issues across every published page and active locale.",
+		...listHeader("content", "SEO report", "Site-wide SEO issues across every published page and active locale."),
 		nav: { group: NAV.content, label: "SEO report", icon: "search-check", order: 40 },
 		view: async (s, { request }) => {
 			const site = cms.site(request);
