@@ -1,0 +1,44 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--font-display: "Fraunces", ui-serif, Georgia, serif;
+	--font-sans: "DM Sans", system-ui, sans-serif;
+	--color-lumen-bg: #f6f3ee;
+	--color-lumen-ink: #141820;
+	--color-lumen-muted: #5c6478;
+	--color-lumen-accent: #e85d4c;
+	--color-lumen-accent-soft: #ffd8d2;
+	--color-lumen-card: #ffffff;
+	--color-lumen-line: #e4dfd6;
+}
+
+:root.dark {
+	--color-lumen-bg: #0e1118;
+	--color-lumen-ink: #eef1f8;
+	--color-lumen-muted: #9aa3b5;
+	--color-lumen-accent: #ff7a6b;
+	--color-lumen-accent-soft: #3a2220;
+	--color-lumen-card: #171b26;
+	--color-lumen-line: #2a3142;
+}
+
+html {
+	font-family: var(--font-sans);
+	background: var(--color-lumen-bg);
+	color: var(--color-lumen-ink);
+}
+
+body {
+	min-height: 100dvh;
+}
+
+.lumen-container {
+	@apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+}
+
+.lumen-prose {
+	@apply text-base leading-relaxed text-lumen-muted [&_p]:mb-4;
+}

@@ -1,0 +1,12 @@
+# Future Cloudflare Workers + D1 deploy (not wired in this dogfood app yet).
+name = "lumen-studio"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lumen-studio"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[vars]
+CMS_URL = "https://lumen.studio.example"
