@@ -243,6 +243,11 @@ Differences from the home page:
   (`resources/views/errors/fallback.blade.php`) with no DB/Inertia/settings
   dependency of its own — see `docs/host/ai/seo.md` and `wiring.md` for the
   full fallback chain and the `errors.handle`/`errors.statuses` config.
+- With no published DB error page, the response is still `Cms/Page`, with an
+  empty `render` spec and `page.id === null`; only `page.heading` carries the
+  lang-file text. The package's `CmsPage.tsx` renders that heading as an `<h1>`
+  in this case alone, so a host that copied an older `CmsPage.tsx` shows a
+  blank error page until it adds the same branch.
 
 ### Building a URL
 
