@@ -115,6 +115,14 @@ describe("a list translated whole (PageEditTypeFields + editorValue)", () => {
 			{ q: { uk: "Як?" }, icon: "b" },
 		]);
 	});
+	test("a bare string in a translatable cell opens in the default locale and saves (seeded or imported content)", async () => {
+		const { cms, record, save } = await panel({ pageTypes: [faqType] });
+		const created = await cms.site().pages.create({ type: "faq", name: { en: "FAQ" }, fields: { items: [{ q: "platforma --tz", icon: "a" }] } });
+		const locale = await cms.site().languages.defaultLocale();
+		expect((await record(created.id)).field_items).toEqual([{ q: { [locale]: "platforma --tz" }, icon: "a" }]);
+		expect((await save(created.id, {})).status).toBe(303);
+		expect((await cms.site().pages.find(created.id))?.fields?.items).toEqual([{ q: { [locale]: "platforma --tz" }, icon: "a" }]);
+	});
 });
 
 describe("a shared block's tab (PageEditBlockTabs::sharedTab)", () => {

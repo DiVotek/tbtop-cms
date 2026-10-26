@@ -160,8 +160,7 @@ export async function resolvePage(site: Site, path: string, locale: string, prev
 }
 
 export async function pageProps(site: Site, page: Page, locale: string, path: string): Promise<PageShape> {
-	const type = site.pageTypes.has(page.type) ? site.pageTypes.get(page.type) : null;
-	const content = page.content ?? type?.template(page) ?? [];
+	const content = page.content ?? site.pageTypes.templateFor(page) ?? [];
 	const { blocks, fields } = await resolveBlocks(site, content, locale, page);
 	const resolved = validateProps(site, bindForms(site, blocks, page, locale));
 	const isPreview = !isLive(page);

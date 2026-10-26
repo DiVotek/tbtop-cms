@@ -306,8 +306,11 @@ async function jsonLd(
 	blockNodes: Record<string, unknown>[],
 ): Promise<Record<string, unknown>[]> {
 	const out: Record<string, unknown>[] = [];
+	const identity = await identityNode(site, locale);
 	if (siteName !== "") {
-		out.push({ "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: site.absolute("/") });
+		// The same @id on every page makes it one WebSite to a crawler, published by the identity.
+		const publisher = identity === null ? {} : { publisher: { "@id": identityId(site) } };
+		out.push({ "@context": "https://schema.org", "@type": "WebSite", "@id": `${site.absolute("/")}#website`, name: siteName, url: site.absolute("/"), ...publisher });
 	}
 	const trail = await breadcrumbs(site, page, locale);
 	const current = trail.at(-1)?.label ?? "";
@@ -323,7 +326,6 @@ async function jsonLd(
 		});
 	}
 	out.push(...(await schema.build(ctx)), ...blockNodes);
-	const identity = await identityNode(site, locale);
 	if (identity !== null) {
 		out.push(identity);
 	}

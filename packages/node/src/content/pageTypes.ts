@@ -129,6 +129,15 @@ export class PageTypes {
 		return this.types.has(key);
 	}
 
+	/**
+	 * Block content for a page that has none of its own: its subtype's
+	 * template when that returns one, else its base type's.
+	 */
+	templateFor(page: Page): unknown[] | null {
+		const own = page.subtype !== null && this.has(page.subtype) ? this.get(page.subtype).template(page) : null;
+		return own ?? (this.has(page.type) ? this.get(page.type).template(page) : null);
+	}
+
 	get(key: string): PageType {
 		const type = this.types.get(key);
 		if (type === undefined) {

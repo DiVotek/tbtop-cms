@@ -606,6 +606,29 @@ D1 refuses the `pragma_table_info` join Kysely's own introspector uses.
 Better Auth introspects through that join too: give it the raw binding
 (`database: env.DB`), not the Kysely instance.
 
+Without the cron, `outbox` submissions stay `pending` and nothing is
+notified (`cms.tasks.health()` warns). TanStack Start's default entry has
+no `scheduled()`, so a Start host on Workers points `main` in
+`wrangler.jsonc` at its own entry that keeps Start's `fetch`:
+
+```ts
+// src/server.ts
+import handler from "@tanstack/react-start/server-entry";
+import { getCms } from "./server/cms"; // the host's Cms for this env
+
+export default {
+	fetch: handler.fetch,
+	scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(getCms(env).tasks.scheduled());
+	},
+};
+```
+
+A Worker that runs `migrateCms` and Better Auth's migrations on its first
+request (no deploy step) sees Better Auth log a schema mismatch once, as
+`betterAuth()` checks the tables before they exist; set
+`advanced.database.validateSchema: false` there, as the workbench does.
+
 ## What 0.0 has
 
 - Schema and one baseline migration equal to the PHP migrations (SQLite,
@@ -657,7 +680,9 @@ Better Auth introspects through that join too: give it the raw binding
   broken shared rows skipped, locale flattening with fallback, FormResolver by
   field kind), resolved props validated against the catalog's zod schema
   (a mismatch is dropped with a warning; `strictBlocks: true` throws
-  `BlockResolutionError` instead, in any environment).
+  `BlockResolutionError` instead, in any environment). Valid props ship as
+  parsed, so a `.default()` fills its key; keep `.transform()` out of a
+  catalog schema, as the browser validates the shipped props again.
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
@@ -670,7 +695,9 @@ Better Auth introspects through that join too: give it the raw binding
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
   built-in blocks.
 - Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
-  tiles trended over 14 days, leads-by-status and daily submission charts,
+  tiles trended over 14 days, leads-by-status and daily submission charts
+  (days in the admin context's `timezone`, UTC unless the host's
+  `createAdmin({ context })` sets one),
   the latest pages and submissions; the page parts need
   `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`, the layout tile
   `tbtop-cms.design`; the System section, with host metrics and versions,

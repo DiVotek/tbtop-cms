@@ -1,4 +1,4 @@
-import { definePage, type S } from "@tbtop/admin";
+import { currentContext, definePage, type S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { firstText, isLive, pageFromRow } from "../content/page";
 import { LEAD_STATUSES, type LeadStatus, submissionFromRow } from "../forms/submissions";
@@ -15,9 +15,13 @@ const RECENT = 5;
 const LEAD_LABELS: Record<LeadStatus, string> = { new: "New", read: "Read", processed: "Processed", discarded: "Discarded" };
 const LEAD_COLORS: Record<LeadStatus, string> = { new: "danger", read: "muted", processed: "success", discarded: "muted" };
 
-const dayKey = (date: Date): string => date.toISOString().slice(0, 10);
+/** The `Y-m-d` day of a moment in the admin's timezone (Carbon's toDateString() in app.timezone). */
+const dayKey = (date: Date): string => new Intl.DateTimeFormat("en-CA", { timeZone: currentContext().timezone }).format(date);
 
-/** `days` UTC dates ending today, oldest first, with the rows created on each (DashboardStats::dailyCounts). */
+/** The `Y-m-d` day `offset` days before a `Y-m-d` day. */
+const dayBefore = (day: string, offset: number): string => new Date(Date.parse(`${day}T00:00:00Z`) - offset * 86_400_000).toISOString().slice(0, 10);
+
+/** `days` dates ending today in the admin's timezone, oldest first, with the rows created on each (DashboardStats::dailyCounts). */
 function daily(createdAt: unknown[], days: number, now = new Date()): { date: string; value: number }[] {
 	const counts = new Map<string, number>();
 	for (const raw of createdAt) {
@@ -26,17 +30,20 @@ function daily(createdAt: unknown[], days: number, now = new Date()): { date: st
 			counts.set(dayKey(date), (counts.get(dayKey(date)) ?? 0) + 1);
 		}
 	}
-	const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+	const today = dayKey(now);
 	return Array.from({ length: days }, (_, offset) => {
-		const date = dayKey(new Date(today - (days - 1 - offset) * 86_400_000));
+		const date = dayBefore(today, days - 1 - offset);
 		return { date, value: counts.get(date) ?? 0 };
 	});
 }
 
-/** The first moment of the window `days` long that ends today, as a stored date. */
+/**
+ * A stored date at or before the first moment of the window `days` long that
+ * ends today: a day early, so a zone ahead of UTC loses no row; daily() drops
+ * what falls before the window.
+ */
 function since(days: number, now = new Date()): string {
-	const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (days - 1) * 86_400_000);
-	return sqlDate(start);
+	return sqlDate(new Date(Date.parse(`${dayBefore(dayKey(now), days)}T00:00:00Z`)));
 }
 
 /** Carbon::diffForHumans, short: "just now", "5 minutes ago", "3 days ago". */

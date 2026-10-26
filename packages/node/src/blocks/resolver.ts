@@ -177,19 +177,21 @@ export const honeypotField = (site: Site): string | null => {
  * The catalog's zod schema is the contract: props that do not match it are
  * dropped, not shipped. That is a resolver/catalog drift, a code bug, so it
  * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
+ * Props that match ship as parsed, so a `.default()` fills its key, as a page
+ * type's schema does for `page.fields`.
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
 	const strict = site.config.strictBlocks === true;
-	return blocks.filter((block) => {
+	return blocks.flatMap((block) => {
 		const result = site.blocks.get(block.kind).props.safeParse(block.props);
 		if (result.success) {
-			return true;
+			return [{ ...block, props: result.data as ResolvedBlock["props"] }];
 		}
 		if (strict) {
 			throw new BlockResolutionError(`Block [${block.kind}] props do not match the catalog: ${result.error.message}`);
 		}
 		console.warn("block.props_invalid", { kind: block.kind, id: block.id, error: result.error.message });
-		return false;
+		return [];
 	});
 }
 

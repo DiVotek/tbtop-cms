@@ -90,6 +90,8 @@ describe("loadPage", () => {
 			xDefault: "https://site.test/blog/first-post",
 		});
 		expect(seo.jsonLd.map((node) => node["@type"])).toEqual(["WebSite", "BreadcrumbList", "Article", "Organization"]);
+		// One WebSite across pages, tied to the identity that publishes it.
+		expect(seo.jsonLd[0]).toMatchObject({ "@id": "https://site.test#website", publisher: { "@id": "https://site.test#identity" } });
 		const article = seo.jsonLd[2];
 		expect(article).toMatchObject({
 			headline: "First post",
