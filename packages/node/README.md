@@ -81,6 +81,9 @@ const cms = createCms({
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
 	// Lists of cards go in a repeater; its translatable cells are edited per locale:
 	// form: (s) => [s.repeater("items").fields([s.text("q").translatable(), s.text("icon")])]
+	// resolve() gets a `.translatable()` field already in the page's locale (default as fallback),
+	// so it never reads `{ en, de }` itself. A link is a linkField (see below), not a text field:
+	// its target is checked on save and on render, a free-text href is not.
 	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
 	schemaTypes: [productSchema], // extra JSON-LD types a page type's schemaTypes can name (see Page types)
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
@@ -357,8 +360,11 @@ page props carry no children, and a block's `resolve()` does not see the
 request's `?page=`. `site.pages.query()` is a Kysely builder over live
 `tbtop_pages` rows (trashed ones left out); `whereLive` adds the rule the
 frontend uses (published, `published_at` passed, `unpublish_at` ahead), the
-counterpart of PHP's `Page::scopeLive`, and `pageFromRow` turns a row into a
-`Page`:
+counterpart of PHP's `Page::scopeLive`, `pageFromRow` turns a row into a
+`Page`, and `site.pageViews(pages, locale)` makes each one what `props.page`
+is for an open page (name, title, heading, summary in the locale with the
+default as fallback, body HTML, image URL) plus its `url`; `{ fields: true }`
+adds the resolved custom fields, one resolve per page:
 
 ```ts
 import { pageFromRow, whereLive } from "@tbtop/cms";
@@ -370,7 +376,7 @@ const children = site.pages.query().$call(whereLive).where("parent_id", "=", blo
 const { total } = await children.select((eb) => eb.fn.countAll<number>().as("total")).executeTakeFirstOrThrow();
 const posts = (await children.selectAll().orderBy("published_at", "desc").orderBy("id", "desc")
 	.limit(perPage).offset((current - 1) * perPage).execute()).map(pageFromRow);
-const cards = await Promise.all(posts.map(async (post) => ({ id: post.id, name: post.name[locale], url: await site.pageUrl(post, locale) })));
+const cards = await site.pageViews(posts, locale); // [{ id, name, summary, url, image, … }]
 // pages: Math.ceil(Number(total) / perPage)
 ```
 

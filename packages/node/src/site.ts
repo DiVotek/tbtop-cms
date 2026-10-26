@@ -1,5 +1,6 @@
 import type { PageRefWithFields, ResolveContext } from "./blocks/context";
 import { resolvePageFields } from "./blocks/resolver";
+import { type PageView, pageViews } from "./frontend/pageView";
 import type { BlockRegistry } from "./blocks/registry";
 import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
 import { AuditLog } from "./content/audit";
@@ -184,6 +185,16 @@ export class Site {
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
 		};
+	}
+
+	/**
+	 * Pages the host listed itself, each as `props.page` (columns in `locale`
+	 * with the default as fallback, body as HTML, image URL) plus its `url`;
+	 * `fields: true` adds the resolved custom fields. Nothing is filtered:
+	 * list with whereLive for what the frontend shows.
+	 */
+	pageViews(pages: Page[], locale: string, options: { fields?: boolean } = {}): Promise<PageView[]> {
+		return pageViews(this, pages, locale, options);
 	}
 
 	/** ctx.pages(value, { fields: true }): each live ref with its page's resolved fields, one level deep. */

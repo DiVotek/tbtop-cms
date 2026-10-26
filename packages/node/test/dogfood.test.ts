@@ -145,10 +145,28 @@ describe("Dogfood: a host lists a category's live children a page at a time", ()
 		const children = site.pages.query().$call(whereLive).where("parent_id", "=", blog);
 		const { total } = await children.select((eb) => eb.fn.countAll<number>().as("total")).executeTakeFirstOrThrow();
 		const posts = (await children.selectAll().orderBy("published_at", "desc").orderBy("id", "desc").limit(10).offset(0).execute()).map(pageFromRow);
-		const cards = await Promise.all(posts.map(async (post) => ({ id: post.id, name: post.name.en, url: await site.pageUrl(post, "en") })));
+		const cards = await site.pageViews(posts, "en");
 
 		// The 2037 post is scheduled, so it is neither counted nor listed.
 		expect(Number(total)).toBe(1);
-		expect(cards).toEqual([{ id: ids["first-post"] as number, name: "First post", url: "/blog/first-post" }]);
+		expect(cards).toEqual([
+			{
+				id: ids["first-post"] as number,
+				type: "article",
+				subtype: null,
+				status: "published",
+				name: "First post",
+				title: null,
+				heading: null,
+				summary: "The first article.",
+				body: "<p>Hello from the first article.</p>",
+				image: null,
+				url: "/blog/first-post",
+				fields: {},
+			},
+		]);
+		// The same post in Ukrainian; fields only when asked.
+		const [uk] = await site.pageViews(posts, "uk", { fields: true });
+		expect([uk?.name, uk?.summary, uk?.url]).toEqual(["Перший запис", "Перша стаття.", "/uk/blog/persii-zapis"]);
 	});
 });

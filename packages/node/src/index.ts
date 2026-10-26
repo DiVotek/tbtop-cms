@@ -1,6 +1,7 @@
 export { type BlockMeta, type Catalog, cmsBlocks, defineBlocks, type Placement, type PropsOf } from "./blocks/catalog";
 export { placeableIn } from "./blocks/catalog";
 export type { PageRefWithFields, ResolveContext } from "./blocks/context";
+export type { PageColumns, PageView } from "./frontend/pageView";
 export { resolveForm } from "./blocks/fields";
 export { LinkField, linkField, PagesField, pagesField, type StoredLink } from "./blocks/cmsFields";
 export {
