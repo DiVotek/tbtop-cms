@@ -44,8 +44,9 @@ bun run e2e                    # production build + vite preview + Playwright
 
 Rerun `bun run setup` after a change to the package. Locally, point
 Playwright at an installed Chromium with `PW_CHROMIUM=/path/to/chrome`.
-E2E serves the build with `NODE_ENV=production` (a block whose props fail
-the catalog is dropped, not thrown) and `CMS_FORMS_THROTTLE=off` (every spec
+E2E serves the build with `NODE_ENV=production` (the workbench turns
+`strictBlocks` on only outside production, so a block whose props fail the
+catalog is dropped, not thrown) and `CMS_FORMS_THROTTLE=off` (every spec
 posts from one client). The workbench registers the link field's client
 from `@tbtop/cms/admin-client` and has its own `Promo` block with a
 `linkField` CTA.
@@ -451,9 +452,6 @@ On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
 `tbtop-cms scheduled` from cron every minute; both read the default export
 of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
-Set `NODE_ENV=production` there (or `strictBlocks: false`): otherwise a
-block whose props fail the catalog throws and its page answers 500, where
-production drops that block with a warning.
 
 On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite: migrate with
 `dialect: "sqlite"`), set `compatibility_flags = ["nodejs_als"]` (or
@@ -516,9 +514,8 @@ Better Auth introspects through that join too: give it the raw binding
   Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
   field kind), resolved props validated against the catalog's zod schema
-  (a mismatch is dropped with a warning in production and throws
-  `BlockResolutionError` in development: on Node and Bun a `NODE_ENV`
-  other than `production`, unset included; never on Workers; `strictBlocks` true or false overrides it).
+  (a mismatch is dropped with a warning; `strictBlocks: true` throws
+  `BlockResolutionError` instead, in any environment).
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,

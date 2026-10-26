@@ -29,7 +29,7 @@ describe("loadPage", () => {
 		// The shared block's data, with the form action bound to this page.
 		expect(contact?.type).toBe("ContactForm");
 		expect(contact?.props).toMatchObject({ heading: "Write to us", submitLabel: "Send" });
-		expect(String(contact?.props.action)).toMatch(new RegExp(`^https://site.test/_cms/forms/en/${ids.home}/fx\\d+$`));
+		expect(String(contact?.props.action)).toMatch(new RegExp(`^/_cms/forms/en/${ids.home}/fx\\d+$`));
 		expect(props.cms).toMatchObject({
 			locale: "en",
 			defaultLocale: "en",

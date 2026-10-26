@@ -5,8 +5,8 @@ import { cmsBlocks, cmsBlockImpls, implementBlocks } from "../src";
 import { makeCms } from "./support";
 
 /** The home page's ContactForm action, as the frontend props carry it. */
-async function contactAction(cms: Awaited<ReturnType<typeof makeCms>>["cms"], path = "/") {
-	const result = await cms.loadPage(new Request(`https://site.test${path}`));
+async function contactAction(cms: Awaited<ReturnType<typeof makeCms>>["cms"], path = "/", origin = "https://site.test") {
+	const result = await cms.loadPage(new Request(`${origin}${path}`));
 	if (result.type !== "page") {
 		throw new Error("no page");
 	}
@@ -15,7 +15,7 @@ async function contactAction(cms: Awaited<ReturnType<typeof makeCms>>["cms"], pa
 }
 
 const post = (url: string, body: Record<string, unknown>, headers: Record<string, string> = {}) =>
-	new Request(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+	new Request(new URL(url, "https://site.test"), { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
 
 const valid = { name: "Ada", email: "ada@example.test", message: "Hello\nthere" };
 
@@ -38,11 +38,24 @@ async function rows(db: Awaited<ReturnType<typeof makeCms>>["db"]) {
 }
 
 describe("form submissions", () => {
-	test("the form props carry the submit URL and the honeypot field", async () => {
+	test("the form props carry a root-relative submit path and the honeypot field", async () => {
 		const { cms } = await makeCms();
 		const props = await contactAction(cms);
-		expect(props.action).toMatch(/^https:\/\/site\.test\/_cms\/forms\/en\/\d+\/fx\d+$/);
+		expect(props.action).toMatch(/^\/_cms\/forms\/en\/\d+\/fx\d+$/);
 		expect(props.honeypotField).toBe("website");
+	});
+
+	test("a page served on another origin than config.url posts its form to itself", async () => {
+		const { cms } = await makeCms(undefined, { url: "https://example.com" });
+		const props = await contactAction(cms, "/", "http://localhost:3310");
+		expect(props.action.startsWith("/_cms/forms/")).toBe(true);
+		const response = await cms.handle(new Request(new URL(props.action, "http://localhost:3310"), {
+			method: "POST",
+			headers: { "Content-Type": "application/json", Accept: "application/json", Origin: "http://localhost:3310" },
+			body: JSON.stringify(valid),
+		}));
+		expect(response?.status).toBe(200);
+		expect(await response?.json()).toEqual({ ok: true });
 	});
 
 	test("a valid submit is stored in field order and handled; only validated keys are kept", async () => {
@@ -101,7 +114,7 @@ describe("form submissions", () => {
 		const { cms } = await makeCms();
 		const { action } = await contactAction(cms);
 		const response = await cms.handle(
-			new Request(action, {
+			new Request(new URL(action, "https://site.test"), {
 				method: "POST",
 				headers: { "Content-Type": "application/x-www-form-urlencoded", Referer: "https://site.test/?a=1" },
 				body: new URLSearchParams(valid).toString(),

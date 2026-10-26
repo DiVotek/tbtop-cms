@@ -10,8 +10,11 @@ export type CmsFormState = {
  * Posts a CMS form block to its `action` as JSON and tracks the answer:
  * `{ ok }`, 422 `{ errors }` or 500 `{ errors: { form } }`. Spread
  * `formProps` on the `<form>`: without JS the browser posts it and the
- * server answers with a 303 back to the page.
+ * server answers with a 303 back to the page. A failure with no answer from
+ * the server (network, CORS, a non-JSON page) lands in `errors.form`.
  */
+const UNREACHABLE = "The form could not be sent. Check your connection and try again.";
+
 export function useCmsForm(action: string) {
 	const [state, setState] = useState<CmsFormState>({ status: "idle", errors: {} });
 	async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -24,7 +27,11 @@ export function useCmsForm(action: string) {
 			body: JSON.stringify(body),
 		}).catch(() => null);
 		const answer = (await response?.json().catch(() => null)) as { ok?: boolean; errors?: Record<string, string[]> } | null;
-		setState(answer?.ok === true ? { status: "sent", errors: {} } : { status: "failed", errors: answer?.errors ?? {} });
+		if (answer?.ok === true) {
+			setState({ status: "sent", errors: {} });
+			return;
+		}
+		setState({ status: "failed", errors: answer?.errors ?? { form: [UNREACHABLE] } });
 	}
 	return { ...state, formProps: { method: "post", action, onSubmit, noValidate: true } as const };
 }

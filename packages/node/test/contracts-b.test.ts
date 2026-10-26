@@ -15,7 +15,7 @@ async function contactAction(cms: Made["cms"]) {
 }
 
 const post = (url: string, body: Record<string, unknown>, headers: Record<string, string> = {}) =>
-	new Request(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+	new Request(new URL(url, "https://site.test"), { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
 
 const valid = { name: "Ada", email: "ada@example.test", message: "Hello" };
 
@@ -131,7 +131,7 @@ describe("q14: named forms (HasForm, Forms::props)", () => {
 		const { cms, db } = await makeCms(undefined, orderForm(seen));
 		const id = await homeId(cms);
 		const props = await cms.site().formProps("service-order", id);
-		expect(props).toEqual({ action: `https://site.test/_cms/forms/en/${id}/service-order`, honeypotField: "website" });
+		expect(props).toEqual({ action: `/_cms/forms/en/${id}/service-order`, honeypotField: "website" });
 		expect((await cms.handle(post(props.action, {})))?.status).toBe(422);
 		expect((await cms.handle(post(props.action, { service: "Repair" })))?.status).toBe(200);
 		expect(seen).toEqual([{ payload: { service: "Repair" }, blockData: {} }]);

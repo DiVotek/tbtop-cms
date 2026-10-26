@@ -71,6 +71,8 @@ const cms = createCms({
 	hostRules: kyselyRules(db),
 	// Section access from the signed-in user's Better Auth role.
 	authorize: panelAuth.authorize,
+	// The workbench is where catalog drift should be loud; E2E serves a production build and drops such a block.
+	strictBlocks: process.env.NODE_ENV !== "production",
 	// E2E posts its forms from one client, which the 10-a-minute throttle would count.
 	forms: process.env.CMS_FORMS_THROTTLE === "off" ? { throttle: false } : {},
 	notifications: {

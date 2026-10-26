@@ -49,7 +49,7 @@ describe("@tbtop/cms/react", () => {
 		const html = page(<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={false} />);
 		expect(html).toContain('data-testid="hero"');
 		expect(html).toContain('data-testid="contact-form"');
-		expect(html).toMatch(/action="https:\/\/site\.test\/_cms\/forms\/en\/\d+\/[^"]+"/);
+		expect(html).toMatch(/action="\/_cms\/forms\/en\/\d+\/[^"]+"/);
 		expect(html).toContain('name="website"');
 	});
 

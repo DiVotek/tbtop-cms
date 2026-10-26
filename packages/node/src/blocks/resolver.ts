@@ -140,9 +140,12 @@ export function bindForms(site: Site, blocks: ResolvedBlock[], page: Page, local
 	);
 }
 
-/** FormActionProps: the submit URL, and the honeypot input name when one is configured. */
+/**
+ * FormActionProps: the root-relative submit path, and the honeypot input name when one is configured.
+ * No origin: `config.url` may differ from the browser's origin (preview port, www), and a cross-origin post fails CORS.
+ */
 export function formActionProps(site: Site, page: Page | number, blockId: string, locale: string): { action: string; honeypotField?: string } {
-	const action = site.absolute(`/_cms/forms/${encodeURIComponent(locale)}/${typeof page === "number" ? page : page.id}/${encodeURIComponent(blockId)}`);
+	const action = `/_cms/forms/${encodeURIComponent(locale)}/${typeof page === "number" ? page : page.id}/${encodeURIComponent(blockId)}`;
 	const honeypot = honeypotField(site);
 	return honeypot === null ? { action } : { action, honeypotField: honeypot };
 }
@@ -155,10 +158,10 @@ export const honeypotField = (site: Site): string | null => {
 /**
  * The catalog's zod schema is the contract: props that do not match it are
  * dropped, not shipped. That is a resolver/catalog drift, a code bug, so it
- * throws under `strictBlocks`, which defaults to on in development.
+ * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
-	const strict = site.config.strictBlocks ?? isDevelopment();
+	const strict = site.config.strictBlocks === true;
 	return blocks.filter((block) => {
 		const result = site.blocks.get(block.kind).props.safeParse(block.props);
 		if (result.success) {
@@ -170,19 +173,6 @@ export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBloc
 		console.warn("block.props_invalid", { kind: block.kind, id: block.id, error: result.error.message });
 		return false;
 	});
-}
-
-/**
- * Development: a `NODE_ENV` other than `production` (unset included) on Node and Bun. Workers
- * have no NODE_ENV (and nodejs_compat leaves it unset), so they count as
- * production, as does any runtime without `process`.
- */
-function isDevelopment(): boolean {
-	if (typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers") {
-		return false;
-	}
-	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-	return env !== undefined && env.NODE_ENV !== "production";
 }
 
 /** PageSpecAssembler: blocks in order under the root; a duplicate or reserved id is skipped. */

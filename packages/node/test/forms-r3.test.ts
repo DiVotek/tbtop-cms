@@ -17,7 +17,7 @@ async function contactAction(cms: Made["cms"]) {
 }
 
 const post = (url: string, body: Record<string, unknown>, headers: Record<string, string> = {}) =>
-	new Request(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+	new Request(new URL(url, "https://site.test"), { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
 
 const valid = { name: "Ada", email: "ada@example.test", message: "Hello" };
 
@@ -76,7 +76,7 @@ describe("R3-forms-1: a cross-site post is refused", () => {
 		const { cms, db } = await makeCms();
 		const action = await contactAction(cms);
 		const form = (headers: Record<string, string>) =>
-			new Request(action, {
+			new Request(new URL(action, "https://site.test"), {
 				method: "POST",
 				headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
 				body: new URLSearchParams(valid).toString(),
@@ -92,7 +92,7 @@ describe("R3-forms-1: a cross-site post is refused", () => {
 	test("a same-origin form post or fetch, and a client with neither header, still go through", async () => {
 		const { cms, db } = await makeCms();
 		const action = await contactAction(cms);
-		const form = new Request(action, {
+		const form = new Request(new URL(action, "https://site.test"), {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: "https://site.test", Referer: "https://site.test/", "Sec-Fetch-Site": "same-origin" },
 			body: new URLSearchParams(valid).toString(),
@@ -131,7 +131,7 @@ describe("R3-forms-3: inputs are trimmed and blanks become null, as Laravel's mi
 		const action = await contactAction(cms);
 		await cms.handle(post(action, { name: " Ada ", phone: "  ", tags: [" a ", ""], password: " secret " }));
 		const form = new URLSearchParams({ name: " Grace​", phone: "", password: " pw " });
-		await cms.handle(new Request(action, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }));
+		await cms.handle(new Request(new URL(action, "https://site.test"), { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() }));
 		const ids = (await cms.site().submissions.query().select("id").orderBy("id").execute()).map((row) => Number(row.id));
 		const payloads = await Promise.all(ids.map(async (id) => (await cms.site().submissions.findOrFail(id)).payload));
 		expect(payloads).toEqual([
