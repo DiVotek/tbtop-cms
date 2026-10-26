@@ -74,8 +74,9 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
         ->and($tabs[3]['label'])->toBe('+ Add block');
 
     $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
-    expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary', 'body')
-        ->and($generalFieldNames)->not->toContain('type', 'parent_id', 'status', 'sort_order');
+    expect($generalFieldNames)->toContain('name', 'heading', 'summary', 'body')
+        ->and($generalFieldNames)->not->toContain('type', 'parent_id', 'status', 'sort_order')
+        ->and($generalFieldNames)->not->toContain('title');
 
     $seoFieldNames = [];
     collectFieldNames($tabs[1]['body'], $seoFieldNames);
@@ -480,6 +481,23 @@ it('saves general and SEO fields including the seo json column', function (): vo
             'og_image' => '42',
             'canonical' => ['en' => 'https://example.com/canonical'],
         ]);
+});
+
+it('keeps the stored title when the editor saves the page', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'Legacy title'],
+    ]);
+
+    // A client built before the field left still posts `title`; it must not reach the column.
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...PageEditHelpers::baseEditPayload(), 'title' => ['en' => '']],
+    )->assertRedirect();
+
+    expect($page->refresh()->getTranslations('title'))->toBe(['en' => 'Legacy title']);
 });
 
 it('keeps host-owned seo keys on save while form-owned keys take the submitted values', function (): void {

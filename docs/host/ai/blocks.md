@@ -302,8 +302,9 @@ Overridable, all with sane defaults:
   Always call this rather than passing the raw richtext value to props; the
   React side expects an HTML string, not the editor's internal document
   shape.
-- **`pageText(string $field): ?string`** — the page's `name`, `title`,
-  `heading` or `summary` in the active locale, falling back to the default
+- **`pageText(string $field): ?string`** — the page's `name`, `title`
+  (deprecated, no longer editable — see inventory.md), `heading` or
+  `summary` in the active locale, falling back to the default
   locale when the active one is blank (the editor saves `''` for every locale
   it showed, which `Page::getTranslation()` would return as-is); `null` when
   neither is filled or there is no page. Use it instead of reading

@@ -104,6 +104,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_10_07_000002_create_page_refs_table')
             ->hasMigration('2026_10_13_000000_add_payload_order_to_form_submissions_table')
             ->hasMigration('2026_10_22_000000_update_notifications_notifiable_id_match_host_key_type')
+            ->hasMigration('2026_10_26_000000_copy_page_title_to_seo_title')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

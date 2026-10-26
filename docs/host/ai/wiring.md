@@ -344,7 +344,7 @@ response:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `page.id`, `.type`, `.subtype`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` resolved via `PageTranslation::text()` — the request locale, else the default locale, else `null` |
+| `page.id`, `.type`, `.subtype`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` resolved via `PageTranslation::text()` — the request locale, else the default locale, else `null`. `.title` is deprecated (no longer editable; see inventory.md) |
 | `page.body` | `string` | The Body rendered to HTML, same locale fallback; `''` when empty |
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
 | `page.fields` | `object` | The page type's resolved type fields, keyed by field name; `{}` when none |
