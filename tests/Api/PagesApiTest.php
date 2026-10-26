@@ -37,7 +37,7 @@ it('keeps the fields an edit does not name', function (): void {
         'name' => ['en' => 'Winter tyres'],
         'title' => ['en' => 'Winter tyres'],
         'summary' => ['en' => 'When to change them'],
-        'is_indexable' => true,
+        'is_indexable' => false,
         'seo' => ['title' => ['en' => 'Winter tyres guide'], 'description' => ['en' => 'How to pick winter tyres']],
     ]);
 
@@ -53,7 +53,7 @@ it('keeps the fields an edit does not name', function (): void {
         ->and($page->seo['title'])->toBe(['en' => 'Winter tyres guide'])
         ->and($page->seo['description'])->toBe(['en' => 'How to pick winter tyres'])
         ->and($page->status)->toBe(PageStatus::Published)
-        ->and($page->is_indexable)->toBeTrue();
+        ->and($page->is_indexable)->toBeFalse();
 });
 
 it('refuses a token without the ability the endpoint needs', function (): void {
@@ -72,7 +72,14 @@ it('refuses a token without the ability the endpoint needs', function (): void {
 it('reaches only the token\'s categories and their articles', function (): void {
     $other = Page::factory()->category()->create(['name' => ['en' => 'Cases']]);
     $home = Page::factory()->create(['is_system' => true, 'name' => ['en' => 'Home']]);
+    $subCategory = Page::factory()->category()->create(['parent_id' => $this->category->id, 'name' => ['en' => 'Winter']]);
     $token = issueApiToken($this->category->id);
+
+    $this->withToken($token)->getJson("/api/cms/v1/pages/{$subCategory->id}")->assertForbidden();
+    $this->withToken($token)
+        ->patchJson("/api/cms/v1/pages/{$subCategory->id}", ['translations' => ['en' => ['title' => 'Renamed']]])
+        ->assertForbidden();
+    expect($subCategory->refresh()->getTranslation('title', 'en'))->not->toBe('Renamed');
 
     $this->withToken($token)->getJson("/api/cms/v1/pages/{$home->id}")->assertForbidden();
     $this->withToken($token)->getJson("/api/cms/v1/pages/{$other->id}")->assertForbidden();
