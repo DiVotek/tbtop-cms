@@ -164,6 +164,8 @@ describe("Dogfood: a host lists a category's live children a page at a time", ()
 				summary: "The first article.",
 				body: "<p>Hello from the first article.</p>",
 				image: null,
+				publishedAt: expect.stringMatching(/^2026-10-01T09:00:00/),
+				updatedAt: expect.any(String),
 				url: "/blog/first-post",
 				fields: {},
 			},

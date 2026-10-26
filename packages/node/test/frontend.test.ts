@@ -219,6 +219,16 @@ describe("handle", () => {
 		expect(nodes[2]).toMatchObject({ author: { "@id": "https://site.test#identity" } });
 	});
 
+	test("props.page carries the publish and update dates the JSON-LD states", async () => {
+		const { cms } = await makeCms();
+		const result = await cms.loadPage(get("/blog/first-post"));
+		if (result.type !== "page") throw new Error(result.type);
+		const node = result.props.seo.jsonLd.find((entry) => entry["@type"] === "Article");
+		expect(result.props.page.publishedAt).toBe(node?.datePublished as string);
+		expect(result.props.page.updatedAt).toBe(node?.dateModified as string);
+		expect(result.props.page.publishedAt).toStartWith("2026-10-01T09:00:00");
+	});
+
 	test("{date} in an SEO template is the publish day in the site's timezone", async () => {
 		const title = async (timezone?: string) => {
 			const { cms } = await makeCms(undefined, timezone === undefined ? {} : { timezone });
