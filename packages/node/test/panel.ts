@@ -4,7 +4,7 @@ import type { Fixture } from "../src";
 import { makeCms } from "./support";
 
 /** A CMS with an admin panel over it, signed in as user 1; `post` sends JSON with a same-origin referer. */
-export async function panel(fixture?: Fixture | null, config: Parameters<typeof makeCms>[1] = {}, extraContext: { timezone?: string } = {}) {
+export async function panel(fixture?: Fixture | null, config: Parameters<typeof makeCms>[1] = {}) {
 	const made = await makeCms(fixture, config);
 	const { cms, db } = made;
 	const admin = createAdmin({
@@ -14,7 +14,7 @@ export async function panel(fixture?: Fixture | null, config: Parameters<typeof 
 		driver: kyselyDriver(db),
 		hostRules: kyselyRules(db),
 		user: () => ({ id: 1, name: "Admin" }),
-		context: async (request) => ({ ...(await cms.admin.context(request)), ...extraContext }),
+		context: cms.admin.context,
 	});
 	const visit = async (url: string, init: RequestInit & { inertia?: boolean } = {}) => {
 		const headers = new Headers(init.headers);

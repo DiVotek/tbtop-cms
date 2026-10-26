@@ -218,5 +218,17 @@ describe("handle", () => {
 		expect(nodes.map((node) => node["@type"])).toEqual(["WebSite", "BreadcrumbList", "Article", "ProfessionalService"]);
 		expect(nodes[2]).toMatchObject({ author: { "@id": "https://site.test#identity" } });
 	});
+
+	test("{date} in an SEO template is the publish day in the site's timezone", async () => {
+		const title = async (timezone?: string) => {
+			const { cms } = await makeCms(undefined, timezone === undefined ? {} : { timezone });
+			await cms.site().settings.set("seo.type_templates.article.title", { en: "{title} · {date}" });
+			const result = await cms.loadPage(get("/blog/first-post"));
+			return result.type === "page" ? result.props.seo.title : result.type;
+		};
+		// Published 2026-10-01T09:00Z: still September 30 in Pago Pago (UTC-11).
+		expect(await title()).toContain("October 1, 2026");
+		expect(await title("Pacific/Pago_Pago")).toContain("September 30, 2026");
+	});
 });
 

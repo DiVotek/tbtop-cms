@@ -269,7 +269,7 @@ async function render(
 		"{site_name}": await site.settings.string("site.name"),
 		"{sep}": separator,
 		"{parent}": ancestors.at(-1)?.label ?? "",
-		"{date}": page.publishedAt !== null && isLive(page) ? longDate(page.publishedAt, locale) : "",
+		"{date}": page.publishedAt !== null && isLive(page) ? longDate(page.publishedAt, locale, site.config.timezone ?? "UTC") : "",
 	};
 	const out = strtr(tpl, all);
 	const sep = escapeRegExp(separator);
@@ -287,9 +287,9 @@ function strtr(text: string, pairs: Record<string, string>): string {
 }
 
 /** Carbon isoFormat('LL'): the locale's long date. */
-function longDate(date: Date, locale: string): string {
+function longDate(date: Date, locale: string, timeZone: string): string {
 	try {
-		return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(date);
+		return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric", timeZone }).format(date);
 	} catch {
 		return date.toISOString().slice(0, 10);
 	}

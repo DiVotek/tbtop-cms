@@ -92,6 +92,7 @@ const cms = createCms({
 	// and Article author/publisher link to it.
 	seo: { extend: (nodes, ctx) => [...nodes.filter((n) => n["@id"] !== identityId(ctx.site)), myOrganization(ctx)] },
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
+	timezone: "Europe/Kyiv", // app.timezone: admin dates, dashboard days, SEO {date}; stored dates stay UTC (default UTC)
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
@@ -705,8 +706,7 @@ request (no deploy step) sees Better Auth log a schema mismatch once, as
   built-in blocks.
 - Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
   tiles trended over 14 days, leads-by-status and daily submission charts
-  (days in the admin context's `timezone`, UTC unless the host's
-  `createAdmin({ context })` sets one),
+  (days in the config's `timezone`, UTC by default),
   the latest pages and submissions; the page parts need
   `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`, the layout tile
   `tbtop-cms.design`; the System section, with host metrics and versions,

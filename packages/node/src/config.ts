@@ -31,6 +31,13 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	pageTypes?: T;
 	/** Extra JSON-LD schema types next to the built-in WebPage family, Article family and CollectionPage. */
 	schemaTypes?: SchemaTypeDef[];
+	/**
+	 * The site's IANA timezone (`Europe/Kyiv`), as Laravel's app.timezone:
+	 * the admin formats and reads dates in it, the dashboard counts days in
+	 * it, and SEO templates print `{date}` in it. Stored dates stay UTC.
+	 * Default UTC.
+	 */
+	timezone?: string;
 	/** The public site origin (`https://example.com`); default: the request's origin. */
 	url?: string;
 	/** A media reference to its public URL; default: absolute URLs and `/…` paths as is, other paths under `/storage/`. */
