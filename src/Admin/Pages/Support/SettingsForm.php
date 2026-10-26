@@ -27,6 +27,18 @@ class SettingsForm
         return $record;
     }
 
+    /** Form field carrying the "clear the saved secret" tick for a secret field. */
+    public static function clearField(string $field): string
+    {
+        return $field . '__clear';
+    }
+
+    /** Whether a secret has a stored value. The value itself never leaves the server. */
+    public static function isSecretSet(string $key): bool
+    {
+        return Setting::query()->where('key', $key)->exists();
+    }
+
     /**
      * @param  array<string, mixed>  $form
      * @param  array<string, string>  $map  field name => store key
@@ -37,6 +49,15 @@ class SettingsForm
 
         app(AuditContext::class)->batch(function () use ($form, $map, $settings, &$applied): void {
             foreach ($map as $field => $key) {
+                // Clear wins over a typed value: an explicit delete is never silently overridden.
+                if ($settings->isSecret($key) && self::isTruthy($form[self::clearField($field)] ?? false)) {
+                    if (self::clearSecret($key, $settings)) {
+                        $applied[] = $key;
+                    }
+
+                    continue;
+                }
+
                 if (! array_key_exists($field, $form)) {
                     continue;
                 }
@@ -79,6 +100,33 @@ class SettingsForm
     private static function isBlank(mixed $value): bool
     {
         return $value === null || $value === '';
+    }
+
+    private static function isTruthy(mixed $value): bool
+    {
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /** Returns false when there was nothing stored to delete. */
+    private static function clearSecret(string $key, Settings $settings): bool
+    {
+        $before = Setting::query()->where('key', $key)->first();
+
+        if ($before === null) {
+            return false;
+        }
+
+        $settings->forget($key);
+        $marker = ['changed' => true, 'is_redacted' => true];
+
+        app(AuditContext::class)->log(
+            $before,
+            'deleted',
+            $key,
+            ['attributes' => [], 'old' => ['value' => $marker]],
+        );
+
+        return true;
     }
 
     private static function isRedacted(string $key, Settings $settings): bool

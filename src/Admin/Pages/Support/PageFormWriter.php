@@ -90,7 +90,7 @@ final class PageFormWriter
         // Folded against the types the form was rendered for, before fill() may change them.
         $fields = $isCreate ? [] : PageEditTypeFields::fold($form, $page);
 
-        $page->fill(PageFormAttributes::for($page, $isCreate ? PageFormAttributes::withTitleFallback($form) : $form, $parentId, $isCreate));
+        $page->fill(PageFormAttributes::for($page, $form, $parentId, $isCreate));
 
         // Null stays null when nothing was entered, so a plain save is not an editorial change.
         if ($fields !== ($page->fields ?? [])) {

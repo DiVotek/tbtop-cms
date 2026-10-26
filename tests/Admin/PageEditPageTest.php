@@ -74,8 +74,9 @@ it('wires General/SEO tabs, one tab per saved block, and a trailing add-block ta
         ->and($tabs[3]['label'])->toBe('+ Add block');
 
     $generalFieldNames = array_column($tabs[0]['body']['options']['children'], 'name');
-    expect($generalFieldNames)->toContain('name', 'title', 'heading', 'summary', 'body')
-        ->and($generalFieldNames)->not->toContain('type', 'parent_id', 'status', 'sort_order');
+    expect($generalFieldNames)->toContain('name', 'heading', 'summary', 'body')
+        ->and($generalFieldNames)->not->toContain('type', 'parent_id', 'status', 'sort_order')
+        ->and($generalFieldNames)->not->toContain('title');
 
     $seoFieldNames = [];
     collectFieldNames($tabs[1]['body'], $seoFieldNames);
@@ -482,6 +483,23 @@ it('saves general and SEO fields including the seo json column', function (): vo
         ]);
 });
 
+it('keeps the stored title when the editor saves the page', function (): void {
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'About'],
+        'title' => ['en' => 'Legacy title'],
+    ]);
+
+    // A client built before the field left still posts `title`; it must not reach the column.
+    test()->actingAs(PageEditHelpers::admin(), 'web')->post(
+        "/admin/pages/{$page->id}/edit/forms/pageEditor",
+        [...PageEditHelpers::baseEditPayload(), 'title' => ['en' => '']],
+    )->assertRedirect();
+
+    expect($page->refresh()->getTranslations('title'))->toBe(['en' => 'Legacy title']);
+});
+
 it('keeps host-owned seo keys on save while form-owned keys take the submitted values', function (): void {
     $page = Page::create([
         'type' => 'page',
@@ -515,8 +533,26 @@ it('placeholders seo_title/seo_description/og_title/og_description with the comp
     $seoTitle = findFieldByName($tabs[1]['body'], 'seo_title');
     $seoDescription = findFieldByName($tabs[1]['body'], 'seo_description');
 
-    expect($seoTitle['options']['placeholder'] ?? null)->toBe('About Page — Acme')
-        ->and($seoDescription['options']['placeholder'] ?? null)->toBe('A short summary.');
+    expect($seoTitle['options']['placeholder'] ?? null)->toBe(['en' => 'About Page — Acme'])
+        ->and($seoDescription['options']['placeholder'] ?? null)->toBe(['en' => 'A short summary.']);
+});
+
+it('placeholders each locale tab of the SEO title with that locale\'s computed value', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    Language::factory()->create(['locale' => 'ru']);
+    app(Settings::class)->set('seo.title_suffix', '— Acme');
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['uk' => 'Про нас', 'ru' => 'О нас'],
+    ]);
+
+    $tabs = PageEditHelpers::formTabs($page->id);
+    $placeholder = findFieldByName($tabs[1]['body'], 'seo_title')['options']['placeholder'] ?? null;
+
+    expect($placeholder)->toBeArray()
+        ->and($placeholder['uk'] ?? null)->toBe('Про нас — Acme')
+        ->and($placeholder['ru'] ?? null)->toBe('О нас — Acme');
 });
 
 it('rejects an invalid seo_canonical URL for the default locale', function (): void {

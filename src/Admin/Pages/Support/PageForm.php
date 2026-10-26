@@ -46,7 +46,6 @@ class PageForm
         return [
             $s->section(['title' => __('tbtop-cms::pages.sections.content')], [
                 $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable(),
-                $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable(),
                 $s->slug('slug')->label(__('tbtop-cms::pages.fields.slug'))->required()
                     ->translatable()->fromField('name'),
             ]),
@@ -135,8 +134,6 @@ class PageForm
         return [
             $s->text('name')->label(__('tbtop-cms::pages.fields.name'))->required()->translatable()
                 ->helperText(__('tbtop-cms::pages.fields.name_hint')),
-            $s->text('title')->label(__('tbtop-cms::pages.fields.title'))->translatable()
-                ->helperText(__('tbtop-cms::pages.fields.title_hint')),
             ...($withSlug ? [
                 $s->slug('slug')->label(__('tbtop-cms::pages.fields.slug'))->required()
                     ->translatable()->fromField('name')
@@ -185,7 +182,6 @@ class PageForm
 
         return [
             'name' => $page->getTranslations('name'),
-            'title' => $page->getTranslations('title'),
             'heading' => $page->getTranslations('heading'),
             'summary' => $page->getTranslations('summary'),
             'body' => $page->getTranslations('body'),

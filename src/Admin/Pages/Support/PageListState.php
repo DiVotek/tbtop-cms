@@ -30,6 +30,42 @@ final class PageListState
     }
 
     /**
+     * Keeps the rows whose computed display state is $value (a
+     * PageDisplayState value). An unknown value matches nothing.
+     *
+     * @param  Builder<Page>  $query
+     * @return Builder<Page>
+     */
+    public static function whereDisplayState(Builder $query, string $table, mixed $value): Builder
+    {
+        $state = PageDisplayState::tryFrom((string) $value);
+
+        if ($state === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereRaw(self::displayStateCase($table) . ' = ?', [...self::displayStateBindings(), $state->value]);
+    }
+
+    /**
+     * Keeps the rows whose computed SEO badge is $value (a SeoState rank).
+     * An unknown value matches nothing.
+     *
+     * @param  Builder<Page>  $query
+     * @return Builder<Page>
+     */
+    public static function whereSeoState(Builder $query, string $table, mixed $value): Builder
+    {
+        $state = is_numeric($value) ? SeoState::tryFrom((int) $value) : null;
+
+        if ($state === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereRaw(self::seoStateCase($table) . ' = ?', [$state->value]);
+    }
+
+    /**
      * SQL mirror of Page::displayState() (that method stays the source of
      * truth for the model-level API — see its docblock) so the status column
      * can badge scheduled/expired without an N+1 model hydration per row.
@@ -44,13 +80,19 @@ final class PageListState
      */
     private static function displayStateSql(string $table): string
     {
+        return self::displayStateCase($table) . ' as display_state';
+    }
+
+    /** The CASE expression behind display_state; the filter compares against it too. */
+    private static function displayStateCase(string $table): string
+    {
         return <<<SQL
             CASE
                 WHEN {$table}.status != ? THEN ?
                 WHEN {$table}.published_at IS NOT NULL AND {$table}.published_at > ? THEN ?
                 WHEN {$table}.unpublish_at IS NOT NULL AND {$table}.unpublish_at <= ? THEN ?
                 ELSE ?
-            END as display_state
+            END
             SQL;
     }
 
@@ -95,6 +137,12 @@ final class PageListState
      */
     private static function seoStateSql(string $table): string
     {
+        return self::seoStateCase($table) . ' as seo_state';
+    }
+
+    /** The CASE expression behind seo_state; the filter compares against it too. */
+    private static function seoStateCase(string $table): string
+    {
         $emptyTitle = self::emptyTranslatableSql($table, 'title');
         $emptyName = self::emptyTranslatableSql($table, 'name');
         $emptySummary = self::emptyTranslatableSql($table, 'summary');
@@ -108,7 +156,7 @@ final class PageListState
                 WHEN {$emptyName} AND {$emptyTitle} THEN {$fail}
                 WHEN {$emptySummary} OR NOT {$table}.is_indexable THEN {$warn}
                 ELSE {$pass}
-            END as seo_state
+            END
             SQL;
     }
 

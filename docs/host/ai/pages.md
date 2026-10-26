@@ -53,9 +53,11 @@ on the frontend is never `status` alone:
   (`PageDisplayState`: `Draft`/`Scheduled`/`Published`/`Expired`), folding
   the schedule into the plain status for the pages list and dashboard.
 
-Publish now: leave `published_at`/`unpublish_at` null and set `status` to
-`Published`. Schedule a future go-live or go-dark by setting the datetime
-columns; no separate "scheduled" status value exists. A host writing pages
+Publish now: set `status` to `Published` and leave `published_at` null. The
+first publish stamps `published_at` with the current time (so the page has a
+`datePublished`), and a later unpublish/republish keeps that stamp. A date you
+set yourself is never overwritten. Schedule a future go-live or go-dark by
+setting the datetime columns; no separate "scheduled" status value exists. A host writing pages
 outside the admin only needs `scopeLive()`/`isLive()` itself if it
 re-implements a frontend read path — `PageResolver` already applies it.
 

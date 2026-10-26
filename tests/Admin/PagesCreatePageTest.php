@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Frontend\Seo\SeoResolver;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -57,12 +58,13 @@ function pageCreateFormChildren(): array
     return $children;
 }
 
-it('composes the create form with name/title/slug in Content and type/parent in Settings', function (): void {
+it('composes the create form with name/slug in Content and type/parent in Settings', function (): void {
     $children = pageCreateFormChildren();
     $names = array_column($children, 'name');
 
-    expect($names)->toContain('name', 'title', 'slug', 'type', 'parent_id')
-        ->and($names)->not->toContain('heading', 'summary', 'is_indexable', 'sort_order', 'content', 'status');
+    expect($names)->toContain('name', 'slug', 'type', 'parent_id')
+        ->and($names)->not->toContain('heading', 'summary', 'is_indexable', 'sort_order', 'content', 'status')
+        ->and($names)->not->toContain('title');
 
     $byName = array_column($children, null, 'name');
     expect($byName['slug']['kind'])->toBe('slug')
@@ -153,12 +155,11 @@ it('falls back to name-derived slug generation for a secondary locale left empty
         ->and($page->pathFor('uk'))->toBe('fresh-page-uk');
 });
 
-it('falls the title back to the name per locale when title is left empty', function (): void {
+it('stores no title on create, so the meta title follows a later rename', function (): void {
     $this->postJson('/admin/pages/actions/pageCreateSave', [
         'payload' => [
             'form' => [
                 'name' => ['en' => 'About Us'],
-                'title' => ['en' => ''],
                 'slug' => ['en' => 'about-us'],
                 'type' => 'page',
                 'parent_id' => 'none',
@@ -167,24 +168,10 @@ it('falls the title back to the name per locale when title is left empty', funct
     ])->assertOk();
 
     $page = Page::query()->where('type', 'page')->firstOrFail();
-    expect($page->getTranslation('title', 'en'))->toBe('About Us');
-});
+    $page->update(['name' => ['en' => 'Our Team']]);
 
-it('keeps an explicit title over the name fallback', function (): void {
-    $this->postJson('/admin/pages/actions/pageCreateSave', [
-        'payload' => [
-            'form' => [
-                'name' => ['en' => 'About Us'],
-                'title' => ['en' => 'Custom Title'],
-                'slug' => ['en' => 'about-us'],
-                'type' => 'page',
-                'parent_id' => 'none',
-            ],
-        ],
-    ])->assertOk();
-
-    $page = Page::query()->where('type', 'page')->firstOrFail();
-    expect($page->getTranslation('title', 'en'))->toBe('Custom Title');
+    expect($page->getTranslations('title'))->toBe([])
+        ->and(app(SeoResolver::class)->resolve($page->refresh(), 'en')['ownTitle'])->toBe('Our Team');
 });
 
 it('always creates pages as indexable, since the create form has no is_indexable field', function (): void {

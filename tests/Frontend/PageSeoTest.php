@@ -190,7 +190,7 @@ it('falls back the meta title to the page name when title and seo.title are empt
         ->assertJsonPath('props.seo.ogTitle', 'About');
 });
 
-it('uses the default-locale title fallback for a non-default-locale page', function (): void {
+it('prefers the locale\'s own name over the default-locale title for the meta title', function (): void {
     Language::factory()->create(['locale' => 'uk']);
 
     $page = Page::factory()->create([
@@ -203,7 +203,8 @@ it('uses the default-locale title fallback for a non-default-locale page', funct
     $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.page.title', 'About Page')
-        ->assertJsonPath('props.seo.title', 'About Page — Acme');
+        ->assertJsonPath('props.seo.title', 'Pro nas — Acme')
+        ->assertJsonPath('props.seo.ogTitle', 'Pro nas');
 });
 
 it('resolves siteName from settings, defaulting to an empty string when unset', function (): void {

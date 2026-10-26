@@ -1,6 +1,6 @@
 @section('subject', __('tbtop-cms::notifications.mail.subject'))
 @foreach ($fields as $key => $value)
-<p><strong>{{ $key }}:</strong> {!! nl2br(e($value)) !!}</p>
+<p><strong>{{ $fieldLabels[$key] ?? $key }}:</strong> {!! nl2br(e($value)) !!}</p>
 @endforeach
 <p><strong>{{ __('tbtop-cms::notifications.mail.fields.page') }}:</strong> {{ $pageName }}</p>
 <p><strong>{{ __('tbtop-cms::notifications.mail.fields.locale') }}:</strong> {{ $locale }}</p>

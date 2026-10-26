@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Form\Notifications;
 
+use Tbtop\Cms\Admin\Support\AdminLocales;
 use Tbtop\Cms\Admin\Support\AdminUsers;
 use Tbtop\Cms\Mail\Recipients as MailRecipients;
 use Tbtop\Cms\Notifications\Audience;
@@ -26,6 +27,11 @@ use Tbtop\Cms\Telegram\ChatIds;
  * an explicit failure rather than a silent no-op — see its docblock — which
  * this class reports via the two *Misconfigured() flags rather than trying
  * to synthesize it from an empty recipient list.
+ *
+ * Every recipient is staff, so its locale is an admin UI locale, never the
+ * submission's page locale: a bell admin's own profile locale, and the
+ * panel's default UI locale for a mail address or a Telegram chat, which
+ * belong to no admin.
  */
 final readonly class FormSubmissionRecipients
 {
@@ -36,14 +42,18 @@ final readonly class FormSubmissionRecipients
         public bool $telegramMisconfigured,
     ) {}
 
-    public static function build(Settings $settings, string $locale): self
+    public static function build(Settings $settings): self
     {
         $enabled = Notifications::enabledChannels('form.submission');
+        $locale = AdminLocales::default();
         $recipients = [];
 
         if (in_array('bell', $enabled, true)) {
-            foreach (AdminUsers::all() as $admin) {
-                $recipients[] = new Recipient(Audience::Staff, $locale, notifiable: $admin);
+            $admins = AdminUsers::all();
+            $locales = AdminLocales::forAdmins($admins);
+
+            foreach ($admins as $admin) {
+                $recipients[] = new Recipient(Audience::Staff, $locales[$admin->getKey()], notifiable: $admin);
             }
         }
 

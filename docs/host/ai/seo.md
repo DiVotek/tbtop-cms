@@ -38,7 +38,13 @@ Field-by-field:
   `{title} {seo.title_suffix}` behavior (`SeoTextRenderer::titleWithSuffix()`) —
   existing sites with no template configured render byte-identical titles.
   The `{title}` placeholder is the *own* title cascade: `seo.title` →
-  `page.title` → `page.name` (`PageOwnSeo::title()`). Templates also support
+  `page.title` → `page.name` (`PageOwnSeo::title()`), all in the requested
+  locale first; only then `page.title` → `page.name` in the default language
+  (`seo.title` has no language fallback). `page.title` is deprecated: the
+  editor no longer has a field for it, and migration
+  `2026_10_26_000000_copy_page_title_to_seo_title` copies it into an empty
+  `seo.title` per locale. It stays in the cascade so a stored value a host
+  wrote outside the admin renders as before. Templates also support
   `{site_name}`, `{sep}` (`seo.title_separator`, default `—`), `{parent}`
   (nearest live ancestor, labelled `name` → `title`; empty when none), `{date}`
   (published date, only when the page `isLive()`).

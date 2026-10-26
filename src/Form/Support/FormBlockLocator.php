@@ -33,13 +33,30 @@ class FormBlockLocator
      */
     public function locate(Page $page, string $blockId, ?string $locale = null): ?LocatedFormBlock
     {
-        $raw = $this->findBlock($page->content ?? [], $blockId) ?? $this->findInLayouts($blockId);
+        $stored = $this->stored($page, $blockId);
+
+        if ($stored === null) {
+            return null;
+        }
+
         $resolvedLocale = $locale ?? (string) app()->getLocale();
 
+        return new LocatedFormBlock($stored['block'], $this->flatten($stored['data'], $stored['block'], $resolvedLocale), $this->context($page, $resolvedLocale));
+    }
+
+    /**
+     * The block and its stored data, before locale flattening: what
+     * {@see locate()} finds, for a caller that flattens to several locales
+     * (staff notifications, one per admin UI locale) from one lookup.
+     *
+     * @return array{block: Block&HandlesFormSubmission, data: array<string, mixed>}|null
+     */
+    public function stored(Page $page, string $blockId): ?array
+    {
+        $raw = $this->findBlock($page->content ?? [], $blockId) ?? $this->findInLayouts($blockId);
+
         if ($raw === null) {
-            return $this->forms->has($blockId)
-                ? new LocatedFormBlock($this->forms->get($blockId), [], $this->context($page, $resolvedLocale))
-                : null;
+            return $this->forms->has($blockId) ? ['block' => $this->forms->get($blockId), 'data' => []] : null;
         }
 
         $kind = (string) ($raw['kind'] ?? '');
@@ -57,11 +74,7 @@ class FormBlockLocator
         // A form placed by reference is configured on the shared block, not on the row.
         $data = $this->sharedBlocks->dataOf($raw, $kind);
 
-        if ($data === null) {
-            return null;
-        }
-
-        return new LocatedFormBlock($block, $this->flatten($data, $block, $resolvedLocale), $this->context($page, $resolvedLocale));
+        return $data === null ? null : ['block' => $block, 'data' => $data];
     }
 
     /**
@@ -94,10 +107,13 @@ class FormBlockLocator
     }
 
     /**
+     * Stored block data with every translatable field picked for `$locale`,
+     * falling back to the default content language.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function flatten(array $data, Block $block, string $locale): array
+    public function flatten(array $data, Block $block, string $locale): array
     {
         $locales = array_column($this->languages->all(), 'locale');
 

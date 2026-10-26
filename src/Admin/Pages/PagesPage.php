@@ -24,6 +24,7 @@ use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EnumLabel;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\SeoState;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
@@ -85,7 +86,7 @@ class PagesPage extends AdminPage
             ->query($this->query(...))
             ->columns($this->columns($subtypes))
             ->tabs($this->tabs($pages))
-            ->filters($this->filters($s, $pages, $subtypes))
+            ->filters($this->filters($s, $pages))
             ->searchable(["{$pages}.name"])
             ->defaultSort('sort_key', 'asc')
             ->emptyState(
@@ -186,17 +187,54 @@ class PagesPage extends AdminPage
         ];
     }
 
-    /**
-     * @param  list<array{value: string, label: string}>  $subtypes
-     * @return list<Field>
-     */
-    private function filters(S $s, string $pages, array $subtypes): array
+    /** @return list<Field> */
+    private function filters(S $s, string $pages): array
     {
-        return $subtypes === [] ? [] : [
-            // Qualified: PageSortKey self-joins the pages table, so a bare `subtype` is ambiguous.
-            $s->select('subtype')->label(__('tbtop-cms::pages.columns.subtype'))->options($subtypes)
-                ->filterUsing(static fn (Builder $q, mixed $value): Builder => $q->where("{$pages}.subtype", $value)),
+        return [
+            // Qualified: PageSortKey self-joins the pages table, so a bare `parent_id` is ambiguous.
+            $s->select('parent_id')->label(__('tbtop-cms::pages.columns.parent'))->options($this->parentOptions())
+                ->filterUsing(static fn (Builder $q, mixed $value): Builder => $q->where("{$pages}.parent_id", $value)),
+            $s->select('display_state')->label(__('tbtop-cms::pages.columns.status'))->options($this->displayStateOptions())
+                ->filterUsing(static fn (Builder $q, mixed $value): Builder => PageListState::whereDisplayState($q, $pages, $value)),
+            $s->select('seo_state')->label(__('tbtop-cms::pages.columns.seo'))->options($this->seoStateOptions())
+                ->filterUsing(static fn (Builder $q, mixed $value): Builder => PageListState::whereSeoState($q, $pages, $value)),
         ];
+    }
+
+    /**
+     * Only pages that have a child are a useful parent to filter by.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function parentOptions(): array
+    {
+        $default = app(Languages::class)->defaultLocale();
+
+        return Page::query()->whereHas('children')->orderBy('sort_order')->orderBy('id')->get()
+            ->map(static fn (Page $page): array => [
+                'value' => (string) $page->getKey(),
+                'label' => $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey()),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    private function displayStateOptions(): array
+    {
+        return array_map(
+            static fn (PageDisplayState $state): array => ['value' => $state->value, 'label' => __('tbtop-cms::pages.status.' . $state->value)],
+            PageDisplayState::cases(),
+        );
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    private function seoStateOptions(): array
+    {
+        return array_map(
+            static fn (SeoState $state): array => ['value' => (string) $state->value, 'label' => $state->label()],
+            SeoState::cases(),
+        );
     }
 
     /** @return Builder<Page> */

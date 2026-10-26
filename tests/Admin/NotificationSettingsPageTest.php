@@ -186,6 +186,21 @@ it('hides template fields from a non-owner and ignores a posted template body wh
     expect(app(Settings::class)->get('notifications.form.submission.channels'))->toBe(['telegram']);
 });
 
+it('offers a template editor per admin UI locale, not per content language', function (): void {
+    Language::factory()->create(['locale' => 'de']);
+    actingAsOwner();
+
+    $structure = test()->get('/admin/notification-settings', ['X-Inertia' => 'true'])
+        ->assertOk()->json('props.structure');
+
+    // Staff notifications render in the admin UI locale (the panel's en/uk),
+    // so a content-only language gets no editor and uk gets one without a
+    // uk content language.
+    expect(findFieldNode($structure, 'tpl__form__submission__short__uk__body'))->not->toBeNull()
+        ->and(findFieldNode($structure, 'tpl__form__submission__short__en__body'))->not->toBeNull()
+        ->and(findFieldNode($structure, 'tpl__form__submission__short__de__body'))->toBeNull();
+});
+
 it('resets a stored template on owner confirmation, deleting the row and clearing the form field', function (): void {
     actingAsOwner();
 

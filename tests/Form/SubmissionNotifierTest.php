@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Tbtop\Admin\Panels\PanelRegistry;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Block\Blocks\ContactForm;
 use Tbtop\Cms\Cms;
@@ -33,6 +34,8 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\GatedContractAdminUser;
+use Tbtop\Cms\Tests\Fixtures\LabelledFormBlock;
+use Tbtop\Cms\Tests\Fixtures\RecordingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingFormBlock;
 use Tbtop\Cms\Tests\Fixtures\ThrowingHostChannel;
 use Tbtop\Cms\Tests\Fixtures\ThrowingNotificationView;
@@ -112,6 +115,158 @@ it('writes the bell body as plain text', function (): void {
     expect($data['body'])->not->toContain('<b>')
         ->and($data['body'])->not->toContain('&#039;')
         ->and($data['body'])->toContain("Ada O'Brien");
+});
+
+it('puts the lead name, contact and page on their own bell lines', function (): void {
+    $admin = notifierAdmin();
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    expect($admin->notifications()->sole()->data['body'])->toBe("Ada\nada@example.test\nPage: Contact");
+});
+
+it('keeps the telegram message as HTML with the title, lead lines, page and link', function (): void {
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    app(Settings::class)->set('notifications.form.submission.channels', ['telegram']);
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+    $page = notifierContactPage();
+
+    $this->post(notifierSubmitUrl($page), [
+        'name' => 'Ada & Co', 'email' => 'ada@example.test', 'message' => 'Hi',
+    ])->assertRedirect();
+
+    $url = route('tbtop.cms.form-submission-page', ['submission' => FormSubmission::query()->sole()->id]);
+    Http::assertSent(fn ($request): bool => trim((string) $request['text'])
+        === "<b>New form submission</b>\nAda &amp; Co\nada@example.test\nPage: Contact\n{$url}");
+});
+
+function notifierUkrainianSubmission(): void
+{
+    Language::factory()->create(['locale' => 'uk']);
+    $page = notifierContactPage();
+
+    test()->post(route('tbtop-cms.form.submit', ['locale' => 'uk', 'page' => $page->getKey(), 'block' => 'form-1']), [
+        'name' => 'Ада', 'email' => 'ada@example.test', 'message' => 'Привіт',
+    ])->assertRedirect();
+
+    expect(FormSubmission::query()->sole()->locale)->toBe('uk');
+}
+
+it('writes each admin\'s bell in their own admin locale, not the page locale', function (): void {
+    $english = notifierAdmin('en@example.test');
+    CmsUserProfile::query()->where('user_id', $english->id)->update(['locale' => 'en']);
+    $ukrainian = notifierAdmin('uk@example.test');
+    CmsUserProfile::query()->where('user_id', $ukrainian->id)->update(['locale' => 'uk']);
+    $unset = notifierAdmin('unset@example.test');
+
+    notifierUkrainianSubmission();
+
+    expect($english->notifications()->sole()->data)
+        ->toMatchArray(['title' => 'New form submission'])
+        ->and($english->notifications()->sole()->data['actions'][0]['label'])->toBe('View submission')
+        ->and($english->notifications()->sole()->data['body'])->toContain('Page: Contact')
+        ->and($ukrainian->notifications()->sole()->data['title'])->toBe('Нова заявка з форми')
+        ->and($ukrainian->notifications()->sole()->data['actions'][0]['label'])->toBe('Переглянути заявку')
+        // No stored preference: the admin panel's default UI locale.
+        ->and($unset->notifications()->sole()->data['title'])->toBe('New form submission')
+        // The visitor's own text is passed through untouched.
+        ->and($ukrainian->notifications()->sole()->data['body'])->toContain('Ада');
+});
+
+it('sends mail and telegram in the admin default locale and keeps the page locale as data', function (): void {
+    Mail::fake();
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+    app(Settings::class)->set('notifications.form.submission.channels', ['mail', 'telegram']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+    app(Settings::class)->set('notifications.telegram.bot_token', 'test-token');
+    app(Settings::class)->set('notifications.telegram.chat_ids', '111');
+
+    notifierUkrainianSubmission();
+
+    Http::assertSent(fn ($request): bool => str_starts_with((string) $request['text'], '<b>New form submission</b>'));
+    Mail::assertSent(RenderedMail::class, fn (RenderedMail $mail): bool => $mail->hasSubject('New form submission')
+        && str_contains($mail->render(), '<strong>Locale:</strong> uk')
+        && str_contains($mail->render(), '<strong>Name:</strong> Ада'));
+});
+
+function notifierMailOnly(): void
+{
+    Mail::fake();
+    app(Settings::class)->set('notifications.form.submission.channels', ['mail']);
+    app(Settings::class)->set('notifications.mail.recipients', 'ops@example.test');
+}
+
+function notifierMailHtml(): string
+{
+    $html = '';
+    Mail::assertSent(RenderedMail::class, function (RenderedMail $mail) use (&$html): bool {
+        $html = $mail->render();
+
+        return true;
+    });
+
+    return $html;
+}
+
+it('labels each submitted field in the mail with the form label in the reader\'s locale', function (): void {
+    notifierMailOnly();
+
+    notifierUkrainianSubmission();
+
+    expect(notifierMailHtml())
+        ->toContain('<strong>Name:</strong> Ада')
+        ->toContain('<strong>Email:</strong> ada@example.test')
+        ->toContain('<strong>Message:</strong> Привіт')
+        ->not->toContain('<strong>name:</strong>');
+});
+
+it('labels the fields in Ukrainian for a Ukrainian admin locale', function (): void {
+    app(PanelRegistry::class)->all()['cms']->defaultLocale('uk');
+    notifierMailOnly();
+
+    notifierUkrainianSubmission();
+
+    expect(notifierMailHtml())
+        ->toContain('<strong>Ім’я:</strong> Ада')
+        ->toContain('<strong>Електронна пошта:</strong> ada@example.test')
+        ->toContain('<strong>Повідомлення:</strong> Привіт');
+});
+
+it('labels a field from the block\'s stored copy, picked for the reader\'s locale', function (): void {
+    config()->set('tbtop-cms.blocks.types', [LabelledFormBlock::class]);
+    Language::factory()->create(['locale' => 'uk']);
+    notifierMailOnly();
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Survey'],
+        'content' => [['id' => 'lab-1', 'kind' => 'Labelled', 'active' => true, 'data' => [
+            'valueLabel' => ['en' => 'Your answer', 'uk' => 'Ваша відповідь'],
+        ]]],
+    ]);
+
+    $this->post(route('tbtop-cms.form.submit', ['locale' => 'uk', 'page' => $page->getKey(), 'block' => 'lab-1']), ['value' => 'так'])
+        ->assertRedirect();
+
+    expect(notifierMailHtml())->toContain('<strong>Your answer:</strong> так');
+});
+
+it('keeps the raw payload keys for a form that declares no field labels', function (): void {
+    config()->set('tbtop-cms.blocks.types', [RecordingFormBlock::class]);
+    notifierMailOnly();
+    $page = Page::factory()->create([
+        'status' => PageStatus::Published,
+        'name' => ['en' => 'Recording'],
+        'content' => [['id' => 'rec-1', 'kind' => 'Recording', 'active' => true, 'data' => []]],
+    ]);
+
+    $this->post(route('tbtop-cms.form.submit', ['locale' => 'en', 'page' => $page->getKey(), 'block' => 'rec-1']), ['value' => 'x'])
+        ->assertRedirect();
+
+    expect(notifierMailHtml())->toContain('<strong>value:</strong> x');
 });
 
 it('labels the bell action instead of showing the raw URL', function (): void {
