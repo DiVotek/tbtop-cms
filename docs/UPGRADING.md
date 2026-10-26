@@ -504,6 +504,20 @@ subject itself drops that step, or a literal `&amp;` in the payload would be
 decoded twice; one that puts the subject into HTML escapes it. The body is
 unchanged.
 
+## An optional pages API under `/api/cms/v1`
+
+Nothing changes until a host turns it on: `tbtop-cms.api.enabled`
+(`TBTOP_CMS_API`) defaults to `false`, and `laravel/sanctum` is suggested,
+not required. To use it: `composer require laravel/sanctum`, publish and run
+its migration, add `Laravel\Sanctum\HasApiTokens` to the user model, set
+`TBTOP_CMS_API=true`, then issue a token with
+`php artisan cms:api-token <email> --parents=<category ids>`
+(docs/host/ai/api.md). A published `config/tbtop-cms.php` needs the `api`
+key only to change the env-driven default. The package adds an auth guard
+`cms-api` unless the host defines one by that name, and `cms:doctor` gains the
+`pages_api` check: a lang override of `tbtop-cms::health.checks.*` may add
+its keys.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
