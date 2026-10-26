@@ -1,6 +1,7 @@
 import type { ResolvedLink } from "../content/link";
 import type { Page, TranslatableField } from "../content/page";
 import type { PageRef } from "../content/pageRefs";
+import type { Site } from "../site";
 
 /** A pages-field ref with its page's resolved custom fields (`ctx.pages(value, { fields: true })`). */
 export type PageRefWithFields = PageRef & { fields: Record<string, unknown> };
@@ -30,4 +31,6 @@ export type ResolveContext = {
 	pageText(field: TranslatableField): string | null;
 	/** A package string (`forms.contact.heading`) in this locale. */
 	t(key: string): string;
+	/** The request's site: settings, pages, pageViews and the rest, for what the helpers above do not cover. */
+	site: Site;
 };

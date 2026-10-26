@@ -184,6 +184,7 @@ export class Site {
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
+			site: this,
 		};
 	}
 

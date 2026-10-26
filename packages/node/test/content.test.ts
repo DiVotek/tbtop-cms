@@ -74,6 +74,19 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi", note: "kept", surface: false });
 	});
 
+	test("a block resolver reads site settings through ctx.site", async () => {
+		const catalog = defineBlocks({ Footer: { props: z.object({ phone: z.string().nullable() }) } });
+		const blocks = implementBlocks(catalog, {
+			Footer: { form: () => [], resolve: async (_input, ctx) => ({ phone: ((await ctx.site.settings.get("site.contacts.phones")) as { number: string }[] | null)?.[0]?.number ?? null }) },
+		});
+		const { cms, ids } = await makeCms(fixture, { blocks });
+		await cms.site().settings.set("site.contacts.phones", [{ number: "+380 44 000 00 00" }]);
+		await cms.site().pages.update(ids.home ?? 1, { content: [{ id: "f", kind: "Footer", data: {} }] as never });
+		const result = await cms.loadPage(get("/"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(result.props.render.elements.f?.props).toEqual({ phone: "+380 44 000 00 00" });
+	});
+
 	test("a key the resolver set ships as resolved, so a transform does not run twice", async () => {
 		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string().transform((text) => `«${text}»`) }) } });
 		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
