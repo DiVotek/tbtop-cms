@@ -108,7 +108,7 @@ createAdmin({
 
 ### Page types
 
-A page type's custom fields are a zod object (`fields`) next to their admin
+A page type's custom fields are a zod object (`schema`) next to their admin
 form (`form`); `definePageType` keeps the literal key, and `createCms` infers
 `PageProps` from `pageTypes`, a union by `page.type`:
 
@@ -117,7 +117,7 @@ import { definePageType, pagesField } from "@tbtop/cms";
 
 export const recipeType = definePageType({
 	key: "recipe",
-	fields: z.object({ minutes: z.number().nullable(), related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
+	schema: z.object({ minutes: z.number().nullable(), related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
 	form: (s) => [s.number("minutes").label("Minutes"), pagesField("related").of("article")],
 });
 

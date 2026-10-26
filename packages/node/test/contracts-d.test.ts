@@ -185,7 +185,7 @@ describe("link and pages fields (q16)", () => {
 
 const recipeType = definePageType({
 	key: "recipe",
-	fields: z.object({
+	schema: z.object({
 		minutes: z.number().nullable(),
 		vegan: z.boolean(),
 		related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })),
@@ -230,7 +230,7 @@ describe("typed page types (q06)", () => {
 		const { db } = await makeCms();
 		const loose = definePageType({
 			key: "event",
-			fields: z.object({ starts: z.string() }),
+			schema: z.object({ starts: z.string() }),
 			form: (s) => [s.text("starts")],
 		});
 		const cms = createCms({ db, blocks: implementBlocks(cmsBlocks, cmsBlockImpls), url: "https://site.test", pageTypes: [loose] });
@@ -247,14 +247,14 @@ describe("typed page types (q06)", () => {
 		const blocks = implementBlocks(cmsBlocks, cmsBlockImpls);
 		const mismatched = definePageType({
 			key: "recipe",
-			fields: z.object({ minutes: z.number().nullable(), servings: z.number() }),
+			schema: z.object({ minutes: z.number().nullable(), servings: z.number() }),
 			form: (s) => [s.number("minutes"), s.text("note")],
 		});
 		expect(() => createCms({ db, blocks, pageTypes: [mismatched] })).toThrow(
-			"Page type [recipe]: its form() fields do not match its fields schema: no form field for servings; no schema key for note.",
+			"Page type [recipe]: its form() fields do not match its schema: no form field for servings; no schema key for note.",
 		);
-		expect(() => createCms({ db, blocks, pageTypes: [{ key: "bare", fields: z.object({ x: z.string() }) }] })).toThrow(/no form field for x/);
-		expect(() => createCms({ db, blocks, pageTypes: [{ key: "computed", fields: z.object({ x: z.string() }), resolveFields: () => ({ x: "1" }) }] })).not.toThrow();
+		expect(() => createCms({ db, blocks, pageTypes: [{ key: "bare", schema: z.object({ x: z.string() }) }] })).toThrow(/no form field for x/);
+		expect(() => createCms({ db, blocks, pageTypes: [{ key: "computed", schema: z.object({ x: z.string() }), resolveFields: () => ({ x: "1" }) }] })).not.toThrow();
 	});
 
 	test("PageProps and a bare Cms keep untyped fields; a typed Cms is still a Cms", async () => {

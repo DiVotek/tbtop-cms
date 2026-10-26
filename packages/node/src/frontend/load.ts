@@ -18,7 +18,7 @@ export type SharedProps = Jsonify<SharedShape>;
  * The props of a CMS page, all JSON: a host passes them through its loader as
  * they are. `page` is a union by `page.type` over the built-in types and `T`
  * (createCms infers it from `pageTypes`), so `page.type === "recipe"`
- * narrows `page.fields` to that type's fields schema.
+ * narrows `page.fields` to that type's schema.
  */
 export type PageProps<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = Jsonify<PageShape<PageTypeUnion<T>>>;
 
