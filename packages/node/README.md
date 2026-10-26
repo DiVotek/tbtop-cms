@@ -334,8 +334,9 @@ is the guard `seedFixtures` uses: true while the site has no page.
 if (await isFreshSite(cms)) {
 	await seedFixtures(cms, { languages, settings }); // or set them yourself
 	const site = cms.site();
-	const catalog = await site.pages.create({ type: "category", name: { uk: "Каталог" }, status: "published" });
-	const bream = await site.pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { uk: "Лящ" }, status: "published" });
+	const catalog = await site.pages.create({ type: "category", name: { uk: "Каталог" }, status: "published" }, { slugs: { uk: "catalog" } });
+	// Without slugs a page gets one from its name (transliterated), as in the editor.
+	const bream = await site.pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { uk: "Лящ" }, status: "published" }, { slugs: { uk: "bream" } });
 	await site.pages.update(catalog.id, {
 		content: [{ id: "grid", kind: "ProductGrid", active: true, sort: 0, data: { products: [String(bream.id)] } }],
 	});
@@ -345,7 +346,10 @@ if (await isFreshSite(cms)) {
 ```
 
 Stored values are the editor's: a pages field is a list of page ids as
-strings, a link `{ type: "page", page: "<id>", label }`.
+strings, a link `{ type: "page", page: "<id>", label }`. The seed is neither
+atomic nor resumable: run it from one process (a deploy step or one boot,
+not every instance at once), and if a step fails, empty the database and
+seed again, since `isFreshSite` is false once the first page exists.
 
 ## Link and pages fields
 

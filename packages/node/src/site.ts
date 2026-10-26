@@ -188,11 +188,9 @@ export class Site {
 
 	/** ctx.pages(value, { fields: true }): each live ref with its page's resolved fields, one level deep. */
 	private async pagesWithFields(value: unknown, locale: string, nested: boolean): Promise<PageRefWithFields[]> {
-		const out: PageRefWithFields[] = [];
-		for (const { ref, page } of await livePageRefs(this, value, locale)) {
-			out.push({ ...ref, fields: nested ? {} : await resolvePageFields(this, page, locale) });
-		}
-		return out;
+		const live = await livePageRefs(this, value, locale);
+		const fields = nested ? live.map(() => ({})) : await resolvePageFields(this, live.map(({ page }) => page), locale);
+		return live.map(({ ref }, i) => ({ ...ref, fields: fields[i] ?? {} }));
 	}
 
 	/**

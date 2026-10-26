@@ -62,15 +62,21 @@ async function linkedIds(site: Site, content: unknown[], page: Page | null): Pro
 }
 
 /**
- * A page's resolved custom fields, as its own page props carry them: what
+ * Pages' resolved custom fields, as their own page props carry them: what
  * `ctx.pages(value, { fields: true })` adds to each ref. Resolved one level
  * deep: inside, `fields: true` gives empty fields, so two pages that pick
  * each other do not recurse.
  */
-export async function resolvePageFields(site: Site, page: Page, locale: string): Promise<Record<string, unknown>> {
+export async function resolvePageFields(site: Site, pages: Page[], locale: string): Promise<Record<string, unknown>[]> {
 	const locales = (await site.languages.all()).map((row) => row.locale);
-	const targets = await site.linkTargets(await linkedIds(site, [], page), locale);
-	return resolveFields(site, page, locale, locales, targets, true);
+	// The pages' links in one lookup for the whole list, not one per page.
+	const ids = (await Promise.all(pages.map((page) => linkedIds(site, [], page)))).flat();
+	const targets = await site.linkTargets(ids, locale);
+	const out: Record<string, unknown>[] = [];
+	for (const page of pages) {
+		out.push(await resolveFields(site, page, locale, locales, targets, true));
+	}
+	return out;
 }
 
 async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets, nested = false): Promise<Record<string, unknown>> {
