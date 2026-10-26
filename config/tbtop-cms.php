@@ -197,6 +197,13 @@ return [
         'root_kind' => 'Fragment',
         'root_view' => null,
     ],
+    'api' => [
+        // The token-authenticated pages API under /api/cms/v1 (docs/host/ai/api.md).
+        // Off unless enabled, and only with laravel/sanctum installed by the host;
+        // `php artisan cms:doctor` names what is missing. Tokens are issued with
+        // `php artisan cms:api-token`. Read with an inline default.
+        'enabled' => (bool) env('TBTOP_CMS_API', false),
+    ],
     // Who answers the tbtop-cms.* section abilities: false leaves every
     // section open to anyone with admin access; true hands them to the host,
     // which must define the gates first — an unanswered ability denies.
