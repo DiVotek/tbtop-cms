@@ -324,6 +324,29 @@ database with pages is left alone. A fixture language marked `default` takes ove
 from the installed one (which stays, non-default: pass `defaultLanguage` to
 `migrateCms` to install the right one).
 
+A seed whose pages point at each other goes step by step in the host's own
+boot, after `migrateCms`: each step gets the ids of the pages before it. The
+writes below are the public seeding API; they take the package's write paths
+(slugs, tree rules, `tbtop_page_refs`, revisions, audit). `isFreshSite(cms)`
+is the guard `seedFixtures` uses: true while the site has no page.
+
+```ts
+if (await isFreshSite(cms)) {
+	await seedFixtures(cms, { languages, settings }); // or set them yourself
+	const site = cms.site();
+	const catalog = await site.pages.create({ type: "category", name: { uk: "Каталог" }, status: "published" });
+	const bream = await site.pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { uk: "Лящ" }, status: "published" });
+	await site.pages.update(catalog.id, {
+		content: [{ id: "grid", kind: "ProductGrid", active: true, sort: 0, data: { products: [String(bream.id)] } }],
+	});
+	await site.layouts.save("header", [{ id: "nav", kind: "SiteNav", active: true, sort: 0, data: {} }]);
+	const contact = await site.sharedBlocks.create({ name: "Contact", kind: "ContactForm", data: {} }); // a row's `shared: contact`
+}
+```
+
+Stored values are the editor's: a pages field is a list of page ids as
+strings, a link `{ type: "page", page: "<id>", label }`.
+
 ## Link and pages fields
 
 `linkField` and `pagesField` go into a host block's `form()` (or a page

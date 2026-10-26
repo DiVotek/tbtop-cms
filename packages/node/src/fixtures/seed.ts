@@ -65,6 +65,14 @@ const lexical = (text: string) => ({
 });
 
 /**
+ * True while the site has no page (trashed ones aside): the guard a host's
+ * own seed checks before it writes, as seedFixtures does.
+ */
+export async function isFreshSite(cms: Cms): Promise<boolean> {
+	return (await cms.site().pages.query().select("id").limit(1).executeTakeFirst()) === undefined;
+}
+
+/**
  * Seeds a fixture through the package's own write paths (slugs, shared
  * references), so the result is what an editor would have produced. It runs
  * once: a database that already has pages is left alone. Returns page ids by key.
@@ -72,8 +80,7 @@ const lexical = (text: string) => ({
 export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<string, number>> {
 	const site = cms.site();
 	const db = cms.config.db;
-	const existing = await site.pages.query().select("id").limit(1).executeTakeFirst();
-	if (existing !== undefined) {
+	if (!(await isFreshSite(cms))) {
 		return {};
 	}
 	const now = sqlDate(new Date());

@@ -38,7 +38,7 @@ export { richtextHtml } from "./content/richtext";
 export { baselineMigration, cmsMigrations, type Dialect, type MigrationOptions, migrateCms } from "./db/migrations";
 export type { CmsDatabase } from "./db/schema";
 export { demoFixture } from "./fixtures/demo";
-export { type Fixture, type FixtureBlock, type FixturePage, seedFixtures } from "./fixtures/seed";
+export { type Fixture, type FixtureBlock, type FixturePage, isFreshSite, seedFixtures } from "./fixtures/seed";
 export { LEAD_STATUSES, type LeadStatus, type Submission, Submissions, type SubmissionStatus } from "./forms/submissions";
 export type { SubmissionEvent } from "./forms/submit";
 export type { Crumb } from "./frontend/breadcrumbs";
