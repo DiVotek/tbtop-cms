@@ -58,7 +58,9 @@ that session. The secrets have fixed defaults (`BETTER_AUTH_SECRET`,
 `CMS_PREVIEW_SECRET` override them), so the workbench is a demo, not a
 deployment. The first request migrates Better Auth's tables too, so the
 workbench turns off Better Auth's schema check (`advanced.database.validateSchema`),
-which runs when `betterAuth()` is built and would log them as missing.
+which runs when `betterAuth()` is built and would log them as missing. That is
+for the demo only: a deployed host migrates before it serves (a deploy step)
+and keeps the check on, so a missing or drifted auth table is reported.
 
 ## Host API
 
