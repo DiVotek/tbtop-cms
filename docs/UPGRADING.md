@@ -504,6 +504,24 @@ subject itself drops that step, or a literal `&amp;` in the payload would be
 decoded twice; one that puts the subject into HTML escapes it. The body is
 unchanged.
 
+## Regenerate media variants for `srcset` (tbtop/admin 0.7.2)
+
+This release requires tbtop/admin `^0.7.2`, whose default
+`tbtop-admin.media.profiles` add three width-only webp variants next to
+`thumb`: `sm` (640), `md` (1024) and `lg` (1600). New uploads get them
+automatically. Media uploaded before the upgrade has only `thumb`, so
+`ResolveContext::mediaImage()` returns a `srcset` of that one small
+candidate plus the original. Build the missing variants once:
+
+```bash
+php artisan tbtop:media-regenerate
+```
+
+It writes only the variants a media item lacks; `--force` rebuilds existing
+ones after a profile changes size or format. A host that publishes
+`config/tbtop-admin.php` keeps its own `media.profiles` and gets none of the
+new defaults: add `sm`/`md`/`lg` there first if it wants them.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
@@ -588,6 +606,10 @@ hand, in order.
     (only then can they edit or revoke them). Make sure the users of any
     host page with a media field hold `tbtop-cms.media`, `.pages`,
     `.settings` or `.design`, or the media API refuses them.
+
+11. **Run `php artisan tbtop:media-regenerate` once** after updating
+    tbtop/admin, so media uploaded earlier gets the `sm`/`md`/`lg` variants
+    `mediaImage()` lists in its `srcset`.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts, the admin
