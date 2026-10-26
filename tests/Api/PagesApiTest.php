@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
-use Tbtop\Cms\Api\ApiWiring;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Api\ApiWiring;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
