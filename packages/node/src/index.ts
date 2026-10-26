@@ -1,6 +1,7 @@
 export { type BlockMeta, type Catalog, cmsBlocks, defineBlocks, type Placement, type PropsOf } from "./blocks/catalog";
 export { placeableIn } from "./blocks/catalog";
-export type { ResolveContext } from "./blocks/context";
+export type { PageRefWithFields, ResolveContext } from "./blocks/context";
+export type { PageColumns, PageView } from "./frontend/pageView";
 export { resolveForm } from "./blocks/fields";
 export { LinkField, linkField, PagesField, pagesField, type StoredLink } from "./blocks/cmsFields";
 export {
@@ -26,8 +27,8 @@ export { type CmsCacheStore, type KvNamespaceLike, kvCache, memoryCache } from "
 export type { CmsAdminAuth, CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
 export type { Language } from "./content/languages";
 export { ensureDefaultLanguage, LanguageError } from "./content/languages";
-export { isLive, type Page, type PageStatus, type Translations } from "./content/page";
-export { PageConflictError, type PageInput } from "./content/pages";
+export { isLive, type Page, pageFromRow, type PageStatus, type Translations } from "./content/page";
+export { PageConflictError, type PageInput, whereLive } from "./content/pages";
 export { rebuildPageRefs } from "./content/pageRefIndex";
 export { AUDIT_SUBJECTS, type AuditEntry, AuditLog, type AuditSubject } from "./content/audit";
 export type { PageRef } from "./content/pageRefs";
@@ -38,7 +39,7 @@ export { richtextHtml } from "./content/richtext";
 export { baselineMigration, cmsMigrations, type Dialect, type MigrationOptions, migrateCms } from "./db/migrations";
 export type { CmsDatabase } from "./db/schema";
 export { demoFixture } from "./fixtures/demo";
-export { type Fixture, type FixtureBlock, type FixturePage, seedFixtures } from "./fixtures/seed";
+export { type Fixture, type FixtureBlock, type FixturePage, isFreshSite, seedFixtures } from "./fixtures/seed";
 export { LEAD_STATUSES, type LeadStatus, type Submission, Submissions, type SubmissionStatus } from "./forms/submissions";
 export type { SubmissionEvent } from "./forms/submit";
 export type { Crumb } from "./frontend/breadcrumbs";

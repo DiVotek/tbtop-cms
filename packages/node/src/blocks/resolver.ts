@@ -61,7 +61,25 @@ async function linkedIds(site: Site, content: unknown[], page: Page | null): Pro
 	return ids;
 }
 
-async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets): Promise<Record<string, unknown>> {
+/**
+ * Pages' resolved custom fields, as their own page props carry them: what
+ * `ctx.pages(value, { fields: true })` adds to each ref. Resolved one level
+ * deep: inside, `fields: true` gives empty fields, so two pages that pick
+ * each other do not recurse.
+ */
+export async function resolvePageFields(site: Site, pages: Page[], locale: string): Promise<Record<string, unknown>[]> {
+	const locales = (await site.languages.all()).map((row) => row.locale);
+	// The pages' links in one lookup for the whole list, not one per page.
+	const ids = (await Promise.all(pages.map((page) => linkedIds(site, [], page)))).flat();
+	const targets = await site.linkTargets(ids, locale);
+	const out: Record<string, unknown>[] = [];
+	for (const page of pages) {
+		out.push(await resolveFields(site, page, locale, locales, targets, true));
+	}
+	return out;
+}
+
+async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets, nested = false): Promise<Record<string, unknown>> {
 	const stored = page.fields ?? {};
 	const types = site.pageTypes.forPage(page);
 	let out: Record<string, unknown> = {};
@@ -69,7 +87,7 @@ async function resolveFields(site: Site, page: Page, locale: string, locales: st
 		try {
 			const later = new Set(types.slice(i + 1).flatMap((next) => fieldNames(next.form(new S()))));
 			const own = Object.fromEntries(Object.entries(stored).filter(([key]) => !later.has(key)));
-			const ctx = await site.resolveContext(locale, page, out, targets);
+			const ctx = await site.resolveContext(locale, page, out, targets, nested);
 			const input = flattenLocales(own, locale, ctx.fallbackLocale, locales, translatablePaths(type.form(new S())));
 			out = { ...out, ...(await type.resolveFields(input, ctx)) };
 		} catch (error) {

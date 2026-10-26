@@ -1,8 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import { z } from "zod";
-import { cmsBlockImpls, cmsBlocks, type CmsConfig, implementBlocks, resolveForm } from "../src";
+import { cmsBlockImpls, cmsBlocks, type CmsConfig, createCms, implementBlocks, resolveForm } from "../src";
 import type { ResolveContext } from "../src/blocks/context";
 import { get, makeCms } from "./support";
 
@@ -259,5 +259,30 @@ describe("R3-blocks-11: rows the site skips are listed as problems and can be re
 		expect(props).not.toContain("Shared block “#999”");
 		await action(url, "blockRemove_gone1111", await record(url, "pageEditor"));
 		expect((await rows(ids.about as number)).map((row) => row.id)).toEqual(["miss1111"]);
+	});
+});
+
+describe("Dogfood: a placement that names no page type", () => {
+	const blocks = (placements: string[]) =>
+		implementBlocks(
+			{ ...cmsBlocks, Detail: { props: z.object({ text: z.string().nullable() }), placements } },
+			{ ...cmsBlockImpls, Detail: { form: (s) => [s.text("text").label("Text")] } },
+		);
+	const warnings = (placements: string[]) => {
+		const warn = spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			createCms({ db: {} as never, blocks: blocks(placements), pageTypes: [{ key: "product", base: "article" }] });
+			return warn.mock.calls.filter(([event]) => event === "block.placement_unknown");
+		} finally {
+			warn.mockRestore();
+		}
+	};
+
+	test("a base/subtype path is reported at boot, since the editor never offers it", () => {
+		expect(warnings(["article/product"])).toEqual([["block.placement_unknown", { kind: "Detail", placements: ["article/product"] }]]);
+	});
+
+	test("pages, layout, a type and a subtype key are quiet", () => {
+		expect(warnings(["pages", "layout", "category", "product"])).toEqual([]);
 	});
 });

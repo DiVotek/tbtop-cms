@@ -38,6 +38,10 @@ const authOptions = {
 	account: { modelName: "tbtop_accounts" },
 	verification: { modelName: "tbtop_verifications" },
 	plugins: [adminPlugin({ ac: cmsAccess, roles: cmsRoles })],
+	// boot() runs Better Auth's migrations before serving; its own check at
+	// construction would race them on a fresh database and log missing tables.
+	// Demo only: a deployed host migrates as a deploy step and keeps the check.
+	advanced: { database: { validateSchema: false } },
 };
 
 /** The host's Better Auth instance; routes/api/auth/$.ts serves its HTTP API. */

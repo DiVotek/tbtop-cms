@@ -56,8 +56,11 @@ The admin signs in through Better Auth (`@tbtop/cms/better-auth`, below):
 E2E signs in as the admin once (the `setup` project) and every spec reuses
 that session. The secrets have fixed defaults (`BETTER_AUTH_SECRET`,
 `CMS_PREVIEW_SECRET` override them), so the workbench is a demo, not a
-deployment. The first request migrates, so Better Auth's start-up check logs
-its tables as missing once.
+deployment. The first request migrates Better Auth's tables too, so the
+workbench turns off Better Auth's schema check (`advanced.database.validateSchema`),
+which runs when `betterAuth()` is built and would log them as missing. That is
+for the demo only: a deployed host migrates before it serves (a deploy step)
+and keeps the check on, so a missing or drifted auth table is reported.
 
 ## Host API
 
@@ -70,11 +73,19 @@ await migrateCms(db, { dialect: "sqlite" }); // fresh database only; or merge cm
 export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, placements: ["pages", "layout"] } });
 // placements: "pages" (every page type, the default), "layout", or page type / subtype keys
 // ("article", "news"): the page editor's Add block offers a kind only where it fits.
+// A subtype goes by its own key ("product", not "article/product"); a key that names
+// no registered type is never offered, and createCms warns `block.placement_unknown`.
 
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
+	// Lists of cards go in a repeater; its translatable cells are edited per locale:
+	// form: (s) => [s.repeater("items").fields([s.text("q").translatable(), s.text("icon")])]
+	// resolve() gets a `.translatable()` field already in the page's locale (default as fallback),
+	// so it never reads `{ en, de }` itself. A link is a linkField (see below), not a text field:
+	// its target is checked on save and on render, a free-text href is not.
 	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
+	schemaTypes: [productSchema], // extra JSON-LD types a page type's schemaTypes can name (see Page types)
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
@@ -171,6 +182,19 @@ if (result.type === "page" && result.props.page.type === "recipe") {
   type is not registered still renders, outside the union.
 - `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
   or `Cms` keeps `fields` as untyped JSON.
+
+A page type offers JSON-LD types by key (`schemaTypes`, the first is the
+default); a subtype without its own inherits its base's. A host adds a type
+with `createCms({ schemaTypes })`, for example a catalog item:
+
+```ts
+const productSchema: SchemaTypeDef = {
+	key: "Product",
+	build: (ctx) => [{ "@context": "https://schema.org", "@type": "Product", name: ctx.name, url: ctx.url,
+		offers: { "@type": "Offer", price: ctx.page.fields?.price, priceCurrency: "UAH" } }],
+};
+const productType = definePageType({ key: "product", base: "article", schemaTypes: ["Product"], schema, form });
+```
 
 `migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
@@ -291,13 +315,75 @@ Telegram bot token are host config, not settings.
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
 A server function answers on its own URL during client navigation, so build
-the page request from the route path (see `workbench/src/server/page.ts`).
+the page request from the route path (see `workbench/src/server/page.ts`):
+pass the path (`location.href` of the router, which has no origin) and
+resolve it against the caller's URL, never an absolute URL from the client.
+Keep `@tanstack/react-start/server` imports in server-only modules
+(`src/server/*`): a route component that imports it breaks the client bundle.
 
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone. A fixture language marked `default` takes over
 from the installed one (which stays, non-default: pass `defaultLanguage` to
 `migrateCms` to install the right one).
+
+A seed whose pages point at each other goes step by step in the host's own
+boot, after `migrateCms`: each step gets the ids of the pages before it. The
+writes below are the public seeding API; they take the package's write paths
+(slugs, tree rules, `tbtop_page_refs`, revisions, audit). `isFreshSite(cms)`
+is the guard `seedFixtures` uses: true while the site has no page.
+
+```ts
+if (await isFreshSite(cms)) {
+	await seedFixtures(cms, { languages, settings }); // or set them yourself
+	const site = cms.site();
+	const catalog = await site.pages.create({ type: "category", name: { uk: "Каталог" }, status: "published" }, { slugs: { uk: "catalog" } });
+	// Without slugs a page gets one from its name (transliterated), as in the editor.
+	const bream = await site.pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { uk: "Лящ" }, status: "published" }, { slugs: { uk: "bream" } });
+	await site.pages.update(catalog.id, {
+		content: [{ id: "grid", kind: "ProductGrid", active: true, sort: 0, data: { products: [String(bream.id)] } }],
+	});
+	await site.layouts.save("header", [{ id: "nav", kind: "SiteNav", active: true, sort: 0, data: {} }]);
+	const contact = await site.sharedBlocks.create({ name: "Contact", kind: "ContactForm", data: {} }); // a row's `shared: contact`
+}
+```
+
+Stored values are the editor's: a pages field is a list of page ids as
+strings, a link `{ type: "page", page: "<id>", label }`. The seed is neither
+atomic nor resumable: run it from one process (a deploy step or one boot,
+not every instance at once), and if a step fails, empty the database and
+seed again, since `isFreshSite` is false once the first page exists.
+Images go the same way: the seed copies the file onto the disk the upload
+fields write to and stores its ref, as an upload would
+(`await copyFile("seed/hero.jpg", "storage/seed/hero.jpg")`, then
+`pages.create({ ..., image: "seed/hero.jpg" })`); `media` turns the ref into
+a URL.
+
+A list the editor does not pick (a blog index, the products of a category,
+"latest three posts") is the host's own query, in its loader or route: the
+page props carry no children, and a block's `resolve()` does not see the
+request's `?page=`. `site.pages.query()` is a Kysely builder over live
+`tbtop_pages` rows (trashed ones left out); `whereLive` adds the rule the
+frontend uses (published, `published_at` passed, `unpublish_at` ahead), the
+counterpart of PHP's `Page::scopeLive`, `pageFromRow` turns a row into a
+`Page`, and `site.pageViews(pages, locale)` makes each one what `props.page`
+is for an open page (name, title, heading, summary in the locale with the
+default as fallback, body HTML, image URL) plus its `url`; `{ fields: true }`
+adds the resolved custom fields, one resolve per page:
+
+```ts
+import { pageFromRow, whereLive } from "@tbtop/cms";
+
+const site = cms.site(request);
+const perPage = 10;
+const current = Math.max(1, Number(new URL(request.url).searchParams.get("page")) || 1);
+const children = site.pages.query().$call(whereLive).where("parent_id", "=", blog.id).where("subtype", "=", "journal");
+const { total } = await children.select((eb) => eb.fn.countAll<number>().as("total")).executeTakeFirstOrThrow();
+const posts = (await children.selectAll().orderBy("published_at", "desc").orderBy("id", "desc")
+	.limit(perPage).offset((current - 1) * perPage).execute()).map(pageFromRow);
+const cards = await site.pageViews(posts, locale); // [{ id, name, summary, url, image, … }]
+// pages: Math.ceil(Number(total) / perPage)
+```
 
 ## Link and pages fields
 
@@ -324,6 +410,23 @@ Promo: {
 - A pages field stores page ids as strings in the order picked and resolves
   to the live ones as `{ id, name, url }[]`; drafts, trashed and unknown ids
   drop out.
+- A host `resolve()` that needs more of the picked pages (a product's price
+  on a catalog card) asks `ctx.pages(input.products, { fields: true })`: the
+  same refs, each with `fields`, that page's resolved custom fields as its
+  own props carry them (`Record<string, unknown>`: the picks may be of any
+  type, so narrow them). It is a convenience: one fields resolve per page,
+  one level deep (inside those resolvers `fields: true` gives `{}`). For a
+  long list, or columns the props never carry, query the database yourself
+  on top of `ctx.pages()`, which has already dropped drafts and built the URLs:
+
+```ts
+resolve: async (input, ctx) => {
+	const refs = await ctx.pages(input.products); // live, in this locale
+	const rows = await db.selectFrom("tbtop_pages").select(["id", "fields"])
+		.where("id", "in", refs.map((ref) => Number(ref.id))).execute(); // raw stored JSON
+	// merge rows into refs by id
+},
+```
 - On save the admin checks `link_shape` (type, target format, an existing
   page, label locales and length) and `page_ref` (each id exists) as host
   rules: `cms.admin.options()` passes them (`cms.admin.hostRules` when

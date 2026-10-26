@@ -79,10 +79,25 @@ export type CmsTasks = {
 const LAST_PRUNE = "system.scheduler.not_found_pruned_at";
 const DAY_MS = 86_400_000;
 
+/**
+ * A placement other than `pages` and `layout` names a page type or subtype by
+ * its own key (`product`, not `article/product`); one that names nothing is
+ * never offered in the editor, so it is reported once at boot.
+ */
+function warnUnknownPlacements(config: CmsConfig, pageTypes: PageTypes): void {
+	for (const block of config.blocks.all()) {
+		const unknown = block.placements.filter((placement) => placement !== "pages" && placement !== "layout" && !pageTypes.has(placement));
+		if (unknown.length > 0) {
+			console.warn("block.placement_unknown", { kind: block.kind, placements: unknown });
+		}
+	}
+}
+
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
 
 export function createCms<const T extends readonly PageTypeDef[] = []>(config: CmsConfig<T>): Cms<T> {
 	const pageTypes = new PageTypes(config.pageTypes);
+	warnUnknownPlacements(config, pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
 	const throttle = submitThrottle(config.forms);
 	const site = (request?: Request, options: { cached?: boolean } = {}): Site => {
