@@ -329,7 +329,8 @@ async function jsonLd(
 	if (identity !== null) {
 		out.push(identity);
 	}
-	return out;
+	const extend = site.config.seo?.extend;
+	return extend === undefined ? out : extend(out, ctx);
 }
 
 async function identityNode(site: Site, locale: string): Promise<Record<string, unknown> | null> {

@@ -202,5 +202,21 @@ describe("handle", () => {
 			provider: { "@id": "https://site.test#identity" },
 		});
 	});
+
+	test("seo.extend gets the page's JSON-LD last and may replace the identity node", async () => {
+		const { cms } = await makeCms(undefined, {
+			seo: {
+				extend: async (nodes, ctx) => [
+					...nodes.filter((node) => node["@id"] !== identityId(ctx.site)),
+					{ "@context": "https://schema.org", "@type": "ProfessionalService", "@id": identityId(ctx.site), name: "Divotek", geo: { "@type": "GeoCoordinates", latitude: 50.45 } },
+				],
+			},
+		});
+		const result = await cms.loadPage(get("/blog/first-post"));
+		if (result.type !== "page") throw new Error(result.type);
+		const nodes = result.props.seo.jsonLd;
+		expect(nodes.map((node) => node["@type"])).toEqual(["WebSite", "BreadcrumbList", "Article", "ProfessionalService"]);
+		expect(nodes[2]).toMatchObject({ author: { "@id": "https://site.test#identity" } });
+	});
 });
 

@@ -88,6 +88,9 @@ const cms = createCms({
 	// its target is checked on save and on render, a free-text href is not.
 	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
 	schemaTypes: [productSchema], // extra JSON-LD types a page type's schemaTypes can name (see Page types)
+	// The page's JSON-LD, last: add or replace nodes. Keep "@id": identityId(ctx.site) on your own organization node
+	// and Article author/publisher link to it.
+	seo: { extend: (nodes, ctx) => [...nodes.filter((n) => n["@id"] !== identityId(ctx.site)), myOrganization(ctx)] },
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),

@@ -7,6 +7,7 @@ import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
 import type { SubmissionEvent } from "./forms/submit";
 import type { Channel, DeliveryEvent, MailTransport, NotificationType } from "./notifications/types";
+import type { SchemaContext } from "./seo/schemaContext";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
 import type { CmsCacheStore } from "./support/cache";
 
@@ -50,6 +51,14 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	 * Without it a secret setting reads as its fallback and cannot be saved.
 	 */
 	settingsKey?: string;
+	seo?: {
+		/**
+		 * The page's JSON-LD documents, last: return them with yours added or
+		 * replaced. A node of yours with `"@id": identityId(ctx.site)` is the one
+		 * Article author and publisher already point to.
+		 */
+		extend?: (nodes: Record<string, unknown>[], ctx: SchemaContext) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
+	};
 	/** Paths robots.txt disallows besides the admin prefix and `/login`. */
 	robotsDisallow?: string[];
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */
