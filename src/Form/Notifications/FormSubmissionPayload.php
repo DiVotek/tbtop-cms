@@ -12,7 +12,10 @@ namespace Tbtop\Cms\Form\Notifications;
  */
 final readonly class FormSubmissionPayload
 {
-    /** @param array<string, mixed> $fields */
+    /**
+     * @param  array<string, mixed>  $fields
+     * @param  array<string, string>  $fieldLabels
+     */
     public function __construct(
         public string $leadIdentity,
         public string $pageName,
@@ -25,5 +28,9 @@ final readonly class FormSubmissionPayload
         // line; '' when the payload has none ($leadIdentity still covers it).
         public string $leadName = '',
         public string $leadContact = '',
+        // Display label per $fields key in the recipients' locale: the form's
+        // own label (HasFieldLabels), else the raw key. $fields keeps the raw
+        // keys, which a custom template may index.
+        public array $fieldLabels = [],
     ) {}
 }
