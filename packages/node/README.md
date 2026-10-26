@@ -56,8 +56,9 @@ The admin signs in through Better Auth (`@tbtop/cms/better-auth`, below):
 E2E signs in as the admin once (the `setup` project) and every spec reuses
 that session. The secrets have fixed defaults (`BETTER_AUTH_SECRET`,
 `CMS_PREVIEW_SECRET` override them), so the workbench is a demo, not a
-deployment. The first request migrates, so Better Auth's start-up check logs
-its tables as missing once.
+deployment. The first request migrates Better Auth's tables too, so the
+workbench turns off Better Auth's schema check (`advanced.database.validateSchema`),
+which runs when `betterAuth()` is built and would log them as missing.
 
 ## Host API
 
@@ -70,11 +71,16 @@ await migrateCms(db, { dialect: "sqlite" }); // fresh database only; or merge cm
 export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, placements: ["pages", "layout"] } });
 // placements: "pages" (every page type, the default), "layout", or page type / subtype keys
 // ("article", "news"): the page editor's Add block offers a kind only where it fits.
+// A subtype goes by its own key ("product", not "article/product"); a key that names
+// no registered type is never offered, and createCms warns `block.placement_unknown`.
 
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
+	// Lists of cards go in a repeater; its translatable cells are edited per locale:
+	// form: (s) => [s.repeater("items").fields([s.text("q").translatable(), s.text("icon")])]
 	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
+	schemaTypes: [productSchema], // extra JSON-LD types a page type's schemaTypes can name (see Page types)
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
@@ -171,6 +177,19 @@ if (result.type === "page" && result.props.page.type === "recipe") {
   type is not registered still renders, outside the union.
 - `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
   or `Cms` keeps `fields` as untyped JSON.
+
+A page type offers JSON-LD types by key (`schemaTypes`, the first is the
+default); a subtype without its own inherits its base's. A host adds a type
+with `createCms({ schemaTypes })`, for example a catalog item:
+
+```ts
+const productSchema: SchemaTypeDef = {
+	key: "Product",
+	build: (ctx) => [{ "@context": "https://schema.org", "@type": "Product", name: ctx.name, url: ctx.url,
+		offers: { "@type": "Offer", price: ctx.page.fields?.price, priceCurrency: "UAH" } }],
+};
+const productType = definePageType({ key: "product", base: "article", schemaTypes: ["Product"], schema, form });
+```
 
 `migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
@@ -291,7 +310,11 @@ Telegram bot token are host config, not settings.
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
 A server function answers on its own URL during client navigation, so build
-the page request from the route path (see `workbench/src/server/page.ts`).
+the page request from the route path (see `workbench/src/server/page.ts`):
+pass the path (`location.href` of the router, which has no origin) and
+resolve it against the caller's URL, never an absolute URL from the client.
+Keep `@tanstack/react-start/server` imports in server-only modules
+(`src/server/*`): a route component that imports it breaks the client bundle.
 
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
