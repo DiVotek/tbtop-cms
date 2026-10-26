@@ -1,4 +1,5 @@
-import type { ResolveContext } from "./blocks/context";
+import type { PageRefWithFields, ResolveContext } from "./blocks/context";
+import { resolvePageFields } from "./blocks/resolver";
 import type { BlockRegistry } from "./blocks/registry";
 import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
 import { AuditLog } from "./content/audit";
@@ -8,7 +9,7 @@ import { NotFoundLog } from "./content/notFoundLog";
 import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from "./content/link";
 import { firstText, type Page, pageFromRow, translationText } from "./content/page";
 import { Pages, whereLive } from "./content/pages";
-import { type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
+import { livePageRefs, type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { PageRevisions } from "./content/revisions";
@@ -167,7 +168,7 @@ export class Site {
 		return { page, url: page === null ? null : await this.pageUrl(page, locale) };
 	}
 
-	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}, targets?: LinkTargets): Promise<ResolveContext> {
+	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}, targets?: LinkTargets, nested = false): Promise<ResolveContext> {
 		const fallback = await this.languages.defaultLocale();
 		return {
 			locale,
@@ -177,11 +178,21 @@ export class Site {
 			mediaUrl: (ref) => this.mediaUrl(ref),
 			richtextHtml,
 			link: (value) => this.link(value, locale, targets),
-			pages: (value) => resolvePageRefs(this, value, locale),
+			pages: ((value: unknown, options?: { fields?: boolean }) =>
+				options?.fields === true ? this.pagesWithFields(value, locale, nested) : resolvePageRefs(this, value, locale)) as ResolveContext["pages"],
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
 		};
+	}
+
+	/** ctx.pages(value, { fields: true }): each live ref with its page's resolved fields, one level deep. */
+	private async pagesWithFields(value: unknown, locale: string, nested: boolean): Promise<PageRefWithFields[]> {
+		const out: PageRefWithFields[] = [];
+		for (const { ref, page } of await livePageRefs(this, value, locale)) {
+			out.push({ ...ref, fields: nested ? {} : await resolvePageFields(this, page, locale) });
+		}
+		return out;
 	}
 
 	/**

@@ -61,7 +61,19 @@ async function linkedIds(site: Site, content: unknown[], page: Page | null): Pro
 	return ids;
 }
 
-async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets): Promise<Record<string, unknown>> {
+/**
+ * A page's resolved custom fields, as its own page props carry them: what
+ * `ctx.pages(value, { fields: true })` adds to each ref. Resolved one level
+ * deep: inside, `fields: true` gives empty fields, so two pages that pick
+ * each other do not recurse.
+ */
+export async function resolvePageFields(site: Site, page: Page, locale: string): Promise<Record<string, unknown>> {
+	const locales = (await site.languages.all()).map((row) => row.locale);
+	const targets = await site.linkTargets(await linkedIds(site, [], page), locale);
+	return resolveFields(site, page, locale, locales, targets, true);
+}
+
+async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets, nested = false): Promise<Record<string, unknown>> {
 	const stored = page.fields ?? {};
 	const types = site.pageTypes.forPage(page);
 	let out: Record<string, unknown> = {};
@@ -69,7 +81,7 @@ async function resolveFields(site: Site, page: Page, locale: string, locales: st
 		try {
 			const later = new Set(types.slice(i + 1).flatMap((next) => fieldNames(next.form(new S()))));
 			const own = Object.fromEntries(Object.entries(stored).filter(([key]) => !later.has(key)));
-			const ctx = await site.resolveContext(locale, page, out, targets);
+			const ctx = await site.resolveContext(locale, page, out, targets, nested);
 			const input = flattenLocales(own, locale, ctx.fallbackLocale, locales, translatablePaths(type.form(new S())));
 			out = { ...out, ...(await type.resolveFields(input, ctx)) };
 		} catch (error) {

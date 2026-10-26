@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { definePageType, demoFixture, type Fixture, isFreshSite, pagesField, type SchemaTypeDef, seedFixtures } from "../src";
+import { cmsBlockImpls, cmsBlocks, definePageType, demoFixture, type Fixture, implementBlocks, isFreshSite, pagesField, type SchemaTypeDef, seedFixtures } from "../src";
 import { get, makeCms } from "./support";
 
 // Findings from the dogfood sites (Golfstrimfish, Lumen Studio) that need no new API.
@@ -71,5 +71,64 @@ describe("Dogfood: a host seeds step by step with real ids", () => {
 		expect(result.props.page.fields).toEqual({ items: [{ id: String(bream.id), name: "Bream steak", url: "/catalog/bream" }] });
 		expect(await isFreshSite(cms)).toBe(false);
 		expect(await seedFixtures(cms, demoFixture)).toEqual({});
+	});
+});
+
+describe("Dogfood: a block reads the fields of the pages it lists", () => {
+	const productType = definePageType({
+		key: "product",
+		base: "article",
+		schema: z.object({ price: z.number().nullable() }),
+		form: (s) => [s.number("price").label("Price")],
+	});
+	// A page type whose resolver lists its picks with their fields: two such pages picking each other must not recurse.
+	const pairType = definePageType({
+		key: "pair",
+		form: () => [pagesField("other").label("Other").of("pair")],
+		resolveFields: async (input, ctx) => ({ other: await ctx.pages(input.other, { fields: true }) }),
+	});
+	const grid = z.object({ products: z.array(z.object({ id: z.string(), name: z.string(), url: z.string(), price: z.number().nullable() })) });
+	const blocks = implementBlocks(
+		{ ...cmsBlocks, ProductGrid: { props: grid } },
+		{
+			...cmsBlockImpls,
+			ProductGrid: {
+				form: () => [pagesField("products").label("Products").of("article", "product")],
+				resolve: async (input, ctx) => ({
+					products: (await ctx.pages(input.products, { fields: true })).map(({ fields, ...ref }) => ({
+						...ref,
+						price: typeof fields.price === "number" ? fields.price : null,
+					})),
+				}),
+			},
+		},
+	);
+
+	test("fields: true adds each listed page's resolved fields; without it the ref stays { id, name, url }", async () => {
+		const { cms } = await makeCms(null, { pageTypes: [productType, pairType], blocks });
+		const pages = cms.site().pages;
+		const catalog = await pages.create({ type: "category", name: { en: "Catalog" }, status: "published" }, { slugs: { en: "catalog" } });
+		const bream = await pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { en: "Bream" }, status: "published", fields: { price: 120 } }, { slugs: { en: "bream" } });
+		const draft = await pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { en: "Carp" }, fields: { price: 90 } }, { slugs: { en: "carp" } });
+		await pages.update(catalog.id, { content: [{ id: "grid", kind: "ProductGrid", active: true, sort: 0, data: { products: [String(bream.id), String(draft.id)] } }] });
+
+		const result = await cms.loadPage(get("/catalog"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(JSON.stringify(result.props.render)).toContain(JSON.stringify({ products: [{ id: String(bream.id), name: "Bream", url: "/catalog/bream", price: 120 }] }));
+	});
+
+	test("pages that pick each other resolve one level deep", async () => {
+		const { cms } = await makeCms(null, { pageTypes: [productType, pairType], blocks });
+		const pages = cms.site().pages;
+		const a = await pages.create({ type: "pair", name: { en: "A" }, status: "published" }, { slugs: { en: "a" } });
+		const b = await pages.create({ type: "pair", name: { en: "B" }, status: "published", fields: { other: [String(a.id)] } }, { slugs: { en: "b" } });
+		await pages.update(a.id, { fields: { other: [String(b.id)] } });
+
+		const result = await cms.loadPage(get("/a"));
+		if (result.type !== "page") throw new Error(result.type);
+		// B's own pick of A comes back as a ref with empty fields: no third level.
+		expect(result.props.page.fields).toEqual({
+			other: [{ id: String(b.id), name: "B", url: "/b", fields: { other: [{ id: String(a.id), name: "A", url: "/a", fields: {} }] } }],
+		});
 	});
 });
