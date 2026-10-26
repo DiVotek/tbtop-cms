@@ -79,8 +79,17 @@ export function defineSite<const D extends SiteDef>(def: D): Site<D> {
 
 export { mapFields };
 
-/** `@tbtop/cms/blocks` in V5 terms: the built-in Hero is fields too. */
+/**
+ * `@tbtop/cms/blocks` in V5 terms: the built-in Hero is fields too. Props ARE
+ * the fields here, so the CTA is one `f.link` (`{ href, type, label }`)
+ * instead of kit/hero.ts's ctaLabel/ctaHref inputs reshaped by `resolve`.
+ */
 export const hero = block(
-	{ title: f.text().label("Title").translatable().required(), subtitle: f.textarea().label("Subtitle").translatable(), image: f.image().label("Image") },
+	{
+		title: f.text().label("Title").translatable().required(),
+		subtitle: f.textarea().label("Subtitle").translatable(),
+		image: f.image().label("Image"),
+		cta: f.link().label("CTA"),
+	},
 	{ label: "Hero", category: "content", description: "Full-width intro section." },
 );

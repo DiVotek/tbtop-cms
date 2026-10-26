@@ -4,7 +4,11 @@
 set -u
 cd "$(dirname "$0")/../../.."
 status=0
+current=""
+# Put the source back even on Ctrl-C or an error.
+trap '[ -n "$current" ] && [ -f "$current.bak" ] && mv "$current.bak" "$current"' EXIT
 for file in design/api/v1-compose/site.ts design/api/v2-config/node.ts design/api/v3-plugins/node.ts design/api/v4-builder/node.ts design/api/v5-zero/node.ts; do
+	current="$file"
 	cp "$file" "$file.bak"
 	sed -i 's/props.page.fields.price satisfies number | null/props.page.fields.price satisfies string/' "$file"
 	if bunx tsc --noEmit -p design/api 2>&1 | grep -q "$file.*TS1360"; then
@@ -14,5 +18,6 @@ for file in design/api/v1-compose/site.ts design/api/v2-config/node.ts design/ap
 		status=1
 	fi
 	mv "$file.bak" "$file"
+	current=""
 done
 exit $status

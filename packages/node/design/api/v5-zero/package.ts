@@ -8,7 +8,7 @@ import { createCms as createFromBuilder } from "../v4-builder/package";
 import type { Site } from "./define";
 
 type Options<S extends Site> = {
-	/** The host's page renderer (the framework's job); without it, `fetch` answers null for a page and the host's router takes it. */
+	/** The host's page renderer (the framework's job); without it, `fetch` answers 404 for a page, and a host with its own router uses `handle`, which answers null there. */
 	render?: (props: PageProps<S["pageTypes"]>) => string | Response;
 	/** Seeded once, on an empty site. */
 	seed?: Fixture;
