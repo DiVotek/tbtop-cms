@@ -16,7 +16,11 @@ export function fakeD1(): D1Database {
 		if (/^\s*(begin|commit|rollback)\b/i.test(sql)) {
 			throw new Error("D1: use batch(), not transactions");
 		}
-		const bound = params.map((value) => (typeof value === "boolean" ? Number(value) : value)) as never[];
+		// Stricter than D1: a boolean or undefined that reaches the binding fails the proof.
+		if (params.some((value) => typeof value === "boolean" || value === undefined)) {
+			throw new Error("fakeD1: boolean/undefined binding; convert before D1");
+		}
+		const bound = params as never[];
 		const query = sqlite.query(sql);
 		if (query.columnNames.length > 0) {
 			const results = query.all(...bound) as Record<string, unknown>[];

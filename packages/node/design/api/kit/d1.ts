@@ -20,7 +20,7 @@ import type { D1Database } from "../shared/workers";
 class D1Connection implements DatabaseConnection {
 	constructor(private readonly d1: D1Database) {}
 	async executeQuery<R>(query: CompiledQuery): Promise<QueryResult<R>> {
-		const result = await this.d1.prepare(query.sql).bind(...query.parameters).all();
+		const result = await this.d1.prepare(query.sql).bind(...query.parameters.map(toD1)).all();
 		const { changes, last_row_id } = result.meta;
 		return {
 			rows: result.results as R[],
@@ -66,3 +66,11 @@ export class D1Dialect implements Dialect {
 }
 
 export const d1Kysely = <DB = unknown>(binding: D1Database) => new Kysely<DB>({ dialect: new D1Dialect(binding) });
+
+/** Booleans as 0/1 here, not left to D1's own coercion; `undefined` is a bug D1 would refuse. */
+function toD1(value: unknown): unknown {
+	if (value === undefined) {
+		throw new TypeError("D1: an undefined binding");
+	}
+	return typeof value === "boolean" ? Number(value) : value;
+}
