@@ -79,7 +79,9 @@ const cms = createCms({
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
-	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
+	auth: cmsAuth(betterAuth), // section access, the panel session, sign-in and Users pages (see Users and sign-in)
+	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
+	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
@@ -97,14 +99,46 @@ const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the 
 
 // Admin
 createAdmin({
-	...cms.admin.panel, // brand, topbar-sidebar, compact, nav groups, chrome (bell, inbox, view site): PHP's CmsPanel
-	pages: [...cms.admin.pages, ...mine],
-	driver: kyselyDriver(db),
-	hostRules: cms.admin.hostRules, // the config's hostRules + link_shape, page_ref
-	context: cms.admin.context, // content locales = admin-active languages
+	...cms.admin.options({ pages: mine }), // see Admin panel
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
+	rootView: rootView({ head }),
 });
 ```
+
+### Admin panel
+
+`cms.admin.options()` is createAdmin's config in one spread, read from the
+CMS config: the panel's look (`cms.admin.panel`: brand, topbar-sidebar,
+compact, nav groups, chrome with bell, inbox and view site, as PHP's
+CmsPanel), `prefix` (`adminPrefix`), `pages`, `hostRules` (the config's plus
+`link_shape` and `page_ref`), `context` (content locales from the
+admin-active languages), the auth adapter's `session` and `loginPath`,
+`notifications.store` (`notifications.bell.store`) and
+`driver: kyselyDriver(config.db)`. A key after the spread overrides it.
+
+`pages` is the host's pages, added after the CMS's and the auth adapter's,
+or a function that gets those and returns the panel's:
+
+```ts
+createAdmin({ ...cms.admin.options({ pages: [reportsPage] }), rootView });
+createAdmin({ ...cms.admin.options({ pages: (cms) => cms.filter((page) => page.path !== "audit") }), rootView });
+```
+
+The CMS pages' `path`s are public contract, under the prefix: `dashboard`,
+`pages`, `pages/$page/edit`, `form-submissions`, `form-submissions/$submission`,
+`redirects`, `not-found`, `seo-report`, `layout`, `layout/$slot`,
+`shared-blocks`, `shared-blocks/$block/edit`, `blocks`, `languages`,
+`languages/new`, `languages/$language/edit`, `settings/site`, `settings/seo`,
+`notification-settings`, `site-health`, `audit`, `audit/$activity` and
+`link/page-search`; `@tbtop/cms/better-auth` adds `login`, `users`,
+`users/new` and `users/$user/edit`. CMS pages link to each other (the
+dashboard, the bell and inbox, the page editor's shared blocks, the link
+field's page picker), so a filtered-out page another one links to leaves a
+dead link or a broken field. To hide a section from some users, return false
+from `authorize` instead: the nav drops it and its links answer 403.
+
+`cms.admin.pages`, `panel`, `hostRules` and `context` stay for a host that
+wires createAdmin itself.
 
 ### Page types
 
@@ -179,13 +213,15 @@ the PHP names: `tbtop-cms.pages` (pages and the page editor),
 editor), `tbtop-cms.languages`, `tbtop-cms.settings` (site, SEO,
 notifications) and `tbtop-cms.audit` (the audit log). A false hides the section from the nav and answers 403 to
 its pages and to every form, action, table and upload on them. Without
-`authorize`, every section is open to any panel user, as before.
+`authorize`, `auth.authorize` decides; without both, every section is open
+to any panel user.
 `tbtop-cms.users` gates the Users page an auth adapter adds.
 
 ### Users and sign-in (`@tbtop/cms/better-auth`)
 
 The core asks the host for a panel user (createAdmin's `session` or `user`)
-and `authorize`. `@tbtop/cms/better-auth` answers both from a Better Auth
+and `authorize`. `@tbtop/cms/better-auth` answers both, passed once as
+`createCms({ auth })`, from a Better Auth
 instance with email and password and the admin plugin (`better-auth` is an
 optional peer dependency):
 
@@ -200,16 +236,9 @@ export const auth = betterAuth({
 	user: { modelName: "tbtop_users" }, // and session, account, verification
 	plugins: [admin({ ac: cmsAccess, roles: cmsRoles })],
 });
-const panelAuth = cmsAuth(auth);
-const cms = createCms({ db, blocks, authorize: panelAuth.authorize });
+const cms = createCms({ db, blocks, auth: cmsAuth(auth) });
 await migrateCms(db, { dialect: "sqlite", userKey: "string" }); // Better Auth's ids are strings
-const admin = createAdmin({
-	prefix: "/admin",
-	pages: [...cms.admin.pages, ...panelAuth.pages(cms)],
-	session: panelAuth.session,
-	loginPath: panelAuth.loginPath(cms),
-	// driver, context, …
-});
+const admin = createAdmin({ ...cms.admin.options(), rootView }); // session, loginPath, the sign-in and Users pages come with it
 ```
 
 - `session` reads Better Auth's session cookie once per request; the panel's
@@ -297,8 +326,9 @@ Promo: {
   drop out.
 - On save the admin checks `link_shape` (type, target format, an existing
   page, label locales and length) and `page_ref` (each id exists) as host
-  rules: pass `cms.admin.hostRules` to `createAdmin({ hostRules })`, or a
-  save with these fields fails on an unknown rule.
+  rules: `cms.admin.options()` passes them (`cms.admin.hostRules` when
+  wiring createAdmin by hand), or a save with these fields fails on an
+  unknown rule.
 - The pages field is a plain async multi-select on the wire, so the stock
   admin client renders it. The link field is the custom `link` kind: the
   admin bundle imports its client from `@tbtop/cms/admin-client` (below),

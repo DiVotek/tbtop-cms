@@ -18,11 +18,12 @@ export {
 export type { StandardSchemaV1 } from "./forms/standardSchema";
 export { assembleSpec, BlockResolutionError, type RenderSpec, type ResolvedBlock } from "./blocks/resolver";
 export type { CmsAdmin } from "./admin";
+export type { CmsAdminConfig, CmsAdminOptions, CmsAdminPages } from "./admin/options";
 export { CMS_ABILITIES, type CmsAbility } from "./admin/abilities";
 export { type Cms, type CmsTasks, createCms } from "./cms";
 export type { HealthResult, HealthStatus } from "./health";
 export { type CmsCacheStore, type KvNamespaceLike, kvCache, memoryCache } from "./support/cache";
-export type { CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
+export type { CmsAdminAuth, CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
 export type { Language } from "./content/languages";
 export { ensureDefaultLanguage, LanguageError } from "./content/languages";
 export { isLive, type Page, type PageStatus, type Translations } from "./content/page";

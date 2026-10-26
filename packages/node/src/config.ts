@@ -1,13 +1,22 @@
-import type { HostRule, NotificationStore } from "@tbtop/admin";
+import type { HostRule, NotificationStore, PageDef, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
+import type { Cms } from "./cms";
 import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
 import type { SubmissionEvent } from "./forms/submit";
 import type { Channel, DeliveryEvent, MailTransport, NotificationType } from "./notifications/types";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
 import type { CmsCacheStore } from "./support/cache";
+
+/** What the CMS needs from an auth adapter; `cmsAuth()` returns one. */
+export type CmsAdminAuth = {
+	authorize: (user: unknown, ability: CmsAbility) => boolean | Promise<boolean>;
+	session: SessionResolver;
+	loginPath: (cms: Cms) => string;
+	pages: (cms: Cms) => PageDef[];
+};
 
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
 export type MediaDetails = { url: string; alt?: string | null; mime?: string | null; width?: number | null; height?: number | null };
@@ -60,9 +69,16 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	 * Section access in the admin (`tbtop-cms.roles` + the host's gates): the
 	 * panel user and a section ability (`tbtop-cms.pages`, see CMS_ABILITIES).
 	 * False hides the section from the nav and answers 403 to its pages and
-	 * actions. Without it every section is open to any admin user.
+	 * actions. Without it `auth.authorize` decides, and without both every
+	 * section is open to any admin user. For hosts without an auth adapter.
 	 */
 	authorize?: (user: unknown, ability: CmsAbility) => boolean | Promise<boolean>;
+	/**
+	 * The panel's auth adapter, given once: `cmsAuth(betterAuth)` from
+	 * `@tbtop/cms/better-auth`. Section access, `cms.admin.options()`'s session,
+	 * login path and sign-in and Users pages all come from it.
+	 */
+	auth?: CmsAdminAuth;
 	/** Extra frontend strings per locale, over the package's own. */
 	strings?: Record<string, Record<string, string>>;
 	debug?: boolean;
