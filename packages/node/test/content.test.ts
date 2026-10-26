@@ -74,6 +74,13 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi", note: "kept", surface: false });
 	});
 
+	test("a key the resolver set ships as resolved, so a transform does not run twice", async () => {
+		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string().transform((text) => `«${text}»`) }) } });
+		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
+		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" } } }], blocks, true);
+		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
+	});
+
 	test("the default resolver maps fields by kind: richtext to HTML, numbers, booleans, repeater rows", async () => {
 		const catalog = defineBlocks({
 			Stats: {

@@ -694,8 +694,8 @@ request (no deploy step) sees Better Auth log a schema mismatch once, as
   field kind), resolved props validated against the catalog's zod schema
   (a mismatch is dropped with a warning; `strictBlocks: true` throws
   `BlockResolutionError` instead, in any environment). Valid props ship as
-  parsed, so a `.default()` fills its key; keep `.transform()` out of a
-  catalog schema, as the browser validates the shipped props again.
+  resolved, and a `.default()` fills a key the resolver left out; a
+  `.transform()` runs only in the browser, which validates the props again.
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
