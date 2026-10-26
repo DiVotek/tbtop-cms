@@ -422,9 +422,11 @@ Promo: {
   drop out.
 - A host `resolve()` that needs more of the picked pages (a product's price
   on a catalog card) asks `ctx.pages(input.products, { fields: true })`: the
-  same refs, each with `fields`, that page's resolved custom fields as its
-  own props carry them (`Record<string, unknown>`: the picks may be of any
-  type, so narrow them). It is a convenience: one fields resolve per page,
+  same refs, each with the page's own columns as `site.pageViews` gives them
+  (`summary`, `image`, `heading`, `body`…) and `fields`, its resolved custom
+  fields as its own props carry them (`Record<string, unknown>`: the picks
+  may be of any type, so narrow them). Any other request-scoped read
+  (settings, `pageViews`) goes through `ctx.site`. It is a convenience: one fields resolve per page,
   one level deep (inside those resolvers `fields: true` gives `{}`). For a
   long list, or columns the props never carry, query the database yourself
   on top of `ctx.pages()`, which has already dropped drafts and built the URLs:

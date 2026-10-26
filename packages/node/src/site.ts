@@ -1,6 +1,6 @@
 import type { PageRefWithFields, ResolveContext } from "./blocks/context";
 import { resolvePageFields } from "./blocks/resolver";
-import { type PageView, pageViews } from "./frontend/pageView";
+import { type PageView, pageColumns, pageViews } from "./frontend/pageView";
 import type { BlockRegistry } from "./blocks/registry";
 import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
 import { AuditLog } from "./content/audit";
@@ -202,7 +202,11 @@ export class Site {
 	private async pagesWithFields(value: unknown, locale: string, nested: boolean): Promise<PageRefWithFields[]> {
 		const live = await livePageRefs(this, value, locale);
 		const fields = nested ? live.map(() => ({})) : await resolvePageFields(this, live.map(({ page }) => page), locale);
-		return live.map(({ ref }, i) => ({ ...ref, fields: fields[i] ?? {} }));
+		const fallback = await this.languages.defaultLocale();
+		return live.map(({ ref, page }, i) => {
+			const { id: _id, name: _name, ...columns } = pageColumns(this, page, locale, fallback);
+			return { ...ref, ...columns, fields: fields[i] ?? {} };
+		});
 	}
 
 	/**
