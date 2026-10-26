@@ -101,7 +101,9 @@ function withExtensions(extra: readonly PageTypeDef[]): PageTypeDef[] {
 		if (rules.length > 0) {
 			throw new Error(`Page type [${def.key}] is built in: extend its fields, label, schemaTypes or template, not ${rules.join(", ")}.`);
 		}
-		builtIns[index] = { ...builtIns[index], ...def };
+		// Only the keys the host set: an explicit undefined must not erase a built-in value.
+		const set = Object.fromEntries(Object.entries(def).filter(([, value]) => value !== undefined));
+		builtIns[index] = { ...builtIns[index], ...set } as PageTypeDef;
 		extended.add(def.key);
 	}
 	return [...builtIns, ...own];

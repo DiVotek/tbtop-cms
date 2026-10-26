@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { S } from "@tbtop/admin";
 import { z } from "zod";
 import { cmsBlockImpls, cmsBlocks, defineBlocks, definePageType, implementBlocks } from "../src";
 import { get, makeCms } from "./support";
@@ -203,6 +204,12 @@ describe("extending a built-in page type", () => {
 		const result = await cms.loadPage(get("/"));
 		if (result.type !== "page") throw new Error(result.type);
 		expect(result.props.page.fields).toEqual({ tagline: "We build" });
+	});
+
+	test("a key the host def leaves undefined keeps the built-in's value", async () => {
+		const category = { key: "category", allowedChildren: undefined, schemaTypes: undefined, form: (s: S) => [s.text("icon")] };
+		const { cms } = await makeCms(fixture, { pageTypes: [category] });
+		expect(cms.pageTypes.get("category")).toMatchObject({ allowedChildren: ["category", "article"], schemaTypes: ["CollectionPage"] });
 	});
 
 	test("its tree rules stay the package's; a second extension of the same key is refused", async () => {
