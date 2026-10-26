@@ -230,5 +230,16 @@ describe("handle", () => {
 		expect(await title()).toContain("October 1, 2026");
 		expect(await title("Pacific/Pago_Pago")).toContain("September 30, 2026");
 	});
+
+	test("{date} for a locale Intl rejects falls back to the ISO day, still in the site's timezone", async () => {
+		const fixture = {
+			languages: [{ locale: "en_US", name: "English", default: true }],
+			pages: [{ key: "post", type: "page", name: { en_US: "Post" }, publishedAt: "2026-10-01T09:00:00Z" }],
+		};
+		const { cms } = await makeCms(fixture, { timezone: "Pacific/Pago_Pago" });
+		await cms.site().settings.set("seo.type_templates.page.title", { en_US: "{title} · {date}" });
+		const result = await cms.loadPage(get("/post"));
+		expect(result.type === "page" ? result.props.seo.title : result.type).toContain("2026-09-30");
+	});
 });
 

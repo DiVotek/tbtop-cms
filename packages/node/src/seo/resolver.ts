@@ -291,7 +291,8 @@ function longDate(date: Date, locale: string, timeZone: string): string {
 	try {
 		return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric", timeZone }).format(date);
 	} catch {
-		return date.toISOString().slice(0, 10);
+		// A locale tag Intl rejects: the ISO day (en-CA is YYYY-MM-DD), still in the site's zone.
+		return new Intl.DateTimeFormat("en-CA", { timeZone }).format(date);
 	}
 }
 

@@ -81,6 +81,14 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
 	});
 
+	test("a default around a transform ships the raw default, so the browser transforms it once", async () => {
+		// zod 4: .transform(f).default(d) returns d without running f.
+		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string(), tone: z.string().transform((tone) => `tone-${tone}`).default("calm") }) } });
+		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
+		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" } } }], blocks, true);
+		expect(spec.elements.q?.props).toEqual({ text: "Hi", tone: "calm" });
+	});
+
 	test("a whole-object transform ships nothing it computed", async () => {
 		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string() }).transform((props) => ({ ...props, shout: props.text.toUpperCase() })) } });
 		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
