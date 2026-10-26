@@ -515,8 +515,26 @@ it('placeholders seo_title/seo_description/og_title/og_description with the comp
     $seoTitle = findFieldByName($tabs[1]['body'], 'seo_title');
     $seoDescription = findFieldByName($tabs[1]['body'], 'seo_description');
 
-    expect($seoTitle['options']['placeholder'] ?? null)->toBe('About Page — Acme')
-        ->and($seoDescription['options']['placeholder'] ?? null)->toBe('A short summary.');
+    expect($seoTitle['options']['placeholder'] ?? null)->toBe(['en' => 'About Page — Acme'])
+        ->and($seoDescription['options']['placeholder'] ?? null)->toBe(['en' => 'A short summary.']);
+});
+
+it('placeholders each locale tab of the SEO title with that locale\'s computed value', function (): void {
+    Language::factory()->create(['locale' => 'uk']);
+    Language::factory()->create(['locale' => 'ru']);
+    app(Settings::class)->set('seo.title_suffix', '— Acme');
+    $page = Page::create([
+        'type' => 'page',
+        'status' => PageStatus::Published,
+        'name' => ['uk' => 'Про нас', 'ru' => 'О нас'],
+    ]);
+
+    $tabs = PageEditHelpers::formTabs($page->id);
+    $placeholder = findFieldByName($tabs[1]['body'], 'seo_title')['options']['placeholder'] ?? null;
+
+    expect($placeholder)->toBeArray()
+        ->and($placeholder['uk'] ?? null)->toBe('Про нас — Acme')
+        ->and($placeholder['ru'] ?? null)->toBe('О нас — Acme');
 });
 
 it('rejects an invalid seo_canonical URL for the default locale', function (): void {
