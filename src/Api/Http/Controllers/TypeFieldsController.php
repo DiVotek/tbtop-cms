@@ -16,7 +16,8 @@ final class TypeFieldsController
     public function __invoke(Request $request, string $type, PageTypeRegistry $registry): JsonResponse
     {
         abort_unless($registry->has($type), 404, __('tbtop-cms::api.errors.type_unknown'));
-        abort_unless(ApiAccess::scope($request)->allowsType($registry->get($type)->base()), 403, __('tbtop-cms::api.errors.out_of_scope'));
+        $scope = ApiAccess::scope($request);
+        abort_unless($scope->reachesAnything() && $scope->allowsType($registry->get($type)->base()), 403, __('tbtop-cms::api.errors.out_of_scope'));
 
         return response()->json(PageFields::forTypeKey($type)->describe());
     }

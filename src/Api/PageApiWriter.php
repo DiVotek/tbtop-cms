@@ -134,7 +134,10 @@ final readonly class PageApiWriter
             $locale = (string) $locale;
             foreach ((array) $texts as $key => $value) {
                 if ($key === 'slug') {
-                    $slugs[$locale] = (string) $value;
+                    // A null or blank slug keeps the stored one (PageSlugWriter reads '' as no override).
+                    if (is_string($value) && trim($value) !== '') {
+                        $slugs[$locale] = $value;
+                    }
                 } elseif ($key === 'seo') {
                     $seo = self::overlaySeo($seo, $locale, (array) $value);
                 } elseif ($key === 'body') {
