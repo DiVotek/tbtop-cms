@@ -85,6 +85,9 @@ it('reaches only the token\'s categories and their articles', function (): void 
     $this->withToken($token)
         ->postJson('/api/cms/v1/pages', ['parent_id' => $other->id, 'translations' => ['en' => ['name' => 'Elsewhere']]])
         ->assertForbidden();
+    $this->withToken($token)
+        ->postJson('/api/cms/v1/pages', ['parent_id' => 999999, 'translations' => ['en' => ['name' => 'Nowhere']]])
+        ->assertForbidden();
     expect(Page::query()->where('parent_id', $other->id)->exists())->toBeFalse();
 
     $created = $this->withToken($token)

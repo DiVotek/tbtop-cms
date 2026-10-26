@@ -63,9 +63,16 @@ final class StorePageRequest extends FormRequest
         return CommonFields::CREATE_KEYS;
     }
 
-    /** The hierarchy rule the save would enforce (PageHierarchy), answered as a field error before anything is written. */
+    /**
+     * The hierarchy rule the save would enforce (PageHierarchy), answered as a
+     * field error before anything is written. A parent outside the token's
+     * reach is a 403 before any lookup, so a token cannot tell a missing id
+     * from someone else's page.
+     */
     private function parentTakesChild(string $attribute, mixed $value, Closure $fail): void
     {
+        abort_unless(in_array($this->parentId(), ApiAccess::scope($this)->parentIds, true), 403, __('tbtop-cms::api.errors.out_of_scope'));
+
         $parent = Page::query()->find($this->parentId());
         if ($parent === null) {
             $fail(__('tbtop-cms::pages.validation.parent_missing', ['id' => (string) $value]));
