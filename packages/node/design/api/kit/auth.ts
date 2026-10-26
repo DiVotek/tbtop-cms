@@ -50,11 +50,15 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 	const extra = options.betterAuth ?? {};
 	const secret = options.secret ?? env("BETTER_AUTH_SECRET");
 	const baseURL = options.baseURL ?? env("BETTER_AUTH_URL");
+	if (secret === undefined || secret === "") {
+		// Fail closed: never fall back to a default secret that signs forgeable sessions.
+		throw new Error("tbtop/cms: set BETTER_AUTH_SECRET (or pass `secret`) before enabling auth.");
+	}
 	const config = {
 		...extra,
 		database: options.database ?? { db, type: dialectOf(db) },
 		basePath,
-		...(secret === undefined ? {} : { secret }),
+		secret,
 		...(baseURL === undefined ? {} : { baseURL }),
 		// Admin users come from ensureUser / the admin plugin; public sign-up is opt-in.
 		emailAndPassword: { enabled: true, disableSignUp: true, ...extra.emailAndPassword },

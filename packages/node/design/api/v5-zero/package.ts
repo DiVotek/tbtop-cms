@@ -35,10 +35,7 @@ function app<S extends Site>(site: S, runtime: Runtime, options: Options<S>) {
 		const routed = await cms.route(request);
 		if (routed !== null) return routed;
 		if (render === undefined) return new Response(null, { status: 404 });
-		return renderPage(cms, request, (props) => {
-			const out = render(props as PageProps<S["pageTypes"]>);
-			return typeof out === "string" ? out : "";
-		});
+		return renderPage(cms, request, (props) => render(props as PageProps<S["pageTypes"]>));
 	};
 	return { cms, boot, fetch };
 }

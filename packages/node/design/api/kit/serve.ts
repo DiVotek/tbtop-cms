@@ -35,11 +35,11 @@ export async function migrateAll(db: Kysely<unknown>, auth: DefaultAuth | null):
 	await auth?.migrate();
 }
 
-/** A page request to a Response with the host's renderer: redirect, 404 and page as the package answers them. */
+/** A page request to a Response with the host's renderer: redirect, 404 and page as the package answers them; a Response from the renderer passes through. */
 export async function renderPage<P>(
 	cms: { loadPage(request: Request): Promise<import("../../../src").LoadResult<P>> },
 	request: Request,
-	render: (props: P) => string,
+	render: (props: P) => string | Response,
 ): Promise<Response> {
 	const result = await cms.loadPage(request);
 	if (result.type === "redirect") {
@@ -48,7 +48,11 @@ export async function renderPage<P>(
 	if (result.type === "notFound") {
 		return new Response("Not found", { status: 404 });
 	}
-	return new Response(render(result.props), { headers: { "content-type": "text/html; charset=utf-8", ...result.headers } });
+	const out = render(result.props);
+	if (out instanceof Response) {
+		return out;
+	}
+	return new Response(out, { headers: { "content-type": "text/html; charset=utf-8", ...result.headers } });
 }
 
 function memoryFallback(): Record<string, Disk> {
