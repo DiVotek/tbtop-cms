@@ -148,6 +148,17 @@ return [
                 'both_missing' => 'No owner account and no active default frontend language exist. Run php artisan cms:install and php artisan cms:admin:create to set up both.',
             ],
         ],
+        'pages_api' => [
+            'label' => 'Pages API',
+            'off' => 'The pages API is off (tbtop-cms.api.enabled).',
+            'ok' => 'The pages API is on under /api/cms/v1.',
+            'no_sanctum' => 'The pages API is enabled but laravel/sanctum is not installed, so its routes are not registered.',
+            'no_tokens' => 'The pages API is enabled but :model cannot hold API tokens.',
+            'hints' => [
+                'no_sanctum' => 'Run composer require laravel/sanctum, publish and run its migration (php artisan vendor:publish --tag=sanctum-migrations && php artisan migrate), and add Laravel\\Sanctum\\HasApiTokens to the user model.',
+                'no_tokens' => 'Add the Laravel\\Sanctum\\HasApiTokens trait to :model.',
+            ],
+        ],
         'session_driver' => [
             'label' => 'Session driver',
             'ok' => 'The session driver is ":driver".',
