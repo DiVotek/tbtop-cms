@@ -44,7 +44,7 @@ export function betterAuthPlugin(options: Omit<DefaultAuthOptions, "secret" | "b
 	});
 }
 
-/** Collects every plugin's contributions into the core config; a duplicate block kind or page type throws, naming both plugins. */
+/** Collects every plugin's contributions into the core config; a duplicate block kind, page type or runtime key (cache, disk, secret…) throws, naming both plugins. */
 export function createCms<const P extends readonly AnyPlugin[]>(options: { db: Kysely<unknown>; plugins: P }) {
 	const { db, plugins } = options;
 	const owner = new Map<string, string>();
@@ -55,7 +55,13 @@ export function createCms<const P extends readonly AnyPlugin[]>(options: { db: K
 		}
 		owner.set(`${what}:${key}`, plugin);
 	};
-	const runtime: Runtime = Object.assign({}, ...plugins.map((p) => p.runtime ?? {}));
+	const runtime: Runtime = {};
+	for (const plugin of plugins) {
+		for (const [key, value] of Object.entries(plugin.runtime ?? {})) {
+			claim("Runtime", key, plugin.name);
+			Object.assign(runtime, { [key]: value });
+		}
+	}
 	const authPlugins = plugins.filter((p) => p.auth !== undefined);
 	if (authPlugins.length > 1) {
 		throw new Error(`Only one auth plugin: ${authPlugins.map((p) => p.name).join(", ")}.`);

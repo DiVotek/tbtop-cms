@@ -77,7 +77,9 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 			if (found !== undefined) {
 				return found.id;
 			}
-			// Server-side, no headers: Better Auth's createUser skips the admin check without a request.
+			// Server-side, no headers: Better Auth's createUser skips the admin check without a
+			// request (the proofs log in as a user made this way). So this is boot/CLI only:
+			// never pass request input to it, it can mint an admin.
 			const createUser = instance.api.createUser as unknown as (input: { body: Record<string, unknown> }) => Promise<{ user: { id: string } }>;
 			const made = await createUser({ body: { email, password, name: name ?? email.split("@")[0] ?? email, role } });
 			return made.user.id;

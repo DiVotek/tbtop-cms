@@ -11,7 +11,10 @@ export type WorkerApp = {
  * The Workers module shape `{ fetch, scheduled }` around an app built from
  * `env` once per isolate. Bindings exist only inside a handler, so the app
  * cannot be built at module scope as on Node; the first request (or cron
- * tick) awaits the boot, the rest reuse it.
+ * tick) awaits the boot, the rest reuse it. Cached per `env` object: workerd
+ * hands one isolate the same `env` on every call, so that is once per
+ * isolate; a runtime that passes a fresh `env` re-runs the boot, which is
+ * idempotent (migrations, seed on an empty site, ensure) but slower.
  */
 export function workerEntry<E extends object>(make: (env: E) => WorkerApp) {
 	const apps = new WeakMap<E, { app: WorkerApp; ready: Promise<void> }>();
