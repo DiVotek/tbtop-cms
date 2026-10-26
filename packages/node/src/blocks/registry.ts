@@ -114,7 +114,12 @@ function blockResolve(kind: string, impl: BlockImpl): BlockKind["resolve"] {
 	}
 	return async (input, ctx) => {
 		const resolved = await resolveForm(impl.form(new S()), input, ctx);
-		return map === undefined ? resolved : { ...resolved, ...(await map(resolved, input, ctx)) };
+		if (map === undefined) {
+			return resolved;
+		}
+		// A key map leaves undefined keeps the form's value.
+		const added = Object.entries(await map(resolved, input, ctx)).filter(([, value]) => value !== undefined);
+		return { ...resolved, ...Object.fromEntries(added) };
 	};
 }
 

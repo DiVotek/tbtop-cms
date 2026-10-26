@@ -114,6 +114,11 @@ describe("blocks", () => {
 		});
 		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hello" } } }], blocks, true);
 		expect(spec.elements.q?.props).toEqual({ text: "Hello", length: 5 });
+		// A key map leaves undefined keeps the form's value.
+		const keep = implementBlocks(catalog, {
+			Quote: { form: (s) => [s.text("text").translatable()], map: () => ({ text: undefined, length: 0 }) },
+		});
+		expect((await render([{ id: "q", kind: "Quote", data: { text: { en: "Hello" } } }], keep, true)).elements.q?.props).toEqual({ text: "Hello", length: 0 });
 		implementBlocks(catalog, {
 			// @ts-expect-error map returns the catalog's props: `length` is a number.
 			Quote: { form: () => [], map: () => ({ length: "5" }) },
