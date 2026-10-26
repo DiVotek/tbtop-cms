@@ -207,7 +207,8 @@ const productType = definePageType({ key: "product", base: "article", schemaType
 
 A def with a built-in key (`page`, `category`, `article`) extends that type
 instead of adding one: its `form`, `schema`, `resolveFields`, `template`,
-`label` and `schemaTypes` apply, and the tree rules stay the package's
+`label` and `schemaTypes` replace the built-in's (list the built-in schema
+types too to keep them pickable), and the tree rules stay the package's
 (setting `allowedChildren`, `requiresParent`, `maxDepth` or `base` throws).
 `page.fields` is typed from its schema as for any other type.
 

@@ -98,9 +98,16 @@ export function parseDate(value: unknown): Date | null {
 	return Number.isNaN(date.getTime()) ? null : date;
 }
 
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
 /** The `Y-m-d` day of a moment in an IANA zone, from formatToParts: no locale's date pattern is assumed. */
 export function isoDay(date: Date, timeZone: string): string {
-	const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+	let format = dayFormats.get(timeZone);
+	if (format === undefined) {
+		format = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+		dayFormats.set(timeZone, format);
+	}
+	const parts = format.formatToParts(date);
 	const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
 	return `${part("year")}-${part("month")}-${part("day")}`;
 }
