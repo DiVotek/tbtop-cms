@@ -71,8 +71,6 @@ return [
     'fields' => [
         'name' => 'Name',
         'name_hint' => 'Short name for the admin lists and tree; the site uses it as the breadcrumb and link label.',
-        'title' => 'Title',
-        'title_hint' => 'Browser-tab and SEO title — falls back to Name when left empty.',
         'slug' => 'Slug',
         'slug_edit_hint' => 'Changing the slug changes the page URL; an automatic redirect is created from the old address.',
         'heading' => 'Heading',
