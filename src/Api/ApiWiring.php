@@ -63,9 +63,17 @@ final class ApiWiring
     {
         $read = CheckAbilities::class . ':' . TokenScope::READ;
         $write = CheckAbilities::class . ':' . TokenScope::WRITE;
+        $throttle = (string) config('tbtop-cms.api.throttle', '60,1');
 
         Route::prefix(self::PREFIX)
-            ->middleware([AcceptsJson::class, SubstituteBindings::class, 'auth:' . ApiAccess::GUARD, ActAsPanelUser::class])
+            ->middleware([
+                AcceptsJson::class,
+                SubstituteBindings::class,
+                'auth:' . ApiAccess::GUARD,
+                ActAsPanelUser::class,
+                // After auth, so the limit is counted per token user, not per IP.
+                ...($throttle === '' ? [] : ['throttle:' . $throttle]),
+            ])
             ->name('tbtop-cms.api.')
             ->group(static function () use ($read, $write): void {
                 Route::get('pages', [PagesController::class, 'index'])->middleware($read)->name('pages.index');

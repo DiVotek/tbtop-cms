@@ -203,6 +203,9 @@ return [
         // `php artisan cms:doctor` names what is missing. Tokens are issued with
         // `php artisan cms:api-token`. Read with an inline default.
         'enabled' => (bool) env('TBTOP_CMS_API', false),
+        // Rate limit on every API route (`max,minutes`, Laravel's `throttle`),
+        // counted per token user. An empty string turns it off.
+        'throttle' => '60,1',
     ],
     // Who answers the tbtop-cms.* section abilities: false leaves every
     // section open to anyone with admin access; true hands them to the host,

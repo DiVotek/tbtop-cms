@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
+use Tbtop\Cms\Api\ApiWiring;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -107,4 +108,16 @@ it('refuses to publish a page missing its name in a locale the site shows', func
         ->assertJsonValidationErrors(['translations.uk.name']);
 
     expect($page->refresh()->status)->toBe(PageStatus::Draft);
+});
+
+it('limits how often one token may call the API', function (): void {
+    // The routes read the limit when they register, so register them again under the host's limit.
+    config(['tbtop-cms.api.throttle' => '2,1']);
+    ApiWiring::wire();
+    app('router')->getRoutes()->refreshNameLookups();
+    $token = issueApiToken($this->category->id);
+
+    $this->withToken($token)->getJson('/api/cms/v1/locales')->assertOk();
+    $this->withToken($token)->getJson('/api/cms/v1/locales')->assertOk();
+    $this->withToken($token)->getJson('/api/cms/v1/locales')->assertTooManyRequests();
 });
