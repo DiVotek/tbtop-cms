@@ -204,6 +204,16 @@ const productSchema: SchemaTypeDef = {
 const productType = definePageType({ key: "product", base: "article", schemaTypes: ["Product"], schema, form });
 ```
 
+A def with a built-in key (`page`, `category`, `article`) extends that type
+instead of adding one: its `form`, `schema`, `resolveFields`, `template`,
+`label` and `schemaTypes` apply, and the tree rules stay the package's
+(setting `allowedChildren`, `requiresParent`, `maxDepth` or `base` throws).
+`page.fields` is typed from its schema as for any other type.
+
+```ts
+const page = definePageType({ key: "page", form: (s) => [s.text("tagline").translatable()], schema: z.object({ tagline: z.string().nullable() }) });
+```
+
 `migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
 default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
@@ -478,7 +488,7 @@ entry has no server code, so it goes into the browser bundle.
 ```tsx
 import { defineRegistry, JSONUIProvider } from "@json-render/react";
 import { cmsBlocks } from "@tbtop/cms/catalog";
-import { CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
+import { assembleSpec, CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
 
 export const catalog = cmsCatalog({ ...cmsBlocks, Faq: faqMeta });
 export const { registry } = defineRegistry(catalog, { components: { ...cmsComponents, Faq } });
@@ -486,7 +496,9 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 // TanStack Start: head: ({ loaderData }) => seoHead(loaderData.seo)
 // Anything else on React 19: <CmsHead seo={props.seo} /> (title, meta and links hoist into <head>)
 <JSONUIProvider registry={registry}>
+	<CmsRenderer spec={assembleSpec(props.cms.layout.header)} catalog={catalog} registry={registry} />
 	<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={props.isPreview} />
+	<CmsRenderer spec={assembleSpec(props.cms.layout.footer)} catalog={catalog} registry={registry} />
 </JSONUIProvider>;
 ```
 
@@ -502,6 +514,8 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
   catalog, and one that throws while rendering; with `showErrors` it says so
   in the console. Wrap all of a page's specs (header, body, footer) in one
   `JSONUIProvider`.
+- The layout slots (`props.cms.layout.header/footer`) are block lists, as in
+  PHP; `assembleSpec` turns one into a spec for `CmsRenderer`.
 - `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
   `useCmsForm(action)` is the ContactForm's submit logic for a custom form
   block: JSON post, field errors, a plain form post without JS. A controlled
@@ -690,8 +704,9 @@ request (no deploy step) sees Better Auth log a schema mismatch once, as
   `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`, `seo:snapshot`,
   `audit [--type page] [--id N] [--limit N]`, `audit:prune [--days N]`
   (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).
-- Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
-  Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
+- Blocks: `defineBlocks` catalog, `implementBlocks` server half, the
+  optional Hero and ContactForm (`cmsBlocks`/`cmsBlockImpls`: nothing is
+  registered unless the host spreads them in, as PHP's `blocks.types`), the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
   field kind), resolved props validated against the catalog's zod schema
   (a mismatch is dropped with a warning; `strictBlocks: true` throws

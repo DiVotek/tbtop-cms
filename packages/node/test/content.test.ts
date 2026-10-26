@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { cmsBlockImpls, cmsBlocks, defineBlocks, implementBlocks } from "../src";
+import { cmsBlockImpls, cmsBlocks, defineBlocks, definePageType, implementBlocks } from "../src";
 import { get, makeCms } from "./support";
 
 const en = [{ locale: "en", name: "English", default: true }];
@@ -166,5 +166,25 @@ describe("fixture bodies", () => {
 		expect(home).toContain("Why us");
 		expect(home).toContain('href="https://example.com"');
 		expect(await body("/plain")).toBe("<p>One</p><p>Two</p>");
+	});
+});
+
+describe("extending a built-in page type", () => {
+	const fixture = { languages: en, pages: [{ key: "home", system: true, name: { en: "Home" } }] };
+	const tagline = definePageType({ key: "page", form: (s) => [s.text("tagline").translatable()], schema: z.object({ tagline: z.string().nullable() }) });
+
+	test("definePageType with a built-in key adds its fields and keeps the tree rules", async () => {
+		const category = definePageType({ key: "category", label: "Section", form: (s) => [s.text("icon")] });
+		const { cms, ids } = await makeCms(fixture, { pageTypes: [tagline, category] });
+		expect(cms.pageTypes.get("category")).toMatchObject({ label: "Section", maxDepth: 3, allowedChildren: ["category", "article"], schemaTypes: ["CollectionPage"] });
+		await cms.site().pages.update(ids.home ?? 1, { fields: { tagline: { en: "We build" } } });
+		const result = await cms.loadPage(get("/"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(result.props.page.fields).toEqual({ tagline: "We build" });
+	});
+
+	test("its tree rules stay the package's; a second extension of the same key is refused", async () => {
+		await expect(makeCms(fixture, { pageTypes: [definePageType({ key: "article", requiresParent: false })] })).rejects.toThrow("Page type [article] is built in");
+		await expect(makeCms(fixture, { pageTypes: [tagline, tagline] })).rejects.toThrow("Page type [page] is already registered.");
 	});
 });

@@ -76,6 +76,37 @@ function assertFormMatchesSchema(def: PageTypeDef): void {
 	throw new Error(`Page type [${def.key}]: its form() fields do not match its schema: ${problems.join("; ")}.`);
 }
 
+/** What a built-in type keeps when the host extends it: the PHP tree rules. */
+const TREE_RULES = ["allowedChildren", "requiresParent", "maxDepth", "base"] as const;
+
+/**
+ * The built-ins with the host's extensions merged in, then the host's own
+ * types. A host def with a built-in key extends that type (label, schema
+ * types, fields, template) once; its tree rules stay the package's.
+ */
+function withExtensions(extra: readonly PageTypeDef[]): PageTypeDef[] {
+	const builtIns: PageTypeDef[] = [...builtInPageTypes];
+	const extended = new Set<string>();
+	const own: PageTypeDef[] = [];
+	for (const def of extra) {
+		const index = builtIns.findIndex((builtIn) => builtIn.key === def.key);
+		if (index === -1) {
+			own.push(def);
+			continue;
+		}
+		if (extended.has(def.key)) {
+			throw new Error(`Page type [${def.key}] is already registered.`);
+		}
+		const rules = TREE_RULES.filter((rule) => def[rule] !== undefined);
+		if (rules.length > 0) {
+			throw new Error(`Page type [${def.key}] is built in: extend its fields, label, schemaTypes or template, not ${rules.join(", ")}.`);
+		}
+		builtIns[index] = { ...builtIns[index], ...def };
+		extended.add(def.key);
+	}
+	return [...builtIns, ...own];
+}
+
 /** A subtype without its own schemaTypes inherits its base's, as a PHP subtype class inherits the method. */
 function normalize(def: PageTypeDef, baseDef: PageTypeDef | undefined): PageType {
 	const form = def.form ?? (() => []);
@@ -107,12 +138,12 @@ function normalize(def: PageTypeDef, baseDef: PageTypeDef | undefined): PageType
 	};
 }
 
-/** PageTypeRegistry: the built-ins plus the host's, keys unique. */
+/** PageTypeRegistry: the built-ins (extended by the host) plus the host's, keys unique. */
 export class PageTypes {
 	private readonly types = new Map<string, PageType>();
 
 	constructor(extra: readonly PageTypeDef[] = []) {
-		const defs: readonly PageTypeDef[] = [...builtInPageTypes, ...extra];
+		const defs = withExtensions(extra);
 		for (const def of defs) {
 			if (def.key === "") {
 				throw new Error("A page type needs a non-empty key.");
@@ -182,7 +213,8 @@ type Bases<D> = D extends unknown ? (BaseKey<D> extends Key<D> ? Key<D> : never)
 /** A page of base type B: its own fields, plus its subtypes' as optional (a page carries at most one subtype). */
 type TypedPage<D, B extends string> = {
 	type: B;
-	fields: [SubtypeFields<D, B>] extends [never] ? OwnFields<D, B> : OwnFields<D, B> & Partial<Intersect<SubtypeFields<D, B>>>;
+	// Intersected: a host def that extends a built-in key adds to that type's (empty) fields.
+	fields: [SubtypeFields<D, B>] extends [never] ? Intersect<OwnFields<D, B>> : Intersect<OwnFields<D, B>> & Partial<Intersect<SubtypeFields<D, B>>>;
 };
 
 /**
