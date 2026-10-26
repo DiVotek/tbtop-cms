@@ -68,9 +68,10 @@ describe("blocks", () => {
 
 	test("a valid block ships its parsed props, so a schema default fills what the resolver left out", async () => {
 		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string(), surface: z.boolean().default(false) }) } });
-		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
-		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" } } }], blocks, true);
-		expect(spec.elements.q?.props).toEqual({ text: "Hi", surface: false });
+		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable(), s.text("note")] } });
+		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" }, note: "kept" } }], blocks, true);
+		// A key the schema does not declare is not stripped.
+		expect(spec.elements.q?.props).toEqual({ text: "Hi", note: "kept", surface: false });
 	});
 
 	test("the default resolver maps fields by kind: richtext to HTML, numbers, booleans, repeater rows", async () => {
