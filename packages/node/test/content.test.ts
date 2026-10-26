@@ -118,3 +118,33 @@ describe("blocks", () => {
 		expect(() => implementBlocks(catalog, {} as never)).toThrow("Block [Lonely] has no implementation.");
 	});
 });
+
+describe("fixture bodies", () => {
+	test("plain text becomes paragraphs; a Lexical document is kept, headings and links included", async () => {
+		const doc = {
+			root: {
+				type: "root",
+				children: [
+					{ type: "heading", tag: "h2", children: [{ type: "text", text: "Why us", format: 0 }] },
+					{ type: "paragraph", children: [{ type: "link", url: "https://example.com", children: [{ type: "text", text: "Read more", format: 0 }] }] },
+				],
+			},
+		};
+		const { cms } = await makeCms({
+			languages: en,
+			pages: [
+				{ key: "home", system: true, name: { en: "Home" }, body: { en: doc } },
+				{ key: "plain", name: { en: "Plain" }, slug: { en: "plain" }, body: { en: "One\n\nTwo" } },
+			],
+		});
+		const body = async (path: string) => {
+			const result = await cms.loadPage(get(path));
+			return result.type === "page" ? result.props.page.body : result.type;
+		};
+		const home = await body("/");
+		expect(home).toContain("<h2");
+		expect(home).toContain("Why us");
+		expect(home).toContain('href="https://example.com"');
+		expect(await body("/plain")).toBe("<p>One</p><p>Two</p>");
+	});
+});

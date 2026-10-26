@@ -332,7 +332,9 @@ Keep `@tanstack/react-start/server` imports in server-only modules
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone. A fixture language marked `default` takes over
 from the installed one (which stays, non-default: pass `defaultLanguage` to
-`migrateCms` to install the right one).
+`migrateCms` to install the right one). A page's `body` per locale is plain
+text (blank-line separated paragraphs) or a Lexical document (`{ root: … }`,
+what the editor stores) for headings, lists and links.
 
 A seed whose pages point at each other goes step by step in the host's own
 boot, after `migrateCms`: each step gets the ids of the pages before it. The
