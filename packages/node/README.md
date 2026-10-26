@@ -353,6 +353,11 @@ strings, a link `{ type: "page", page: "<id>", label }`. The seed is neither
 atomic nor resumable: run it from one process (a deploy step or one boot,
 not every instance at once), and if a step fails, empty the database and
 seed again, since `isFreshSite` is false once the first page exists.
+Images go the same way: the seed copies the file onto the disk the upload
+fields write to and stores its ref, as an upload would
+(`await copyFile("seed/hero.jpg", "storage/seed/hero.jpg")`, then
+`pages.create({ ..., image: "seed/hero.jpg" })`); `media` turns the ref into
+a URL.
 
 A list the editor does not pick (a blog index, the products of a category,
 "latest three posts") is the host's own query, in its loader or route: the
