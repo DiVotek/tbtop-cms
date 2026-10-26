@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Api;
 use Illuminate\Support\Facades\Route;
 use Tbtop\Cms\Api\Fields\CommonFields;
 use Tbtop\Cms\Api\Fields\PageFields;
+use Tbtop\Cms\Api\Fields\TypeFields;
 use Tbtop\Cms\Frontend\PreviewLink;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
@@ -30,6 +31,31 @@ final readonly class PageResource
 
     /** @return array<string, mixed> */
     public function toArray(Page $page): array
+    {
+        return $this->present($page, PageFields::for($page->type, $page->subtype)->typeFields);
+    }
+
+    /**
+     * A page of results: each type's fields are mapped once for the list, not
+     * once per row, since mapping walks the type's whole DSL form.
+     *
+     * @param  list<Page>  $pages
+     * @return list<array<string, mixed>>
+     */
+    public function collection(array $pages): array
+    {
+        $byType = [];
+
+        return array_map(function (Page $page) use (&$byType): array {
+            $key = $page->type . '|' . $page->subtype;
+            $byType[$key] ??= PageFields::for($page->type, $page->subtype)->typeFields;
+
+            return $this->present($page, $byType[$key]);
+        }, $pages);
+    }
+
+    /** @return array<string, mixed> */
+    private function present(Page $page, TypeFields $typeFields): array
     {
         $page->loadMissing('slugs');
         $seo = is_array($page->seo) ? $page->seo : [];
@@ -61,7 +87,7 @@ final readonly class PageResource
             'image' => self::mediaId($page->image),
             'og_image' => self::mediaId($seo['og_image'] ?? null),
             'translations' => $translations,
-            'fields' => PageFields::for($page->type, $page->subtype)->typeFields->present($fields),
+            'fields' => $typeFields->present($fields),
             'url' => $urls,
             'preview_url' => $previews,
             'created_at' => $page->created_at?->toIso8601String(),

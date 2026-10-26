@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Language\Models\Language;
@@ -19,15 +18,6 @@ beforeEach(function (): void {
     CmsUserProfile::query()->forceCreate(['user_id' => $this->user->id]);
     $this->category = Page::factory()->category()->create(['name' => ['en' => 'News'], 'status' => PageStatus::Published]);
 });
-
-/** A token as the site admin issues it: `cms:api-token`, whose last output line is the token. */
-function issueApiToken(int ...$parentIds): string
-{
-    expect(Artisan::call('cms:api-token', ['user' => 'social@example.com', '--parents' => implode(',', $parentIds)]))->toBe(0);
-    $lines = array_values(array_filter(explode("\n", trim(Artisan::output()))));
-
-    return (string) end($lines);
-}
 
 it('keeps the fields an edit does not name', function (): void {
     $token = issueApiToken($this->category->id);

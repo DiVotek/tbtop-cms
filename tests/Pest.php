@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Artisan;
 use Tbtop\Cms\Tests\Fixtures\ApiTestCase;
 use Tbtop\Cms\Tests\Fixtures\FreshInstallTestCase;
 use Tbtop\Cms\Tests\Fixtures\HostAuthTestCase;
@@ -224,4 +225,13 @@ function forgetPublishedConfig(): void
     if (is_file($published)) {
         unlink($published);
     }
+}
+
+/** A pages-API token as the site admin issues it: `cms:api-token`, whose last output line is the token. */
+function issueApiToken(int ...$parentIds): string
+{
+    expect(Artisan::call('cms:api-token', ['user' => 'social@example.com', '--parents' => implode(',', $parentIds)]))->toBe(0);
+    $lines = array_values(array_filter(explode("\n", trim(Artisan::output()))));
+
+    return (string) end($lines);
 }
