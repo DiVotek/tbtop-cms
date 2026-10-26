@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Api\ApiWiring;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -19,15 +19,6 @@ beforeEach(function (): void {
     CmsUserProfile::query()->forceCreate(['user_id' => $this->user->id]);
     $this->category = Page::factory()->category()->create(['name' => ['en' => 'News'], 'status' => PageStatus::Published]);
 });
-
-/** A token as the site admin issues it: `cms:api-token`, whose last output line is the token. */
-function issueApiToken(int ...$parentIds): string
-{
-    expect(Artisan::call('cms:api-token', ['user' => 'social@example.com', '--parents' => implode(',', $parentIds)]))->toBe(0);
-    $lines = array_values(array_filter(explode("\n", trim(Artisan::output()))));
-
-    return (string) end($lines);
-}
 
 it('keeps the fields an edit does not name', function (): void {
     $token = issueApiToken($this->category->id);
@@ -117,4 +108,16 @@ it('refuses to publish a page missing its name in a locale the site shows', func
         ->assertJsonValidationErrors(['translations.uk.name']);
 
     expect($page->refresh()->status)->toBe(PageStatus::Draft);
+});
+
+it('limits how often one token may call the API', function (): void {
+    // The routes read the limit when they register, so register them again under the host's limit.
+    config(['tbtop-cms.api.throttle' => '2,1']);
+    ApiWiring::wire();
+    app('router')->getRoutes()->refreshNameLookups();
+    $token = issueApiToken($this->category->id);
+
+    $this->withToken($token)->getJson('/api/cms/v1/locales')->assertOk();
+    $this->withToken($token)->getJson('/api/cms/v1/locales')->assertOk();
+    $this->withToken($token)->getJson('/api/cms/v1/locales')->assertTooManyRequests();
 });

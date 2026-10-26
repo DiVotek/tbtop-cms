@@ -55,6 +55,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `render.root_kind` | `string` | `'Fragment'` | Root block `kind` `PageSpecAssembler` wraps a page's resolved blocks in | pages.md |
 | `render.root_view` | `?string` | `null` | Overrides the Inertia root Blade view for CMS responses; checked by `Health/Checks/InertiaRootViewCheck.php` | wiring.md |
 | `api.enabled` | `bool` | `env('TBTOP_CMS_API', false)` | Registers the token-authenticated pages API under `/api/cms/v1` (`Api/ApiWiring.php`); needs `laravel/sanctum`, without it the routes stay unregistered and `cms:doctor` (`pages_api`) warns | api.md |
+| `api.throttle` | `string` | `'60,1'` | Rate-limit spec (`max,minutes`) on every pages-API route, counted per token user (`Api/ApiWiring.php`); `''` turns it off; over the limit is a 429 | api.md |
 | `roles` | `bool` | `false` | `false` leaves every `tbtop-cms.*` section ability open to any admin; `true` hands all of them to host-defined gates (`Admin/Support/CmsAbilities::enabled()`) — an unanswered ability then denies | §8 below |
 | `admin.autoregister` | `bool` | `true` | Whether `CmsServiceProvider` auto-registers the admin panel/routes itself | wiring.md |
 | `admin.prefix` | `string` | `'admin'` | URL prefix the admin panel and its routes mount under | §3 below |
@@ -109,7 +110,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | `tbtop.cms.logout` | POST | `{admin.prefix}/logout` | `LogoutController`, middleware `['web','auth:{admin.guard}']` |
 | `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
 
-**Pages API** (`Api/ApiWiring.php`, only when `tbtop-cms.api.enabled` and Sanctum is installed) — prefix `api/cms/v1`, middleware `[AcceptsJson, SubstituteBindings, 'auth:cms-api', ActAsPanelUser]` plus `CheckAbilities:pages:read` or `:pages:write` per route; shapes in api.md:
+**Pages API** (`Api/ApiWiring.php`, only when `tbtop-cms.api.enabled` and Sanctum is installed) — prefix `api/cms/v1`, middleware `[AcceptsJson, SubstituteBindings, 'auth:cms-api', ActAsPanelUser, 'throttle:' . api.throttle]` plus `CheckAbilities:pages:read` or `:pages:write` per route; shapes in api.md:
 
 | Name | Method | Path | Ability |
 |---|---|---|---|
