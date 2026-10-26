@@ -20,7 +20,7 @@ goes where it first matches.
    | Field | Holds | Also used for |
    |---|---|---|
    | `name` | the page's short name | admin lists and tree, breadcrumb label, the label of a page link or `pages`-field entry; `title` falls back to it |
-   | `title` | the browser-tab title | the meta title when the SEO tab sets none (then `name`) |
+   | `title` | **deprecated** — not on the General tab any more; the browser-tab title is the SEO tab's *Meta title* (`seo.title`) | a stored value still feeds the meta title when `seo.title` is empty (then `name`) and still ships as `page.title`; do not model content into it |
    | `heading` | the H1 drawn on the page | the SEO checklist's keyword-in-H1 check |
    | `summary` | a short plain-text lead or teaser | the meta description when the SEO tab sets none |
    | `body` (admin "Content") | the page's main rich text — its description | shipped as `page.body` HTML (this locale, else the default one, `''` when empty); `ResolveContext::pageBodyHtml()` in a block |

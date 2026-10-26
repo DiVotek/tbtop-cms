@@ -180,7 +180,7 @@ Also shared at the top level (not under `cms`): `errors` — session validation 
 | `page.status` | `string` | `PageStatus` enum value |
 | `page.subtype` | `string\|null` | subtype key, null for a page of a base type |
 | `page.name` | `string\|null` | translated name — this locale, else the default locale, else `null`; a blank (`''`, whitespace) translation counts as missing (`PageTranslation::text()`) |
-| `page.title` | `string\|null` | translated title, same fallback |
+| `page.title` | `string\|null` | **deprecated**, to be removed in a later release: translated title, same fallback. The admin no longer edits it (the meta title is `seo.title`, migration `2026_10_26_000000_copy_page_title_to_seo_title`), so it carries only a value stored before that or written by host code; a new page has none. Read `page.heading` for the H1 and `seo.title` for the browser-tab title |
 | `page.heading` | `string\|null` | translated heading, same fallback |
 | `page.summary` | `string\|null` | translated summary, same fallback |
 | `page.body` | `string` | the Body (General tab) rendered to HTML via `RichtextHtmlRenderer`, active locale falling back to the default locale (`PageTranslation`); `''` when empty. A DB error page (`ErrorResponse`) carries its Body the same way; the fallback error page sends `''` |
@@ -345,7 +345,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | Table | Owning concept | `tbtop_` prefixed? | Notes |
 |---|---|---|---|
 | `tbtop_languages` | `src/Language/Models/Language.php` | Yes | |
-| `tbtop_pages` | `src/Page/Models/Page.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define`; gained `body`/`excerpt`, `image`, `source_id`, scheduling columns, a starter-blocks flag, a nullable unique `error_class` column (`ErrorClass` enum, migration `2026_09_15_000000_add_error_class_to_pages_table.php`), and `subtype` (nullable, indexed) + `fields` (JSON, type fields' values; migration `2026_10_06_000000_add_subtype_and_fields_to_pages_table.php`, which also moves a subtype key out of `type` and strips `owner` from content rows) over later ALTER migrations |
+| `tbtop_pages` | `src/Page/Models/Page.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define`; gained `body`/`excerpt`, `image`, `source_id`, scheduling columns, a starter-blocks flag, a nullable unique `error_class` column (`ErrorClass` enum, migration `2026_09_15_000000_add_error_class_to_pages_table.php`), and `subtype` (nullable, indexed) + `fields` (JSON, type fields' values; migration `2026_10_06_000000_add_subtype_and_fields_to_pages_table.php`, which also moves a subtype key out of `type` and strips `owner` from content rows) over later ALTER migrations. `title` is deprecated and no longer edited in the admin; migration `2026_10_26_000000_copy_page_title_to_seo_title.php` copies each locale's non-blank `title` into an empty `seo.title` |
 | `tbtop_page_slugs` | `src/Page/Models/PageSlug.php` | Yes | |
 | `tbtop_user_profiles` | `src/Admin/Models/CmsUserProfile.php` | Yes | `user_id` via `UserKeyColumn::define` (unique); gained a `user_id` FK, then `role` (added, later dropped), then `is_owner` |
 | `tbtop_redirects` | `src/Redirect/Models/Redirect.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define` |

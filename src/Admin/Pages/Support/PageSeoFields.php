@@ -30,8 +30,8 @@ final class PageSeoFields
      * scalar: an image isn't per-locale, and hreflang pages share it.
      *
      * Placeholders show the COMPUTED final value (template/suffix applied)
-     * for the DEFAULT locale only — a static, single-per-field hint (same
-     * string in every locale tab) rather than a live per-locale preview; see
+     * per editor locale, so each locale tab hints what that locale resolves
+     * to — a static hint as of the last save, not a live preview; see
      * computedPlaceholders() below. $page is only absent for the create
      * modal, which never renders this tab today, but the guard keeps the
      * method safe if that ever changes.
@@ -55,7 +55,7 @@ final class PageSeoFields
                 ->translatable()->placeholder($placeholders['title'])
                 ->helperText(__('tbtop-cms::pages.fields.seo_title_hint')),
             $s->textarea('seo_description')->label(__('tbtop-cms::pages.fields.seo_description'))
-                ->translatable()->set('placeholder', $placeholders['description'])
+                ->translatable()->placeholder($placeholders['description'])
                 ->helperText(__('tbtop-cms::pages.fields.seo_description_hint')),
             $s->text('seo_focus_keyword')->label(__('tbtop-cms::pages.fields.seo_focus_keyword'))
                 ->translatable()
@@ -69,7 +69,7 @@ final class PageSeoFields
                 $s->text('og_title')->label(__('tbtop-cms::pages.fields.og_title'))
                     ->translatable()->placeholder($placeholders['og_title']),
                 $s->textarea('og_description')->label(__('tbtop-cms::pages.fields.og_description'))
-                    ->translatable()->set('placeholder', $placeholders['og_description']),
+                    ->translatable()->placeholder($placeholders['og_description']),
                 $s->media('og_image')->label(__('tbtop-cms::pages.fields.og_image'))
                     ->variant('preview'),
             ]),
@@ -221,12 +221,14 @@ final class PageSeoFields
     }
 
     /**
-     * Computed values a blank SEO field would actually resolve to, for the
-     * default locale — reuses SeoResolver rather than re-deriving the
-     * title/description cascade a second time. null $page (create modal, not
-     * reached today) or an unsaved record yields empty placeholders.
+     * Computed values a blank SEO field would actually resolve to, one per
+     * editor locale (EditorLocales::list(), the set the translatable tabs
+     * and SerpPreview show) — reuses SeoResolver rather than re-deriving the
+     * title/description cascade a second time. One resolve per locale, shared
+     * by all four fields. null $page (create modal, not reached today) or an
+     * unsaved record yields empty placeholders.
      *
-     * @return array{title: string, description: string, og_title: string, og_description: string}
+     * @return array{title: array<string, string>|string, description: array<string, string>|string, og_title: array<string, string>|string, og_description: array<string, string>|string}
      */
     private static function computedPlaceholders(?Page $page): array
     {
@@ -234,21 +236,21 @@ final class PageSeoFields
             return ['title' => '', 'description' => '', 'og_title' => '', 'og_description' => ''];
         }
 
-        $locale = app(Languages::class)->defaultLocale();
-        // Breadcrumbs passed for the same reason SerpPreview and SeoChecklist
-        // pass them: a placeholder promising what an empty field resolves to
-        // must not drop a {parent} segment the frontend renders.
-        $resolved = app(SeoResolver::class)->resolve(
-            $page,
-            $locale,
-            app(Breadcrumbs::class)->ancestors($page, $locale),
-        );
+        $placeholders = ['title' => [], 'description' => [], 'og_title' => [], 'og_description' => []];
+        $resolver = app(SeoResolver::class);
+        $breadcrumbs = app(Breadcrumbs::class);
 
-        return [
-            'title' => $resolved['title'],
-            'description' => $resolved['description'],
-            'og_title' => $resolved['ogTitle'],
-            'og_description' => $resolved['ogDescription'],
-        ];
+        foreach (EditorLocales::list(app(Languages::class)->defaultLocale()) as $locale) {
+            // Breadcrumbs passed for the same reason SerpPreview and SeoChecklist
+            // pass them: a placeholder promising what an empty field resolves to
+            // must not drop a {parent} segment the frontend renders.
+            $resolved = $resolver->resolve($page, $locale, $breadcrumbs->ancestors($page, $locale));
+            $placeholders['title'][$locale] = $resolved['title'];
+            $placeholders['description'][$locale] = $resolved['description'];
+            $placeholders['og_title'][$locale] = $resolved['ogTitle'];
+            $placeholders['og_description'][$locale] = $resolved['ogDescription'];
+        }
+
+        return $placeholders;
     }
 }

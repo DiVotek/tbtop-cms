@@ -504,6 +504,47 @@ subject itself drops that step, or a literal `&amp;` in the payload would be
 decoded twice; one that puts the subject into HTML escapes it. The body is
 unchanged.
 
+## The page `title` field moved to the SEO tab's meta title
+
+The page editor's General tab no longer has a *Title* field, and the create
+dialog no longer asks for one: the browser-tab title is edited only as the SEO
+tab's *Meta title* (`seo.title`). `heading` (the H1) stays on the General tab.
+Saving a page leaves a stored `title` as it is, and a new page gets none (the
+create dialog used to fill it from the name).
+
+Run `php artisan migrate`: `2026_10_26_000000_copy_page_title_to_seo_title`
+copies each locale's non-blank `title` into `seo.title` where that locale's
+`seo.title` is empty. A filled `seo.title` is never overwritten. Without it, a
+page whose title differed from its name keeps rendering that title, but the
+editor cannot see or change it outside the SEO tab placeholder. Its `down()`
+is a no-op: a copy cannot be told apart from a meta title typed by hand, and
+it renders the same `<title>` either way.
+
+The `title` column, the model attribute and the `page.title` prop stay for
+now and are **deprecated**, to be removed in a later release. `title` still
+feeds the meta title when `seo.title` is empty, so output does not change.
+A host that reads `page.title` switches to `page.heading` for the H1 or the
+`seo` prop's `title` for the browser-tab title; a host that writes `title`
+from its own code (an import, a seeder) writes `seo.title` instead.
+
+## Regenerate media variants for `srcset` (tbtop/admin 0.7.2)
+
+This release requires tbtop/admin `^0.7.2`, whose default
+`tbtop-admin.media.profiles` add three width-only webp variants next to
+`thumb`: `sm` (640), `md` (1024) and `lg` (1600). New uploads get them
+automatically. Media uploaded before the upgrade has only `thumb`, so
+`ResolveContext::mediaImage()` returns a `srcset` of that one small
+candidate plus the original. Build the missing variants once:
+
+```bash
+php artisan tbtop:media-regenerate
+```
+
+It writes only the variants a media item lacks; `--force` rebuilds existing
+ones after a profile changes size or format. A host that publishes
+`config/tbtop-admin.php` keeps its own `media.profiles` and gets none of the
+new defaults: add `sm`/`md`/`lg` there first if it wants them.
+
 ## An optional pages API under `/api/cms/v1`
 
 Nothing changes until a host turns it on: `tbtop-cms.api.enabled`
@@ -534,11 +575,14 @@ hand, in order.
    `2026_10_06_000000_add_subtype_and_fields_to_pages_table`,
    `2026_10_07_000000_add_lock_version_to_shared_blocks_table`,
    `2026_10_07_000001_move_identity_contacts_to_site_contacts`,
-   `2026_10_07_000002_create_page_refs_table`. Register host page-type
+   `2026_10_07_000002_create_page_refs_table`,
+   `2026_10_26_000000_copy_page_title_to_seo_title`. Register host page-type
    classes (`PageTypeRegistry::extend()` or config) before migrating: the
    subtype migration reads the registry. Rolling back is lossy:
    - `move_identity_contacts_to_site_contacts` has an empty `down()`; the
      old `seo.identity.*` keys are not restored.
+   - `copy_page_title_to_seo_title` has an empty `down()`; the copied
+     `seo.title` values stay (they render the same `<title>`).
    - `add_subtype_and_fields` `down()` moves each subtype page back to
      `type = <subtype>`, then drops the `subtype` and `fields` columns, so
      every stored `fields` value is lost.
@@ -604,6 +648,10 @@ hand, in order.
     (only then can they edit or revoke them). Make sure the users of any
     host page with a media field hold `tbtop-cms.media`, `.pages`,
     `.settings` or `.design`, or the media API refuses them.
+
+11. **Run `php artisan tbtop:media-regenerate` once** after updating
+    tbtop/admin, so media uploaded earlier gets the `sm`/`md`/`lg` variants
+    `mediaImage()` lists in its `srcset`.
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts, the admin
