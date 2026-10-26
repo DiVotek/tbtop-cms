@@ -1,4 +1,4 @@
-import { definePage, Effects, type S } from "@tbtop/admin";
+import { definePage, Effects, Field, S, walk } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
@@ -116,20 +116,42 @@ function socialsComplete(form: Dict): string | null {
 	return socials.every((row) => "label" in row && "href" in row) ? null : "Each social profile needs a short label and a link.";
 }
 
+const SITE_MAP: Record<string, string> = {
+	site_name: "site.name",
+	site_logo: "site.logo",
+	site_favicon: "site.favicon",
+	phones: "site.contacts.phones",
+	emails: "site.contacts.emails",
+	socials: "site.contacts.socials",
+};
+
+/** The fields of a host tab, through layout nodes; a repeater is one field. */
+function tabFields(nodes: unknown[]): Field[] {
+	return nodes.flatMap((node) => (node instanceof Field ? [node] : tabFields(walk.descendants(node))));
+}
+
+/** The host tabs' fields by name, each at `site.<name>`; a name the page already uses (or its key) throws. */
+function hostSiteMap(cms: Cms): Record<string, string> {
+	const tabs = cms.config.siteSettings?.tabs(new S()) ?? [];
+	const taken = new Set([...Object.keys(SITE_MAP), ...Object.values(SITE_MAP)]);
+	const map: Record<string, string> = {};
+	for (const field of tabFields(tabs.flatMap((tab) => tab.children))) {
+		const key = `site.${field.name}`;
+		if (taken.has(field.name) || taken.has(key) || field.name in map) {
+			throw new Error(`siteSettings: the field "${field.name}" is already on the Site settings page.`);
+		}
+		map[field.name] = key;
+	}
+	return map;
+}
+
 export function siteSettings(cms: Cms) {
 	return settingsPage(cms, {
 		path: "settings/site",
 		title: "Site settings",
 		subtitle: "General site identity: name, logo, and favicon.",
 		nav: { label: "Site settings", icon: "settings", order: 20 },
-		map: {
-			site_name: "site.name",
-			site_logo: "site.logo",
-			site_favicon: "site.favicon",
-			phones: "site.contacts.phones",
-			emails: "site.contacts.emails",
-			socials: "site.contacts.socials",
-		},
+		map: { ...SITE_MAP, ...hostSiteMap(cms) },
 		rows: { phones: ["number"], emails: ["address"], socials: ["label", "name", "href"] },
 		prepare: socialsComplete,
 		fields: (s) => [
@@ -159,6 +181,7 @@ export function siteSettings(cms: Cms) {
 							]),
 					],
 				},
+				...(cms.config.siteSettings?.tabs(s) ?? []),
 			]),
 		],
 	});

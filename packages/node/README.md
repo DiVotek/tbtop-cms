@@ -100,6 +100,8 @@ const cms = createCms({
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
+	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches cms.settings.
+	siteSettings: { tabs: (s) => [{ label: "Brand & forms", children: [s.text("tagline").label("Tagline")] }] },
 	hostRules: { ...kyselyRules(db), ...myRules }, // the admin's unique/exists and the host's own rules: cms.admin.hostRules
 });
 

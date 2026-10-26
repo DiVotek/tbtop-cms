@@ -1,4 +1,4 @@
-import type { HostRule, NotificationStore, PageDef, SessionResolver } from "@tbtop/admin";
+import type { HostRule, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
@@ -36,6 +36,14 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	media?: (ref: string) => MediaDetails | null;
 	/** Settings keys holding secrets: sealed with `settingsKey`, never sent to the frontend. */
 	secretSettings?: string[];
+	/**
+	 * The host's own tabs on Site settings, after Branding and Contacts. A
+	 * field named `tagline` is stored at `site.tagline`, so it reaches the
+	 * frontend in `cms.settings` (unless listed in `secretSettings`) and
+	 * reads back with `site.settings.get("site.tagline")`. A name the page
+	 * already uses throws.
+	 */
+	siteSettings?: { tabs: (s: S) => { label: string; children: unknown[] }[] };
 	/**
 	 * The key secret settings are sealed with (AES-256-GCM over Web Crypto).
 	 * Keep it in the environment; changing it makes stored secrets unreadable.
