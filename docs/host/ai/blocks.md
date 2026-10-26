@@ -287,13 +287,24 @@ Overridable, all with sane defaults:
   `MediaUrlResolver`, `null` if the media row is missing or has no path.
   Call this from `resolve()`, never store the resolved URL back into the
   envelope.
+- **`mediaImage(string|int $id): ?array`** — the same lookup, shaped for an
+  `<img>`: `{src: string, srcset: string|null, width: int|null, height: int|null, alt: string|null}`.
+  `src` is the original; `srcset` lists the media's stored variants
+  (tbtop/admin `media.profiles`, webp by default) narrowest first, then the
+  original at its own width. Only a variant with the original's aspect ratio
+  is listed (a cropped variant is a different picture), and only one
+  narrower than the original. `srcset` is `null` when no variant qualifies
+  or the original's width is unknown (SVG), so render `src` alone then.
+  `null` for a missing or pathless row, like `mediaUrl()`. One query per
+  call, like `mediaUrl()`.
 - **`richtextHtml(mixed $value): string`** — renders a stored richtext value
   (from an `$s->richtext()` field) to safe HTML via `RichtextHtmlRenderer`.
   Always call this rather than passing the raw richtext value to props; the
   React side expects an HTML string, not the editor's internal document
   shape.
-- **`pageText(string $field): ?string`** — the page's `name`, `title`,
-  `heading` or `summary` in the active locale, falling back to the default
+- **`pageText(string $field): ?string`** — the page's `name`, `title`
+  (deprecated, no longer editable — see inventory.md), `heading` or
+  `summary` in the active locale, falling back to the default
   locale when the active one is blank (the editor saves `''` for every locale
   it showed, which `Page::getTranslation()` would return as-is); `null` when
   neither is filled or there is no page. Use it instead of reading
@@ -404,6 +415,36 @@ here. Block-specific usage:
   `$ctx->mediaUrl($input['image'] ?? null)`, which returns `null` for a
   missing/pathless row — always guard the field type before calling it
   (`is_string($value) || is_int($value)`), since editor input is untrusted.
+  For a large image (a hero, a banner) resolve `$ctx->mediaImage(...)`
+  instead and let the browser pick a width; `sizes` is the host's call, as
+  only the layout knows the rendered width:
+
+  ```php
+  /** @return array{image: array{src: string, srcset: string|null, width: int|null, height: int|null, alt: string|null}|null} */
+  public function resolve(array $input, ResolveContext $ctx): array
+  {
+      $image = $input['image'] ?? null;
+
+      return ['image' => is_string($image) || is_int($image) ? $ctx->mediaImage($image) : null];
+  }
+  ```
+
+  ```tsx
+  {image && (
+    <img
+      src={image.src}
+      srcSet={image.srcset ?? undefined}
+      sizes="(min-width: 1024px) 1024px, 100vw"
+      width={image.width ?? undefined}
+      height={image.height ?? undefined}
+      alt={image.alt ?? ''}
+      fetchPriority="high"
+    />
+  )}
+  ```
+
+  Give `width`/`height` so the browser reserves the box before the image
+  loads, and `loading="lazy"` to any image below the fold (never the LCP one).
 - **Richtext fields** (`$s->richtext('body')`) — store the editor's document
   shape; never pass it straight through to props. Resolve via
   `$ctx->richtextHtml($input['body'] ?? null)` to get the HTML string the
@@ -489,6 +530,24 @@ to extending `Block`:
   the error, nothing is stored or notified. A retry follows the same rule:
   if `handleSubmit()` throws again the row stays `Failed` with its error
   and nothing is sent (see notifications.md).
+
+- **Optional: `HasFieldLabels`** (`src/Block/HasFieldLabels.php`) —
+  `fieldLabels(string $locale, array $input): array<string, string>`, labels
+  keyed by payload field name. Staff notifications (the mail's field list)
+  show each submitted field under its label, called with the reader's admin
+  UI locale (not the page's), so return text in that locale. `$input` is the
+  submitting block's stored data (a shared block's when placed by
+  reference) with translatable fields picked for that same `$locale`,
+  falling back to the default content language, so an editor-authored label
+  reads in the admin's language; a form addressed by name (`HasForm`) gets
+  `[]`. A code-authored label can use
+  `__('my-app::forms.fields.' . $name, [], $locale)`. A field the map leaves
+  out, a blank label, a block no longer found on the page, or a block
+  without the interface shows the raw payload key. Values are never touched.
+  `ContactForm` implements it from `tbtop-cms::forms.contact.fields.*`, the
+  same labels its `resolve()` hands the frontend, and ignores `$input`. It is
+  a separate interface, so an existing `HandlesFormSubmission` block keeps
+  compiling unchanged.
 
 `SubmitContext` (`src/Block/SubmitContext.php`) is the trimmed version of
 `ResolveContext` available at submit time: `locale`, `fallbackLocale`,
