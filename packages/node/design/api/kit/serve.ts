@@ -9,14 +9,15 @@ export type AdminDefaults = Omit<Partial<AdminConfig>, "pages" | "disks"> & CmsA
 
 /**
  * Q15's `cms.admin.create()`: createAdmin({ ...cms.admin.options(), ... })
- * with what a host otherwise always writes: a `public` disk (memory until the
- * host gives one) and a root view without the admin client assets.
+ * with what a host otherwise always writes: a `public` disk and a root view
+ * without the admin client assets. Without a disk, uploads go to memory and
+ * vanish on restart, so that default says so once.
  */
 export function createCmsAdmin(cms: Cms, options: AdminDefaults = {}) {
 	const { pages, disks, ...rest } = options;
 	return createAdmin({
 		...cms.admin.options(pages === undefined ? {} : { pages }),
-		disks: disks ?? { public: memoryDisk("/storage") },
+		disks: disks ?? memoryFallback(),
 		rootView: rest.rootView ?? rootView(),
 		...rest,
 	});
@@ -48,4 +49,9 @@ export async function renderPage<P>(
 		return new Response("Not found", { status: 404 });
 	}
 	return new Response(render(result.props), { headers: { "content-type": "text/html; charset=utf-8", ...result.headers } });
+}
+
+function memoryFallback(): Record<string, Disk> {
+	console.warn("@tbtop/cms: no `disk` given, uploads are kept in memory and lost on restart");
+	return { public: memoryDisk("/storage") };
 }

@@ -56,7 +56,8 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		basePath,
 		...(secret === undefined ? {} : { secret }),
 		...(baseURL === undefined ? {} : { baseURL }),
-		emailAndPassword: { enabled: true, ...extra.emailAndPassword },
+		// Admin users come from ensureUser / the admin plugin; public sign-up is opt-in.
+		emailAndPassword: { enabled: true, disableSignUp: true, ...extra.emailAndPassword },
 		user: { ...extra.user, modelName: "tbtop_users" },
 		session: { ...extra.session, modelName: "tbtop_sessions" },
 		account: { ...extra.account, modelName: "tbtop_accounts" },

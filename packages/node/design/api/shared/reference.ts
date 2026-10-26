@@ -65,6 +65,9 @@ export const organization = (id: string) => ({
 	sameAs: ["https://github.com/DiVotek"],
 });
 
+/** JSON inside <script>: a `</script>` in a page name or setting must not close the tag. */
+const jsonInScript = (value: unknown) => JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
 const esc = (text: unknown) => String(text ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
@@ -74,7 +77,7 @@ const esc = (text: unknown) => String(text ?? "").replace(/[&<>"]/g, (c) => `&#$
 export function html(props: PageProps, extra: string): string {
 	const blocks = (props.render.elements.$root?.children ?? []).map((id) => props.render.elements[id]);
 	return `<!doctype html><title>${esc(props.seo.title)}</title>
-${props.seo.jsonLd.map((node) => `<script type="application/ld+json">${JSON.stringify(node)}</script>`).join("")}
+${props.seo.jsonLd.map((node) => `<script type="application/ld+json">${jsonInScript(node)}</script>`).join("")}
 <h1>${esc(props.page.name)}</h1><p class="extra">${esc(extra)}</p>
 ${blocks.map((block) => `<section data-kind="${esc(block?.type)}">${esc(JSON.stringify(block?.props))}</section>`).join("")}`;
 }

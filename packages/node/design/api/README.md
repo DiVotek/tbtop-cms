@@ -28,5 +28,6 @@ bunx tsc --noEmit -p design/api          # typecheck against src/
 design/api/scripts/negative-types.sh     # a wrong page.fields type must fail tsc in every variant
 ```
 
-`shared/fakeD1.ts` is a D1 binding over bun:sqlite (no transactions, the
+`shared/fakeD1.ts` is a D1 binding over bun:sqlite (no transactions outside an
+atomic `batch`, the
 pragma join refused); workerd itself is not run here.

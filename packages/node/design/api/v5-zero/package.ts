@@ -47,17 +47,23 @@ function app<S extends Site>(site: S, runtime: Runtime, options: Options<S>) {
 export function serve<S extends Site>(site: S, options: Options<S> & Runtime) {
 	const { render, seed, admin, ...runtime } = options;
 	const built = app(site, runtime, { ...(render === undefined ? {} : { render }), ...(seed === undefined ? {} : { seed }), ...(admin === undefined ? {} : { admin }) });
-	let ready: Promise<void> | null = null;
+	let booting: Promise<void> | null = null;
+	// A failed boot is forgotten, so the next request retries it instead of rethrowing forever.
+	const ready = () =>
+		(booting ??= built.boot().catch((error: unknown) => {
+			booting = null;
+			throw error;
+		}));
 	return {
 		cms: built.cms,
-		ready: () => (ready ??= built.boot()),
+		ready,
 		/** Everything but pages (admin, auth, robots, sitemaps, forms); null for a page: a TanStack Start entry falls through to its router. */
 		handle: async (request: Request) => {
-			await (ready ??= built.boot());
+			await ready();
 			return built.cms.route(request);
 		},
 		fetch: async (request: Request) => {
-			await (ready ??= built.boot());
+			await ready();
 			return built.fetch(request);
 		},
 	};

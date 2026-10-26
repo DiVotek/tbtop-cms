@@ -26,7 +26,9 @@ export function fakeD1(): D1Database {
 		const run = query.run(...bound);
 		return { results: [], success: true, meta: { changes: run.changes, last_row_id: Number(run.lastInsertRowid), duration: 0 } };
 	};
-	const statement = (sql: string, params: unknown[] = []): D1PreparedStatement => ({
+	const bodies = new WeakMap<D1PreparedStatement, [string, unknown[]]>();
+	const statement = (sql: string, params: unknown[] = []): D1PreparedStatement => {
+		const prepared: D1PreparedStatement = {
 		bind: (...values) => statement(sql, values),
 		all: async <T>() => exec(sql, params) as D1Result<T>,
 		run: async <T>() => exec(sql, params) as D1Result<T>,
@@ -35,10 +37,15 @@ export function fakeD1(): D1Database {
 			return (column === undefined || row === null ? row : row[column]) as T | null;
 		},
 		raw: async <T>() => exec(sql, params).results.map((row) => Object.values(row)) as T[],
-	});
+		};
+		bodies.set(prepared, [sql, params]);
+		return prepared;
+	};
 	return {
 		prepare: (sql) => statement(sql),
-		batch: async <T>(statements: D1PreparedStatement[]) => Promise.all(statements.map((s) => s.all<T>())),
+		// D1 runs a batch as one transaction: all statements or none.
+		batch: async <T>(statements: D1PreparedStatement[]) =>
+			sqlite.transaction(() => statements.map((s) => exec(...(bodies.get(s) as [string, unknown[]])) as D1Result<T>))(),
 		exec: async (sql) => sqlite.exec(sql),
 	};
 }

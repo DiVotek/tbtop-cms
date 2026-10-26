@@ -19,7 +19,12 @@ export function workerEntry<E extends object>(make: (env: E) => WorkerApp) {
 		let hit = apps.get(env);
 		if (hit === undefined) {
 			const app = make(env);
-			hit = { app, ready: app.boot() };
+			// A failed boot (D1 hiccup mid-migration) is dropped, so the next request retries it.
+			const ready = app.boot().catch((error: unknown) => {
+				apps.delete(env);
+				throw error;
+			});
+			hit = { app, ready };
 			apps.set(env, hit);
 		}
 		return hit;
