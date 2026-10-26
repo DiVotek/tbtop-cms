@@ -512,7 +512,9 @@ not required. To use it: `composer require laravel/sanctum`, publish and run
 its migration, add `Laravel\Sanctum\HasApiTokens` to the user model, set
 `TBTOP_CMS_API=true`, then issue a token with
 `php artisan cms:api-token <email> --parents=<category ids>`
-(docs/host/ai/api.md). A published `config/tbtop-cms.php` needs the `api`
+(docs/host/ai/api.md). The token's user is a full CMS admin: create a
+dedicated one with `cms:admin:create`, discard the random password it prints,
+and never sign in as it. A published `config/tbtop-cms.php` needs the `api`
 key only to change the env-driven default. The package adds an auth guard
 `cms-api` unless the host defines one by that name, and `cms:doctor` gains the
 `pages_api` check: a lang override of `tbtop-cms::health.checks.*` may add
