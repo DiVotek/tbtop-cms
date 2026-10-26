@@ -502,7 +502,10 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
   `JSONUIProvider`.
 - `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
   `useCmsForm(action)` is the ContactForm's submit logic for a custom form
-  block: JSON post, field errors, a plain form post without JS.
+  block: JSON post, field errors, a plain form post without JS. A controlled
+  form calls `submit(values)` (resolves true once accepted) instead of
+  spreading `formProps`; `setError(field, message)` shows a client check's
+  message like the server's, `reset()` goes back to idle.
 - The Hero's CTA link is read the way a browser reads it (leading controls
   and spaces dropped, tabs and newlines removed): a relative link (`/contact`,
   `blog`, `#form`, `?ref=x`) or an http(s), `mailto:`, `tel:` or messenger
