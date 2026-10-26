@@ -54,7 +54,7 @@ describe("Dogfood: a host seeds step by step with real ids", () => {
 	const shelfType = definePageType({
 		key: "shelf",
 		schema: z.object({ items: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
-		form: (s) => [pagesField("items").label("Items").of("article")],
+		form: () => [pagesField("items").label("Items").of("article")],
 	});
 
 	test("pages created first are linked by id in a later step; the site is no longer fresh", async () => {
