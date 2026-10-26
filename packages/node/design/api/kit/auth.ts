@@ -25,7 +25,7 @@ export type DefaultAuth = {
 export type DefaultAuthOptions = {
 	/** Default `BETTER_AUTH_SECRET`; on Workers the cloudflare entry passes it from `env`. */
 	secret?: string;
-	/** Default `BETTER_AUTH_URL`, else the CMS `url`. */
+	/** Default `BETTER_AUTH_URL`; unset, Better Auth infers it from the request. */
 	baseURL?: string;
 	/** Raw database for Better Auth when the Kysely instance is not enough (D1: the binding itself). */
 	database?: BetterAuthOptions["database"];

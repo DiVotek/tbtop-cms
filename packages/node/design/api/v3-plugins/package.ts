@@ -96,6 +96,15 @@ export function createCms<const P extends readonly AnyPlugin[]>(options: { db: K
 	const admin = createCmsAdmin(core, runtime.disk === undefined ? {} : { disks: { public: runtime.disk } });
 	const setups = plugins.map((p) => p.setup?.({ cms: core, auth }) ?? {});
 	const base = cmsRoutes(core, admin, auth);
+	// A plugin's api may add members, never replace a core one (tasks, route, migrate…) or another plugin's.
+	setups.forEach((setup, i) => {
+		for (const key of Object.keys(setup.api ?? {})) {
+			if (key in core || key === "route" || key === "migrate") {
+				throw new Error(`Plugin [${plugins[i]?.name}] api [${key}] would replace a core member.`);
+			}
+			claim("Api", key, plugins[i]?.name ?? String(i));
+		}
+	});
 	return Object.assign(core, ...setups.map((s) => s.api ?? {}), {
 		route: async (request: Request) => {
 			for (const setup of setups) {
