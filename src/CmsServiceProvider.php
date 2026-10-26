@@ -35,6 +35,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Link\LinkResolver;
 use Tbtop\Cms\Link\LinkShapeValidator;
+use Tbtop\Cms\Link\SafeHref;
 use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\NotFound\Commands\PruneNotFoundHitsCommand;
 use Tbtop\Cms\Notifications\Contracts\TemplateStore;
@@ -160,6 +161,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->gateSsrByRequest();
         AdminWiring::wire($this->app);
         LinkShapeValidator::register();
+        SafeHref::register();
         PageRefRule::register();
         ContentEventsWiring::wire($this->app);
         NotificationWiring::wire($this->app);

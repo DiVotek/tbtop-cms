@@ -8,6 +8,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Link\SafeHref;
 
 class HeroBlock extends Block
 {
@@ -42,7 +43,7 @@ class HeroBlock extends Block
             $s->textarea('subtitle')->label('Subtitle')->translatable(),
             $s->text('image')->label('Image URL'),
             $s->text('ctaLabel')->label('CTA label')->translatable(),
-            $s->text('ctaHref')->label('CTA link'),
+            $s->text('ctaHref')->label('CTA link')->rules(SafeHref::RULE),
         ];
     }
 
@@ -70,7 +71,7 @@ class HeroBlock extends Block
         $label = $this->clean($input['ctaLabel'] ?? null);
         $href = $this->clean($input['ctaHref'] ?? null);
 
-        if ($label === null || $href === null) {
+        if ($label === null || $href === null || ! SafeHref::passes($href)) {
             return null;
         }
 
