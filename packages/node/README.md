@@ -450,6 +450,17 @@ resolve: async (input, ctx) => {
 	// merge rows into refs by id
 },
 ```
+- For "the form, plus a key or two", set `map` instead of `resolve`: the
+  package resolves the form, and `map(resolved, input, ctx)` returns the keys
+  to add or replace, typed as `Partial` of the catalog props (no
+  `resolveForm` call, no cast). A block sets `resolve` or `map`, not both.
+
+```ts
+Pricing: {
+	form: (s) => [s.text("title").translatable(), pagesField("plans").of("article", "plan")],
+	map: async (_resolved, input, ctx) => ({ plans: await ctx.pages(input.plans, { fields: true }) }),
+},
+```
 - On save the admin checks `link_shape` (type, target format, an existing
   page, label locales and length) and `page_ref` (each id exists) as host
   rules: `cms.admin.options()` passes them (`cms.admin.hostRules` when

@@ -107,6 +107,25 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
 	});
 
+	test("map adds keys over the form's resolve, typed by the catalog props", async () => {
+		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string(), length: z.number() }) } });
+		const blocks = implementBlocks(catalog, {
+			Quote: { form: (s) => [s.text("text").translatable()], map: (resolved) => ({ length: String(resolved.text).length }) },
+		});
+		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hello" } } }], blocks, true);
+		expect(spec.elements.q?.props).toEqual({ text: "Hello", length: 5 });
+		implementBlocks(catalog, {
+			// @ts-expect-error map returns the catalog's props: `length` is a number.
+			Quote: { form: () => [], map: () => ({ length: "5" }) },
+		});
+	});
+
+	test("a block with both resolve and map is refused", () => {
+		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string() }) } });
+		const both = { form: () => [], resolve: () => ({ text: "" }), map: () => ({}) };
+		expect(() => implementBlocks(catalog, { Quote: both as never })).toThrow("Block [Quote] sets both resolve and map");
+	});
+
 	test("a block resolver reads site settings through ctx.site", async () => {
 		const catalog = defineBlocks({ Footer: { props: z.object({ phone: z.string().nullable() }) } });
 		const blocks = implementBlocks(catalog, {
