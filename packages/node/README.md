@@ -104,7 +104,8 @@ const cms = createCms({
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
-	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches cms.settings.
+	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches cms.settings,
+	// like every setting; list a token's key (site.<name>) in secretSettings to seal it instead.
 	siteSettings: { tabs: (s) => [{ label: "Brand & forms", children: [s.text("tagline").label("Tagline")] }] },
 	hostRules: { ...kyselyRules(db), ...myRules }, // the admin's unique/exists and the host's own rules: cms.admin.hostRules
 });
@@ -712,7 +713,8 @@ request (no deploy step) sees Better Auth log a schema mismatch once, as
   (a mismatch is dropped with a warning; `strictBlocks: true` throws
   `BlockResolutionError` instead, in any environment). Valid props ship as
   resolved, and a `.default()` fills a key the resolver left out; a
-  `.transform()` runs only in the browser, which validates the props again.
+  `.transform()`'s output is not shipped: the browser validates the props
+  again and runs it there (the server parse runs it too, so keep it pure).
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,

@@ -169,12 +169,17 @@ export const honeypotField = (site: Site): string | null => {
 	return field === undefined ? "website" : field === null || field.trim() === "" ? null : field;
 };
 
-/** The parsed values of the keys the resolver left out, except those a transform pipe produced. */
+/**
+ * The parsed values of the keys the resolver left out that the object's own
+ * shape declares, except a transform pipe's. A schema with no shape (a
+ * whole-object transform) fills nothing.
+ */
 function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed: unknown): Record<string, unknown> {
 	const shape = (schema as { shape?: Record<string, { _zod?: { def?: { type?: string } } }> }).shape ?? {};
 	const out: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(isDict(parsed) ? parsed : {})) {
-		if (!(key in props) && shape[key]?._zod?.def?.type !== "pipe") {
+		const field = shape[key];
+		if (!(key in props) && field !== undefined && field._zod?.def?.type !== "pipe") {
 			out[key] = value;
 		}
 	}
@@ -187,9 +192,9 @@ function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed:
  * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
  * Props that match ship as resolved, plus the parsed value of each key the
  * resolver left out, so a `.default()` fills it as a page type's schema does
- * for `page.fields`. The browser parses again, so a `.transform()` must not
- * run here: keys the resolver set keep their value, and a left-out key whose
- * schema is a transform pipe is left to the browser.
+ * for `page.fields`. The browser parses again, so no transform output ships
+ * (the parse here still runs it: keep transforms pure): keys the resolver set
+ * keep their value, and a left-out key behind a transform is left to the browser.
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
 	const strict = site.config.strictBlocks === true;

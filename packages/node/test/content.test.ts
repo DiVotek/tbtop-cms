@@ -81,6 +81,13 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
 	});
 
+	test("a whole-object transform ships nothing it computed", async () => {
+		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string() }).transform((props) => ({ ...props, shout: props.text.toUpperCase() })) } });
+		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
+		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" } } }], blocks, true);
+		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
+	});
+
 	test("a block resolver reads site settings through ctx.site", async () => {
 		const catalog = defineBlocks({ Footer: { props: z.object({ phone: z.string().nullable() }) } });
 		const blocks = implementBlocks(catalog, {
@@ -193,5 +200,11 @@ describe("extending a built-in page type", () => {
 	test("its tree rules stay the package's; a second extension of the same key is refused", async () => {
 		await expect(makeCms(fixture, { pageTypes: [definePageType({ key: "article", requiresParent: false })] })).rejects.toThrow("Page type [article] is built in");
 		await expect(makeCms(fixture, { pageTypes: [tagline, tagline] })).rejects.toThrow("Page type [page] is already registered.");
+	});
+});
+
+describe("createCms timezone", () => {
+	test("a name Intl does not know is refused up front", async () => {
+		await expect(makeCms(null, { timezone: "Europe/Atlantis" })).rejects.toThrow('timezone "Europe/Atlantis" is not a valid IANA name');
 	});
 });
