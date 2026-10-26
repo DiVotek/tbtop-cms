@@ -65,10 +65,14 @@ describe("Dogfood: a host seeds step by step with real ids", () => {
 		const bream = await pages.create({ type: "article", parentId: catalog.id, name: { en: "Bream steak" }, status: "published" }, { slugs: { en: "bream" } });
 		const shelf = await pages.create({ type: "shelf", name: { en: "Shelf" }, status: "published" }, { slugs: { en: "shelf" } });
 		await pages.update(shelf.id, { fields: { items: [String(bream.id)] } });
+		const contact = await cms.site().sharedBlocks.create({ name: "Contact", kind: "ContactForm", data: { heading: { en: "Write to us" } } });
+		await cms.site().layouts.save("footer", [{ id: "contact", kind: "ContactForm", active: true, sort: 0, shared: contact }]);
 
 		const result = await cms.loadPage(get("/shelf"));
 		if (result.type !== "page") throw new Error(result.type);
 		expect(result.props.page.fields).toEqual({ items: [{ id: String(bream.id), name: "Bream steak", url: "/catalog/bream" }] });
+		// The footer row points at the shared block, so its copy renders on every page.
+		expect(JSON.stringify(result.props.cms.layout.footer)).toContain("Write to us");
 		expect(await isFreshSite(cms)).toBe(false);
 		expect(await seedFixtures(cms, demoFixture)).toEqual({});
 	});
