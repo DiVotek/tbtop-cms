@@ -14,6 +14,10 @@ return [
     ],
     'validation' => [
         'html_tags' => 'The HTML may use only :allowed; found: :tags.',
+        'html_attributes' => 'The HTML may carry no attributes but a link\'s href; found: :attributes.',
+        'html_links' => 'A link may point only to an http, https, mailto or tel URL or a path on the site; found: :links.',
+        'html_head' => 'The HTML must be body content only: no title, meta, style or other head elements.',
+        'unknown_key' => 'The API does not accept :key.',
     ],
     'command' => [
         'no_sanctum' => 'The pages API needs laravel/sanctum: run composer require laravel/sanctum and publish its migration.',

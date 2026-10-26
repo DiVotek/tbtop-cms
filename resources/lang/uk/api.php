@@ -14,6 +14,10 @@ return [
     ],
     'validation' => [
         'html_tags' => 'У HTML можна використовувати лише :allowed; знайдено: :tags.',
+        'html_attributes' => 'HTML не може мати атрибутів, крім href у посилання; знайдено: :attributes.',
+        'html_links' => 'Посилання може вести лише на URL http, https, mailto чи tel або на шлях сайту; знайдено: :links.',
+        'html_head' => 'HTML має містити лише вміст body: без title, meta, style та інших елементів head.',
+        'unknown_key' => 'API не приймає :key.',
     ],
     'command' => [
         'no_sanctum' => 'API сторінок потребує laravel/sanctum: виконайте composer require laravel/sanctum і опублікуйте його міграцію.',

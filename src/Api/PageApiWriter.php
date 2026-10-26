@@ -8,7 +8,6 @@ use DomainException;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
-use Tbtop\Cms\Admin\Fields\BlockContent;
 use Tbtop\Cms\Admin\Pages\Support\PageFormGuards;
 use Tbtop\Cms\Admin\Pages\Support\PageLeafType;
 use Tbtop\Cms\Api\Fields\CommonFields;
@@ -36,14 +35,14 @@ final readonly class PageApiWriter
 
     /**
      * The leaf type and subtype a page created under $parentId gets, as the
-     * admin's create form settles them (PageLeafType).
+     * admin's create form settles them (PageLeafType): v1 creates articles.
      *
      * @return array{type: string, subtype: ?string}
      */
-    public static function resolveType(int $parentId, ?string $type): array
+    public static function resolveType(int $parentId): array
     {
         $page = new Page;
-        ['type' => $type] = PageLeafType::resolve($page, $type ?? PageLeafType::ARTICLE, $parentId);
+        ['type' => $type] = PageLeafType::resolve($page, PageLeafType::ARTICLE, $parentId);
 
         return ['type' => $type, 'subtype' => PageLeafType::defaultSubtype($page, $type, $parentId, null)];
     }
@@ -52,16 +51,15 @@ final readonly class PageApiWriter
     public function create(array $data): Page
     {
         $parentId = (int) $data['parent_id'];
-        ['type' => $type, 'subtype' => $subtype] = self::resolveType($parentId, isset($data['type']) ? (string) $data['type'] : null);
+        ['type' => $type, 'subtype' => $subtype] = self::resolveType($parentId);
 
         $page = new Page;
         $page->fill(['type' => $type, 'subtype' => $subtype, 'parent_id' => $parentId, 'status' => PageStatus::Draft, 'is_indexable' => true]);
         $this->overlay($page, self::withNameFallback($data));
 
-        if (! array_key_exists('content', $data)) {
-            $starter = app(StarterBlocks::class)->contentFor($page);
-            $page->content = $starter !== [] ? $starter : app(TypeTemplateContent::class)->contentFor($page);
-        }
+        // Blocks are not written through v1; a new page starts with its type's blocks, as in the admin.
+        $starter = app(StarterBlocks::class)->contentFor($page);
+        $page->content = $starter !== [] ? $starter : app(TypeTemplateContent::class)->contentFor($page);
 
         $this->save($page, null);
 
@@ -98,8 +96,10 @@ final readonly class PageApiWriter
             throw ValidationException::withMessages($missing);
         }
 
-        $publishedAt ??= Carbon::now();
-        PageFormGuards::scheduling(['published_at' => $publishedAt->toIso8601String(), 'unpublish_at' => $page->unpublish_at?->toIso8601String()]);
+        // Without a date, a page keeps the stamp of an earlier publish, and a first publish is stamped now
+        // by the observer (stampFirstPublish), as the admin's publish does.
+        $publishedAt ??= $page->published_at;
+        PageFormGuards::scheduling(['published_at' => ($publishedAt ?? Carbon::now())->toIso8601String(), 'unpublish_at' => $page->unpublish_at?->toIso8601String()]);
 
         $page->status = PageStatus::Published;
         $page->published_at = $publishedAt;
@@ -150,13 +150,6 @@ final readonly class PageApiWriter
         }
         if (array_key_exists('og_image', $data)) {
             $seo['og_image'] = $data['og_image'] === null ? '' : (string) $data['og_image'];
-        }
-
-        if (array_key_exists('content', $data)) {
-            $page->content = BlockContent::toEnvelope(array_map(
-                static fn (array $row): array => [...(array) ($row['data'] ?? []), 'id' => $row['id'] ?? null, 'kind' => $row['kind'], 'active' => $row['active'] ?? true],
-                (array) $data['content'],
-            ));
         }
 
         if (array_key_exists('fields', $data)) {

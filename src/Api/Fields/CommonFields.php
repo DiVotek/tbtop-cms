@@ -6,15 +6,20 @@ namespace Tbtop\Cms\Api\Fields;
 
 use Illuminate\Validation\Rule;
 use Tbtop\Admin\Media\Models\Media;
-use Tbtop\Cms\Block\BlockRegistry;
 
 /**
  * The fields every page has, whatever its type: the translated texts and
- * SEO under `translations.{locale}`, the two images and the block content.
- * The description and the rules are both read from FIELDS.
+ * SEO under `translations.{locale}` and the two images. Block content is not
+ * in v1 (a create gets the type's starter blocks, as in the admin). The
+ * description and the rules are both read from FIELDS.
  */
 final class CommonFields
 {
+    /** The body keys a write may carry; anything else at the top level is refused. */
+    public const array CREATE_KEYS = ['parent_id', 'translations', 'image', 'og_image', 'fields'];
+
+    public const array UPDATE_KEYS = ['translations', 'image', 'og_image', 'fields'];
+
     /** key => [kind, label key, translatable, max length] — the SEO keys are `seo.*` under the locale. */
     private const array FIELDS = [
         'name' => [FieldKind::Text, 'name', true, 255],
@@ -31,7 +36,6 @@ final class CommonFields
         'seo.canonical' => [FieldKind::Text, 'seo_canonical', true, 2048],
         'image' => [FieldKind::Media, 'image', false, null],
         'og_image' => [FieldKind::Media, 'og_image', false, null],
-        'content' => [FieldKind::Blocks, null, false, null],
     ];
 
     /** The texts a page is published with: a create needs it in the default locale, publish in every active one. */
@@ -66,7 +70,7 @@ final class CommonFields
         foreach (self::FIELDS as $key => [$kind, $label, $isTranslatable]) {
             $fields[] = new ApiField(
                 key: $key,
-                label: $label === null ? __('tbtop-cms::pages.blocks.section_title') : __('tbtop-cms::pages.fields.' . $label),
+                label: __('tbtop-cms::pages.fields.' . $label),
                 kind: $kind,
                 isRequired: $key === self::REQUIRED,
                 isTranslatable: $isTranslatable,
@@ -77,11 +81,15 @@ final class CommonFields
     }
 
     /**
+     * A title, once sent for the default or a frontend-active locale, may not
+     * be blank: publish would refuse the page there, and an update could
+     * otherwise empty a live page's title.
+     *
      * @param  list<string>  $locales  The writable locales.
-     * @param  list<string>  $placements  The page's type and subtype, for the block kinds it may hold.
+     * @param  list<string>  $active  The frontend-active locales.
      * @return array<string, list<mixed>>
      */
-    public static function rules(array $locales, string $default, bool $isCreate, array $placements): array
+    public static function rules(array $locales, array $active, string $default, bool $isCreate): array
     {
         $rules = [
             'translations' => [$isCreate ? 'required' : 'sometimes', 'array:' . implode(',', $locales)],
@@ -92,34 +100,28 @@ final class CommonFields
             $rules[$base] = ['array:' . implode(',', self::translationKeys())];
             $rules["{$base}.seo"] = ['array:' . implode(',', self::seoKeys())];
             foreach (self::FIELDS as $key => [$kind, , $isTranslatable, $max]) {
-                if ($isTranslatable) {
-                    $isRequired = $isCreate && $key === self::REQUIRED && $locale === $default;
-                    $rules["{$base}.{$key}"] = self::textRules($kind, $max, $key === 'seo.canonical', $isRequired);
+                if (! $isTranslatable) {
+                    continue;
                 }
+                $presence = match (true) {
+                    $key !== self::REQUIRED => ['nullable'],
+                    $isCreate && $locale === $default => ['required'],
+                    $locale === $default || in_array($locale, $active, true) => ['sometimes', 'required'],
+                    default => ['nullable'],
+                };
+                $rules["{$base}.{$key}"] = [...$presence, ...self::textRules($kind, $max, $key === 'seo.canonical')];
             }
         }
 
         $media = ['nullable', 'integer', Rule::exists(Media::class, 'id')];
-        $kinds = array_keys(app(BlockRegistry::class)->forPlacements($placements));
 
-        return [
-            ...$rules,
-            'image' => $media,
-            'og_image' => $media,
-            'content' => ['array'],
-            'content.*' => ['array:id,kind,active,data'],
-            'content.*.id' => ['nullable', 'string', 'max:64'],
-            'content.*.kind' => ['required', 'string', Rule::in($kinds)],
-            'content.*.active' => ['boolean'],
-            'content.*.data' => ['array'],
-        ];
+        return [...$rules, 'image' => $media, 'og_image' => $media];
     }
 
     /** @return list<mixed> */
-    private static function textRules(FieldKind $kind, ?int $max, bool $isUrl, bool $isRequired): array
+    private static function textRules(FieldKind $kind, ?int $max, bool $isUrl): array
     {
         return [
-            $isRequired ? 'required' : 'nullable',
             'string',
             ...($max !== null ? ['max:' . $max] : []),
             ...($isUrl ? ['url:http,https'] : []),

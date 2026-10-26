@@ -62,7 +62,6 @@ final readonly class PageResource
             'og_image' => self::mediaId($seo['og_image'] ?? null),
             'translations' => $translations,
             'fields' => PageFields::for($page->type, $page->subtype)->typeFields->present($fields),
-            'content' => is_array($page->content) ? $page->content : [],
             'url' => $urls,
             'preview_url' => $previews,
             'created_at' => $page->created_at?->toIso8601String(),

@@ -6,6 +6,7 @@ namespace Tbtop\Cms\Api;
 
 use Closure;
 use Illuminate\Support\Facades\App;
+use Tbtop\Cms\Admin\Support\AdminLocales;
 use Tbtop\Cms\Language\Languages;
 
 /** The locales an API request may write (admin- or frontend-active) and the ones publish requires (frontend-active). */
@@ -55,20 +56,18 @@ final readonly class ApiLocales
     }
 
     /**
+     * Runs $callback in the admin panel's default UI locale (not a content
+     * locale), so field labels read as the site's editors see them.
+     *
      * @template T
      *
      * @param  Closure(): T  $callback
      * @return T
      */
-    public function withDefaultLocale(Closure $callback): mixed
+    public function withAdminLocale(Closure $callback): mixed
     {
-        $default = $this->default();
-        if ($default === '') {
-            return $callback();
-        }
-
         $previous = App::getLocale();
-        App::setLocale($default);
+        App::setLocale(AdminLocales::default());
 
         try {
             return $callback();
