@@ -6,6 +6,7 @@ touches: new routes under /api/cms/v1 (off by default), config, artisan commands
 > ⚠️ **Contract** New config key `tbtop-cms.api.enabled` (`env('TBTOP_CMS_API', false)`).
 > ⚠️ **Contract** New command `cms:api-token {user} --parents= [--name=]`; `{user}` is the email of a CMS admin. Revoke with that user's `tokens()->delete()`.
 > ⚠️ **Contract** Response `Page.url` and `Page.preview_url` are maps keyed by locale; a field description carries `multiple?: true` for list-valued select, media and ref fields. Write bodies refuse unknown top-level keys (422); v1 neither writes nor returns `content`.
+> ⚠️ **Contract** `translations.{locale}` carries no `title` (release 0.4 moved the page title to `seo.title` and deprecated the column): `name` is the required text — on create in the default locale, at publish in every frontend-active locale (422 `translations.{locale}.name`, no fallback) — and the meta title is `translations.{locale}.seo.title`. A caller that sent `title` sends `name` (and `seo.title` for a distinct browser-tab title); `title` is now 422.
 > ⚠️ **Contract** Publish answers 409 for any page whose status is Published, including one whose `unpublish_at` has passed.
 > ⚠️ **Contract** `RichtextLinkRenderer::isAllowedUrl()` is public (the API's richtext validation reuses it).
 > ⚠️ **Contract** New auth guard `cms-api` (driver `sanctum`, the admin guard's provider), added only when the host has none by that name.
@@ -30,7 +31,7 @@ Tests: `tests/Api/PagesApiTest` (4; each mutated by hand and caught — PATCH
 keeps unsent SEO, texts and `is_indexable: false`, a token without
 `pages:write` is refused, a token reaches only its category's articles (POST
 elsewhere, GET of a system page, a sub-category neither listed nor
-patchable), publish with a blank title in a frontend-active locale is 422 and
+patchable), publish with no name in a frontend-active locale is 422, even with that locale's `seo.title` set, and
 stays draft).
 
 Read by eye: `cms:api-token` with an unknown id names it; `cms:doctor` with

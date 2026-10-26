@@ -23,7 +23,6 @@ final class CommonFields
     /** key => [kind, label key, translatable, max length] — the SEO keys are `seo.*` under the locale. */
     private const array FIELDS = [
         'name' => [FieldKind::Text, 'name', true, 255],
-        'title' => [FieldKind::Text, 'title', true, 255],
         'slug' => [FieldKind::Text, 'slug', true, 120],
         'heading' => [FieldKind::Text, 'heading', true, 255],
         'summary' => [FieldKind::Textarea, 'summary', true, null],
@@ -38,8 +37,13 @@ final class CommonFields
         'og_image' => [FieldKind::Media, 'og_image', false, null],
     ];
 
-    /** The texts a page is published with: a create needs it in the default locale, publish in every active one. */
-    public const string REQUIRED = 'title';
+    /**
+     * The text a page is published with: a create needs it in the default
+     * locale, publish in every active one. It is `name`, the one text the
+     * admin requires; the deprecated `title` column is not written (the meta
+     * title is `seo.title`, see UPGRADING "The page `title` field moved").
+     */
+    public const string REQUIRED = 'name';
 
     /** @return list<string> */
     public static function translationKeys(): array
@@ -81,9 +85,9 @@ final class CommonFields
     }
 
     /**
-     * A title, once sent for the default or a frontend-active locale, may not
+     * A name, once sent for the default or a frontend-active locale, may not
      * be blank: publish would refuse the page there, and an update could
-     * otherwise empty a live page's title.
+     * otherwise empty a live page's name.
      *
      * @param  list<string>  $locales  The writable locales.
      * @param  list<string>  $active  The frontend-active locales.

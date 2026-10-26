@@ -10,7 +10,7 @@ return [
         'type_unknown' => 'No such page type.',
         'already_published' => 'The page is already published.',
         'delete_published' => 'Only a draft can be deleted through the API. Unpublish the page in the admin first.',
-        'title_missing' => 'The page has no title in ":locale", which the site shows.',
+        'name_missing' => 'The page has no name in ":locale", which the site shows.',
     ],
     'validation' => [
         'html_tags' => 'The HTML may use only :allowed; found: :tags.',

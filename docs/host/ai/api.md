@@ -64,9 +64,9 @@ All bodies are JSON; errors are Laravel's `{message, errors?}`.
 | `GET /pages?parent_id=&type=&status=&per_page=&page=` | read | `{data: [Page], meta: {current_page, last_page, per_page, total}}`, `per_page` 1–100 (50) |
 | `GET /pages/{id}` | read | `Page`; 404 missing or trashed, 403 out of reach |
 | `POST /pages` | write | 201 `Page`, always an `article` draft with the type's starter blocks. Its subtype follows from the parent as in the admin's create form (`PageLeafType`); the body has no `type`. A missing or invalid `parent_id`, or a parent that takes no article, is 422 on `parent_id`; a valid parent outside the token's reach is 403 |
-| `PATCH /pages/{id}` | write | `Page`. Only the keys sent are written; a translatable value keeps the locales not sent. A title sent for the default or a frontend-active locale may not be null or blank. `status`, `parent_id`, `is_indexable` and the schedule are not patchable (422) |
+| `PATCH /pages/{id}` | write | `Page`. Only the keys sent are written; a translatable value keeps the locales not sent. A `name` sent for the default or a frontend-active locale may not be null or blank. `status`, `parent_id`, `is_indexable` and the schedule are not patchable (422) |
 | `DELETE /pages/{id}` | write | 204, soft delete; 404 missing, 409 published |
-| `POST /pages/{id}/publish {published_at?}` | write | `Page`; 404 trashed, 409 when the status is already Published — also when its `unpublish_at` has passed and the page is off the site, which is unpublished in the admin first — 422 `translations.{locale}.title` when a frontend-active locale has no title (no fallback). Without `published_at` a page keeps an earlier publish's date, else is stamped now; a future one schedules |
+| `POST /pages/{id}/publish {published_at?}` | write | `Page`; 404 trashed, 409 when the status is already Published — also when its `unpublish_at` has passed and the page is off the site, which is unpublished in the admin first — 422 `translations.{locale}.name` when a frontend-active locale has no name (no fallback to another locale or to `seo.title`). Without `published_at` a page keeps an earlier publish's date, else is stamped now; a future one schedules |
 | `GET /types/{type}/fields` | read | `[Field]` for a base type or subtype key; 404 unknown, 403 when its base type is not writable for the token |
 | `GET /locales` | read | `{default, active: [locale]}` — `active` is the frontend-active locales publish checks |
 | `POST /media` | write | 201 `{id, url}`; 403 for a token with no parent. `url` (http/https, downloaded through the admin's SSRF guard and size cap), plus `name?`, `alt?`. No file upload: the caller hands over a public URL. A refused URL or file type is 422 with the media library's own message |
@@ -77,15 +77,20 @@ All bodies are JSON; errors are Laravel's `{message, errors?}`.
 ```json
 {
   "parent_id": 12,
-  "translations": {"en": {"title": "…", "name": "…", "slug": "…", "heading": "…", "summary": "…", "body": "<p>…</p>",
+  "translations": {"en": {"name": "…", "slug": "…", "heading": "…", "summary": "…", "body": "<p>…</p>",
                           "seo": {"title": "…", "description": "…", "focus_keyword": "…", "og_title": "…", "og_description": "…", "canonical": "https://…"}}},
   "image": 41, "og_image": 41,
   "fields": {"cardLabel": {"en": "…"}, "steps": ["…"], "poster": 41}
 }
 ```
 
-`translations` keys are the content locales; `title` in the default locale is
-required on create, and a missing `name` takes the title. `body` and any
+`translations` keys are the content locales; `name` in the default locale is
+required on create. There is no `title`: the page title moved to the SEO
+tab's meta title (UPGRADING, "The page `title` field moved"), so the
+browser-tab title is `seo.title`, the H1 `heading`, and `name` the page's own
+text the admin requires — the list label, breadcrumb, link text and the slug
+source, and the meta title when `seo.title` is empty. A `title` key is 422,
+and a page's deprecated stored `title` is not returned. `body` and any
 `richtext` field take HTML limited to `p, h2–h4, ul, ol, li, strong, em, a,
 blockquote`, with no attribute but a link's `href`, and are stored as
 richtext nodes. A link must be http, https, mailto, tel or a path on the site

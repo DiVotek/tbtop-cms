@@ -55,7 +55,7 @@ final readonly class PageApiWriter
 
         $page = new Page;
         $page->fill(['type' => $type, 'subtype' => $subtype, 'parent_id' => $parentId, 'status' => PageStatus::Draft, 'is_indexable' => true]);
-        $this->overlay($page, self::withNameFallback($data));
+        $this->overlay($page, $data);
 
         // Blocks are not written through v1; a new page starts with its type's blocks, as in the admin.
         $starter = app(StarterBlocks::class)->contentFor($page);
@@ -76,7 +76,7 @@ final readonly class PageApiWriter
     }
 
     /**
-     * Refuses a page already published and one missing a title in a locale
+     * Refuses a page already published and one missing a name in a locale
      * the site shows: the page would go live there with another locale's text.
      */
     public function publish(Page $page, ?Carbon $publishedAt): Page
@@ -87,9 +87,9 @@ final readonly class PageApiWriter
 
         $missing = [];
         foreach ($this->locales->active() as $locale) {
-            $title = $page->getTranslation(CommonFields::REQUIRED, $locale, false);
-            if (! is_string($title) || trim($title) === '') {
-                $missing["translations.{$locale}.title"] = __('tbtop-cms::api.errors.title_missing', ['locale' => $locale]);
+            $name = $page->getTranslation(CommonFields::REQUIRED, $locale, false);
+            if (! is_string($name) || trim($name) === '') {
+                $missing["translations.{$locale}." . CommonFields::REQUIRED] = __('tbtop-cms::api.errors.name_missing', ['locale' => $locale]);
             }
         }
         if ($missing !== []) {
@@ -177,30 +177,6 @@ final readonly class PageApiWriter
         }
 
         return $seo;
-    }
-
-    /**
-     * A create without a name takes the title as the name per locale, the way
-     * the admin's create form fills a blank title from the name.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    private static function withNameFallback(array $data): array
-    {
-        foreach ((array) ($data['translations'] ?? []) as $locale => $texts) {
-            $texts = (array) $texts;
-            $name = $texts['name'] ?? null;
-            $title = $texts['title'] ?? null;
-            if ((! is_string($name) || trim($name) === '') && is_string($title) && trim($title) !== '') {
-                $data['translations'][$locale]['name'] = $title;
-            }
-            if ((! is_string($title) || trim($title) === '') && is_string($name) && trim($name) !== '') {
-                $data['translations'][$locale]['title'] = $name;
-            }
-        }
-
-        return $data;
     }
 
     /** The observers' DomainExceptions are the model's invariants, answered as field errors like the admin does. */
