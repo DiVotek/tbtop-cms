@@ -79,6 +79,8 @@ export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, plac
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
+	// toSchema: (props, ctx) => ({ ...baseNode(ctx, "Service"), provider: { "@id": identityId(ctx.site) } })
+	// baseNode gives the page's name, url, description, image and dates; identityId links to the site identity.
 	// Lists of cards go in a repeater; its translatable cells are edited per locale:
 	// form: (s) => [s.repeater("items").fields([s.text("q").translatable(), s.text("icon")])]
 	// resolve() gets a `.translatable()` field already in the page's locale (default as fallback),

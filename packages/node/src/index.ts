@@ -62,7 +62,7 @@ export {
 	type Template,
 } from "./notifications";
 export type { Alternate, Seo } from "./seo/resolver";
-export type { SchemaContext } from "./seo/schemaContext";
+export { baseNode, identityId, type SchemaContext } from "./seo/schemaContext";
 export type { OpenGraph, SchemaTypeDef } from "./seo/schemaTypes";
 export { Site } from "./site";
 export type { Json, Jsonify } from "./support/values";

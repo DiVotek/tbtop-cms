@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
+import { baseNode, cmsBlockImpls, cmsBlocks, defineBlocks, identityId, implementBlocks } from "../src";
 import { makeCms, get } from "./support";
 
 describe("loadPage", () => {
@@ -179,4 +181,26 @@ describe("handle", () => {
 		expect((await cms.handle(get("/sitemap-2.xml")))?.status).toBe(404);
 		expect(await cms.handle(get("/about-us"))).toBeNull();
 	});
+
+	test("a block's toSchema builds on the exported baseNode and links the identity by identityId", async () => {
+		const catalog = defineBlocks({ ...cmsBlocks, Budget: { props: z.object({ price: z.string() }) } });
+		const blocks = implementBlocks(catalog, {
+			...cmsBlockImpls,
+			Budget: {
+				form: (s) => [s.text("price")],
+				toSchema: (props, ctx) => ({ ...baseNode(ctx, "Service"), offers: { "@type": "Offer", price: props.price }, provider: { "@id": identityId(ctx.site) } }),
+			},
+		});
+		const { cms, ids } = await makeCms(undefined, { blocks });
+		await cms.site().pages.update(ids.home as number, { content: [{ id: "b", kind: "Budget", data: { price: "100" } }] as never });
+		const result = await cms.loadPage(get("/"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(result.props.seo.jsonLd.find((node) => node["@type"] === "Service")).toMatchObject({
+			name: "Welcome",
+			url: "https://site.test",
+			offers: { price: "100" },
+			provider: { "@id": "https://site.test#identity" },
+		});
+	});
 });
+

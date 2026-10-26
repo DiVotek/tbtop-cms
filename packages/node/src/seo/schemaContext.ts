@@ -141,6 +141,7 @@ async function canonical(site: Site, page: Page, locale: string): Promise<string
 	);
 }
 
+/** The site identity node's `@id`: a host node (a block's `toSchema`) links to the organization by it. */
 export const identityId = (site: Site): string => `${site.absolute("/")}#identity`;
 
 async function identityAuthor(site: Site): Promise<Record<string, unknown> | null> {
