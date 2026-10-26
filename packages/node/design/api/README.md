@@ -23,7 +23,7 @@ D1 dialect, `runtimeFromEnv` and `workerEntry` (Q16).
 
 ```bash
 cd packages/node
-bun test ./design/api                    # 45 checks: 5 variants x (Node + Workers)
+bun test ./design/api                    # 45 checks: 5 variants x (Node + Workers), plus dialectOf per adapter
 bunx tsc --noEmit -p design/api          # typecheck against src/
 design/api/scripts/negative-types.sh     # a wrong page.fields type must fail tsc in every variant
 ```
