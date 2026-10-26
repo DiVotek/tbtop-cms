@@ -169,22 +169,35 @@ export const honeypotField = (site: Site): string | null => {
 	return field === undefined ? "website" : field === null || field.trim() === "" ? null : field;
 };
 
+/** The parsed values of the keys the resolver left out, except those a transform pipe produced. */
+function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed: unknown): Record<string, unknown> {
+	const shape = (schema as { shape?: Record<string, { _zod?: { def?: { type?: string } } }> }).shape ?? {};
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(isDict(parsed) ? parsed : {})) {
+		if (!(key in props) && shape[key]?._zod?.def?.type !== "pipe") {
+			out[key] = value;
+		}
+	}
+	return out;
+}
+
 /**
  * The catalog's zod schema is the contract: props that do not match it are
  * dropped, not shipped. That is a resolver/catalog drift, a code bug, so it
  * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
  * Props that match ship as resolved, plus the parsed value of each key the
  * resolver left out, so a `.default()` fills it as a page type's schema does
- * for `page.fields`. Keys the resolver set keep their value: the browser
- * parses again, and a `.transform()` must not run twice.
+ * for `page.fields`. The browser parses again, so a `.transform()` must not
+ * run here: keys the resolver set keep their value, and a left-out key whose
+ * schema is a transform pipe is left to the browser.
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
 	const strict = site.config.strictBlocks === true;
 	return blocks.flatMap((block) => {
-		const result = site.blocks.get(block.kind).props.safeParse(block.props);
+		const schema = site.blocks.get(block.kind).props;
+		const result = schema.safeParse(block.props);
 		if (result.success) {
-			// The resolver's keys win: zod strips undeclared ones, and a transform must not run twice.
-			return [{ ...block, props: { ...(result.data as ResolvedBlock["props"]), ...block.props } }];
+			return [{ ...block, props: { ...filledDefaults(schema, block.props, result.data), ...block.props } }];
 		}
 		if (strict) {
 			throw new BlockResolutionError(`Block [${block.kind}] props do not match the catalog: ${result.error.message}`);

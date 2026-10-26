@@ -74,6 +74,13 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi", note: "kept", surface: false });
 	});
 
+	test("a defaulted key behind a transform is left to the browser, so the transform runs once", async () => {
+		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string(), tone: z.string().default("calm").transform((tone) => `tone-${tone}`) }) } });
+		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
+		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" } } }], blocks, true);
+		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
+	});
+
 	test("a block resolver reads site settings through ctx.site", async () => {
 		const catalog = defineBlocks({ Footer: { props: z.object({ phone: z.string().nullable() }) } });
 		const blocks = implementBlocks(catalog, {
