@@ -1,0 +1,38 @@
+import type { ExecutionContext, ScheduledController } from "../shared/workers";
+
+/** What one isolate keeps per `env`: the built app and its first-request boot (migrations, seed). */
+export type WorkerApp = {
+	boot(): Promise<void>;
+	fetch(request: Request, ctx: ExecutionContext): Promise<Response>;
+	scheduled(): Promise<unknown>;
+};
+
+/**
+ * The Workers module shape `{ fetch, scheduled }` around an app built from
+ * `env` once per isolate. Bindings exist only inside a handler, so the app
+ * cannot be built at module scope as on Node; the first request (or cron
+ * tick) awaits the boot, the rest reuse it.
+ */
+export function workerEntry<E extends object>(make: (env: E) => WorkerApp) {
+	const apps = new WeakMap<E, { app: WorkerApp; ready: Promise<void> }>();
+	const get = (env: E) => {
+		let hit = apps.get(env);
+		if (hit === undefined) {
+			const app = make(env);
+			hit = { app, ready: app.boot() };
+			apps.set(env, hit);
+		}
+		return hit;
+	};
+	return {
+		async fetch(request: Request, env: E, ctx: ExecutionContext): Promise<Response> {
+			const { app, ready } = get(env);
+			await ready;
+			return app.fetch(request, ctx);
+		},
+		async scheduled(_controller: ScheduledController, env: E, ctx: ExecutionContext): Promise<void> {
+			const { app, ready } = get(env);
+			ctx.waitUntil(ready.then(() => app.scheduled()));
+		},
+	};
+}
