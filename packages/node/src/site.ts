@@ -11,6 +11,7 @@ import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from
 import { firstText, type Page, pageFromRow, translationText } from "./content/page";
 import { Pages, whereLive } from "./content/pages";
 import { livePageRefs, type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
+import { hostMediaKeys } from "./content/hostSettings";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { PageRevisions } from "./content/revisions";
@@ -61,6 +62,7 @@ export class Site {
 			secretKeys: config.secretSettings ?? [],
 			secretKey: config.settingsKey,
 			mediaUrl: (ref) => this.mediaUrl(ref),
+			mediaKeys: hostMediaKeys(config),
 		});
 		this.pages = new Pages(
 			db,

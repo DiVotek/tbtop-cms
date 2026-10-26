@@ -3,7 +3,7 @@ import type { Cms } from "../cms";
 import { firstText, isLive, pageFromRow } from "../content/page";
 import { LEAD_STATUSES, type LeadStatus, submissionFromRow } from "../forms/submissions";
 import { leadIdentity } from "../forms/lead";
-import { parseDate, sqlDate } from "../support/values";
+import { isoDay, parseDate, sqlDate } from "../support/values";
 import { allows } from "./abilities";
 import { environmentCards, systemMetrics } from "./dashboardSystem";
 import { adminPrefix } from "./support";
@@ -16,7 +16,7 @@ const LEAD_LABELS: Record<LeadStatus, string> = { new: "New", read: "Read", proc
 const LEAD_COLORS: Record<LeadStatus, string> = { new: "danger", read: "muted", processed: "success", discarded: "muted" };
 
 /** The `Y-m-d` day of a moment in the admin's timezone (Carbon's toDateString() in app.timezone). */
-const dayKey = (date: Date): string => new Intl.DateTimeFormat("en-CA", { timeZone: currentContext().timezone || "UTC" }).format(date);
+const dayKey = (date: Date): string => isoDay(date, currentContext().timezone || "UTC");
 
 /** The `Y-m-d` day `offset` days before a `Y-m-d` day. */
 const dayBefore = (day: string, offset: number): string => new Date(Date.parse(`${day}T00:00:00Z`) - offset * 86_400_000).toISOString().slice(0, 10);

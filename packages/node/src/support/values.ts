@@ -99,6 +99,13 @@ export function parseDate(value: unknown): Date | null {
 }
 
 /** Carbon's toIso8601String()/toAtomString() in UTC: `2026-10-22T10:00:00+00:00`. */
+/** The `Y-m-d` day of a moment in an IANA zone, from formatToParts: no locale's date pattern is assumed. */
+export function isoDay(date: Date, timeZone: string): string {
+	const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+	const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+	return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 export const atom = (date: Date): string => `${date.toISOString().slice(0, 19)}+00:00`;
 
 export const bool = (value: unknown): boolean => value === true || value === 1 || value === "1";

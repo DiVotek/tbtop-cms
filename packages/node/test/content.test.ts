@@ -82,12 +82,22 @@ describe("blocks", () => {
 		expect(spec.elements.q?.props).toEqual({ text: "Hi" });
 	});
 
-	test("a default around a transform ships the raw default, so the browser transforms it once", async () => {
-		// zod 4: .transform(f).default(d) returns d without running f.
-		const catalog = defineBlocks({ Quote: { props: z.object({ text: z.string(), tone: z.string().transform((tone) => `tone-${tone}`).default("calm") }) } });
+	test("a filled default ships only when the browser's parse of it gives it back", async () => {
+		const catalog = defineBlocks({
+			Quote: {
+				props: z.object({
+					text: z.string(),
+					tone: z.string().transform((tone) => `tone-${tone}`).default("calm"),
+					size: z.string().transform((value) => value.length).prefault("ab"),
+					at: z.date().default(() => new Date(0)),
+					surface: z.boolean().default(false),
+				}),
+			},
+		});
 		const blocks = implementBlocks(catalog, { Quote: { form: (s) => [s.text("text").translatable()] } });
 		const spec = await render([{ id: "q", kind: "Quote", data: { text: { en: "Hi" } } }], blocks, true);
-		expect(spec.elements.q?.props).toEqual({ text: "Hi", tone: "calm" });
+		// Only the plain default: the others would change or fail when the browser parses them again.
+		expect(spec.elements.q?.props).toEqual({ text: "Hi", surface: false });
 	});
 
 	test("a whole-object transform ships nothing it computed", async () => {

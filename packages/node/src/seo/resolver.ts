@@ -14,6 +14,7 @@ import {
 	type SchemaContext,
 } from "./schemaContext";
 import { FALLBACK_SCHEMA, type OpenGraph, type SchemaTypeDef } from "./schemaTypes";
+import { isoDay } from "../support/values";
 
 export type Alternate = { locale: string; url: string };
 
@@ -291,8 +292,8 @@ function longDate(date: Date, locale: string, timeZone: string): string {
 	try {
 		return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric", timeZone }).format(date);
 	} catch {
-		// A locale tag Intl rejects: the ISO day (en-CA is YYYY-MM-DD), still in the site's zone.
-		return new Intl.DateTimeFormat("en-CA", { timeZone }).format(date);
+		// A locale tag Intl rejects: the ISO day, still in the site's zone.
+		return isoDay(date, timeZone);
 	}
 }
 

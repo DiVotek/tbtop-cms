@@ -1,5 +1,6 @@
-import { definePage, Effects, Field, S, walk } from "@tbtop/admin";
+import { definePage, Effects, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
+import { tabFields } from "../content/hostSettings";
 import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
@@ -124,11 +125,6 @@ const SITE_MAP: Record<string, string> = {
 	emails: "site.contacts.emails",
 	socials: "site.contacts.socials",
 };
-
-/** The fields of a host tab, through layout nodes; a repeater is one field. */
-function tabFields(nodes: unknown[]): Field[] {
-	return nodes.flatMap((node) => (node instanceof Field ? [node] : tabFields(walk.descendants(node))));
-}
 
 /** The host tabs' fields by name, each at `site.<name>`; a name the page already uses (or its key) throws. */
 function hostSiteMap(cms: Cms): Record<string, string> {

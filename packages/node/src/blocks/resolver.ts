@@ -171,15 +171,21 @@ export const honeypotField = (site: Site): string | null => {
 
 /**
  * The parsed values of the keys the resolver left out that the object's own
- * shape declares, except a transform pipe's. A schema with no shape (a
- * whole-object transform) fills nothing.
+ * shape declares, each only when the browser's parse of it (after JSON) gives
+ * it back: a transform's output, a Date, a prefault or catch would change or
+ * fail there. A schema with no shape (a whole-object transform) fills nothing.
  */
 function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed: unknown): Record<string, unknown> {
-	const shape = (schema as { shape?: Record<string, { _zod?: { def?: { type?: string } } }> }).shape ?? {};
+	const shape = (schema as { shape?: Record<string, { safeParse(value: unknown): { success: boolean; data?: unknown } }> }).shape ?? {};
 	const out: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(isDict(parsed) ? parsed : {})) {
 		const field = shape[key];
-		if (!(key in props) && field !== undefined && field._zod?.def?.type !== "pipe") {
+		if (key in props || field === undefined || value === undefined) {
+			continue;
+		}
+		const wire = JSON.stringify(value);
+		const again = field.safeParse(JSON.parse(wire));
+		if (again.success && JSON.stringify(again.data) === wire) {
 			out[key] = value;
 		}
 	}
@@ -192,9 +198,9 @@ function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed:
  * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
  * Props that match ship as resolved, plus the parsed value of each key the
  * resolver left out, so a `.default()` fills it as a page type's schema does
- * for `page.fields`. The browser parses again, so no transform output ships
- * (the parse here still runs it: keep transforms pure): keys the resolver set
- * keep their value, and a left-out key behind a transform is left to the browser.
+ * for `page.fields`. The browser parses again, so keys the resolver set keep
+ * their value and a default ships only when that parse gives it back (the
+ * parse here still runs transforms: keep them pure).
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
 	const strict = site.config.strictBlocks === true;
