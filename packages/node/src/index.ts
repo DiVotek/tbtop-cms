@@ -26,8 +26,8 @@ export { type CmsCacheStore, type KvNamespaceLike, kvCache, memoryCache } from "
 export type { CmsAdminAuth, CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
 export type { Language } from "./content/languages";
 export { ensureDefaultLanguage, LanguageError } from "./content/languages";
-export { isLive, type Page, type PageStatus, type Translations } from "./content/page";
-export { PageConflictError, type PageInput } from "./content/pages";
+export { isLive, type Page, pageFromRow, type PageStatus, type Translations } from "./content/page";
+export { PageConflictError, type PageInput, whereLive } from "./content/pages";
 export { rebuildPageRefs } from "./content/pageRefIndex";
 export { AUDIT_SUBJECTS, type AuditEntry, AuditLog, type AuditSubject } from "./content/audit";
 export type { PageRef } from "./content/pageRefs";

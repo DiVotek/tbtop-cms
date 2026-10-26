@@ -351,6 +351,29 @@ atomic nor resumable: run it from one process (a deploy step or one boot,
 not every instance at once), and if a step fails, empty the database and
 seed again, since `isFreshSite` is false once the first page exists.
 
+A list the editor does not pick (a blog index, the products of a category,
+"latest three posts") is the host's own query, in its loader or route: the
+page props carry no children, and a block's `resolve()` does not see the
+request's `?page=`. `site.pages.query()` is a Kysely builder over live
+`tbtop_pages` rows (trashed ones left out); `whereLive` adds the rule the
+frontend uses (published, `published_at` passed, `unpublish_at` ahead), the
+counterpart of PHP's `Page::scopeLive`, and `pageFromRow` turns a row into a
+`Page`:
+
+```ts
+import { pageFromRow, whereLive } from "@tbtop/cms";
+
+const site = cms.site(request);
+const perPage = 10;
+const current = Math.max(1, Number(new URL(request.url).searchParams.get("page")) || 1);
+const children = site.pages.query().$call(whereLive).where("parent_id", "=", blog.id).where("subtype", "=", "journal");
+const { total } = await children.select((eb) => eb.fn.countAll<number>().as("total")).executeTakeFirstOrThrow();
+const posts = (await children.selectAll().orderBy("published_at", "desc").orderBy("id", "desc")
+	.limit(perPage).offset((current - 1) * perPage).execute()).map(pageFromRow);
+const cards = await Promise.all(posts.map(async (post) => ({ id: post.id, name: post.name[locale], url: await site.pageUrl(post, locale) })));
+// pages: Math.ceil(Number(total) / perPage)
+```
+
 ## Link and pages fields
 
 `linkField` and `pagesField` go into a host block's `form()` (or a page

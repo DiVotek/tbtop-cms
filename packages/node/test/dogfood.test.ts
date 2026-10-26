@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { cmsBlockImpls, cmsBlocks, definePageType, demoFixture, type Fixture, implementBlocks, isFreshSite, pagesField, type SchemaTypeDef, seedFixtures } from "../src";
+import { cmsBlockImpls, cmsBlocks, definePageType, demoFixture, type Fixture, implementBlocks, isFreshSite, pageFromRow, pagesField, whereLive, type SchemaTypeDef, seedFixtures } from "../src";
 import { get, makeCms } from "./support";
 
 // Findings from the dogfood sites (Golfstrimfish, Lumen Studio) that need no new API.
@@ -130,5 +130,21 @@ describe("Dogfood: a block reads the fields of the pages it lists", () => {
 		expect(result.props.page.fields).toEqual({
 			other: [{ id: String(b.id), name: "B", url: "/b", fields: { other: [{ id: String(a.id), name: "A", url: "/a", fields: {} }] } }],
 		});
+	});
+});
+
+describe("Dogfood: a host lists a category's live children a page at a time", () => {
+	test("whereLive and pageFromRow page through the children the frontend would show", async () => {
+		const { cms, ids } = await makeCms(demoFixture);
+		const site = cms.site(get("/blog?page=1"));
+		const blog = ids.blog as number;
+		const children = site.pages.query().$call(whereLive).where("parent_id", "=", blog);
+		const { total } = await children.select((eb) => eb.fn.countAll<number>().as("total")).executeTakeFirstOrThrow();
+		const posts = (await children.selectAll().orderBy("published_at", "desc").orderBy("id", "desc").limit(10).offset(0).execute()).map(pageFromRow);
+		const cards = await Promise.all(posts.map(async (post) => ({ id: post.id, name: post.name.en, url: await site.pageUrl(post, "en") })));
+
+		// The 2037 post is scheduled, so it is neither counted nor listed.
+		expect(Number(total)).toBe(1);
+		expect(cards).toEqual([{ id: ids["first-post"] as number, name: "First post", url: "/blog/first-post" }]);
 	});
 });
