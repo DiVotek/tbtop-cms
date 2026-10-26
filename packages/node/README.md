@@ -85,7 +85,7 @@ const cms = createCms({
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
-	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
+	hostRules: { ...kyselyRules(db), ...myRules }, // the admin's unique/exists and the host's own rules: cms.admin.hostRules
 });
 
 // Frontend
@@ -369,21 +369,30 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 
 ## Forms and notifications
 
-A form block declares `submit` in its implementation: the validation rules
-(Laravel rule strings, run by the admin validator) and an optional `handle`
-for the host's own work (a CRM call). `ContactForm` ships with rules and no
-handler. The block's props carry `action` and `honeypotField`; post the
+A form block declares `submit` in its implementation: a `schema` for the
+payload (any Standard Schema: zod, valibot, arktype) and an optional `handle`
+for the host's own work (a CRM call). `ContactForm` ships with a schema and no
+handler. Wrap it in `defineSubmit` to get `handle`'s payload typed from the schema:
+
+```ts
+submit: defineSubmit({
+	schema: z.object({ name: z.string().max(200), email: z.email().max(200) }),
+	handle: async (payload) => crm.lead(payload.email), // { name: string; email: string }
+}),
+```
+
+`schema` may be a function of the block's data and the submit context
+(`{ locale, page, t }`), for choices an editor sets or messages in the page's
+language: `t("validation.required", { attribute })` reads the CMS strings,
+Laravel's validation lines included. The block's props carry `action` and `honeypotField`; post the
 fields there as JSON (`{ ok }`, 422 `{ errors }`, 500 `{ errors: { form } }`)
 or as a plain form (303 back to the page with `cms_form_status`).
 
-The rules run with the admin's rule set: the built-in Laravel rules, the
-CMS's `link_shape` and `page_ref`, and the config's `hostRules` (pass
-`kyselyRules(db)` there for `unique`/`exists`, and a rule of the host's
-own, `{ check, message }`, for a block that needs one; `createCms` refuses
-a host rule named `link_shape` or `page_ref`). The same set is
-`cms.admin.hostRules` for createAdmin. A rule nobody defines, or a `rules`
-that throws, answers `failed` (500 `{ errors: { form } }`, logged as
-`form.submit.validation_failed`) and stores nothing.
+The schema gets the input trimmed, with blank strings as null (Laravel's
+middleware). Its issues answer 422 by top-level field; one with no path is
+`errors.form`. `unique`/`exists` are async refinements over the host's own
+Kysely. A schema that throws answers `failed` (500 `{ errors: { form } }`,
+logged as `form.submit.validation_failed`) and stores nothing.
 
 A form an editor does not place (one a page type's `template()` or the host
 renders) gets a name: `formName: "service-order"` next to `submit` in its

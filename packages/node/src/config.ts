@@ -68,10 +68,9 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	debug?: boolean;
 	forms?: FormsConfig;
 	/**
-	 * The host's validation rules (`kyselyRules(db)` for `unique`/`exists`,
-	 * its own). Form submits and `cms.admin.hostRules` both carry them next
-	 * to the CMS's `link_shape` and `page_ref`, so a block's `submit.rules`
-	 * and the admin validate with one set. The CMS's own rules win a name clash.
+	 * The admin's host validation rules (`kyselyRules(db)` for `unique`/`exists`,
+	 * its own): `cms.admin.hostRules` carries them next to the CMS's `link_shape`
+	 * and `page_ref`. Frontend forms validate with `submit.schema` instead.
 	 */
 	hostRules?: Record<string, HostRule>;
 	notifications?: NotificationsConfig;

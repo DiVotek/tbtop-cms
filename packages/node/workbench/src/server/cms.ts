@@ -67,7 +67,7 @@ const cms = createCms({
 	// Drafts open through the page editor's signed "Preview" links. A host sets
 	// its own secret (and canPreview for its signed-in editors).
 	preview: { secret: process.env.CMS_PREVIEW_SECRET ?? "workbench-preview-secret" },
-	// Kysely's unique/exists for the form submits; the admin gets them back in cms.admin.hostRules.
+	// Kysely's unique/exists for the admin's forms; it gets them back in cms.admin.hostRules.
 	hostRules: kyselyRules(db),
 	// Section access from the signed-in user's Better Auth role.
 	authorize: panelAuth.authorize,

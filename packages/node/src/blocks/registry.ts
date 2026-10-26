@@ -1,5 +1,6 @@
 import { S } from "@tbtop/admin";
-import type { z } from "zod";
+import { z } from "zod";
+import type { StandardSchemaV1 } from "../forms/standardSchema";
 import type { Page } from "../content/page";
 import { safeHref, safeHrefRule } from "../content/safeHref";
 import type { SchemaContext } from "../seo/schemaContext";
@@ -28,20 +29,37 @@ export type BlockImpl<P = unknown> = {
 	formName?: string;
 };
 
-/** What a submit needs besides the payload (SubmitContext.php). */
-export type SubmitContext = { locale: string; fallbackLocale: string; page: Page };
+/** What a submit needs besides the payload (SubmitContext.php); `t` reads the CMS strings in the page's locale. */
+export type SubmitContext = { locale: string; fallbackLocale: string; page: Page; t: (key: string, params?: Record<string, string | number>) => string };
 
-/** HandlesFormSubmission: the payload's rules and what a valid submission does. */
-export type SubmitHandler = {
-	/** Laravel validation rules by field (`required|email|max:200`), checked by @tbtop/admin's validator. */
-	rules: (blockData: Record<string, unknown>, ctx: SubmitContext) => Record<string, string | string[]>;
+/** A Standard Schema (zod, valibot, arktype) whose output is the stored payload. */
+export type PayloadSchema = StandardSchemaV1<unknown, Record<string, unknown>>;
+
+/** HandlesFormSubmission: the payload's schema and what a valid submission does. */
+export type SubmitHandler<S extends PayloadSchema = PayloadSchema> = {
+	/**
+	 * Validates the trimmed input (blanks are null); its output is the payload. Issues answer
+	 * 422 by top-level field. A function builds it per submit, from the block's data and `ctx`.
+	 * Async checks (unique, exists) are async refinements over the host's database.
+	 */
+	schema: S | ((blockData: Record<string, unknown>, ctx: SubmitContext) => S);
 	/**
 	 * The block's own delivery (forward to a CRM, a queue). Runs once per
 	 * submission; a throw fails it and the visitor sees an error. The team's
 	 * mail/Telegram/bell notifications are the CMS's job, not this.
 	 */
-	handle?: (payload: Record<string, unknown>, blockData: Record<string, unknown>, ctx: SubmitContext) => void | Promise<void>;
+	handle?(payload: StandardSchemaV1.InferOutput<S>, blockData: Record<string, unknown>, ctx: SubmitContext): void | Promise<void>;
 };
+
+/** A submit handler whose `handle` gets the payload typed from `schema`. */
+export function defineSubmit<S extends PayloadSchema>(handler: SubmitHandler<S>): SubmitHandler {
+	return handler as SubmitHandler;
+}
+
+/** The schema of one submit: the handler's, or the one its factory builds for this block and context. */
+export function submitSchema(handler: SubmitHandler, blockData: Record<string, unknown>, ctx: SubmitContext): PayloadSchema {
+	return "~standard" in handler.schema ? handler.schema : handler.schema(blockData, ctx);
+}
 
 export type Implementations<C extends Catalog> = { [K in keyof C]: BlockImpl<z.infer<C[K]["props"]>> };
 
@@ -187,12 +205,17 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 				action: "",
 			};
 		},
-		submit: {
-			rules: () => ({
-				name: "required|string|max:200",
-				email: "required|email|max:200",
-				message: "required|string|max:5000",
-			}),
-		},
+		submit: { schema: (_data, ctx) => contactSchema(ctx) },
 	},
 };
+
+/** The ContactForm payload, with Laravel's messages in the page's language (`validation.*` strings). */
+function contactSchema({ t }: SubmitContext) {
+	const text = (field: string, max: number) => {
+		const attribute = t(`validation.attributes.${field}`);
+		return z.string({ error: t("validation.required", { attribute }) }).max(max, t("validation.max.string", { attribute, max }));
+	};
+	const attribute = t("validation.attributes.email");
+	const email = z.email({ error: (issue) => t(issue.input == null ? "validation.required" : "validation.email", { attribute }) });
+	return z.object({ name: text("name", 200), email: email.max(200, t("validation.max.string", { attribute, max: 200 })), message: text("message", 5000) });
+}

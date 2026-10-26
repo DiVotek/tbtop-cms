@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { memoryNotifications } from "@tbtop/admin";
 import type { CmsConfig, MailMessage } from "../src";
 import { cmsBlocks, cmsBlockImpls, implementBlocks } from "../src";
+import { z } from "zod";
 import { makeCms } from "./support";
 
 /** The home page's ContactForm action, as the frontend props carry it. */
@@ -208,7 +209,7 @@ describe("form submissions", () => {
 			ContactForm: {
 				...cmsBlockImpls.ContactForm,
 				submit: {
-					rules: cmsBlockImpls.ContactForm.submit?.rules ?? (() => ({})),
+					schema: z.object({ name: z.string(), email: z.email(), message: z.string() }),
 					handle: () => {
 						calls += 1;
 						if (calls === 1) {

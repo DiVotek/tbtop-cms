@@ -109,7 +109,7 @@ function orderForm(seen: Record<string, unknown>[] = []): Partial<CmsConfig> {
 				resolve: () => ({ action: "" }),
 				formName: "service-order",
 				submit: {
-					rules: () => ({ service: "required|string|max:50" }),
+					schema: z.object({ service: z.string().max(50) }),
 					handle: (payload, blockData) => void seen.push({ payload, blockData }),
 				},
 			},
@@ -161,7 +161,7 @@ describe("q14: named forms (HasForm, Forms::props)", () => {
 
 	test("a form name without a submit handler, or declared twice, is refused", () => {
 		const catalog = defineBlocks({ A: { props: z.object({}) }, B: { props: z.object({}) } });
-		const submit = { rules: () => ({}) };
+		const submit = { schema: z.object({}) };
 		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x" }, B: { form: () => [] } })).toThrow("has no submit handler");
 		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x", submit }, B: { form: () => [], formName: "x", submit } })).toThrow(
 			"Form [x] is declared by both [A] and [B].",

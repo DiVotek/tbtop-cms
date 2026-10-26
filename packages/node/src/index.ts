@@ -8,11 +8,14 @@ export {
 	type BlockKind,
 	type BlockRegistry,
 	cmsBlockImpls,
+	defineSubmit,
 	implementBlocks,
 	type Implementations,
 	type SubmitContext,
+	type PayloadSchema,
 	type SubmitHandler,
 } from "./blocks/registry";
+export type { StandardSchemaV1 } from "./forms/standardSchema";
 export { assembleSpec, BlockResolutionError, type RenderSpec, type ResolvedBlock } from "./blocks/resolver";
 export type { CmsAdmin } from "./admin";
 export { CMS_ABILITIES, type CmsAbility } from "./admin/abilities";

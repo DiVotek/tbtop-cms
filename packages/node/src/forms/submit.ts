@@ -1,11 +1,11 @@
-import { type HostRule, validate, type ValidationResult } from "@tbtop/admin";
 import type { Page } from "../content/page";
 import { honeypotField } from "../blocks/resolver";
-import { validationLang } from "../support/strings";
+import { submitSchema } from "../blocks/registry";
 import type { Site } from "../site";
 import { locateForm } from "./locate";
 import type { Submission } from "./submissions";
 import { notifySubmission } from "./notifier";
+import { type SchemaOutcome, validateWith } from "./standardSchema";
 import { clientKey, type SubmitThrottle } from "./throttle";
 
 const ROUTE = /^\/_cms\/forms\/([^/]+)\/(\d+)\/([^/]+)\/?$/;
@@ -26,7 +26,6 @@ export async function submitForm(
 	site: Site,
 	request: Request,
 	throttle: SubmitThrottle | null = null,
-	hostRules: Record<string, HostRule> = {},
 ): Promise<Response | null> {
 	const url = new URL(request.url);
 	const match = ROUTE.exec(url.pathname);
@@ -62,23 +61,18 @@ export async function submitForm(
 		console.debug("form.submit.honeypot_tripped", { page: page.id, block: blockId });
 		return reply("sent");
 	}
-	let result: ValidationResult;
+	let result: SchemaOutcome<Record<string, unknown>>;
 	try {
-		const rules = Object.fromEntries(
-			Object.entries(located.submit.rules(located.data, located.ctx)).map(([field, rule]) => [field, Array.isArray(rule) ? rule : rule.split("|")]),
-		);
-		// The admin's rules: an unknown one throws (fails closed), which is the site's fault, not the visitor's.
-		// The visitor's language: Laravel validates in the app locale the page set.
-		const { messages, attributes } = validationLang(locale, site.config.strings);
-		result = await validate(input, rules, { hostRules, attributes, ...(Object.keys(messages).length > 0 ? { messages } : {}) });
+		result = await validateWith(submitSchema(located.submit, located.data, located.ctx), input);
 	} catch (error) {
+		// A throwing schema (a failed database refinement) is the site's fault, not the visitor's.
 		console.error("form.submit.validation_failed", { page: page.id, block: blockId, error: error instanceof Error ? error.message : String(error) });
 		return reply("failed", { form: [await site.t("forms.submit_failed", locale)] });
 	}
 	if (!result.ok) {
 		return reply("invalid", result.errors);
 	}
-	const payload = result.validated;
+	const payload = result.value;
 	const submission =
 		site.config.forms?.store === false
 			? null

@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import type { Channel, CmsConfig, MailMessage } from "../src";
-import { cmsBlockImpls, cmsBlocks, implementBlocks } from "../src";
+import { z } from "zod";
+import { cmsBlockImpls, cmsBlocks, implementBlocks, type PayloadSchema } from "../src";
 import { makeCms } from "./support";
 
 type Made = Awaited<ReturnType<typeof makeCms>>;
@@ -28,12 +29,12 @@ function mailbox() {
 	return { sent, transport: { send: async (message: MailMessage) => void sent.push(message) } };
 }
 
-/** ContactForm with other submit rules, so a test can post any field shape. */
-const withRules = (rules: Record<string, string>) =>
+/** ContactForm with another submit schema, so a test can post any field shape. */
+const withSchema = (schema: PayloadSchema) =>
 	({
 		blocks: implementBlocks(cmsBlocks, {
 			...cmsBlockImpls,
-			ContactForm: { ...cmsBlockImpls.ContactForm, submit: { rules: () => rules } },
+			ContactForm: { ...cmsBlockImpls.ContactForm, submit: { schema } },
 		}),
 	}) as Partial<CmsConfig>;
 
@@ -127,7 +128,7 @@ describe("R3-forms-3: inputs are trimmed and blanks become null, as Laravel's mi
 	});
 
 	test("nested strings are trimmed, an empty one is null, a password keeps its spaces; form data alike", async () => {
-		const { cms } = await makeCms(undefined, withRules({ name: "required|string", phone: "nullable|string", tags: "array", password: "required|string" }));
+		const { cms } = await makeCms(undefined, withSchema(z.object({ name: z.string(), phone: z.string().nullable(), tags: z.array(z.string().nullable()).optional(), password: z.string() })));
 		const action = await contactAction(cms);
 		await cms.handle(post(action, { name: " Ada ", phone: "  ", tags: [" a ", ""], password: " secret " }));
 		const form = new URLSearchParams({ name: " Grace​", phone: "", password: " pw " });
@@ -216,7 +217,7 @@ describe("R3-forms-9: field text matches PHP", () => {
 	test("booleans read 1 and empty, false is no lead, and truncation keeps whole characters", async () => {
 		const mail = mailbox();
 		const { cms, table } = await panel({
-			...withRules({ newsletter: "boolean", note: "nullable|string", consent: "accepted" }),
+			...withSchema(z.object({ newsletter: z.boolean().optional(), note: z.string().nullable().optional(), consent: z.literal(true) })),
 			notifications: { mail: mail.transport },
 		});
 		const settings = cms.site().settings;

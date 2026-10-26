@@ -11,6 +11,13 @@ export const STRINGS: Record<string, Record<string, string>> = {
 		"errors.4xx.heading": "Page not found",
 		"errors.5xx.heading": "Something went wrong",
 		"forms.submit_failed": "Sorry, we could not process your submission. Please try again.",
+		// Laravel's lang/en/validation.php, for the messages of the built-in ContactForm's schema.
+		"validation.required": "The :attribute field is required.",
+		"validation.email": "The :attribute field must be a valid email address.",
+		"validation.max.string": "The :attribute field must not be greater than :max characters.",
+		"validation.attributes.name": "name",
+		"validation.attributes.email": "email",
+		"validation.attributes.message": "message",
 		"notifications.mail.subject": "New form submission",
 		"notifications.mail.fields.page": "Page",
 		"notifications.mail.fields.locale": "Locale",
@@ -73,7 +80,7 @@ export const STRINGS: Record<string, Record<string, string>> = {
 		"form-submissions.errors.retry_unfinished": "Повторну спробу не завершено.",
 		"form-submissions.errors.page_missing": "Сторінки більше не існує.",
 		"form-submissions.errors.block_missing": "Блоку форми більше немає на сторінці.",
-		// Laravel's lang/uk/validation.php for the rules a form block uses; English comes from @tbtop/admin.
+		// Laravel's lang/uk/validation.php, for form schemas' messages through SubmitContext.t.
 		"validation.accepted": "Поле :attribute повинно бути прийняте.",
 		"validation.boolean": "Поле :attribute повинно мати значення «так» або «ні».",
 		"validation.date": "Поле :attribute повинно містити дійсну дату.",
@@ -123,23 +130,3 @@ const fill = (text: string, params: Record<string, string | number>): string =>
 	Object.keys(params)
 		.sort((a, b) => b.length - a.length)
 		.reduce((out, name) => out.replaceAll(`:${name}`, String(params[name])), text);
-
-/**
- * Laravel's validation lang for one locale: `validation.<rule>` message
- * templates and `validation.attributes.<field>` names, the host's strings
- * over the package's. Only the locale's own: a rule it does not translate
- * keeps @tbtop/admin's English, never another locale's text.
- */
-export function validationLang(locale: string, extra: Record<string, Record<string, string>> = {}): { messages: Record<string, string>; attributes: Record<string, string> } {
-	const own = { ...STRINGS[locale], ...extra[locale] };
-	const messages: Record<string, string> = {};
-	const attributes: Record<string, string> = {};
-	for (const [key, text] of Object.entries(own)) {
-		if (key.startsWith("validation.attributes.")) {
-			attributes[key.slice("validation.attributes.".length)] = text;
-		} else if (key.startsWith("validation.")) {
-			messages[key.slice("validation.".length)] = text;
-		}
-	}
-	return { messages, attributes };
-}
