@@ -12,7 +12,8 @@ use Tbtop\Cms\Page\Models\Page;
  * it is issued, stored and revoked with the token: `pages:parent:{id}` per
  * allowed parent and `pages:type:{type}` per child type. A token reads its
  * parents and their direct children of those types, and writes only the
- * children. A token with none of them (a host's `*` token) reaches nothing.
+ * children. A token with none of them (a host's `*` token) reaches nothing,
+ * and no token reaches a system page (home, error pages), whatever its parent.
  */
 final readonly class TokenScope
 {
@@ -66,7 +67,7 @@ final readonly class TokenScope
      */
     public function apply(Builder $query): Builder
     {
-        return $query->where(fn (Builder $q): Builder => $q
+        return $query->where('is_system', false)->where(fn (Builder $q): Builder => $q
             ->whereIn('id', $this->parentIds === [] ? [0] : $this->parentIds)
             ->orWhere(fn (Builder $child): Builder => $child
                 ->whereIn('parent_id', $this->parentIds === [] ? [0] : $this->parentIds)
@@ -75,17 +76,23 @@ final readonly class TokenScope
 
     public function reads(Page $page): bool
     {
-        return in_array((int) $page->getKey(), $this->parentIds, true) || $this->writes($page);
+        return ! $page->is_system && (in_array((int) $page->getKey(), $this->parentIds, true) || $this->writes($page));
     }
 
     public function writes(Page $page): bool
     {
-        return $page->parent_id !== null && $this->allowsChild($page->parent_id, $page->type);
+        return ! $page->is_system && $page->parent_id !== null && $this->allowsChild($page->parent_id, $page->type);
     }
 
     public function allowsChild(int $parentId, string $type): bool
     {
         return in_array($parentId, $this->parentIds, true) && in_array($type, $this->childTypes, true);
+    }
+
+    /** Uploads are not tied to a page, so a token qualifies by naming any parent at all. */
+    public function reachesAnything(): bool
+    {
+        return $this->parentIds !== [] && $this->childTypes !== [];
     }
 
     public function allowsType(string $type): bool
