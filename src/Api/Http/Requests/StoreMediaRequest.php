@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Api\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Tbtop\Admin\Media\MediaUploadLimit;
 use Tbtop\Cms\Api\ApiAccess;
 
-/** `POST /media`: exactly one of a public `url` to import or an uploaded `file`. MediaIngest does not check the size, so this does. */
+/** `POST /media`: a public `url` to import. The import's size cap is enforced by the admin's UrlFetcher. */
 final class StoreMediaRequest extends FormRequest
 {
     /** A token that reaches no page (a host's `*` token) may not fill the library either. */
@@ -26,8 +25,7 @@ final class StoreMediaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'url' => ['required_without:file', 'prohibits:file', 'string', 'url:http,https', 'max:2048'],
-            'file' => ['required_without:url', 'file', 'max:' . MediaUploadLimit::kilobytes()],
+            'url' => ['required', 'string', 'url:http,https', 'max:2048'],
             'name' => ['nullable', 'string', 'max:255'],
             'alt' => ['nullable', 'string', 'max:255'],
         ];

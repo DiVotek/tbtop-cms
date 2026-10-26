@@ -69,7 +69,7 @@ All bodies are JSON; errors are Laravel's `{message, errors?}`.
 | `POST /pages/{id}/publish {published_at?}` | write | `Page`; 404 trashed, 409 when the status is already Published — also when its `unpublish_at` has passed and the page is off the site, which is unpublished in the admin first — 422 `translations.{locale}.title` when a frontend-active locale has no title (no fallback). Without `published_at` a page keeps an earlier publish's date, else is stamped now; a future one schedules |
 | `GET /types/{type}/fields` | read | `[Field]` for a base type or subtype key; 404 unknown, 403 when its base type is not writable for the token |
 | `GET /locales` | read | `{default, active: [locale]}` — `active` is the frontend-active locales publish checks |
-| `POST /media` | write | 201 `{id, url}`; 403 for a token with no parent. Exactly one of `url` (http/https, downloaded through the admin's SSRF guard) or multipart `file` (capped by `MediaUploadLimit`), plus `name?`, `alt?`; a file over the limit is a validation error, a refused URL or file type is 422 with the media library's own message |
+| `POST /media` | write | 201 `{id, url}`; 403 for a token with no parent. `url` (http/https, downloaded through the admin's SSRF guard and size cap), plus `name?`, `alt?`. No file upload: the caller hands over a public URL. A refused URL or file type is 422 with the media library's own message |
 
 **Write body** — `POST` takes exactly `parent_id, translations, image, og_image, fields`; `PATCH` the same without `parent_id`, every key optional. Any other top-level key is 422. Blocks (`content`) are not written or returned in v1.
 
