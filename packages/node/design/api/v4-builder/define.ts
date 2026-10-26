@@ -38,6 +38,7 @@ export class SiteBuilder<B extends Record<string, BlockDef<z.ZodType>> = {}, PT 
 
 	/** A new page type, or a built-in key (`page`, `category`, `article`) to extend it. */
 	pageType<const K extends string, const D extends PageTypeEntry>(key: K, def: D): SiteBuilder<B, PT | PageDefOf<K, D>> {
+		if (key in (this.config.pageTypes ?? {})) throw new Error(`Page type [${key}] is already defined.`);
 		return this.with({ pageTypes: { ...this.config.pageTypes, [key]: def } });
 	}
 

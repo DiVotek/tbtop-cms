@@ -1,5 +1,7 @@
 process.env.BETTER_AUTH_URL ??= "http://site.test";
 process.env.BETTER_AUTH_SECRET ??= "design-secret-design-secret-design";
+process.env.TBTOP_ADMIN_EMAIL ??= "admin@divotek.test";
+process.env.TBTOP_ADMIN_PASSWORD ??= "correct-horse-battery";
 
 import { prove, proveWorker } from "./shared/prove";
 import { boot as v1 } from "./v1-compose/node";

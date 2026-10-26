@@ -1,5 +1,5 @@
 import type { Kysely } from "kysely";
-import { ADMIN, fixture, html } from "../shared/reference";
+import { fixture, html } from "../shared/reference";
 import { serve } from "./package";
 import { site } from "./site";
 
@@ -8,7 +8,6 @@ export const boot = async (db: Kysely<unknown>) =>
 	serve(site, {
 		db,
 		seed: fixture,
-		admin: ADMIN,
 		render: (props) =>
 			html(
 				props,

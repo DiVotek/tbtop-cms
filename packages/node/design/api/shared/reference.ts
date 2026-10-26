@@ -41,7 +41,21 @@ export const fixture: Fixture = {
 	],
 };
 
-export const ADMIN = { email: "admin@divotek.test", password: "correct-horse-battery" };
+const secret = (name: string): string => {
+	const value = typeof process === "undefined" ? undefined : process.env[name];
+	if (value === undefined || value === "") throw new Error(`set ${name}: the first admin comes from secrets, never from source`);
+	return value;
+};
+
+/** The first admin, from secrets (the test sets them); read when a boot needs it. */
+export const ADMIN = {
+	get email() {
+		return secret("TBTOP_ADMIN_EMAIL");
+	},
+	get password() {
+		return secret("TBTOP_ADMIN_PASSWORD");
+	},
+};
 
 /** The Promo block's props (client-safe: zod only). */
 export const promoProps = z.object({
