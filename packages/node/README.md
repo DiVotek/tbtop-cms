@@ -79,6 +79,8 @@ export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, plac
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
+	// toSchema: (props, ctx) => ({ ...baseNode(ctx, "Service"), provider: { "@id": identityId(ctx.site) } })
+	// baseNode gives the page's name, url, description, image and dates; identityId links to the site identity.
 	// Lists of cards go in a repeater; its translatable cells are edited per locale:
 	// form: (s) => [s.repeater("items").fields([s.text("q").translatable(), s.text("icon")])]
 	// resolve() gets a `.translatable()` field already in the page's locale (default as fallback),
@@ -86,7 +88,11 @@ const cms = createCms({
 	// its target is checked on save and on render, a free-text href is not.
 	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
 	schemaTypes: [productSchema], // extra JSON-LD types a page type's schemaTypes can name (see Page types)
+	// The page's JSON-LD, last: add or replace nodes. Keep "@id": identityId(ctx.site) on your own organization node
+	// and Article author/publisher link to it.
+	seo: { extend: (nodes, ctx) => [...nodes.filter((n) => n["@id"] !== identityId(ctx.site)), myOrganization(ctx)] },
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
+	timezone: "Europe/Kyiv", // app.timezone: admin dates, dashboard days, SEO {date}; stored dates stay UTC (default UTC)
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
@@ -98,6 +104,9 @@ const cms = createCms({
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
+	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches cms.settings,
+	// like every setting; list a token's key (site.<name>) in secretSettings to seal it instead.
+	siteSettings: { tabs: (s) => [{ label: "Brand & forms", children: [s.text("tagline").label("Tagline")] }] },
 	hostRules: { ...kyselyRules(db), ...myRules }, // the admin's unique/exists and the host's own rules: cms.admin.hostRules
 });
 
@@ -194,6 +203,17 @@ const productSchema: SchemaTypeDef = {
 		offers: { "@type": "Offer", price: ctx.page.fields?.price, priceCurrency: "UAH" } }],
 };
 const productType = definePageType({ key: "product", base: "article", schemaTypes: ["Product"], schema, form });
+```
+
+A def with a built-in key (`page`, `category`, `article`) extends that type
+instead of adding one: its `form`, `schema`, `resolveFields`, `template`,
+`label` and `schemaTypes` replace the built-in's (list the built-in schema
+types too to keep them pickable), and the tree rules stay the package's
+(setting `allowedChildren`, `requiresParent`, `maxDepth` or `base` throws).
+`page.fields` is typed from its schema as for any other type.
+
+```ts
+const page = definePageType({ key: "page", form: (s) => [s.text("tagline").translatable()], schema: z.object({ tagline: z.string().nullable() }) });
 ```
 
 `migrateCms` creates the tables on a fresh database.
@@ -325,7 +345,9 @@ Keep `@tanstack/react-start/server` imports in server-only modules
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone. A fixture language marked `default` takes over
 from the installed one (which stays, non-default: pass `defaultLanguage` to
-`migrateCms` to install the right one).
+`migrateCms` to install the right one). A page's `body` per locale is plain
+text (blank-line separated paragraphs) or a Lexical document (`{ root: … }`,
+what the editor stores) for headings, lists and links.
 
 A seed whose pages point at each other goes step by step in the host's own
 boot, after `migrateCms`: each step gets the ids of the pages before it. The
@@ -412,9 +434,11 @@ Promo: {
   drop out.
 - A host `resolve()` that needs more of the picked pages (a product's price
   on a catalog card) asks `ctx.pages(input.products, { fields: true })`: the
-  same refs, each with `fields`, that page's resolved custom fields as its
-  own props carry them (`Record<string, unknown>`: the picks may be of any
-  type, so narrow them). It is a convenience: one fields resolve per page,
+  same refs, each with the page's own columns as `site.pageViews` gives them
+  (`summary`, `image`, `heading`, `body`…) and `fields`, its resolved custom
+  fields as its own props carry them (`Record<string, unknown>`: the picks
+  may be of any type, so narrow them). Any other request-scoped read
+  (settings, `pageViews`) goes through `ctx.site`. It is a convenience: one fields resolve per page,
   one level deep (inside those resolvers `fields: true` gives `{}`). For a
   long list, or columns the props never carry, query the database yourself
   on top of `ctx.pages()`, which has already dropped drafts and built the URLs:
@@ -425,6 +449,17 @@ resolve: async (input, ctx) => {
 	const rows = await db.selectFrom("tbtop_pages").select(["id", "fields"])
 		.where("id", "in", refs.map((ref) => Number(ref.id))).execute(); // raw stored JSON
 	// merge rows into refs by id
+},
+```
+- For "the form, plus a key or two", set `map` instead of `resolve`: the
+  package resolves the form, and `map(resolved, input, ctx)` returns the keys
+  to add or replace, typed as `Partial` of the catalog props (no
+  `resolveForm` call, no cast). A block sets `resolve` or `map`, not both.
+
+```ts
+Pricing: {
+	form: (s) => [s.text("title").translatable(), pagesField("plans").of("article", "plan")],
+	map: async (_resolved, input, ctx) => ({ plans: await ctx.pages(input.plans, { fields: true }) }),
 },
 ```
 - On save the admin checks `link_shape` (type, target format, an existing
@@ -466,7 +501,7 @@ entry has no server code, so it goes into the browser bundle.
 ```tsx
 import { defineRegistry, JSONUIProvider } from "@json-render/react";
 import { cmsBlocks } from "@tbtop/cms/catalog";
-import { CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
+import { assembleSpec, CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
 
 export const catalog = cmsCatalog({ ...cmsBlocks, Faq: faqMeta });
 export const { registry } = defineRegistry(catalog, { components: { ...cmsComponents, Faq } });
@@ -474,7 +509,9 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 // TanStack Start: head: ({ loaderData }) => seoHead(loaderData.seo)
 // Anything else on React 19: <CmsHead seo={props.seo} /> (title, meta and links hoist into <head>)
 <JSONUIProvider registry={registry}>
+	<CmsRenderer spec={assembleSpec(props.cms.layout.header)} catalog={catalog} registry={registry} />
 	<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={props.isPreview} />
+	<CmsRenderer spec={assembleSpec(props.cms.layout.footer)} catalog={catalog} registry={registry} />
 </JSONUIProvider>;
 ```
 
@@ -490,9 +527,14 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
   catalog, and one that throws while rendering; with `showErrors` it says so
   in the console. Wrap all of a page's specs (header, body, footer) in one
   `JSONUIProvider`.
+- The layout slots (`props.cms.layout.header/footer`) are block lists, as in
+  PHP; `assembleSpec` turns one into a spec for `CmsRenderer`.
 - `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
   `useCmsForm(action)` is the ContactForm's submit logic for a custom form
-  block: JSON post, field errors, a plain form post without JS.
+  block: JSON post, field errors, a plain form post without JS. A controlled
+  form calls `submit(values)` (resolves true once accepted) instead of
+  spreading `formProps`; `setError(field, message)` shows a client check's
+  message like the server's, `reset()` goes back to idle.
 - The Hero's CTA link is read the way a browser reads it (leading controls
   and spaces dropped, tabs and newlines removed): a relative link (`/contact`,
   `blog`, `#form`, `?ref=x`) or an http(s), `mailto:`, `tel:` or messenger
@@ -606,6 +648,29 @@ D1 refuses the `pragma_table_info` join Kysely's own introspector uses.
 Better Auth introspects through that join too: give it the raw binding
 (`database: env.DB`), not the Kysely instance.
 
+Without the cron, `outbox` submissions stay `pending` and nothing is
+notified (`cms.tasks.health()` warns). TanStack Start's default entry has
+no `scheduled()`, so a Start host on Workers points `main` in
+`wrangler.jsonc` at its own entry that keeps Start's `fetch`:
+
+```ts
+// src/server.ts
+import handler from "@tanstack/react-start/server-entry";
+import { getCms } from "./server/cms"; // the host's Cms for this env
+
+export default {
+	fetch: handler.fetch,
+	scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(getCms(env).tasks.scheduled());
+	},
+};
+```
+
+A Worker that runs `migrateCms` and Better Auth's migrations on its first
+request (no deploy step) sees Better Auth log a schema mismatch once, as
+`betterAuth()` checks the tables before they exist; set
+`advanced.database.validateSchema: false` there, as the workbench does.
+
 ## What 0.0 has
 
 - Schema and one baseline migration equal to the PHP migrations (SQLite,
@@ -652,12 +717,16 @@ Better Auth introspects through that join too: give it the raw binding
   `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`, `seo:snapshot`,
   `audit [--type page] [--id N] [--limit N]`, `audit:prune [--days N]`
   (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).
-- Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
-  Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
+- Blocks: `defineBlocks` catalog, `implementBlocks` server half, the
+  optional Hero and ContactForm (`cmsBlocks`/`cmsBlockImpls`: nothing is
+  registered unless the host spreads them in, as PHP's `blocks.types`), the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
   field kind), resolved props validated against the catalog's zod schema
   (a mismatch is dropped with a warning; `strictBlocks: true` throws
-  `BlockResolutionError` instead, in any environment).
+  `BlockResolutionError` instead, in any environment). Valid props ship as
+  resolved, and a `.default()` fills a key the resolver left out; a
+  `.transform()`'s output is not shipped: the browser validates the props
+  again and runs it there (the server parse runs it too, so keep it pure).
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
@@ -670,7 +739,8 @@ Better Auth introspects through that join too: give it the raw binding
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
   built-in blocks.
 - Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
-  tiles trended over 14 days, leads-by-status and daily submission charts,
+  tiles trended over 14 days, leads-by-status and daily submission charts
+  (days in the config's `timezone`, UTC by default),
   the latest pages and submissions; the page parts need
   `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`, the layout tile
   `tbtop-cms.design`; the System section, with host metrics and versions,

@@ -118,6 +118,8 @@ describe("Better Auth adapter", () => {
 		expect(structure).toContain("Go to site");
 		expect(structure).toContain(`TableTop CMS © ${new Date().getFullYear()}`);
 		expect(structure).toContain('"content":"TableTop CMS"');
+		// A sign-in leaves the page, so the form never asks "Leave site?" (LoginPage's guardUnsaved(false)).
+		expect(structure).toMatch(/"kind":"form","options":\{"name":"login",.*"guardUnsaved":false\},"meta":\{\},"name":"login"/);
 
 		await cms.site().settings.set("site.name", "Acme");
 		expect(JSON.stringify((await page("/admin/login")).props.structure)).toContain('"content":"Acme"');

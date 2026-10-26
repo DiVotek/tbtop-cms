@@ -6,13 +6,9 @@ import type { LinkTargets, Site } from "../site";
 import { type Dict, isDict } from "../support/values";
 import { flattenLocales, translatablePaths } from "./locale";
 
-export type ResolvedBlock = { id: string; kind: string; props: Record<string, unknown> };
+import type { ResolvedBlock } from "./spec";
 
-/** A render spec json-render's Renderer takes: flat elements, `$root` lists the blocks in order. */
-export type RenderSpec = {
-	root: "$root";
-	elements: Record<string, { type: string; props: Record<string, unknown>; children?: string[] }>;
-};
+export { assembleSpec, type RenderSpec, type ResolvedBlock } from "./spec";
 
 export class BlockResolutionError extends Error {}
 
@@ -174,37 +170,50 @@ export const honeypotField = (site: Site): string | null => {
 };
 
 /**
+ * The parsed values of the keys the resolver left out that the object's own
+ * shape declares, each only when the browser's parse of it (after JSON) gives
+ * it back: a transform's output, a Date, a prefault or catch would change or
+ * fail there. A schema with no shape (a whole-object transform) fills nothing.
+ */
+function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed: unknown): Record<string, unknown> {
+	const shape = (schema as { shape?: Record<string, { safeParse(value: unknown): { success: boolean; data?: unknown } }> }).shape ?? {};
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(isDict(parsed) ? parsed : {})) {
+		const field = shape[key];
+		if (key in props || field === undefined || value === undefined) {
+			continue;
+		}
+		const wire = JSON.stringify(value);
+		const again = field.safeParse(JSON.parse(wire));
+		if (again.success && JSON.stringify(again.data) === wire) {
+			out[key] = value;
+		}
+	}
+	return out;
+}
+
+/**
  * The catalog's zod schema is the contract: props that do not match it are
  * dropped, not shipped. That is a resolver/catalog drift, a code bug, so it
  * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
+ * Props that match ship as resolved, plus the parsed value of each key the
+ * resolver left out, so a `.default()` fills it as a page type's schema does
+ * for `page.fields`. The browser parses again, so keys the resolver set keep
+ * their value and a default ships only when that parse gives it back (the
+ * parse here still runs transforms: keep them pure).
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
 	const strict = site.config.strictBlocks === true;
-	return blocks.filter((block) => {
-		const result = site.blocks.get(block.kind).props.safeParse(block.props);
+	return blocks.flatMap((block) => {
+		const schema = site.blocks.get(block.kind).props;
+		const result = schema.safeParse(block.props);
 		if (result.success) {
-			return true;
+			return [{ ...block, props: { ...filledDefaults(schema, block.props, result.data), ...block.props } }];
 		}
 		if (strict) {
 			throw new BlockResolutionError(`Block [${block.kind}] props do not match the catalog: ${result.error.message}`);
 		}
 		console.warn("block.props_invalid", { kind: block.kind, id: block.id, error: result.error.message });
-		return false;
+		return [];
 	});
-}
-
-/** PageSpecAssembler: blocks in order under the root; a duplicate or reserved id is skipped. */
-export function assembleSpec(blocks: ResolvedBlock[], rootKind = "Fragment"): RenderSpec {
-	const elements: RenderSpec["elements"] = {};
-	const children: string[] = [];
-	for (const block of blocks) {
-		if (block.id === "$root" || block.id in elements) {
-			console.warn("block.reserved_or_duplicate_id", { id: block.id, kind: block.kind });
-			continue;
-		}
-		children.push(block.id);
-		elements[block.id] = { type: block.kind, props: block.props };
-	}
-	elements.$root = { type: rootKind, props: {}, children };
-	return { root: "$root", elements };
 }

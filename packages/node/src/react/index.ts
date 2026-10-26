@@ -8,3 +8,4 @@ export { type HeadTag, jsonLdText, seoHead, seoTags } from "./head";
 export { gtmNoscriptHtml, gtmScript } from "./head";
 export { cmsCatalog, cmsComponents } from "./registry";
 export { type CmsFormState, useCmsForm } from "./useCmsForm";
+export { assembleSpec, type ResolvedBlock } from "../blocks/spec";

@@ -23,8 +23,12 @@ export type FixturePage = {
 	title?: Translations;
 	heading?: Translations;
 	summary?: Translations;
-	/** Plain text per locale, stored as a Lexical document. */
-	body?: Record<string, string>;
+	/**
+	 * Per locale: plain text (blank-line separated paragraphs), or a Lexical
+	 * document (`{ root: … }`, what the editor stores) kept as is for headings,
+	 * lists and links.
+	 */
+	body?: Record<string, string | { root: Record<string, unknown> }>;
 	status?: "draft" | "published";
 	publishedAt?: string;
 	unpublishAt?: string;
@@ -57,12 +61,18 @@ export type Fixture = {
 	redirects?: { from: string; to: string; status?: number; locale?: string | null }[];
 };
 
-const lexical = (text: string) => ({
-	root: {
-		type: "root",
-		children: text.split(/\n{2,}/).map((paragraph) => ({ type: "paragraph", children: [{ type: "text", text: paragraph, format: 0 }] })),
-	},
-});
+/** A fixture body as a Lexical document: plain text becomes paragraphs, a document stays as is. */
+function lexical(body: string | { root: Record<string, unknown> }) {
+	if (typeof body !== "string") {
+		return body;
+	}
+	return {
+		root: {
+			type: "root",
+			children: body.split(/\n{2,}/).map((paragraph) => ({ type: "paragraph", children: [{ type: "text", text: paragraph, format: 0 }] })),
+		},
+	};
+}
 
 /**
  * True while the site has no page (trashed ones aside): the guard a host's

@@ -1,6 +1,7 @@
 import { resolvePageFields } from "../blocks/resolver";
 import { type Page, translation, translationText } from "../content/page";
 import { richtextHtml } from "../content/richtext";
+import { modifiedAt, publishedAt } from "../seo/schemaContext";
 import type { Site } from "../site";
 
 /** A page's own columns in one locale, as `props.page` carries them (fallback: the default locale). */
@@ -15,6 +16,9 @@ export type PageColumns = {
 	summary: string | null;
 	body: string;
 	image: string | null;
+	/** The dates the JSON-LD states (ISO 8601): published only once live, else null. */
+	publishedAt: string | null;
+	updatedAt: string | null;
 };
 
 /** A page in a host's list (site.pageViews): `props.page` plus its URL; `fields` only when asked. */
@@ -32,6 +36,8 @@ export function pageColumns(site: Site, page: Page, locale: string, fallback: st
 		summary: translationText(page, "summary", locale, fallback),
 		body: richtextHtml(translation(page, "body", locale, fallback)),
 		image: page.image !== null && page.image !== "" ? site.mediaUrl(page.image) : null,
+		publishedAt: publishedAt(page),
+		updatedAt: modifiedAt(page),
 	};
 }
 

@@ -91,7 +91,7 @@ describe("Dogfood: a block reads the fields of the pages it lists", () => {
 		form: () => [pagesField("other").label("Other").of("pair")],
 		resolveFields: async (input, ctx) => ({ other: await ctx.pages(input.other, { fields: true }) }),
 	});
-	const grid = z.object({ products: z.array(z.object({ id: z.string(), name: z.string(), url: z.string(), price: z.number().nullable() })) });
+	const grid = z.object({ products: z.array(z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.string().nullable(), price: z.number().nullable() })) });
 	const blocks = implementBlocks(
 		{ ...cmsBlocks, ProductGrid: { props: grid } },
 		{
@@ -99,8 +99,11 @@ describe("Dogfood: a block reads the fields of the pages it lists", () => {
 			ProductGrid: {
 				form: () => [pagesField("products").label("Products").of("article", "product")],
 				resolve: async (input, ctx) => ({
-					products: (await ctx.pages(input.products, { fields: true })).map(({ fields, ...ref }) => ({
-						...ref,
+					products: (await ctx.pages(input.products, { fields: true })).map(({ id, name, url, summary, fields }) => ({
+						id,
+						name,
+						url,
+						summary,
 						price: typeof fields.price === "number" ? fields.price : null,
 					})),
 				}),
@@ -108,17 +111,17 @@ describe("Dogfood: a block reads the fields of the pages it lists", () => {
 		},
 	);
 
-	test("fields: true adds each listed page's resolved fields; without it the ref stays { id, name, url }", async () => {
+	test("fields: true adds each listed page's columns and resolved fields; without it the ref stays { id, name, url }", async () => {
 		const { cms } = await makeCms(null, { pageTypes: [productType, pairType], blocks });
 		const pages = cms.site().pages;
 		const catalog = await pages.create({ type: "category", name: { en: "Catalog" }, status: "published" }, { slugs: { en: "catalog" } });
-		const bream = await pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { en: "Bream" }, status: "published", fields: { price: 120 } }, { slugs: { en: "bream" } });
+		const bream = await pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { en: "Bream" }, summary: { en: "Fresh bream" }, status: "published", fields: { price: 120 } }, { slugs: { en: "bream" } });
 		const draft = await pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { en: "Carp" }, fields: { price: 90 } }, { slugs: { en: "carp" } });
 		await pages.update(catalog.id, { content: [{ id: "grid", kind: "ProductGrid", active: true, sort: 0, data: { products: [String(bream.id), String(draft.id)] } }] });
 
 		const result = await cms.loadPage(get("/catalog"));
 		if (result.type !== "page") throw new Error(result.type);
-		expect(JSON.stringify(result.props.render)).toContain(JSON.stringify({ products: [{ id: String(bream.id), name: "Bream", url: "/catalog/bream", price: 120 }] }));
+		expect(JSON.stringify(result.props.render)).toContain(JSON.stringify({ products: [{ id: String(bream.id), name: "Bream", url: "/catalog/bream", summary: "Fresh bream", price: 120 }] }));
 	});
 
 	test("pages that pick each other resolve one level deep", async () => {
@@ -131,8 +134,8 @@ describe("Dogfood: a block reads the fields of the pages it lists", () => {
 		const result = await cms.loadPage(get("/a"));
 		if (result.type !== "page") throw new Error(result.type);
 		// B's own pick of A comes back as a ref with empty fields: no third level.
-		expect(result.props.page.fields).toEqual({
-			other: [{ id: String(b.id), name: "B", url: "/b", fields: { other: [{ id: String(a.id), name: "A", url: "/a", fields: {} }] } }],
+		expect(result.props.page.fields).toMatchObject({
+			other: [{ id: String(b.id), name: "B", url: "/b", type: "pair", fields: { other: [{ id: String(a.id), name: "A", url: "/a", type: "pair", fields: {} }] } }],
 		});
 	});
 });
@@ -161,6 +164,8 @@ describe("Dogfood: a host lists a category's live children a page at a time", ()
 				summary: "The first article.",
 				body: "<p>Hello from the first article.</p>",
 				image: null,
+				publishedAt: expect.stringMatching(/^2026-10-01T09:00:00/),
+				updatedAt: expect.any(String),
 				url: "/blog/first-post",
 				fields: {},
 			},

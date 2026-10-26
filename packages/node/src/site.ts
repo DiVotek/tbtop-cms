@@ -1,6 +1,6 @@
 import type { PageRefWithFields, ResolveContext } from "./blocks/context";
 import { resolvePageFields } from "./blocks/resolver";
-import { type PageView, pageViews } from "./frontend/pageView";
+import { type PageView, pageColumns, pageViews } from "./frontend/pageView";
 import type { BlockRegistry } from "./blocks/registry";
 import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
 import { AuditLog } from "./content/audit";
@@ -11,6 +11,7 @@ import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from
 import { firstText, type Page, pageFromRow, translationText } from "./content/page";
 import { Pages, whereLive } from "./content/pages";
 import { livePageRefs, type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
+import { hostMediaKeys } from "./content/hostSettings";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { PageRevisions } from "./content/revisions";
@@ -61,6 +62,7 @@ export class Site {
 			secretKeys: config.secretSettings ?? [],
 			secretKey: config.settingsKey,
 			mediaUrl: (ref) => this.mediaUrl(ref),
+			mediaKeys: hostMediaKeys(config),
 		});
 		this.pages = new Pages(
 			db,
@@ -184,6 +186,7 @@ export class Site {
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
+			site: this,
 		};
 	}
 
@@ -201,7 +204,11 @@ export class Site {
 	private async pagesWithFields(value: unknown, locale: string, nested: boolean): Promise<PageRefWithFields[]> {
 		const live = await livePageRefs(this, value, locale);
 		const fields = nested ? live.map(() => ({})) : await resolvePageFields(this, live.map(({ page }) => page), locale);
-		return live.map(({ ref }, i) => ({ ...ref, fields: fields[i] ?? {} }));
+		const fallback = await this.languages.defaultLocale();
+		return live.map(({ ref, page }, i) => {
+			const { id: _id, name: _name, ...columns } = pageColumns(this, page, locale, fallback);
+			return { ...ref, ...columns, fields: fields[i] ?? {} };
+		});
 	}
 
 	/**

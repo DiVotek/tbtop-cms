@@ -150,6 +150,27 @@ describe("R2-content-8: a new page's title and content", () => {
 		expect(new Set(content.map((row) => row.id)).size).toBe(2);
 	});
 
+	test("a subtype's own template wins over its base's, on create and on render", async () => {
+		const { cms, post } = await panel({
+			pageTypes: [
+				{ key: "landing", template: () => [{ kind: "Faq" }] },
+				{ key: "solution", base: "landing", template: () => [{ id: "tpl1", kind: "Hero", data: { title: { en: "Solution" } } }] },
+				{ key: "plain", base: "landing" },
+			],
+		});
+		const created = async (subtype: string) => {
+			await post("/admin/pages/forms/pageCreate", { name: { en: subtype }, type: "landing", subtype_landing: subtype }, "/admin/pages");
+			const row = await cms.site().pages.query().selectAll().orderBy("id", "desc").executeTakeFirst();
+			return cms.site().pages.find(Number(row?.id));
+		};
+		const kinds = (content: unknown) => ((content ?? []) as Record<string, unknown>[]).map((row) => row.kind);
+		expect(kinds((await created("solution"))?.content)).toEqual(["Hero"]);
+		expect(kinds((await created("plain"))?.content)).toEqual(["Faq"]);
+		await cms.site().pages.create({ type: "landing", subtype: "solution", status: "published", name: { en: "Seeded" } }, { slugs: { en: "seeded" } });
+		const rendered = await cms.loadPage(get("/seeded"));
+		expect(rendered.type === "page" ? Object.values(rendered.props.render.elements).map((element) => element.type) : rendered.type).toContain("Hero");
+	});
+
 	test("a type without a template starts with no blocks", async () => {
 		const { cms, post } = await panel();
 		await post("/admin/pages/forms/pageCreate", { name: { en: "Fresh" }, type: "page" }, "/admin/pages");

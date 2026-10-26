@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
+import { baseNode, cmsBlockImpls, cmsBlocks, defineBlocks, identityId, implementBlocks } from "../src";
 import { makeCms, get } from "./support";
 
 describe("loadPage", () => {
@@ -90,6 +92,8 @@ describe("loadPage", () => {
 			xDefault: "https://site.test/blog/first-post",
 		});
 		expect(seo.jsonLd.map((node) => node["@type"])).toEqual(["WebSite", "BreadcrumbList", "Article", "Organization"]);
+		// One WebSite across pages, tied to the identity that publishes it.
+		expect(seo.jsonLd[0]).toMatchObject({ "@id": "https://site.test#website", publisher: { "@id": "https://site.test#identity" } });
 		const article = seo.jsonLd[2];
 		expect(article).toMatchObject({
 			headline: "First post",
@@ -177,4 +181,75 @@ describe("handle", () => {
 		expect((await cms.handle(get("/sitemap-2.xml")))?.status).toBe(404);
 		expect(await cms.handle(get("/about-us"))).toBeNull();
 	});
+
+	test("a block's toSchema builds on the exported baseNode and links the identity by identityId", async () => {
+		const catalog = defineBlocks({ ...cmsBlocks, Budget: { props: z.object({ price: z.string() }) } });
+		const blocks = implementBlocks(catalog, {
+			...cmsBlockImpls,
+			Budget: {
+				form: (s) => [s.text("price")],
+				toSchema: (props, ctx) => ({ ...baseNode(ctx, "Service"), offers: { "@type": "Offer", price: props.price }, provider: { "@id": identityId(ctx.site) } }),
+			},
+		});
+		const { cms, ids } = await makeCms(undefined, { blocks });
+		await cms.site().pages.update(ids.home as number, { content: [{ id: "b", kind: "Budget", data: { price: "100" } }] as never });
+		const result = await cms.loadPage(get("/"));
+		if (result.type !== "page") throw new Error(result.type);
+		expect(result.props.seo.jsonLd.find((node) => node["@type"] === "Service")).toMatchObject({
+			name: "Welcome",
+			url: "https://site.test",
+			offers: { price: "100" },
+			provider: { "@id": "https://site.test#identity" },
+		});
+	});
+
+	test("seo.extend gets the page's JSON-LD last and may replace the identity node", async () => {
+		const { cms } = await makeCms(undefined, {
+			seo: {
+				extend: async (nodes, ctx) => [
+					...nodes.filter((node) => node["@id"] !== identityId(ctx.site)),
+					{ "@context": "https://schema.org", "@type": "ProfessionalService", "@id": identityId(ctx.site), name: "Divotek", geo: { "@type": "GeoCoordinates", latitude: 50.45 } },
+				],
+			},
+		});
+		const result = await cms.loadPage(get("/blog/first-post"));
+		if (result.type !== "page") throw new Error(result.type);
+		const nodes = result.props.seo.jsonLd;
+		expect(nodes.map((node) => node["@type"])).toEqual(["WebSite", "BreadcrumbList", "Article", "ProfessionalService"]);
+		expect(nodes[2]).toMatchObject({ author: { "@id": "https://site.test#identity" } });
+	});
+
+	test("props.page carries the publish and update dates the JSON-LD states", async () => {
+		const { cms } = await makeCms();
+		const result = await cms.loadPage(get("/blog/first-post"));
+		if (result.type !== "page") throw new Error(result.type);
+		const node = result.props.seo.jsonLd.find((entry) => entry["@type"] === "Article");
+		expect(result.props.page.publishedAt).toBe(node?.datePublished as string);
+		expect(result.props.page.updatedAt).toBe(node?.dateModified as string);
+		expect(result.props.page.publishedAt).toStartWith("2026-10-01T09:00:00");
+	});
+
+	test("{date} in an SEO template is the publish day in the site's timezone", async () => {
+		const title = async (timezone?: string) => {
+			const { cms } = await makeCms(undefined, timezone === undefined ? {} : { timezone });
+			await cms.site().settings.set("seo.type_templates.article.title", { en: "{title} · {date}" });
+			const result = await cms.loadPage(get("/blog/first-post"));
+			return result.type === "page" ? result.props.seo.title : result.type;
+		};
+		// Published 2026-10-01T09:00Z: still September 30 in Pago Pago (UTC-11).
+		expect(await title()).toContain("October 1, 2026");
+		expect(await title("Pacific/Pago_Pago")).toContain("September 30, 2026");
+	});
+
+	test("{date} for a locale Intl rejects falls back to the ISO day, still in the site's timezone", async () => {
+		const fixture = {
+			languages: [{ locale: "en_US", name: "English", default: true }],
+			pages: [{ key: "post", type: "page", name: { en_US: "Post" }, publishedAt: "2026-10-01T09:00:00Z" }],
+		};
+		const { cms } = await makeCms(fixture, { timezone: "Pacific/Pago_Pago" });
+		await cms.site().settings.set("seo.type_templates.page.title", { en_US: "{title} · {date}" });
+		const result = await cms.loadPage(get("/post"));
+		expect(result.type === "page" ? result.props.seo.title : result.type).toContain("2026-09-30");
+	});
 });
+

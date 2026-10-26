@@ -1,4 +1,4 @@
-import type { HostRule, NotificationStore, PageDef, SessionResolver } from "@tbtop/admin";
+import type { HostRule, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
@@ -7,6 +7,7 @@ import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
 import type { SubmissionEvent } from "./forms/submit";
 import type { Channel, DeliveryEvent, MailTransport, NotificationType } from "./notifications/types";
+import type { SchemaContext } from "./seo/schemaContext";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
 import type { CmsCacheStore } from "./support/cache";
 
@@ -30,6 +31,13 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	pageTypes?: T;
 	/** Extra JSON-LD schema types next to the built-in WebPage family, Article family and CollectionPage. */
 	schemaTypes?: SchemaTypeDef[];
+	/**
+	 * The site's IANA timezone (`Europe/Kyiv`), as Laravel's app.timezone:
+	 * the admin formats and reads dates in it, the dashboard counts days in
+	 * it, and SEO templates print `{date}` in it. Stored dates stay UTC.
+	 * Default UTC.
+	 */
+	timezone?: string;
 	/** The public site origin (`https://example.com`); default: the request's origin. */
 	url?: string;
 	/** A media reference to its public URL; default: absolute URLs and `/…` paths as is, other paths under `/storage/`. */
@@ -37,11 +45,27 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	/** Settings keys holding secrets: sealed with `settingsKey`, never sent to the frontend. */
 	secretSettings?: string[];
 	/**
+	 * The host's own tabs on Site settings, after Branding and Contacts. A
+	 * field named `tagline` is stored at `site.tagline`, so it reaches the
+	 * frontend in `cms.settings` (unless listed in `secretSettings`) and
+	 * reads back with `site.settings.get("site.tagline")`. A name the page
+	 * already uses throws.
+	 */
+	siteSettings?: { tabs: (s: S) => { label: string; children: unknown[] }[] };
+	/**
 	 * The key secret settings are sealed with (AES-256-GCM over Web Crypto).
 	 * Keep it in the environment; changing it makes stored secrets unreadable.
 	 * Without it a secret setting reads as its fallback and cannot be saved.
 	 */
 	settingsKey?: string;
+	seo?: {
+		/**
+		 * The page's JSON-LD documents, last: return them with yours added or
+		 * replaced. A node of yours with `"@id": identityId(ctx.site)` is the one
+		 * Article author and publisher already point to.
+		 */
+		extend?: (nodes: Record<string, unknown>[], ctx: SchemaContext) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
+	};
 	/** Paths robots.txt disallows besides the admin prefix and `/login`. */
 	robotsDisallow?: string[];
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */

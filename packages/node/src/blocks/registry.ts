@@ -10,12 +10,27 @@ import type { ResolveContext } from "./context";
 import { resolveForm } from "./fields";
 import { translatablePaths } from "./locale";
 
+/** How stored input becomes props: the whole resolve, or keys over the form's resolve; not both. */
+type BlockResolve<P> =
+	| {
+			/** Flattened input to props; default: FormResolver over `form`. */
+			resolve?: (input: Record<string, unknown>, ctx: ResolveContext) => P | Promise<P>;
+			map?: never;
+	  }
+	| {
+			resolve?: never;
+			/**
+			 * Keys over the FormResolver's output (`resolved`), typed by the
+			 * catalog props: the common "the form, plus a key or two" without
+			 * a resolveForm call and a cast. `input` is the flattened stored data.
+			 */
+			map?: (resolved: Record<string, unknown>, input: Record<string, unknown>, ctx: ResolveContext) => Partial<P> | Promise<Partial<P>>;
+	  };
+
 /** The server half of a block kind: its editor form and how stored input becomes props. */
-export type BlockImpl<P = unknown> = {
+export type BlockImpl<P = unknown> = BlockResolve<P> & {
 	/** The admin form (fields of the `S` DSL); translatable() fields store locale maps. */
 	form: (s: S) => unknown[];
-	/** Flattened input to props; default: FormResolver over `form`. */
-	resolve?: (input: Record<string, unknown>, ctx: ResolveContext) => P | Promise<P>;
 	/** A JSON-LD node the block adds to the page, or null. */
 	toSchema?: (props: P, ctx: SchemaContext) => Record<string, unknown> | null;
 	/** The block posts a form: `action` (and `honeypotField`) are bound into its props, `/_cms/forms/...` takes the post. */
@@ -88,6 +103,26 @@ export type BlockRegistry = {
 	forPlacement(placement: Placement): BlockKind[];
 };
 
+/** The kind's input-to-props step: its resolve, else the FormResolver with its map on top. */
+function blockResolve(kind: string, impl: BlockImpl): BlockKind["resolve"] {
+	const { resolve, map } = impl;
+	if (resolve !== undefined && map !== undefined) {
+		throw new Error(`Block [${kind}] sets both resolve and map: map adds keys over the form's resolve, resolve replaces it.`);
+	}
+	if (resolve !== undefined) {
+		return async (input, ctx) => resolve(input, ctx);
+	}
+	return async (input, ctx) => {
+		const resolved = await resolveForm(impl.form(new S()), input, ctx);
+		if (map === undefined) {
+			return resolved;
+		}
+		// A key map leaves undefined keeps the form's value.
+		const added = Object.entries(await map(resolved, input, ctx)).filter(([, value]) => value !== undefined);
+		return { ...resolved, ...Object.fromEntries(added) };
+	};
+}
+
 const headline = (kind: string) => kind.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ");
 
 /**
@@ -113,8 +148,7 @@ export function implementBlocks<const C extends Catalog>(catalog: C, impls: Impl
 			placements: meta.placements ?? ["pages"],
 			props: meta.props,
 			form: impl.form,
-			resolve: async (input, ctx) =>
-				impl.resolve === undefined ? resolveForm(impl.form(new S()), input, ctx) : impl.resolve(input, ctx),
+			resolve: blockResolve(kind, impl),
 			translatableFields: () => translatablePaths(impl.form(new S())),
 			toSchema: (props, ctx) => impl.toSchema?.(props, ctx) ?? null,
 			submit: impl.submit ?? null,

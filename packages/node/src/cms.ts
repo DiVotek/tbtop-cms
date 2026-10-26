@@ -93,9 +93,22 @@ function warnUnknownPlacements(config: CmsConfig, pageTypes: PageTypes): void {
 	}
 }
 
+/** A bad zone would throw on every dashboard load and SEO `{date}`: refuse it once, here. */
+function assertTimezone(timezone: string | undefined): void {
+	if (timezone === undefined) {
+		return;
+	}
+	try {
+		new Intl.DateTimeFormat("en", { timeZone: timezone });
+	} catch {
+		throw new Error(`createCms: timezone "${timezone}" is not a valid IANA name.`);
+	}
+}
+
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
 
 export function createCms<const T extends readonly PageTypeDef[] = []>(config: CmsConfig<T>): Cms<T> {
+	assertTimezone(config.timezone);
 	const pageTypes = new PageTypes(config.pageTypes);
 	warnUnknownPlacements(config, pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);

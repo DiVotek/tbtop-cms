@@ -1,4 +1,4 @@
-import { type ActionCtx, Effects, Field, S } from "@tbtop/admin";
+import { type ActionCtx, defaultLocale, Effects, Field, S } from "@tbtop/admin";
 import { bindCmsFields } from "../blocks/cmsFields";
 import type { BlockRegistry } from "../blocks/registry";
 import { placeableIn } from "../blocks/catalog";
@@ -100,7 +100,24 @@ export function editorValue(field: Field, value: unknown): unknown {
 	}
 	const children = field.childFields().filter((child): child is Field => child instanceof Field);
 	const rows = perLocaleRows(children, value) ?? value;
-	return Array.isArray(rows) ? rows.map((row) => (isDict(row) ? { ...row, ...editorValues(children, row) } : row)) : rows;
+	return Array.isArray(rows) ? rows.map((row) => (isDict(row) ? { ...row, ...cellValues(children, row) } : row)) : rows;
+}
+
+/**
+ * A repeater row's editor values. The resolver reads a bare string in a
+ * translatable cell as every locale's text; the admin normalizes only
+ * top-level fields, so such a cell (seeded, imported) would open empty and
+ * fail `required`. It opens in the default locale, as a top-level one does.
+ */
+function cellValues(children: Field[], row: Dict): Dict {
+	const values = editorValues(children, row);
+	for (const child of children) {
+		const value = values[child.name];
+		if (child.isTranslatableField() && value !== null && value !== undefined && typeof value !== "object") {
+			values[child.name] = { [defaultLocale()]: value };
+		}
+	}
+	return values;
 }
 
 /** `{ locale: rows }` merged row by row; null for anything else. */

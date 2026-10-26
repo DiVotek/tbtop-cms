@@ -86,6 +86,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			return {
 				contentLocales: locales.length > 0 ? locales : [fallback || "en"],
 				defaultContentLocale: fallback || locales[0] || "en",
+				...(cms.config.timezone === undefined ? {} : { timezone: cms.config.timezone }),
 			};
 		},
 	};

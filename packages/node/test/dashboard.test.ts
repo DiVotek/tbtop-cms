@@ -61,6 +61,18 @@ describe("dashboard", () => {
 		expect(daily.data.at(-1)).toEqual({ date: new Date().toISOString().slice(0, 10), value: 1 });
 	});
 
+	test("the daily charts count days in the site's timezone, as PHP counts them in app.timezone", async () => {
+		// At any UTC hour, one of these zones is on another date than UTC.
+		for (const timezone of ["Pacific/Kiritimati", "Pacific/Pago_Pago"]) {
+			const { cms, visit } = await panel(fixture, { timezone });
+			const home = (await cms.site().pages.query().select("id").where("is_system", "=", 1).executeTakeFirstOrThrow()).id;
+			await cms.site().submissions.create({ pageId: Number(home), blockId: "b1", kind: "contact", locale: "en", payload: { name: "Ada" } });
+			const daily = (await (await visit("/admin/dashboard/data/submissions-daily?period=7", { inertia: false })).json()) as { data: { date: string; value: number }[] };
+			const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+			expect([timezone, daily.data.at(-1)]).toEqual([timezone, { date: today, value: 1 }]);
+		}
+	});
+
 	test("without the inbox ability the submission tiles, charts and list are left out", async () => {
 		const { page, visit } = await panel(fixture, { authorize: (_user, ability) => ability !== "tbtop-cms.submissions" });
 		const all = nodes((await page("/admin/dashboard")).props);
