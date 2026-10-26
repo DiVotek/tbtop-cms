@@ -54,6 +54,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `render.component` | `string` | `'Cms/Page'` | Inertia component name `PageController` renders for every CMS frontend page | pages.md |
 | `render.root_kind` | `string` | `'Fragment'` | Root block `kind` `PageSpecAssembler` wraps a page's resolved blocks in | pages.md |
 | `render.root_view` | `?string` | `null` | Overrides the Inertia root Blade view for CMS responses; checked by `Health/Checks/InertiaRootViewCheck.php` | wiring.md |
+| `api.enabled` | `bool` | `env('TBTOP_CMS_API', false)` | Registers the token-authenticated pages API under `/api/cms/v1` (`Api/ApiWiring.php`); needs `laravel/sanctum`, without it the routes stay unregistered and `cms:doctor` (`pages_api`) warns | api.md |
 | `roles` | `bool` | `false` | `false` leaves every `tbtop-cms.*` section ability open to any admin; `true` hands all of them to host-defined gates (`Admin/Support/CmsAbilities::enabled()`) — an unanswered ability then denies | §8 below |
 | `admin.autoregister` | `bool` | `true` | Whether `CmsServiceProvider` auto-registers the admin panel/routes itself | wiring.md |
 | `admin.prefix` | `string` | `'admin'` | URL prefix the admin panel and its routes mount under | §3 below |
@@ -68,7 +69,8 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 | Command | Signature/options | Purpose | Scheduled? |
 |---|---|---|---|
 | `cms:install` | `{--force : Overwrite published config files} {--skip-migrations : Do not run database migrations}` | Publish config, run migrations, seed default languages and home page, rebuild the page references index | No |
-| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks; `page_type_pairs` — stored pages whose `type` is a subtype key or whose `subtype` is not a registered subtype of their `type`, per pair with a count and the first ids, trashed included; `page_subtype_bases` — subtypes whose `base()` is unregistered or itself a subtype; `unknown_schema_types` — page types whose `schemaTypes()` list a key `SchemaTypeRegistry` does not know, which the page skips). Exit 1 only on an error-level check | No |
+| `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks; `page_type_pairs` — stored pages whose `type` is a subtype key or whose `subtype` is not a registered subtype of their `type`, per pair with a count and the first ids, trashed included; `page_subtype_bases` — subtypes whose `base()` is unregistered or itself a subtype; `unknown_schema_types` — page types whose `schemaTypes()` list a key `SchemaTypeRegistry` does not know, which the page skips; `pages_api` — `api.enabled` on without Sanctum or with a user model lacking `HasApiTokens`). Exit 1 only on an error-level check | No |
+| `cms:api-token` | `{user : email} {--parents= : category ids} {--name=cms-api}` | Issue a pages-API token for a CMS admin with `pages:read`, `pages:write` and the given categories (api.md); refuses ids that are not categories, naming them; prints the token once | No |
 | `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access (a new user needs a valid email) | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses the protected owner; a user with no CMS access gets a warning, exit 0) | No |
@@ -106,6 +108,20 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `AdminWiring::wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
 | `tbtop.cms.logout` | POST | `{admin.prefix}/logout` | `LogoutController`, middleware `['web','auth:{admin.guard}']` |
 | `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
+
+**Pages API** (`Api/ApiWiring.php`, only when `tbtop-cms.api.enabled` and Sanctum is installed) — prefix `api/cms/v1`, middleware `[AcceptsJson, SubstituteBindings, 'auth:cms-api', ActAsPanelUser]` plus `CheckAbilities:pages:read` or `:pages:write` per route; shapes in api.md:
+
+| Name | Method | Path | Ability |
+|---|---|---|---|
+| `tbtop-cms.api.pages.index` | GET | `api/cms/v1/pages` | `pages:read` |
+| `tbtop-cms.api.pages.show` | GET | `api/cms/v1/pages/{page}` | `pages:read` |
+| `tbtop-cms.api.types.fields` | GET | `api/cms/v1/types/{type}/fields` | `pages:read` |
+| `tbtop-cms.api.locales` | GET | `api/cms/v1/locales` | `pages:read` |
+| `tbtop-cms.api.pages.store` | POST | `api/cms/v1/pages` | `pages:write` |
+| `tbtop-cms.api.pages.update` | PATCH | `api/cms/v1/pages/{page}` | `pages:write` |
+| `tbtop-cms.api.pages.destroy` | DELETE | `api/cms/v1/pages/{page}` | `pages:write` |
+| `tbtop-cms.api.pages.publish` | POST | `api/cms/v1/pages/{page}/publish` | `pages:write` |
+| `tbtop-cms.api.media.store` | POST | `api/cms/v1/media` | `pages:write` |
 
 **Admin panel pages** (`CmsPanel`, prefix = `config('tbtop-cms.admin.prefix','admin')`, guard = `config('tbtop-cms.admin.guard','web')`):
 

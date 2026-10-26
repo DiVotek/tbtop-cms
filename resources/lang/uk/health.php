@@ -148,6 +148,17 @@ return [
                 'both_missing' => 'Немає ні власника, ні активної мови фронтенду за замовчуванням. Виконайте php artisan cms:install та php artisan cms:admin:create, щоб налаштувати обидва.',
             ],
         ],
+        'pages_api' => [
+            'label' => 'API сторінок',
+            'off' => 'API сторінок вимкнено (tbtop-cms.api.enabled).',
+            'ok' => 'API сторінок увімкнено за адресою /api/cms/v1.',
+            'no_sanctum' => 'API сторінок увімкнено, але laravel/sanctum не встановлено, тож його маршрути не зареєстровано.',
+            'no_tokens' => 'API сторінок увімкнено, але :model не може мати API-токенів.',
+            'hints' => [
+                'no_sanctum' => 'Виконайте composer require laravel/sanctum, опублікуйте й застосуйте його міграцію (php artisan vendor:publish --tag=sanctum-migrations && php artisan migrate) і додайте Laravel\\Sanctum\\HasApiTokens до моделі користувача.',
+                'no_tokens' => 'Додайте трейт Laravel\\Sanctum\\HasApiTokens до :model.',
+            ],
+        ],
         'session_driver' => [
             'label' => 'Драйвер сесій',
             'ok' => 'Драйвер сесій — ":driver".',

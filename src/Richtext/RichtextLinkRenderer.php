@@ -50,7 +50,8 @@ class RichtextLinkRenderer
         return $attrs;
     }
 
-    private function isAllowedUrl(string $url): bool
+    /** Also the API's check on a link it is sent (Api/Fields/RestrictedHtml), so both refuse the same URLs. */
+    public function isAllowedUrl(string $url): bool
     {
         // Browsers delete tab/CR/LF anywhere in a URL and trim C0 controls
         // and spaces from its ends before parsing, so " javascript:alert(1)"

@@ -15,6 +15,8 @@ use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
 use Tbtop\Cms\Admin\Fields\Link;
 use Tbtop\Cms\Admin\Fields\Pages;
+use Tbtop\Cms\Api\ApiWiring;
+use Tbtop\Cms\Api\Commands\ApiTokenCommand;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
@@ -116,6 +118,7 @@ class CmsServiceProvider extends PackageServiceProvider
                 DoctorCommand::class,
                 BlocksTypesCommand::class,
                 RebuildPageRefsCommand::class,
+                ApiTokenCommand::class,
             ])
             ->runsMigrations();
     }
@@ -167,6 +170,7 @@ class CmsServiceProvider extends PackageServiceProvider
         NotificationWiring::wire($this->app);
         ErrorPagesWiring::wire($this->app);
         ScheduleWiring::wire($this->app);
+        ApiWiring::wire();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
