@@ -89,7 +89,7 @@ describe("D1 migrations as SQL files", () => {
 		expect([plan.toBeCreated, plan.toBeAdded]).toEqual([[], []]);
 	});
 
-	test("without auth only the CMS file; the default language is chosen or left out", async () => {
+	test("without auth only the CMS files; the default language is chosen or left out", async () => {
 		const [uk] = await d1Migrations({ defaultLanguage: "uk" });
 		expect((await d1Migrations()).map((file) => file.name)).toEqual(["2026_10_22_000000_tbtop_cms_baseline", "2026_10_27_000000_tbtop_page_title_to_seo"]);
 		expect((await d1Migrations())[1]?.sql).toContain('update "tbtop_pages" set "seo"');

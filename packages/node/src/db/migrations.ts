@@ -341,7 +341,8 @@ const localeMap = (raw: unknown): Record<string, unknown> => {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 };
 
-const filled = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+/** Not blank: something besides spaces, tabs and line breaks, the set the SQLite statement trims too. */
+const filled = (value: unknown): value is string => typeof value === "string" && /[^ \t\r\n]/.test(value);
 
 /**
  * The SQLite (D1 included) copy as one statement, so the D1 SQL files carry
@@ -352,12 +353,12 @@ const SQLITE_TITLE_TO_SEO = sql`
 	update "tbtop_pages" set "seo" = json_set(seo_json, '$.title', json((
 		select json_group_object(key, value) from (
 			select key, value from json_each(seo_title)
-			where key not in (select key from json_each("title") where type = 'text' and trim(value) <> '')
-				or (type = 'text' and trim(value) <> '')
+			where key not in (select key from json_each("title") where type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')
+				or (type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')
 			union all
 			select key, value from json_each("title")
-			where type = 'text' and trim(value) <> ''
-				and key not in (select key from json_each(seo_title) where type = 'text' and trim(value) <> '')
+			where type = 'text' and trim(value, char(32, 9, 10, 13)) <> ''
+				and key not in (select key from json_each(seo_title) where type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')
 		)
 	)))
 	from (select "id" as page_id,
@@ -365,7 +366,7 @@ const SQLITE_TITLE_TO_SEO = sql`
 		case when json_valid("seo") and json_type("seo", '$.title') = 'object' then json_extract("seo", '$.title') else '{}' end as seo_title
 		from "tbtop_pages") as current
 	where "id" = current.page_id and json_valid("title") and json_type("title") = 'object'
-		and exists (select 1 from json_each("title") where type = 'text' and trim(value) <> '')`;
+		and exists (select 1 from json_each("title") where type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')`;
 
 /**
  * PHP #326: the page title lives only in SEO. Each locale's non-blank title

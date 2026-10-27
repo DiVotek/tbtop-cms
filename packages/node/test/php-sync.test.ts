@@ -215,7 +215,7 @@ describe("an upgraded database moves page titles into SEO (#326)", () => {
 		});
 		await (db as unknown as Kysely<Record<string, Record<string, unknown>>>)
 			.insertInto("tbtop_pages")
-			.values([page(1, { en: "Studio", uk: "Студія", de: " " }, { title: { en: "Kept" }, description: { en: "Desc" } }), page(2, { en: "Only" }, null), page(3, null, null)])
+			.values([page(1, { en: "Studio", uk: "Студія", de: " \n\t", fr: "\r\n" }, { title: { en: "Kept" }, description: { en: "Desc" } }), page(2, { en: "Only" }, null), page(3, null, null)])
 			.execute();
 		const migrator = new Migrator({ db: db as Kysely<unknown>, provider: cmsMigrations({ dialect: testDialect }), migrationTableName: "m", migrationLockTableName: "m_lock" });
 		// The baseline already ran by hand: mark it done, then upgrade.
