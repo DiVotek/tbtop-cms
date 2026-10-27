@@ -147,7 +147,7 @@ describe("form submissions", () => {
 		expect(mail.sent[0]?.html).toMatch(/href="https:\/\/site\.test\/admin\/form-submissions\/\d+"/);
 		expect(bot.calls.map((call) => call.body.chat_id)).toEqual(["-1001", "42"]);
 		expect(bot.calls[0]?.url).toBe("https://api.telegram.org/botT0KEN/sendMessage");
-		expect(String(bot.calls[0]?.body.text)).toContain("Ada · ada@example.test");
+		expect(String(bot.calls[0]?.body.text)).toContain("<b>New form submission</b>\nAda\nada@example.test\nPage: Home");
 
 		const [row] = await rows(db);
 		expect(row).toMatchObject({ status: "handled", error: null });
@@ -178,7 +178,7 @@ describe("form submissions", () => {
 		const { action } = await contactAction(cms);
 		await cms.handle(post(action, valid));
 		expect(store.rows.map((row) => row.owner).sort()).toEqual(["1", "2"]);
-		expect(store.rows[0]?.data).toMatchObject({ title: "New form submission", body: "Ada · ada@example.test\nPage: Home" });
+		expect(store.rows[0]?.data).toMatchObject({ title: "New form submission", body: "Ada\nada@example.test\nPage: Home" });
 		expect(store.rows[0]?.data.actions?.[0]).toMatchObject({ label: "View submission" });
 	});
 

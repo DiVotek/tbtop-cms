@@ -11,6 +11,10 @@ export type FormSubmissionPayload = {
 	fields: Record<string, string>;
 	actionUrl: string;
 	actionLabel: string;
+	/** The lead's name, '' when the payload has none (leadIdentity still covers it). */
+	leadName: string;
+	/** How to reach the lead: the email, else a phone; '' when neither. */
+	leadContact: string;
 };
 
 const multiline = (value: string) => escapeHtml(value).replace(/\r?\n/g, "<br>\n");
@@ -22,7 +26,7 @@ export const formSubmissionType: NotificationType<FormSubmissionPayload> = {
 	group: "forms",
 	audiences: ["staff"],
 	defaultChannels: ["bell"],
-	variables: ["leadIdentity", "pageName", "locale", "submittedAt", "fields", "actionUrl", "actionLabel"],
+	variables: ["leadIdentity", "leadName", "leadContact", "pageName", "locale", "submittedAt", "fields", "actionUrl", "actionLabel"],
 	templates: {
 		html: (payload, { t }) => ({
 			subject: t("notifications.mail.subject"),
@@ -38,7 +42,8 @@ export const formSubmissionType: NotificationType<FormSubmissionPayload> = {
 			subject: t("notifications.bell.title"),
 			body: [
 				`<b>${escapeHtml(t("notifications.telegram.message_title"))}</b>`,
-				escapeHtml(payload.leadIdentity),
+				// Name and contact on their own lines; the one-line identity only when both are missing.
+				...(payload.leadName === "" && payload.leadContact === "" ? [payload.leadIdentity] : [payload.leadName, payload.leadContact].filter((line) => line !== "")).map(escapeHtml),
 				`${escapeHtml(t("notifications.mail.fields.page"))}: ${escapeHtml(payload.pageName)}`,
 				escapeHtml(payload.actionUrl),
 			].join("\n"),

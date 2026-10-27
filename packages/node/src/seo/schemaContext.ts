@@ -48,13 +48,16 @@ export const publishedAt = (page: Page): string | null =>
 
 export const modifiedAt = (page: Page): string | null => (page.updatedAt === null ? null : atom(page.updatedAt));
 
-/** PageOwnSeo::title: seo.title, else title, else name. */
+/**
+ * PageOwnSeo::title: seo.title, else title, else name. The whole chain runs in
+ * this locale before the default one: this locale's name beats the default
+ * language's title, or a translated page ships an untranslated <title>.
+ */
 export async function ownTitle(site: Site, page: Page, locale: string): Promise<string> {
 	const fallback = await site.languages.defaultLocale();
 	return (
 		localized(page.seo.title, locale) ||
-		firstText(page, ["title"], locale, fallback) ||
-		firstText(page, ["name"], locale, fallback)
+		firstText(page, ["title", "name"], locale, fallback)
 	);
 }
 

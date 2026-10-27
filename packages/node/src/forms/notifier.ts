@@ -4,7 +4,7 @@ import { formatPhpDate } from "@tbtop/admin";
 import type { FormSubmissionPayload } from "../notifications/formSubmission";
 import type { Delivery, Recipient } from "../notifications/types";
 import { hasString } from "../support/strings";
-import { formatFields, leadIdentity } from "./lead";
+import { formatFields, leadContact, leadIdentity, leadName } from "./lead";
 import { locateForm } from "./locate";
 import { type Submission, staleBefore } from "./submissions";
 
@@ -143,6 +143,8 @@ export async function submissionPayload(site: Site, submission: Submission, page
 		fields: formatFields(submission.payload),
 		actionUrl: site.absolute(`${prefix}/form-submissions/${submission.id}`),
 		actionLabel: await site.t("notifications.bell.view", locale),
+		leadName: leadName(submission.payload) ?? "",
+		leadContact: leadContact(submission.payload) ?? "",
 	};
 }
 

@@ -626,7 +626,8 @@ sent or has failed (`status`, `stage` render or send, `error`, `to` the
 recipient), on retries too. Both are awaited; a throw in either is logged
 and never fails the submit or the delivery.
 
-Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
+Template overrides are Liquid (`{{ leadIdentity }}`, or `{{ leadName }}` and
+`{{ leadContact }}` apart, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored
 in `tbtop_notification_templates`.
 
