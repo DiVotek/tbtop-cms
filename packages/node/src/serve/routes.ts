@@ -13,8 +13,8 @@ export function cmsRoutes(cms: Handler, admin: Handler, auth: Pick<DefaultAuth, 
 }
 
 /** The CMS's tables (user columns as Better Auth's string ids when it is on), then Better Auth's. Idempotent: a deploy step, or the first request. */
-export async function migrateAll(db: Kysely<unknown>, auth: Pick<DefaultAuth, "migrate"> | null = null): Promise<void> {
-	await migrateCms(db, { userKey: auth === null ? "int" : "string" });
+export async function migrateAll(db: Kysely<unknown>, auth: Pick<DefaultAuth, "migrate"> | null = null, userKey: "int" | "string" = "int"): Promise<void> {
+	await migrateCms(db, { userKey: auth === null ? userKey : "string" });
 	await auth?.migrate();
 }
 
