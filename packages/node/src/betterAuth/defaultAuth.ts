@@ -80,7 +80,7 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		...(baseURL === undefined ? {} : { baseURL }),
 	} satisfies BetterAuthOptions;
 	const instance = betterAuth(config) as unknown as DefaultAuth["instance"];
-	const users = db as Kysely<{ tbtop_users: { id: string; email: string } }>;
+	const users = db as Kysely<{ tbtop_users: { id: string; email: string; role: string | null } }>;
 	const ensureUser = async (email: string, role: string, { password, name }: { password: string; name?: string }): Promise<string> => {
 		const found = await users.selectFrom("tbtop_users").select("id").where("email", "=", email).executeTakeFirst();
 		if (found !== undefined) {
@@ -105,7 +105,15 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		},
 		handle: async (request) => (new URL(request.url).pathname.startsWith(`${basePath}/`) ? instance.handler(request) : null),
 	};
-	firstAdmins.set(auth, (email, password) => ensureUser(email, "admin", { password }));
+	// Only while the site has no admin: a deleted or demoted first admin stays so, whatever the secrets say.
+	firstAdmins.set(auth, async (email, password) => {
+		const admin = await users
+			.selectFrom("tbtop_users")
+			.select("id")
+			.where((eb) => eb.or([eb("role", "=", "admin"), eb("role", "like", "admin,%"), eb("role", "like", "%,admin"), eb("role", "like", "%,admin,%")]))
+			.executeTakeFirst();
+		return admin?.id ?? ensureUser(email, "admin", { password });
+	});
 	return auth;
 }
 

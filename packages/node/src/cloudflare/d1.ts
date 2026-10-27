@@ -7,9 +7,9 @@ import {
 	Kysely,
 	type QueryResult,
 	SqliteAdapter,
-	SqliteIntrospector,
 	SqliteQueryCompiler,
 } from "kysely";
+import { SqliteMasterIntrospector } from "../db/sqliteIntrospector";
 import type { D1Database } from "./types";
 
 /**
@@ -61,7 +61,8 @@ export class D1Dialect implements Dialect {
 		return new SqliteQueryCompiler();
 	}
 	createIntrospector(db: Kysely<unknown>): DatabaseIntrospector {
-		return new SqliteIntrospector(db);
+		// Kysely's own joins pragma_table_info, which D1 refuses.
+		return new SqliteMasterIntrospector(db);
 	}
 }
 

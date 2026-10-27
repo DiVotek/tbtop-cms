@@ -40,6 +40,17 @@ describe("serve(site, { db })", () => {
 		return app(db);
 	});
 
+	test("the secrets create the first admin only while the site has none", async () => {
+		process.env.TBTOP_ADMIN_EMAIL = "second@site.test";
+		try {
+			await app(db).ready();
+		} finally {
+			process.env.TBTOP_ADMIN_EMAIL = ADMIN.email;
+		}
+		const second = await (db as unknown as Kysely<{ tbtop_users: { email: string } }>).selectFrom("tbtop_users").select("email").where("email", "=", "second@site.test").execute();
+		expect(second).toEqual([]);
+	});
+
 	test("users.ensure seeds an editor, never an admin", async () => {
 		const host = app(db);
 		await host.ready();
