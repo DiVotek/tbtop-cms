@@ -1,4 +1,4 @@
-import { definePage } from "@tbtop/admin";
+import { currentContext, definePage } from "@tbtop/admin";
 import type { Cms } from "@tbtop/cms";
 import type { SiteAdmin } from "@tbtop/cms/serve";
 import type { site } from "./site";
@@ -13,6 +13,11 @@ export const admin: SiteAdmin<typeof site.def> = (cms: Cms) => ({
 			path: "callbacks",
 			title: "Callbacks",
 			nav: { group: "Sales", label: "Callbacks", icon: "phone", order: 10 },
+			// Submissions are personal data: the same ability as the CMS inbox.
+			authorize: async () => {
+				const check = cms.config.authorize ?? cms.config.auth?.authorize;
+				return check === undefined || (await check(currentContext().user, "tbtop-cms.submissions")) === true;
+			},
 			view: async (s) => {
 				const rows = await cms.config.db.selectFrom("tbtop_form_submissions").select(["id", "payload"]).where("kind", "=", "Callback").orderBy("id", "desc").limit(20).execute();
 				return s.stack([
