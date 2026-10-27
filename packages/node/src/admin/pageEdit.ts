@@ -148,9 +148,9 @@ async function statusBar(s: S, cms: Cms, site: Site, page: Page, slugs: Record<s
 	const badge = STATE_BADGES[state];
 	const note =
 		state === "scheduled" && page.publishedAt !== null
-			? [s.displayText("Scheduled for").variant("muted"), s.displayValue(page.publishedAt.toISOString()).datetime("d.m.Y H:i")]
+			? [s.displayText("Scheduled for").variant("muted"), s.displayValue(page.publishedAt).datetime("d.m.Y H:i")]
 			: state === "expired" && page.unpublishAt !== null
-				? [s.displayText("Expired").variant("muted"), s.displayValue(page.unpublishAt.toISOString()).datetime("d.m.Y H:i")]
+				? [s.displayText("Expired").variant("muted"), s.displayValue(page.unpublishAt).datetime("d.m.Y H:i")]
 				: [];
 	const revisions = await revisionsAction(s, cms, site, page, back);
 	return s.flex(
@@ -174,10 +174,10 @@ function timestamps(s: S, page: Page): unknown[] {
 	const icon = (name: string) => s.displayValue(name).icon({ [name]: { icon: name } });
 	const out: unknown[] = [];
 	if (page.updatedAt !== null) {
-		out.push(s.flex([icon("pencil"), s.displayValue(page.updatedAt.toISOString()).datetime("d.m.Y H:i")], { align: "center", gap: 1 }));
+		out.push(s.flex([icon("pencil"), s.displayValue(page.updatedAt).datetime("d.m.Y H:i")], { align: "center", gap: 1 }));
 	}
 	if (page.createdAt !== null && page.createdAt.getTime() !== page.updatedAt?.getTime()) {
-		out.push(s.flex([icon("calendar-plus"), s.displayValue(page.createdAt.toISOString()).date("d.m.Y")], { align: "center", gap: 1 }));
+		out.push(s.flex([icon("calendar-plus"), s.displayValue(page.createdAt).date("d.m.Y")], { align: "center", gap: 1 }));
 	}
 	return out;
 }
