@@ -19,7 +19,7 @@ const catalog = defineBlocks({
 /** createAdmin(cms.admin.options()) under `/cp`, with Better Auth given once to createCms. */
 async function cpPanel() {
 	const db = await freshDb();
-	await migrateCms(db as Kysely<unknown>, { dialect: testDialect });
+	await migrateCms(db as Kysely<unknown>, { dialect: testDialect, userKey: "string" });
 	const options = {
 		database: { db: db as Kysely<unknown>, type: testDialect },
 		secret: "test-secret-test-secret-test-secret",
