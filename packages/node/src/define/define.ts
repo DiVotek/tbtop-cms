@@ -48,7 +48,7 @@ const formProps = { action: z.string(), honeypotField: z.string().optional() };
 // biome-ignore lint/suspicious/noExplicitAny: any block.
 export const blockProps = (b: Block<any>) => (b.form ? zodOf(b.fields).extend(formProps) : zodOf(b.fields));
 
-type PageOptions = Omit<PageTypeDef, "key" | "form" | "schema" | "schemaTypes" | "resolveFields" | "template"> & {
+type PageOptions = Omit<PageTypeDef, "key" | "form" | "schema" | "schemaTypes" | "resolveFields"> & {
 	/** JSON-LD type keys the editor may pick (the site's `jsonLd` or the built-in ones); the first is the default. */
 	jsonLd?: string | readonly string[];
 };

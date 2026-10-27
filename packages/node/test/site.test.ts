@@ -233,4 +233,11 @@ describe("defineSite", () => {
 		expect(b).toMatchObject({ key: "b", label: "B", schemaTypes: ["Service"] });
 		expect(Object.keys(b?.schema?.shape ?? {})).toEqual(["a"]);
 	});
+
+	test("pageType() keeps a subtype's template, so its new pages start from the starter blocks", () => {
+		const starter = [{ kind: "Promo", data: { title: { en: "Hi" } } }];
+		const s = defineSite({ pages: { solution: pageType({}, { base: "page", template: () => starter }) }, blocks: { Promo: block({}) } });
+		const [solution] = pageTypeDefs(s.def, { link: () => ({ types: () => null }), pages: () => ({ of: () => null }) });
+		expect(solution?.template?.({} as never)).toEqual(starter);
+	});
 });
