@@ -8,12 +8,12 @@ export type RenderSpec = {
 	elements: Record<string, { type: string; props: Record<string, unknown>; children?: string[] }>;
 };
 
-/** PageSpecAssembler: blocks in order under the root; a duplicate or reserved id is skipped. */
+/** PageSpecAssembler: blocks in order under the root; a duplicate or reserved id (`$root`, `__proto__`) is skipped. */
 export function assembleSpec(blocks: ResolvedBlock[], rootKind = "Fragment"): RenderSpec {
 	const elements: RenderSpec["elements"] = {};
 	const children: string[] = [];
 	for (const block of blocks) {
-		if (block.id === "$root" || block.id in elements) {
+		if (block.id === "$root" || block.id === "__proto__" || Object.hasOwn(elements, block.id)) {
 			console.warn("block.reserved_or_duplicate_id", { id: block.id, kind: block.kind });
 			continue;
 		}

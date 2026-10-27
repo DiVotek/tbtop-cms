@@ -197,7 +197,7 @@ const cms = createCms({
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
-	auth: cmsAuth(betterAuth), // section access, the panel session, sign-in and Users pages (see Users and sign-in)
+	auth: cmsAuth(auth), // a betterAuth({...}) instance: section access, the panel session, sign-in and Users pages (see Users and sign-in)
 	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
 	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none

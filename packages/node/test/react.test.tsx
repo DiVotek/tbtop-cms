@@ -51,6 +51,14 @@ describe("@tbtop/cms/react", () => {
 		expect(html).toContain("Header hero");
 	});
 
+	test("assembleSpec keeps blocks whose ids are Object.prototype names, and skips $root, __proto__ and duplicates", () => {
+		const block = (id: string) => ({ id, kind: "Hero", props: {} });
+		const spec = assembleSpec(["constructor", "toString", "hasOwnProperty", "$root", "__proto__", "a", "a"].map(block));
+		expect(spec.elements.$root?.children).toEqual(["constructor", "toString", "hasOwnProperty", "a"]);
+		expect(Object.hasOwn(spec.elements, "constructor")).toBe(true);
+		expect(Object.getPrototypeOf(spec.elements)).toBe(Object.prototype);
+	});
+
 	test("CmsRenderer draws the page blocks with the built-in components on the server", async () => {
 		const props = await home();
 		const html = page(<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={false} />);
