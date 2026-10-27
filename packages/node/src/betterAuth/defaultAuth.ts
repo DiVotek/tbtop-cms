@@ -67,26 +67,17 @@ const env = (name: string): string | undefined => (typeof process === "undefined
 export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {}): DefaultAuth {
 	const roles: Record<string, CmsAccessRole> = options.roles ?? cmsRoles;
 	const basePath = options.basePath ?? "/api/auth";
-	const extra = options.betterAuth ?? {};
 	const secret = options.secret ?? env("BETTER_AUTH_SECRET");
 	const baseURL = options.baseURL ?? env("BETTER_AUTH_URL");
 	if (secret === undefined || secret === "") {
 		throw new Error("tbtop/cms: set BETTER_AUTH_SECRET (or pass `secret`): sessions are never signed with a default secret.");
 	}
 	const config = {
-		...extra,
+		...defaultAuthSchema({ ...options, roles }),
 		database: options.database ?? { db, type: databaseType(db) },
 		basePath,
 		secret,
 		...(baseURL === undefined ? {} : { baseURL }),
-		emailAndPassword: { enabled: true, disableSignUp: true, ...extra.emailAndPassword },
-		user: { ...extra.user, modelName: "tbtop_users" },
-		session: { ...extra.session, modelName: "tbtop_sessions" },
-		account: { ...extra.account, modelName: "tbtop_accounts" },
-		verification: { ...extra.verification, modelName: "tbtop_verifications" },
-		plugins: [adminPlugin({ ac: cmsAccess, roles }), ...(extra.plugins ?? [])],
-		// migrate() runs before the first request is served; Better Auth's own check at construction would race it on a fresh database.
-		advanced: { ...extra.advanced, database: { ...extra.advanced?.database, validateSchema: false } },
 	} satisfies BetterAuthOptions;
 	const instance = betterAuth(config) as unknown as DefaultAuth["instance"];
 	const users = db as Kysely<{ tbtop_users: { id: string; email: string } }>;
@@ -111,6 +102,27 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 	};
 	firstAdmins.set(auth, (email, password) => ensureUser(email, "admin", { password }));
 	return auth;
+}
+
+/**
+ * Better Auth's options without the database and secrets: the `tbtop_*`
+ * models, the admin plugin with the roles, email and password with public
+ * sign-up off, then the host's extras. They decide Better Auth's tables, so
+ * the D1 SQL files (`tbtop-cms d1:migrations`) are generated from them.
+ */
+export function defaultAuthSchema(options: Pick<DefaultAuthOptions, "roles" | "betterAuth"> = {}) {
+	const extra = options.betterAuth ?? {};
+	return {
+		...extra,
+		emailAndPassword: { enabled: true, disableSignUp: true, ...extra.emailAndPassword },
+		user: { ...extra.user, modelName: "tbtop_users" },
+		session: { ...extra.session, modelName: "tbtop_sessions" },
+		account: { ...extra.account, modelName: "tbtop_accounts" },
+		verification: { ...extra.verification, modelName: "tbtop_verifications" },
+		plugins: [adminPlugin({ ac: cmsAccess, roles: options.roles ?? cmsRoles }), ...(extra.plugins ?? [])],
+		// The tables exist before the first request (migrate() or the D1 files); Better Auth's own check at construction would race migrate() on a fresh database.
+		advanced: { ...extra.advanced, database: { ...extra.advanced?.database, validateSchema: false } },
+	} satisfies BetterAuthOptions;
 }
 
 function databaseType(db: Kysely<unknown>): "sqlite" | "postgres" | "mysql" {

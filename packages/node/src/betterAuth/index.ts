@@ -10,7 +10,7 @@ import { AuthSession, type CmsAuthUser } from "./session";
 
 export { CMS_SECTIONS, cmsAccess, cmsRoles, cmsStatements, type CmsRole, permissionFor } from "./access";
 export type { CmsAuthUser } from "./session";
-export { type CmsAccessRole, type DefaultAuth, type DefaultAuthOptions, defaultAuth } from "./defaultAuth";
+export { type CmsAccessRole, type DefaultAuth, type DefaultAuthOptions, defaultAuth, defaultAuthSchema } from "./defaultAuth";
 
 type Call<B> = { body: B; headers: Headers };
 

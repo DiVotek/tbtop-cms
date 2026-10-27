@@ -9,6 +9,8 @@ const HELP = `Usage: tbtop-cms <command> [--config cms.config.ts]
 
 Commands:
   migrate             Run the CMS migrations (dialect from the Kysely adapter; --dialect to override)
+  d1:migrations [--out migrations] [--entry worker.ts] [--locale en | --no-language]
+                      Write the SQL files for \`wrangler d1 migrations apply\` (CMS + Better Auth; no --config)
   doctor              Run the health checks; exits 1 on an error
   scheduled           Deliver the outbox, prune logs and snapshot SEO once a day, stamp the heartbeat (run every minute)
   deliver [--limit N] Deliver pending form submissions now
@@ -20,7 +22,7 @@ Commands:
   audit:prune [--days N]
                       Delete audit entries older than N days (default audit.retentionDays, 365)
 
-The config module's default export is the host's Cms (or a function returning one).`;
+The config module's default export is the host's Cms (or a function returning one).\nd1:migrations reads Better Auth's options from --entry, the Worker module cloudflare(site, options) returns.`;
 
 /** The Kysely dialect behind a db, for the migrations' column types (see dialectOfDb). */
 export function dialectOf(db: Kysely<unknown>): Dialect {

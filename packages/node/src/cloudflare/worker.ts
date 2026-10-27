@@ -1,6 +1,6 @@
 import type { ExecutionContext, ScheduledController } from "./types";
 
-/** What one isolate keeps per `env`: the built app and its first-request boot (migrations, seed). */
+/** What one isolate keeps per `env`: the built app and its first-request boot (the seed, the first admin). */
 export type WorkerApp = {
 	boot(): Promise<void>;
 	fetch(request: Request, ctx: ExecutionContext): Promise<Response>;
@@ -14,7 +14,8 @@ export type WorkerApp = {
  * tick) awaits the boot, the rest reuse it. Cached per `env` object: workerd
  * hands one isolate the same `env` on every call, so that is once per
  * isolate; a runtime that passes a fresh `env` re-runs the boot, which is
- * idempotent (migrations, seed on an empty site, ensure) but slower.
+ * idempotent but slower. The boot does not migrate: D1's tables come on
+ * deploy (`tbtop-cms d1:migrations`, `wrangler d1 migrations apply`).
  */
 export function workerEntry<E extends object>(make: (env: E) => WorkerApp) {
 	const apps = new WeakMap<E, { app: WorkerApp; ready: Promise<void> }>();
@@ -22,7 +23,7 @@ export function workerEntry<E extends object>(make: (env: E) => WorkerApp) {
 		let hit = apps.get(env);
 		if (hit === undefined) {
 			const app = make(env);
-			// A failed boot (D1 hiccup mid-migration) is dropped, so the next request retries it.
+			// A failed boot (a D1 hiccup, tables not applied yet) is dropped, so the next request retries it.
 			const ready = app.boot().catch((error: unknown) => {
 				apps.delete(env);
 				throw error;

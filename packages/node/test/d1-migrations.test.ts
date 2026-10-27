@@ -9,7 +9,7 @@ import { admin as adminPlugin, username } from "better-auth/plugins";
 import { Kysely } from "kysely";
 import { BunSqliteDialect } from "kysely-bun-sqlite";
 import { type CmsDatabase, cmsBlockImpls, cmsBlocks, createCms, d1Migrations, implementBlocks, migrateCms } from "../src";
-import { writeD1Migrations } from "../src/cli/d1";
+import { runD1Migrations, writeD1Migrations } from "../src/cli/d1";
 import { cmsAccess, cmsRoles } from "../src/betterAuth";
 
 const auth = (extra: Partial<BetterAuthOptions> = {}): BetterAuthOptions => ({
@@ -81,5 +81,19 @@ describe("D1 migrations as SQL files", () => {
 		expect(uk?.sql).toContain("'uk'");
 		expect((await d1Migrations({ defaultLanguage: false }))[0]?.sql).not.toContain('insert into "tbtop_languages"');
 		await expect(d1Migrations({ defaultLanguage: "xx" })).rejects.toThrow("Unknown locale");
+	});
+
+	test("tbtop-cms d1:migrations reads Better Auth's options from the Worker entry", async () => {
+		const dir = await tempDir();
+		const lines: string[] = [];
+		const io = { out: (line: string) => lines.push(line), err: (line: string) => lines.push(`ERR ${line}`) };
+		expect(await runD1Migrations(["d1:migrations", "--out", dir, "--entry", "example/site/worker.ts", "--locale", "uk"], io)).toBe(0);
+		expect((await readdir(dir)).sort()).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_better_auth.sql"]);
+		expect(await readFile(join(dir, "0002_better_auth.sql"), "utf8")).toContain('create table "tbtop_sessions"');
+		expect(lines.at(-1)).toContain("wrangler d1 migrations apply");
+
+		lines.length = 0;
+		expect(await runD1Migrations(["d1:migrations", "--out", dir], io)).toBe(0);
+		expect(lines).toEqual([`Nothing to add: ${dir} is up to date.`]);
 	});
 });

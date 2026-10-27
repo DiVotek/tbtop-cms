@@ -108,9 +108,11 @@ Anything else of the admin: `f.custom((s, name) => s.colorpicker(name), z.string
 **What `serve` does.** Better Auth from `db` (dialect read from the Kysely
 adapter, `tbtop_*` tables, admin plugin, email and password with public
 sign-up off), the admin panel, one route handler (admin, auth, robots,
-sitemaps, form posts), then pages through `render`. The first request (or
+sitemaps, form posts), then pages through `render`. On Node the first request (or
 `await app.ready()` in a deploy step) migrates the CMS and Better Auth, seeds
 `seed` into an empty site, creates the 404/5xx pages and the first admin.
+`cloudflare` does the same without migrating: on Workers the tables come on
+deploy from SQL files (see "Migrations on Workers").
 `handle(request)` is the same without pages, for a framework router.
 
 **Secrets.** `BETTER_AUTH_SECRET` is required (no default secret: it throws).
@@ -122,6 +124,25 @@ the Worker (`wrangler secret put`); `BETTER_AUTH_URL` and `MEDIA_URL` are option
 **Workers bindings.** `DB` (D1), `CACHE` (KV, optional), `MEDIA` (R2,
 optional; uploads stay in memory without it). `scheduled` runs the CMS's
 tasks: add a cron trigger. See [`example/site/wrangler.jsonc`](example/site/wrangler.jsonc).
+
+**Migrations on Workers.** D1 has no transactions and an isolate's first
+request may come to several isolates at once, so a Worker never migrates
+itself. The CLI writes the SQL and wrangler applies it on deploy:
+
+```bash
+bunx tbtop-cms d1:migrations --entry worker.ts   # adds missing files to ./migrations
+wrangler d1 migrations apply DB --remote         # in the deploy, before wrangler deploy
+```
+
+`d1:migrations` writes one file per CMS migration (with the default
+language, `--locale uk` or `--no-language`) and one with Better Auth's
+tables, taken from the options `cloudflare(site, options)` was given
+(`--entry`; without it, the defaults). Files already in the folder are never
+rewritten: rerun it after a package update or a new Better Auth plugin and it
+adds only what is missing (a new plugin's columns go in `better_auth_2`).
+Commit the folder. `--out` sets wrangler's `migrations_dir` (default
+`migrations`). No D1 is reached: the SQL is compiled, not read from a database.
+A Worker whose files were not applied fails its first request with that hint.
 
 **Low level.** Everything below (`createCms`, `implementBlocks`,
 `defaultAuth` from `@tbtop/cms/better-auth`, `createCmsAdmin`, `cmsRoutes`, `migrateAll`) stays public:
@@ -705,16 +726,17 @@ On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
 of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
 
-On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite: migrate with
-`dialect: "sqlite"`), set `compatibility_flags = ["nodejs_als"]` (or
-`nodejs_compat`) for `node:async_hooks`, add a `* * * * *` cron trigger
+On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite), set
+`compatibility_flags = ["nodejs_als"]` (or `nodejs_compat`) for `node:async_hooks`, add a `* * * * *` cron trigger
 whose `scheduled()` calls `cms.tasks.scheduled()`, and pass
 `{ waitUntil: ctx.waitUntil }` to `loadPage`. The CLI does not reach D1:
-run `migrateCms` from the Worker (a deploy hook or a guarded route).
-`migrateCms` needs no transaction and reads tables from `sqlite_master`, as
-D1 refuses the `pragma_table_info` join Kysely's own introspector uses.
-Better Auth introspects through that join too: give it the raw binding
-(`database: env.DB`), not the Kysely instance.
+migrate on deploy with `tbtop-cms d1:migrations` and `wrangler d1 migrations
+apply` (see "Migrations on Workers"; `d1Migrations(options)` returns the same
+SQL for a host's own tooling). The files also fill Kysely's
+`tbtop_cms_migrations`, so `migrateCms` on that database later finds the
+baseline applied. Better Auth introspects through the `pragma_table_info`
+join D1 refuses: give it the raw binding (`database: env.DB`), not the
+Kysely instance.
 
 Without the cron, `outbox` submissions stay `pending` and nothing is
 notified (`cms.tasks.health()` warns). TanStack Start's default entry has
@@ -734,10 +756,6 @@ export default {
 };
 ```
 
-A Worker that runs `migrateCms` and Better Auth's migrations on its first
-request (no deploy step) sees Better Auth log a schema mismatch once, as
-`betterAuth()` checks the tables before they exist; set
-`advanced.database.validateSchema: false` there, as the workbench does.
 
 ## What 0.0 has
 
@@ -782,6 +800,7 @@ request (no deploy step) sees Better Auth log a schema mismatch once, as
   runs the checks (site URL, default language, block rows, page types,
   notifications, scheduler, secrets). The `tbtop-cms` bin runs the same over
   a `cms.config.ts` whose default export is the host's Cms: `migrate`,
+  `d1:migrations` (no config: SQL files for wrangler),
   `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`, `seo:snapshot`,
   `audit [--type page] [--id N] [--limit N]`, `audit:prune [--days N]`
   (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).

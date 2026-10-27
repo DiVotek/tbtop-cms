@@ -107,6 +107,16 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 	const route = cmsRoutes(cms, admin, auth);
 	const migrate = () => migrateAll(db, auth);
 	const { render, renderError } = options;
+	/** The seed into an empty site, the 404/5xx pages and the first admin, on migrated tables. Idempotent. */
+	const setup = async () => {
+		if (options.seed !== undefined) {
+			await seedFixtures(cms, options.seed);
+		}
+		await ensureErrorPages(cms);
+		if (auth !== null && runtime.firstAdmin !== undefined) {
+			await ensureFirstAdmin(auth, runtime.firstAdmin.email, runtime.firstAdmin.password);
+		}
+	};
 	return {
 		cms,
 		/** The Better Auth the site built; null with `auth: false`. */
@@ -121,17 +131,12 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 			ensure: (email: string, role: string, opts: { password: string; name?: string }) =>
 				auth === null ? Promise.reject(new Error("tbtop/cms: the site has no Better Auth (auth: false).")) : auth.ensureUser(email, role, opts),
 		},
-		/** Migrations, the seed into an empty site, the 404/5xx pages and the first admin. Idempotent. */
+		/** Migrations, then `setup`. Idempotent. */
 		boot: async () => {
 			await migrate();
-			if (options.seed !== undefined) {
-				await seedFixtures(cms, options.seed);
-			}
-			await ensureErrorPages(cms);
-			if (auth !== null && runtime.firstAdmin !== undefined) {
-				await ensureFirstAdmin(auth, runtime.firstAdmin.email, runtime.firstAdmin.password);
-			}
+			await setup();
 		},
+		setup,
 		/** The whole site as one fetch: routes, then pages through `render` (404 without one). */
 		fetch: async (request: Request, waitUntil?: (task: Promise<unknown>) => void): Promise<Response> => {
 			const routed = await route(request);
@@ -157,8 +162,10 @@ export type SiteApp<D extends SiteDef = SiteDef> = {
 	/** The CMS's tables and Better Auth's. Idempotent. */
 	migrate(): Promise<void>;
 	users: { ensure(email: string, role: string, options: { password: string; name?: string }): Promise<string> };
-	/** Migrations, the seed into an empty site, the 404/5xx pages and the first admin. Idempotent. */
+	/** Migrations, then `setup`. Idempotent. */
 	boot(): Promise<void>;
+	/** The seed into an empty site, the 404/5xx pages and the first admin, on tables already migrated (Workers: the D1 files). Idempotent. */
+	setup(): Promise<void>;
 	/** The whole site as one fetch: routes, then pages through `render` (404 without one). */
 	fetch(request: Request, waitUntil?: (task: Promise<unknown>) => void): Promise<Response>;
 };

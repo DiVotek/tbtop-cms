@@ -1,6 +1,10 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { BETTER_AUTH_MIGRATION, type D1MigrationOptions, d1Migrations } from "../db/d1Migrations";
+import { join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import type { BetterAuthOptions } from "better-auth";
+import { defaultAuthSchema } from "../betterAuth/defaultAuth";
+import { BETTER_AUTH_MIGRATION, D1_AUTH, type D1MigrationOptions, d1Migrations } from "../db/d1Migrations";
+import type { CliIo } from "./run";
 
 const FILE = /^(\d+)_(.+)\.sql$/;
 
@@ -30,4 +34,39 @@ export async function writeD1Migrations(dir: string, options: Omit<D1MigrationOp
 		written.push(path);
 	}
 	return written;
+}
+
+function flag(args: string[], name: string): string | undefined {
+	const index = args.indexOf(`--${name}`);
+	return index === -1 ? undefined : args[index + 1];
+}
+
+/** Better Auth's options from the Worker module `cloudflare(site, options)` returned; false: the Worker has none. */
+async function authOfEntry(path: string): Promise<BetterAuthOptions | false> {
+	const mod = (await import(pathToFileURL(resolve(path)).href)) as { default?: Record<symbol, unknown> };
+	const auth = mod.default?.[D1_AUTH];
+	if (auth === undefined) {
+		throw new Error(`${path} must default-export cloudflare(site, options) from @tbtop/cms/cloudflare.`);
+	}
+	return auth as BetterAuthOptions | false;
+}
+
+/**
+ * `tbtop-cms d1:migrations [--out migrations] [--entry worker.ts] [--locale en | --no-language]`:
+ * the SQL files for `wrangler d1 migrations apply`. Without `--entry`,
+ * Better Auth as `cloudflare(site)` builds it with no `auth` option.
+ */
+export async function runD1Migrations(args: string[], io: CliIo): Promise<number> {
+	const out = flag(args, "out") ?? "migrations";
+	const entry = flag(args, "entry");
+	const locale = flag(args, "locale");
+	const written = await writeD1Migrations(out, {
+		auth: entry === undefined ? defaultAuthSchema() : await authOfEntry(entry),
+		defaultLanguage: args.includes("--no-language") ? false : (locale ?? "en"),
+	});
+	for (const path of written) {
+		io.out(`Wrote ${relative(process.cwd(), path)}`);
+	}
+	io.out(written.length === 0 ? `Nothing to add: ${out} is up to date.` : `\nApply on deploy: wrangler d1 migrations apply <DB> --remote`);
+	return 0;
 }
