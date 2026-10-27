@@ -39,6 +39,15 @@ describe("content cache", () => {
 		expect(await siteName(plain.cms)).toBe("Live");
 	});
 
+	test("the scheduler's own bookkeeping (system.* keys) does not empty the cache every minute", async () => {
+		const { cms, db } = await makeCms(fixture, { cache: { store: memoryCache() } });
+		expect(await siteName(cms)).toBe("Acme");
+		await db.updateTable("tbtop_settings").set({ value: '"Changed"' }).where("key", "=", "site.name").execute();
+		await cms.tasks.scheduled();
+		expect(await siteName(cms)).toBe("Acme");
+		expect(await cms.site().settings.get("system.scheduler.heartbeat")).toBeString();
+	});
+
 	test("kvCache keeps KV's 60-second minimum TTL", async () => {
 		const puts: [string, number | undefined][] = [];
 		const store = kvCache({ get: async () => null, put: async (key, _value, options) => void puts.push([key, options?.expirationTtl]) });
