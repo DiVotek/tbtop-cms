@@ -87,5 +87,28 @@ describe("useCmsForm with a controlled form", () => {
 		expect(bodies).toEqual([{ topic: "audit", name: "Ada" }]);
 		view.unmount();
 	});
+
+	test("clearError(field) drops one field's message and keeps the others; with none left the form is idle", async () => {
+		function Controlled() {
+			const form = useCmsForm("/_cms/forms/en/1/abc");
+			return (
+				<div>
+					<button type="button" onClick={() => (form.setError("name", "Required"), form.setError("phone", "Invalid"))}>check</button>
+					<button type="button" onClick={() => form.clearError("name")}>name</button>
+					<button type="button" onClick={() => form.clearError("phone")}>phone</button>
+					<p data-testid="state">{`${form.status}:${Object.keys(form.errors).join(",")}`}</p>
+				</div>
+			);
+		}
+		const view = render(<Controlled />);
+		const state = () => view.getByTestId("state").textContent;
+		fireEvent.click(view.getByText("check"));
+		await waitFor(() => expect(state()).toBe("failed:name,phone"));
+		fireEvent.click(view.getByText("name"));
+		await waitFor(() => expect(state()).toBe("failed:phone"));
+		fireEvent.click(view.getByText("phone"));
+		await waitFor(() => expect(state()).toBe("idle:"));
+		view.unmount();
+	});
 });
 

@@ -667,7 +667,8 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
   block: JSON post, field errors, a plain form post without JS. A controlled
   form calls `submit(values)` (resolves true once accepted) instead of
   spreading `formProps`; `setError(field, message)` shows a client check's
-  message like the server's, `reset()` goes back to idle.
+  message like the server's, `clearError(field)` drops one field's message
+  (say, as the visitor edits it), `reset()` goes back to idle.
 - The Hero's CTA link is read the way a browser reads it (leading controls
   and spaces dropped, tabs and newlines removed): a relative link (`/contact`,
   `blog`, `#form`, `?ref=x`) or an http(s), `mailto:`, `tel:` or messenger

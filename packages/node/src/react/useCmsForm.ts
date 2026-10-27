@@ -41,9 +41,19 @@ export function useCmsForm(action: string) {
 	function setError(field: string, message: string) {
 		setState((current) => ({ status: "failed", errors: { ...current.errors, [field]: [message] } }));
 	}
+	/** Drops one field's (or `form`'s) messages, e.g. once the visitor edits it; with none left the form is idle again. */
+	function clearError(field: string) {
+		setState((current) => {
+			if (!(field in current.errors)) {
+				return current;
+			}
+			const { [field]: _cleared, ...errors } = current.errors;
+			return { status: Object.keys(errors).length === 0 && current.status === "failed" ? "idle" : current.status, errors };
+		});
+	}
 	/** Back to idle with no errors, e.g. to send the form again. */
 	function reset() {
 		setState({ status: "idle", errors: {} });
 	}
-	return { ...state, submit, setError, reset, formProps: { method: "post", action, onSubmit, noValidate: true } as const };
+	return { ...state, submit, setError, clearError, reset, formProps: { method: "post", action, onSubmit, noValidate: true } as const };
 }
