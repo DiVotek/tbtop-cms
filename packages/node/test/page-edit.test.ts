@@ -142,7 +142,7 @@ describe("a shared block's tab (PageEditBlockTabs::sharedTab)", () => {
 describe("the page editor header dates", () => {
 	test("the edit, create and schedule times show in the site's timezone, as the publish field does", async () => {
 		const { cms, db, page } = await panel({ timezone: "Europe/Kyiv" });
-		const created = await cms.site().pages.create({ type: "page", name: { en: "Later" }, status: "published", publishedAt: new Date("2099-10-27T21:30:00Z") });
+		const created = await cms.site().pages.create({ type: "page", name: { en: "Later" }, status: "published", publishedAt: new Date("2037-10-27T21:30:00Z") }); // MySQL timestamps end in 2038
 		await (db as unknown as import("kysely").Kysely<{ tbtop_pages: { id: number; updated_at: string; created_at: string } }>)
 			.updateTable("tbtop_pages")
 			.set({ updated_at: "2026-10-27 15:44:54", created_at: "2026-10-27 22:10:00" })
@@ -151,6 +151,6 @@ describe("the page editor header dates", () => {
 		const props = JSON.stringify((await page(`/admin/pages/${created.id}/edit`)).props);
 		expect(props).toContain('"value":"27.10.2026 17:44"');
 		expect(props).toContain('"value":"28.10.2026"');
-		expect(props).toContain('"value":"27.10.2099 23:30"');
+		expect(props).toContain('"value":"27.10.2037 23:30"');
 	});
 });
