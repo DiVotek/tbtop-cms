@@ -113,3 +113,29 @@ describe("the page title lives only in SEO (#326)", () => {
 		expect(fieldNames((await page("/admin/pages")).props)).not.toContain("title");
 	});
 });
+
+describe("ctx.mediaImage (#314)", () => {
+	const loader = (ref: string, width: number) => `https://cdn.test/w${width}/${ref}`;
+	const media = (ref: string) => (ref === "missing" ? null : { url: `https://cdn.test/${ref}`, alt: "Banner", ...(ref === "svg" ? {} : { width: ref === "small" ? 500 : 1600, height: 800 }) });
+
+	test("a srcset of loader copies narrower than the original, then the original", async () => {
+		const { cms } = await makeCms(null, { media, imageLoader: loader });
+		const ctx = await cms.site().resolveContext("en", null);
+		expect(ctx.mediaImage("hero.png")).toEqual({
+			src: "https://cdn.test/hero.png",
+			srcset: "https://cdn.test/w640/hero.png 640w, https://cdn.test/w960/hero.png 960w, https://cdn.test/w1280/hero.png 1280w, https://cdn.test/hero.png 1600w",
+			width: 1600,
+			height: 800,
+			alt: "Banner",
+		});
+	});
+
+	test("no loader, no width or no narrower step: src alone; an unknown ref is null", async () => {
+		const plain = await (await makeCms(null, { media })).cms.site().resolveContext("en", null);
+		expect(plain.mediaImage("hero.png")?.srcset).toBeNull();
+		const ctx = await (await makeCms(null, { media, imageLoader: loader })).cms.site().resolveContext("en", null);
+		expect(ctx.mediaImage("svg")).toMatchObject({ src: "https://cdn.test/svg", srcset: null, width: null });
+		expect(ctx.mediaImage("small")?.srcset).toBeNull();
+		expect(ctx.mediaImage("missing")).toBeNull();
+	});
+});

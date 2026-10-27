@@ -2,7 +2,7 @@ import type { PageRefWithFields, ResolveContext } from "./blocks/context";
 import { resolvePageFields } from "./blocks/resolver";
 import { type PageView, pageColumns, pageViews } from "./frontend/pageView";
 import type { BlockRegistry } from "./blocks/registry";
-import { type CmsConfig, defaultMedia, type MediaDetails } from "./config";
+import { type CmsConfig, defaultMedia, type MediaDetails, type MediaImage } from "./config";
 import { AuditLog } from "./content/audit";
 import { Languages } from "./content/languages";
 import { Layouts } from "./content/layouts";
@@ -30,6 +30,11 @@ import { translate } from "./support/strings";
  * and the URL helpers. createCms builds a fresh Site per request, so no
  * stale state survives between requests.
  */
+/** The srcset steps `imageLoader` is asked for (next/image's common device widths). */
+const IMAGE_WIDTHS = [640, 960, 1280, 1920];
+
+const positive = (value: number | null | undefined): number | null => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : null);
+
 export class Site {
 	readonly languages: Languages;
 	readonly settings: Settings;
@@ -90,6 +95,23 @@ export class Site {
 
 	mediaUrl(ref: string | null | undefined): string | null {
 		return this.media(ref)?.url ?? null;
+	}
+
+	/**
+	 * ResolveContext::mediaImage: the srcset lists `imageLoader` copies at
+	 * the standard widths narrower than the original, then the original at
+	 * its own width; no loader, no known width or no narrower step: null.
+	 */
+	mediaImage(ref: string | null | undefined): MediaImage | null {
+		const details = this.media(ref);
+		if (details === null || ref === null || ref === undefined) {
+			return null;
+		}
+		const width = positive(details.width);
+		const loader = this.config.imageLoader;
+		const steps = loader === undefined || width === null ? [] : IMAGE_WIDTHS.filter((step) => step < width);
+		const srcset = steps.length === 0 || loader === undefined ? null : [...steps.map((step) => `${loader(ref, step)} ${step}w`), `${details.url} ${width}w`].join(", ");
+		return { src: details.url, srcset, width, height: positive(details.height), alt: details.alt ?? null };
 	}
 
 	/** PageUrl::build: `/{path}` for the default locale, `/{locale}/{path}` for the others. */
@@ -179,6 +201,7 @@ export class Site {
 			page,
 			fields,
 			mediaUrl: (ref) => this.mediaUrl(ref),
+			mediaImage: (ref) => this.mediaImage(ref),
 			richtextHtml,
 			link: (value) => this.link(value, locale, targets),
 			pages: ((value: unknown, options?: { fields?: boolean }) =>

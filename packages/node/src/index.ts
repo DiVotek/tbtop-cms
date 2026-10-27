@@ -24,7 +24,7 @@ export { CMS_ABILITIES, type CmsAbility } from "./admin/abilities";
 export { type Cms, type CmsTasks, createCms } from "./cms";
 export type { HealthResult, HealthStatus } from "./health";
 export { type CmsCacheStore, type KvNamespaceLike, kvCache, memoryCache } from "./support/cache";
-export type { CmsAdminAuth, CmsConfig, FormsConfig, MediaDetails, NotificationsConfig } from "./config";
+export type { CmsAdminAuth, CmsConfig, FormsConfig, MediaDetails, MediaImage, NotificationsConfig } from "./config";
 export type { Language } from "./content/languages";
 export { ensureDefaultLanguage, LanguageError } from "./content/languages";
 export { isLive, type Page, pageFromRow, type PageStatus, type Translations } from "./content/page";

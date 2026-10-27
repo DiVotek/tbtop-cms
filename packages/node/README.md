@@ -93,7 +93,8 @@ const cms = createCms({
 	seo: { extend: (nodes, ctx) => [...nodes.filter((n) => n["@id"] !== identityId(ctx.site)), myOrganization(ctx)] },
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	timezone: "Europe/Kyiv", // app.timezone: admin dates, dashboard days, SEO {date}; stored dates stay UTC (default UTC)
-	media: (ref) => ({ url: `/storage/${ref}` }),
+	media: (ref) => ({ url: `/storage/${ref}` }), // width/height/alt too, for og:image and ctx.mediaImage()
+	imageLoader: (ref, width) => `/cdn-cgi/image/width=${width}/storage/${ref}`, // srcset copies for ctx.mediaImage()
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
 	auth: cmsAuth(betterAuth), // section access, the panel session, sign-in and Users pages (see Users and sign-in)
@@ -380,6 +381,13 @@ fields write to and stores its ref, as an upload would
 (`await copyFile("seed/hero.jpg", "storage/seed/hero.jpg")`, then
 `pages.create({ ..., image: "seed/hero.jpg" })`); `media` turns the ref into
 a URL.
+
+A block that renders a large image calls `ctx.mediaImage(ref)` in `resolve()`
+instead of `ctx.mediaUrl(ref)`: `{ src, srcset, width, height, alt }` for
+`<img srcset sizes width height>`. The srcset lists `imageLoader(ref, w)` at
+640, 960, 1280 and 1920 below the original's width (from `media()`), then the
+original; without a loader, a known width or a narrower step it is null and
+`src` renders alone. An unknown ref is null, as with `mediaUrl`.
 
 A list the editor does not pick (a blog index, the products of a category,
 "latest three posts") is the host's own query, in its loader or route: the

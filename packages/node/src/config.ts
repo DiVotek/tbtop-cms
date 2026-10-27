@@ -22,6 +22,9 @@ export type CmsAdminAuth = {
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
 export type MediaDetails = { url: string; alt?: string | null; mime?: string | null; width?: number | null; height?: number | null };
 
+/** A library image for `<img src srcset width height alt>` (ResolveContext::mediaImage); srcset null means render `src` alone. */
+export type MediaImage = { src: string; srcset: string | null; width: number | null; height: number | null; alt: string | null };
+
 export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = {
 	/** The host's Kysely instance over a database the package migrations ran on. */
 	db: Kysely<CmsDatabase>;
@@ -42,6 +45,13 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	url?: string;
 	/** A media reference to its public URL; default: absolute URLs and `/…` paths as is, other paths under `/storage/`. */
 	media?: (ref: string) => MediaDetails | null;
+	/**
+	 * A resized copy of a media reference at `width` pixels (a CDN's resize
+	 * URL: Cloudflare Images, imgix). With it `ctx.mediaImage()` lists a srcset
+	 * at 640/960/1280/1920 below the original's width; without it, or when
+	 * `media()` gives no width, srcset is null.
+	 */
+	imageLoader?: (ref: string, width: number) => string;
 	/** Settings keys holding secrets: sealed with `settingsKey`, never sent to the frontend. */
 	secretSettings?: string[];
 	/**

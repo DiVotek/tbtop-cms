@@ -1,3 +1,4 @@
+import type { MediaImage } from "../config";
 import type { ResolvedLink } from "../content/link";
 import type { Page, TranslatableField } from "../content/page";
 import type { PageRef } from "../content/pageRefs";
@@ -19,6 +20,8 @@ export type ResolveContext = {
 	/** The page type's resolved custom fields. */
 	fields: Record<string, unknown>;
 	mediaUrl(ref: string): string | null;
+	/** The image with its srcset (config `imageLoader`), width, height and alt; null like mediaUrl. */
+	mediaImage(ref: string): MediaImage | null;
 	richtextHtml(value: unknown): string;
 	link(value: unknown): Promise<ResolvedLink | null>;
 	/** A pages field value to its live pages, `{ id, name, url }` in this locale (PageRefList). */
