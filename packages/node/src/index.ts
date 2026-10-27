@@ -20,6 +20,7 @@ export type { StandardSchemaV1 } from "./forms/standardSchema";
 export { assembleSpec, BlockResolutionError, type RenderSpec, type ResolvedBlock } from "./blocks/resolver";
 export type { CmsAdmin } from "./admin";
 export type { CmsAdminConfig, CmsAdminOptions, CmsAdminPages } from "./admin/options";
+export { type CmsAdminOverrides, createCmsAdmin } from "./admin/create";
 export { CMS_ABILITIES, type CmsAbility } from "./admin/abilities";
 export { type Cms, type CmsTasks, createCms } from "./cms";
 export type { HealthResult, HealthStatus } from "./health";

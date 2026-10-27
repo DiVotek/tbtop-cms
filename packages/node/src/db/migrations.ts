@@ -10,6 +10,7 @@ import {
 import { ensureDefaultLanguage } from "../content/languages";
 import type { CmsDatabase } from "./schema";
 import { withSqliteMasterIntrospection } from "./sqliteIntrospector";
+import { dialectOfDb } from "../support/db";
 
 export type Dialect = "sqlite" | "postgres" | "mysql";
 
@@ -334,8 +335,17 @@ export function cmsMigrations(options: MigrationOptions): MigrationProvider {
  * Runs the package migrations to the latest, then, like `cms:install`, gives
  * a database with no live language its default (`defaultLanguage`, a catalog
  * locale, default `en`; false skips it). Throws on the first failure.
+ * `dialect` defaults to the one behind `db`'s Kysely adapter.
  */
-export async function migrateCms(db: Kysely<unknown>, options: MigrationOptions & { defaultLanguage?: string | false }): Promise<void> {
+export async function migrateCms(
+	db: Kysely<unknown>,
+	given: Omit<MigrationOptions, "dialect"> & { dialect?: Dialect; defaultLanguage?: string | false } = {},
+): Promise<void> {
+	const dialect = given.dialect ?? dialectOfDb(db);
+	if (dialect === null) {
+		throw new TypeError("tbtop/cms: unknown Kysely dialect; pass `dialect` to migrateCms.");
+	}
+	const options = { ...given, dialect };
 	const migrator = new Migrator({
 		// SQLite (D1 included) through sqlite_master: D1 refuses Kysely's pragma_table_info join.
 		db: options.dialect === "sqlite" ? withSqliteMasterIntrospection(db) : db,

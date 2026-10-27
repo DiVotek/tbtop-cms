@@ -62,6 +62,74 @@ which runs when `betterAuth()` is built and would log them as missing. That is
 for the demo only: a deployed host migrates before it serves (a deploy step)
 and keeps the check on, so a missing or drifted auth table is reported.
 
+## Quick start: `defineSite` + `serve` / `cloudflare`
+
+The front door. A site is records of fields: one description gives the admin
+form, the zod schema and the TypeScript type, so the three cannot drift. The
+full example, used as the package's proof test, is [`example/site`](example/site).
+
+```ts
+// site.ts: client-safe, the browser imports `site.catalog` from it
+import { block, defineSite, f, formBlock, hero, pageType } from "@tbtop/cms/site";
+
+export const site = defineSite({
+	blocks: {
+		Hero: hero,
+		Quote: block({ text: f.textarea().translatable(), by: f.text() }, { label: "Quote" }),
+		Callback: formBlock({ heading: f.text() }, { label: "Call me back", submit: { schema: callbackSchema } }),
+	},
+	pages: {
+		page: { tagline: f.text() }, // extends the built-in `page` type
+		post: pageType({ author: f.text(), readingTime: f.number() }, { label: "Post", jsonLd: "BlogPosting" }),
+	},
+	jsonLd: { /* schema types: (ctx, { baseNode, identityId }) => nodes */ },
+	seo: async (nodes, ctx, h) => nodes, // every page's JSON-LD, last
+	settings: { Company: { phone: f.text() } }, // Site settings tabs
+});
+
+// server.ts (Node / Bun)
+import { serve } from "@tbtop/cms/serve";
+export default serve(site, { db, render, renderError, admin: { pages: [myPage] }, config: { timezone: "Europe/Kyiv" } });
+
+// worker.ts (Cloudflare Workers: DB, CACHE, MEDIA bindings by name)
+import { cloudflare } from "@tbtop/cms/cloudflare";
+export default cloudflare(site, { render, renderError });
+```
+
+`page.fields.readingTime` is `number | null` in `render` without a hand-written
+type. A form block gets `action` and `honeypotField` props: post the form there.
+
+**Fields (`f.*`).** `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
+`select(options)` (one value or null), `select(options, { multiple: true })`
+(an array), `tags`, `image`, `link(types?)`, `pages(type?)`, `repeater(fields)`.
+Each takes `.label()`, `.helperText()`, `.translatable()`, `.required()`.
+Anything else of the admin: `f.custom((s, name) => s.colorpicker(name), z.string().nullable())`.
+
+**What `serve` does.** Better Auth from `db` (dialect read from the Kysely
+adapter, `tbtop_*` tables, admin plugin, email and password with public
+sign-up off), the admin panel, one route handler (admin, auth, robots,
+sitemaps, form posts), then pages through `render`. The first request (or
+`await app.ready()` in a deploy step) migrates the CMS and Better Auth, seeds
+`seed` into an empty site, creates the 404/5xx pages and the first admin.
+`handle(request)` is the same without pages, for a framework router.
+
+**Secrets.** `BETTER_AUTH_SECRET` is required (no default secret: it throws).
+The first admin comes only from `TBTOP_ADMIN_EMAIL` / `TBTOP_ADMIN_PASSWORD`.
+`users.ensure(email, role, { password })` seeds other users in a seed or a
+test; it refuses the `admin` role. On Workers these are secrets and vars of
+the Worker (`wrangler secret put`); `BETTER_AUTH_URL` and `MEDIA_URL` are optional.
+
+**Workers bindings.** `DB` (D1), `CACHE` (KV, optional), `MEDIA` (R2,
+optional; uploads stay in memory without it). `scheduled` runs the CMS's
+tasks: add a cron trigger. See [`example/site/wrangler.jsonc`](example/site/wrangler.jsonc).
+
+**Low level.** Everything below (`createCms`, `implementBlocks`,
+`defaultAuth` from `@tbtop/cms/better-auth`, `createCmsAdmin`, `cmsRoutes`, `migrateAll`) stays public:
+`siteApp(site, runtime, options)` from `@tbtop/cms/serve` is built from it,
+and a host with its own auth (`auth: false` + `config.auth`) or its own
+runtime (`runtimeFromEnv`, `d1Kysely`, `workerEntry` from
+`@tbtop/cms/cloudflare`) assembles the parts itself.
+
 ## Host API
 
 ```ts

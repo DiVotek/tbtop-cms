@@ -27,6 +27,18 @@
 			"types": "./dist/react.d.ts",
 			"import": "./dist/react.js"
 		},
+		"./site": {
+			"types": "./dist/site.d.ts",
+			"import": "./dist/site.js"
+		},
+		"./serve": {
+			"types": "./dist/serve.d.ts",
+			"import": "./dist/serve.js"
+		},
+		"./cloudflare": {
+			"types": "./dist/cloudflare.d.ts",
+			"import": "./dist/cloudflare.js"
+		},
 		"./better-auth": {
 			"types": "./dist/better-auth.d.ts",
 			"import": "./dist/better-auth.js"
@@ -39,7 +51,7 @@
 	},
 	"scripts": {
 		"setup:admin": "./scripts/fetch-admin.sh",
-		"build": "tsup",
+		"build": "NODE_OPTIONS=--max-old-space-size=6144 tsup",
 		"test": "bun test ./test --timeout 20000 && bun run test:dom",
 		"test:dom": "bun test ./test/react-dom.dom.tsx && bun test ./test/admin-client.dom.tsx",
 		"typecheck": "tsc --noEmit"

@@ -1,0 +1,13 @@
+// The bindings `cloudflare(site)` reads, by name. Secrets: `wrangler secret put
+// BETTER_AUTH_SECRET`, TBTOP_ADMIN_EMAIL, TBTOP_ADMIN_PASSWORD.
+{
+	"name": "tbtop-site",
+	"main": "worker.ts",
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": ["nodejs_als"],
+	"d1_databases": [{ "binding": "DB", "database_name": "tbtop-site", "database_id": "<wrangler d1 create tbtop-site>" }],
+	"kv_namespaces": [{ "binding": "CACHE", "id": "<wrangler kv namespace create CACHE>" }],
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tbtop-site-media" }],
+	"vars": { "MEDIA_URL": "https://media.example.com" },
+	"triggers": { "crons": ["* * * * *"] }
+}
