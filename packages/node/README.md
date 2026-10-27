@@ -420,7 +420,9 @@ const admin = createAdmin({ ...cms.admin.options(), rootView }); // session, log
   default 5 a minute, `false` turns it off; a success clears the count):
   Better Auth's own rate limit covers only its HTTP routes, and every
   attempt costs a password hash. In memory, like `forms.throttle`; the
-  client comes from `forms.clientIp` or the proxy headers.
+  client comes from `forms.clientIp` or the proxy headers. With no proxy in
+  front, pass `forms.clientIp`: otherwise a client sets its own
+  `X-Forwarded-For` and gets a fresh count on every attempt (see Forms).
 - Better Auth's tables live in the CMS's database; run its migrations
   (`getMigrations(options).runMigrations()` or its CLI) next to `migrateCms`.
   Mount `auth.handler` (e.g. `/api/auth/*`) only for the host's own
