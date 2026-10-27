@@ -8,9 +8,12 @@ import { fixture } from "./fixture";
 import { render, renderError } from "./render";
 import { site } from "./site";
 
-// Node / Bun: the host gives the database; everything else has a default.
-// Secrets from the environment: BETTER_AUTH_SECRET, and TBTOP_ADMIN_EMAIL /
-// TBTOP_ADMIN_PASSWORD for the first admin. `bun example/site/node.ts`.
+// A server host (Bun here): the host gives the database; everything else has a
+// default. This file runs on Bun (bun:sqlite, Bun.serve); on Node, pass a
+// Kysely over a Node driver (better-sqlite3, pg, mysql2) and serve `app().fetch`
+// with any fetch adapter. Secrets from the environment: BETTER_AUTH_SECRET, and
+// TBTOP_ADMIN_EMAIL / TBTOP_ADMIN_PASSWORD for the first admin.
+// `bun example/site/node.ts`.
 
 export function app(db = new Kysely({ dialect: new BunSqliteDialect({ database: new Database(process.env.DB ?? ":memory:") }) })) {
 	return serve(site, {
