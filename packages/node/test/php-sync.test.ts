@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { panel } from "./panel";
-import { get, makeCms } from "./support";
+import { type Kysely, Migrator } from "kysely";
+import { baselineMigration, cmsMigrations } from "../src";
+import { freshDb, get, makeCms, testDialect } from "./support";
 
 describe("<title> in a translated page (#311, #326)", () => {
 	test("a blank meta title falls back to the page's own locale name, never another language's", async () => {
@@ -184,5 +186,41 @@ describe("the admin UI locale is each admin's own, saved to the profile (#309)",
 		const { db, visit } = await signedIn({});
 		await visit("/admin/locale", { method: "POST", body: JSON.stringify({ locale: "en" }), headers: { "content-type": "application/json", referer: "http://x/admin" } });
 		expect(await db.selectFrom("tbtop_user_profiles").selectAll().execute()).toEqual([]);
+	});
+});
+
+describe("an upgraded database moves page titles into SEO (#326)", () => {
+	test("a non-blank title fills an empty meta title per locale, a set one wins, and the column goes", async () => {
+		const db = await freshDb();
+		await baselineMigration({ dialect: testDialect }).up(db as Kysely<unknown>);
+		const now = "2026-10-27 00:00:00";
+		const page = (id: number, title: unknown, seo: unknown) => ({
+			id,
+			type: "page",
+			status: "published",
+			name: JSON.stringify({ en: `Page ${id}` }),
+			title: title === null ? null : JSON.stringify(title),
+			seo: seo === null ? null : JSON.stringify(seo),
+			created_at: now,
+			updated_at: now,
+		});
+		await (db as unknown as Kysely<Record<string, Record<string, unknown>>>)
+			.insertInto("tbtop_pages")
+			.values([page(1, { en: "Studio", uk: "Студія", de: " " }, { title: { en: "Kept" }, description: { en: "Desc" } }), page(2, { en: "Only" }, null), page(3, null, null)])
+			.execute();
+		const migrator = new Migrator({ db: db as Kysely<unknown>, provider: cmsMigrations({ dialect: testDialect }), migrationTableName: "m", migrationLockTableName: "m_lock" });
+		// The baseline already ran by hand: mark it done, then upgrade.
+		await db.schema.createTable("m").addColumn("name", "varchar(255)", (c) => c.primaryKey()).addColumn("timestamp", "varchar(255)", (c) => c.notNull()).execute();
+		await (db as unknown as Kysely<{ m: { name: string; timestamp: string } }>).insertInto("m").values({ name: "2026_10_22_000000_tbtop_cms_baseline", timestamp: now }).execute();
+		expect((await migrator.migrateToLatest()).error).toBeUndefined();
+
+		const seo = async (id: number) => {
+			const row = await db.selectFrom("tbtop_pages").select("seo").where("id", "=", id).executeTakeFirst();
+			return typeof row?.seo === "string" ? JSON.parse(row.seo) : row?.seo;
+		};
+		expect(await seo(1)).toEqual({ title: { en: "Kept", uk: "Студія" }, description: { en: "Desc" } });
+		expect(await seo(2)).toEqual({ title: { en: "Only" } });
+		expect(await seo(3)).toBeNull();
+		expect(Object.keys((await db.selectFrom("tbtop_pages").selectAll().where("id", "=", 1).executeTakeFirst()) ?? {})).not.toContain("title");
 	});
 });

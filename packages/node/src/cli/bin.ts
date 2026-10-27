@@ -26,8 +26,13 @@ const io = { out: (line: string) => console.log(line), err: (line: string) => co
 let code = 1;
 let cms: Cms | null = null;
 try {
-	cms = args[0] === undefined || args[0] === "help" || args[0] === "--help" ? null : await loadCms(args);
-	code = cms === null ? await runCommand({} as Cms, ["help"], io) : await runCommand(cms, args, io);
+	if (args[0] === "d1:migrations") {
+		// No Cms: the files are generated, D1 is not reachable from here.
+		code = await (await import("./d1")).runD1Migrations(args, io);
+	} else {
+		cms = args[0] === undefined || args[0] === "help" || args[0] === "--help" ? null : await loadCms(args);
+		code = cms === null ? await runCommand({} as Cms, ["help"], io) : await runCommand(cms, args, io);
+	}
 } catch (error) {
 	io.err(error instanceof Error ? error.message : String(error));
 } finally {
