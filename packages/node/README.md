@@ -556,6 +556,13 @@ submit: defineSubmit({
 }),
 ```
 
+An optional `labels(locale, blockData, ctx)` names the fields in the team's
+mail (`{ email: "Пошта", topic: "Тема" }`), in the readers' language rather
+than the page's; `ctx.t` reads the CMS strings in it. Templates get the map as
+`fieldLabels` (`fields` stays keyed by the raw names); a field without a
+label keeps its key. `ContactForm` labels its fields from
+`forms.contact.fields.*`.
+
 `schema` may be a function of the block's data and the submit context
 (`{ locale, page, t }`), for choices an editor sets or messages in the page's
 language: `t("validation.required", { attribute })` reads the CMS strings,

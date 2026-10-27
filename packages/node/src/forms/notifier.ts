@@ -141,11 +141,35 @@ export async function submissionPayload(site: Site, submission: Submission, page
 		locale,
 		submittedAt: String(formatPhpDate(submission.createdAt ?? new Date(), await site.t("form-submissions.date_format", locale))),
 		fields: formatFields(submission.payload),
+		fieldLabels: await fieldLabels(site, submission, page, locale),
 		actionUrl: site.absolute(`${prefix}/form-submissions/${submission.id}`),
 		actionLabel: await site.t("notifications.bell.view", locale),
 		leadName: leadName(submission.payload) ?? "",
 		leadContact: leadContact(submission.payload) ?? "",
 	};
+}
+
+/**
+ * The submitting form's `labels()` in the readers' locale, kept to the
+ * payload's keys and non-blank text. A form that cannot be found or whose
+ * labels throw leaves the raw keys: a label never fails a delivery.
+ */
+async function fieldLabels(site: Site, submission: Submission, page: Page, locale: string): Promise<Record<string, string>> {
+	try {
+		const located = await locateForm(site, page, submission.blockId, locale);
+		if (located?.submit.labels === undefined) {
+			return {};
+		}
+		const labels = await located.submit.labels(locale, located.data, located.ctx);
+		return Object.fromEntries(
+			Object.keys(submission.payload)
+				.map((key) => [key, labels[key]] as const)
+				.filter((entry): entry is readonly [string, string] => typeof entry[1] === "string" && entry[1].trim() !== ""),
+		);
+	} catch (error) {
+		console.warn("form.submission.labels_failed", { submission: submission.id, error });
+		return {};
+	}
 }
 
 /** A render failure names the channel; a send failure reads through the channel's own error text. */

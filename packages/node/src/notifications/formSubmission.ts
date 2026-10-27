@@ -9,6 +9,8 @@ export type FormSubmissionPayload = {
 	submittedAt: string;
 	/** Field name to display text, in submit order. */
 	fields: Record<string, string>;
+	/** Field name to the form's label for it in the readers' language; a field without one is left out. */
+	fieldLabels: Record<string, string>;
 	actionUrl: string;
 	actionLabel: string;
 	/** The lead's name, '' when the payload has none (leadIdentity still covers it). */
@@ -26,12 +28,12 @@ export const formSubmissionType: NotificationType<FormSubmissionPayload> = {
 	group: "forms",
 	audiences: ["staff"],
 	defaultChannels: ["bell"],
-	variables: ["leadIdentity", "leadName", "leadContact", "pageName", "locale", "submittedAt", "fields", "actionUrl", "actionLabel"],
+	variables: ["leadIdentity", "leadName", "leadContact", "pageName", "locale", "submittedAt", "fields", "fieldLabels", "actionUrl", "actionLabel"],
 	templates: {
 		html: (payload, { t }) => ({
 			subject: t("notifications.mail.subject"),
 			body: [
-				...Object.entries(payload.fields).map(([key, value]) => `<p><strong>${escapeHtml(key)}:</strong> ${multiline(value)}</p>`),
+				...Object.entries(payload.fields).map(([key, value]) => `<p><strong>${escapeHtml(payload.fieldLabels[key] ?? key)}:</strong> ${multiline(value)}</p>`),
 				`<p><strong>${escapeHtml(t("notifications.mail.fields.page"))}:</strong> ${escapeHtml(payload.pageName)}</p>`,
 				`<p><strong>${escapeHtml(t("notifications.mail.fields.locale"))}:</strong> ${escapeHtml(payload.locale)}</p>`,
 				`<p><strong>${escapeHtml(t("notifications.mail.fields.submitted_at"))}:</strong> ${escapeHtml(payload.submittedAt)}</p>`,
