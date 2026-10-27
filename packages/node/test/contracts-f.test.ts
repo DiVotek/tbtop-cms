@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { HostRule } from "@tbtop/admin";
-import { kyselyRules } from "@tbtop/admin/kysely";
-import { cmsBlockImpls, cmsBlocks, type CmsConfig, demoFixture, ensureErrorPages, type ErrorPageProps, implementBlocks, type LoadResult } from "../src";
+import { cmsBlockImpls, cmsBlocks, type CmsConfig, demoFixture, ensureErrorPages, type ErrorPageProps, implementBlocks, type LoadResult, type PayloadSchema } from "../src";
+import { z } from "zod";
 import { seoTags } from "../src/react";
 import { get, makeCms } from "./support";
 
@@ -88,26 +88,13 @@ describe("error pages (q09)", () => {
 	});
 });
 
-describe("form validation host rules (q13)", () => {
-	type Made = Awaited<ReturnType<typeof makeCms>>;
-	const late: { db?: Made["db"] } = {};
-	/** kyselyRules over the test's own database, which exists only once makeCms ran. */
-	const lateKysely = (name: string): HostRule => ({
-		message: "The :attribute has already been taken.",
-		check: (value, params, key) => {
-			const rule = late.db === undefined ? undefined : kyselyRules(late.db)[name];
-			if (rule === undefined) {
-				throw new Error(`no ${name} rule`);
-			}
-			return rule.check(value, params, key);
-		},
-	});
-	const even: HostRule = { message: "The :attribute must be even.", check: (value) => Number(value) % 2 === 0 };
-
-	async function site(rules: Record<string, string>, hostRules?: CmsConfig["hostRules"]) {
+describe("form schemas (q13)", () => {
+	async function site(schema: (db: Awaited<ReturnType<typeof makeCms>>["db"]) => PayloadSchema, config: Partial<CmsConfig> = {}) {
+		const late: { db?: Awaited<ReturnType<typeof makeCms>>["db"] } = {};
 		const made = await makeCms(undefined, {
-			blocks: implementBlocks(cmsBlocks, { ...cmsBlockImpls, ContactForm: { ...cmsBlockImpls.ContactForm, submit: { rules: () => rules } } }),
-			...(hostRules === undefined ? {} : { hostRules }),
+			// The schema reads the test's own database, which exists only once makeCms ran.
+			blocks: implementBlocks(cmsBlocks, { ...cmsBlockImpls, ContactForm: { ...cmsBlockImpls.ContactForm, submit: { schema: () => schema(late.db as never) } } }),
+			...config,
 		});
 		late.db = made.db;
 		const home = await made.cms.loadPage(get("/"));
@@ -126,22 +113,29 @@ describe("form validation host rules (q13)", () => {
 		return { ...made, submit };
 	}
 
-	test("a block's rules run with the host's rules: unique/exists from kyselyRules and the host's own", async () => {
-		const { submit, db } = await site({ locale: "required|unique:tbtop_languages,locale", count: "required|even" }, { unique: lateKysely("unique"), even });
-		expect(await submit({ locale: "en", count: 3 })).toMatchObject({ status: 422, body: { ok: false, errors: { locale: [expect.any(String)], count: ["The count must be even."] } } });
+	test("an async refinement checks the host's database: a taken value is 422 by field, a free one is stored", async () => {
+		const { submit, db } = await site((db) =>
+			z.object({
+				locale: z.string().refine(async (locale) => (await db.selectFrom("tbtop_languages").select("id").where("locale", "=", locale).executeTakeFirst()) === undefined, "The locale has already been taken."),
+				count: z.number().refine((count) => count % 2 === 0, "The count must be even."),
+			}),
+		);
+		expect(await submit({ locale: "en", count: 3 })).toEqual({ status: 422, body: { ok: false, errors: { locale: ["The locale has already been taken."], count: ["The count must be even."] } } });
 		expect(await submit({ locale: "fr", count: 4 })).toEqual({ status: 200, body: { ok: true } });
 		expect(await db.selectFrom("tbtop_form_submissions").select("id").execute()).toHaveLength(1);
 	});
 
-	test("the CMS's own rules (page_ref) validate a form too, and cms.admin.hostRules carries the host's", async () => {
-		const { submit, cms, ids } = await site({ page: "required|page_ref" }, { even });
-		expect((await submit({ page: String(ids.about) })).status).toBe(200);
-		expect((await submit({ page: "999999" })).status).toBe(422);
-		expect(await cms.admin.hostRules.even?.check("2", [], "n")).toBe(true);
+	test("an issue with no field path is the form's error", async () => {
+		const { submit } = await site(() => z.object({ a: z.string().nullable(), b: z.string().nullable() }).refine((input) => input.a !== null || input.b !== null, "Fill a or b."));
+		expect(await submit({ a: "", b: "" })).toEqual({ status: 422, body: { ok: false, errors: { form: ["Fill a or b."] } } });
 	});
 
-	test("an unknown rule answers failed with a form error instead of an unhandled 500", async () => {
-		const { submit, db } = await site({ email: "required|unique:users,email" });
+	test("a throwing schema answers failed with a form error, stores nothing, and is logged", async () => {
+		const { submit, db } = await site(() =>
+			z.object({ email: z.string().refine(() => {
+				throw new Error("no such table: users");
+			}) }),
+		);
 		const errors: unknown[] = [];
 		const original = console.error;
 		console.error = (...args: unknown[]) => void errors.push(args);
@@ -153,5 +147,11 @@ describe("form validation host rules (q13)", () => {
 		}
 		expect(errors).toHaveLength(1);
 		expect(await db.selectFrom("tbtop_form_submissions").select("id").execute()).toHaveLength(0);
+	});
+
+	test("cms.admin.hostRules still carries the host's rules for the admin's forms", async () => {
+		const even: HostRule = { message: "The :attribute must be even.", check: (value) => Number(value) % 2 === 0 };
+		const { cms } = await site(() => z.object({}), { hostRules: { even } });
+		expect(await cms.admin.hostRules.even?.check("2", [], "n")).toBe(true);
 	});
 });

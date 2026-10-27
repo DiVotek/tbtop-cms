@@ -12,7 +12,15 @@
 		"types": ["bun"],
 		"resolveJsonModule": true,
 		"verbatimModuleSyntax": true,
-		"jsx": "react-jsx"
+		"jsx": "react-jsx",
+		// The examples import the package by name, as a host does; here it resolves to src.
+		"paths": {
+			"@tbtop/cms": ["./src/index.ts"],
+			"@tbtop/cms/site": ["./src/define/index.ts"],
+			"@tbtop/cms/serve": ["./src/serve/index.ts"],
+			"@tbtop/cms/cloudflare": ["./src/cloudflare/index.ts"],
+			"@tbtop/cms/better-auth": ["./src/betterAuth/index.ts"]
+		}
 	},
 	"include": ["src", "test", "example"]
 }

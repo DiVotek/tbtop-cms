@@ -41,7 +41,7 @@ const run = `${process.pid}_${Date.now().toString(36)}`;
 const open: Kysely<CmsDatabase>[] = [];
 const KEEP_OPEN = 8;
 
-async function freshDb(): Promise<Kysely<CmsDatabase>> {
+export async function freshDb(): Promise<Kysely<CmsDatabase>> {
 	if (testDialect === "sqlite") {
 		return new Kysely<CmsDatabase>({ dialect: new StrictBindsDialect({ database: new Database(":memory:") }) });
 	}

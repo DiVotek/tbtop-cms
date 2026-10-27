@@ -1,6 +1,6 @@
 import { appendFile, readFile } from "node:fs/promises";
 import { createAdmin, rootView, type ViteManifest, viteTags } from "@tbtop/admin";
-import { kyselyDriver, kyselyNotifications, kyselyRules } from "@tbtop/admin/kysely";
+import { kyselyNotifications, kyselyRules } from "@tbtop/admin/kysely";
 import { localDisk } from "@tbtop/admin/local-disk";
 import { type CmsDatabase, type Fixture, type MailMessage, cmsBlockImpls, createCms, demoFixture, ensureErrorPages, implementBlocks, linkField, migrateCms, seedFixtures } from "@tbtop/cms";
 import { cmsAccess, cmsAuth, cmsRoles } from "@tbtop/cms/better-auth";
@@ -38,11 +38,14 @@ const authOptions = {
 	account: { modelName: "tbtop_accounts" },
 	verification: { modelName: "tbtop_verifications" },
 	plugins: [adminPlugin({ ac: cmsAccess, roles: cmsRoles })],
+	// boot() runs Better Auth's migrations before serving; its own check at
+	// construction would race them on a fresh database and log missing tables.
+	// Demo only: a deployed host migrates as a deploy step and keeps the check.
+	advanced: { database: { validateSchema: false } },
 };
 
 /** The host's Better Auth instance; routes/api/auth/$.ts serves its HTTP API. */
 export const auth = betterAuth(authOptions);
-const panelAuth = cmsAuth(auth);
 
 /** The seeded admin (admin@admin.com / password, as in the PHP workbench): the bell's only staff user. */
 let adminId = "";
@@ -67,10 +70,12 @@ const cms = createCms({
 	// Drafts open through the page editor's signed "Preview" links. A host sets
 	// its own secret (and canPreview for its signed-in editors).
 	preview: { secret: process.env.CMS_PREVIEW_SECRET ?? "workbench-preview-secret" },
-	// Kysely's unique/exists for the form submits; the admin gets them back in cms.admin.hostRules.
+	// Kysely's unique/exists for the admin's forms; it gets them back in cms.admin.hostRules.
 	hostRules: kyselyRules(db),
-	// Section access from the signed-in user's Better Auth role.
-	authorize: panelAuth.authorize,
+	// Better Auth, given once: section access, and the admin's session, login and Users pages.
+	auth: cmsAuth(auth),
+	// The workbench is where catalog drift should be loud; E2E serves a production build and drops such a block.
+	strictBlocks: process.env.NODE_ENV !== "production",
 	// E2E posts its forms from one client, which the 10-a-minute throttle would count.
 	forms: process.env.CMS_FORMS_THROTTLE === "off" ? { throttle: false } : {},
 	notifications: {
@@ -94,20 +99,10 @@ async function boot() {
 	// The 404 and 5xx pages an editor keeps in the pages list, as cms:install creates them.
 	await ensureErrorPages(cms);
 	const admin = createAdmin({
-		// The CMS panel's look: brand, topbar-sidebar, compact, nav groups, chrome (as PHP's CmsPanel).
-		...cms.admin.panel,
-		prefix: "/admin",
-		pages: [...cms.admin.pages, ...panelAuth.pages(cms)],
-		driver: kyselyDriver(db),
-		// The config's hostRules plus link_shape and page_ref, which check the link and pages fields on save.
-		hostRules: cms.admin.hostRules,
-		// The panel's user is Better Auth's session user; guests go to the sign-in page.
-		session: panelAuth.session,
-		loginPath: panelAuth.loginPath(cms),
-		context: cms.admin.context,
+		// The CMS panel: look, prefix, pages (with sign-in and Users), rules, context, session, bell, driver.
+		...cms.admin.options(),
 		// The CMS upload fields write to "public"; its refs read back as /storage/{ref}.
 		disks: { public: localDisk(STORAGE, "/storage") },
-		notifications: { store: bell },
 		rootView: rootView({ head: await adminAssets() }),
 	});
 	return { cms, admin };

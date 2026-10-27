@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createAdmin, type InertiaPage } from "@tbtop/admin";
+import { createAdmin, type InertiaPage, type S } from "@tbtop/admin";
 import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
+import { panel as hostPanel } from "./panel";
 import { get, makeCms } from "./support";
 
 async function panel() {
@@ -175,5 +176,35 @@ describe("admin pages", () => {
 		expect(await settings.get("notifications.form.submission.channels")).toEqual(["mail"]);
 		const rows = await cms.config.db.selectFrom("tbtop_notification_templates").select(["format", "locale", "subject", "body"]).execute();
 		expect(rows).toEqual([{ format: "html", locale: "en", subject: "Lead {{ leadIdentity }}", body: "<p>{{ pageName }}</p>" }]);
+	});
+});
+
+describe("host tabs on Site settings (siteSettings)", () => {
+	const brand = { tabs: (s: S) => [{ label: "Brand & forms", children: [s.grid({ cols: 2 }, [s.text("tagline").label("Tagline"), s.text("monogram").label("Monogram")])] }] };
+
+	test("show after the built-in tabs, save at site.<name> and reach the frontend's cms.settings", async () => {
+		const { cms, page, post } = await hostPanel(undefined, { siteSettings: brand });
+		expect(JSON.stringify((await page("/admin/settings/site")).props.structure)).toContain("Brand & forms");
+		const res = await post("/admin/settings/site/forms/settings_site", { site_name: "Acme", tagline: "We build", monogram: "" }, "/admin/settings/site");
+		expect(res.status).toBe(303);
+		expect(await cms.site().settings.get("site.tagline")).toBe("We build");
+		expect(await cms.site().settings.get("site.monogram")).toBeNull();
+		const result = await cms.loadPage(get("/"));
+		expect(result.type === "page" ? result.props.cms.settings["site.tagline"] : null).toBe("We build");
+	});
+
+	test("a host media field reaches cms.settings as a URL, like the logo", async () => {
+		const media = { tabs: (s: S) => [{ label: "Brand", children: [s.upload("og_logo").label("OG logo")] }] };
+		const { cms } = await hostPanel(undefined, { siteSettings: media });
+		await cms.site().settings.set("site.og_logo", "brand/og.png");
+		const result = await cms.loadPage(get("/"));
+		const shipped = result.type === "page" ? result.props.cms.settings["site.og_logo"] : null;
+		expect(shipped).toBe(cms.site().mediaUrl("brand/og.png"));
+		expect(shipped).not.toBe("brand/og.png");
+	});
+
+	test("a field name the page already uses is refused", async () => {
+		const clash = { tabs: (s: S) => [{ label: "Mine", children: [s.text("site_name")] }] };
+		await expect(hostPanel(undefined, { siteSettings: clash })).rejects.toThrow('"site_name" is already on the Site settings page');
 	});
 });

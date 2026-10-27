@@ -51,6 +51,11 @@ export function pageNameOf(page: Pick<Page, "name">, locale: string, defaultLoca
  * with no slug or no name in the locale, as a link to it would.
  */
 export async function resolvePageRefs(site: Site, value: unknown, locale: string): Promise<PageRef[]> {
+	return (await livePageRefs(site, value, locale)).map(({ ref }) => ref);
+}
+
+/** resolvePageRefs with each ref's page, for a caller that reads more of it. */
+export async function livePageRefs(site: Site, value: unknown, locale: string): Promise<{ ref: PageRef; page: Page }[]> {
 	const ids = pageIds(value);
 	if (ids.length === 0) {
 		return [];
@@ -59,13 +64,13 @@ export async function resolvePageRefs(site: Site, value: unknown, locale: string
 	const pages = new Map(rows.map((row) => [Number(row.id), pageFromRow(row)]));
 	const paths = await site.pages.slugs.pathsFor(ids, locale);
 	const fallback = await site.languages.defaultLocale();
-	const out: PageRef[] = [];
+	const out: { ref: PageRef; page: Page }[] = [];
 	for (const id of ids) {
 		const page = pages.get(id);
 		const name = page === undefined || !isLive(page) ? null : pageNameOf(page, locale, fallback);
 		const path = paths.get(id);
-		if (name !== null && path !== undefined) {
-			out.push({ id: String(id), name, url: await site.url(path, locale) });
+		if (page !== undefined && name !== null && path !== undefined) {
+			out.push({ ref: { id: String(id), name, url: await site.url(path, locale) }, page });
 		}
 	}
 	return out;

@@ -44,8 +44,9 @@ bun run e2e                    # production build + vite preview + Playwright
 
 Rerun `bun run setup` after a change to the package. Locally, point
 Playwright at an installed Chromium with `PW_CHROMIUM=/path/to/chrome`.
-E2E serves the build with `NODE_ENV=production` (a block whose props fail
-the catalog is dropped, not thrown) and `CMS_FORMS_THROTTLE=off` (every spec
+E2E serves the build with `NODE_ENV=production` (the workbench turns
+`strictBlocks` on only outside production, so a block whose props fail the
+catalog is dropped, not thrown) and `CMS_FORMS_THROTTLE=off` (every spec
 posts from one client). The workbench registers the link field's client
 from `@tbtop/cms/admin-client` and has its own `Promo` block with a
 `linkField` CTA.
@@ -55,8 +56,112 @@ The admin signs in through Better Auth (`@tbtop/cms/better-auth`, below):
 E2E signs in as the admin once (the `setup` project) and every spec reuses
 that session. The secrets have fixed defaults (`BETTER_AUTH_SECRET`,
 `CMS_PREVIEW_SECRET` override them), so the workbench is a demo, not a
-deployment. The first request migrates, so Better Auth's start-up check logs
-its tables as missing once.
+deployment. The first request migrates Better Auth's tables too, so the
+workbench turns off Better Auth's schema check (`advanced.database.validateSchema`),
+which runs when `betterAuth()` is built and would log them as missing. That is
+for the demo only: a deployed host migrates before it serves (a deploy step)
+and keeps the check on, so a missing or drifted auth table is reported.
+
+## Quick start: `defineSite` + `serve` / `cloudflare`
+
+The front door. A site is records of fields: one description gives the admin
+form, the zod schema and the TypeScript type, so the three cannot drift. The
+full example, used as the package's proof test, is [`example/site`](example/site).
+
+```ts
+// site.ts: client-safe, the browser imports `site.catalog` from it
+import { block, defineSite, f, formBlock, hero, pageType } from "@tbtop/cms/site";
+
+export const site = defineSite({
+	blocks: {
+		Hero: hero,
+		Quote: block({ text: f.textarea().translatable(), by: f.text() }, { label: "Quote" }),
+		Callback: formBlock({ heading: f.text() }, { label: "Call me back", submit: { schema: callbackSchema } }),
+	},
+	pages: {
+		page: { tagline: f.text() }, // extends the built-in `page` type
+		post: pageType({ author: f.text(), readingTime: f.number() }, { label: "Post", jsonLd: "BlogPosting" }),
+	},
+	jsonLd: { /* schema types: (ctx, { baseNode, identityId }) => nodes */ },
+	seo: async (nodes, ctx, h) => nodes, // every page's JSON-LD, last
+	settings: { Company: { phone: f.text() } }, // Site settings tabs
+});
+
+// server.ts (Node / Bun)
+import { serve } from "@tbtop/cms/serve";
+export default serve(site, { db, render, renderError, admin: { pages: [myPage] }, config: { timezone: "Europe/Kyiv" } });
+
+// worker.ts (Cloudflare Workers: DB, CACHE, MEDIA bindings by name)
+import { cloudflare } from "@tbtop/cms/cloudflare";
+export default cloudflare(site, { render, renderError });
+```
+
+`page.fields.readingTime` is `number | null` in `render` without a hand-written
+type. A form block gets `action` and `honeypotField` props: post the form there.
+
+**Fields (`f.*`).** `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
+`select(options)` (one value or null), `select(options, { multiple: true })`
+(an array), `tags`, `image`, `link(types?)`, `pages(type?)`, `repeater(fields)`.
+Each takes `.label()`, `.helperText()`, `.translatable()`, `.required()`.
+Anything else of the admin: `f.custom((s, name) => s.colorpicker(name), z.string().nullable())`.
+
+**What `serve` does.** Better Auth from `db` (dialect read from the Kysely
+adapter, `tbtop_*` tables, admin plugin, email and password with public
+sign-up off), the admin panel, one route handler (admin, auth, robots,
+sitemaps, form posts), then pages through `render`. On Node the first request (or
+awaiting `ready()` of `serve`'s result in a deploy step) migrates the CMS and Better Auth, seeds
+`seed` into an empty site, creates the 404/5xx pages and the first admin.
+`cloudflare` does the same without migrating: on Workers the tables come on
+deploy from SQL files (see "Migrations on Workers").
+`handle(request)` is the same without pages, for a framework router.
+
+**Secrets.** `BETTER_AUTH_SECRET` is required (no default secret: it throws).
+The first admin comes only from `TBTOP_ADMIN_EMAIL` / `TBTOP_ADMIN_PASSWORD`.
+The boot creates that admin only while the site has no admin user at all:
+while one exists, changing the secrets changes nothing, so rotate the password
+on the Users page. With the last admin removed, the next boot creates one from
+the secrets again: unset `TBTOP_ADMIN_PASSWORD` after the first boot unless
+you want that recovery path. With its own auth (`auth: false` +
+`config.auth`) a host whose user ids are strings passes `userKey: "string"`.
+`users.ensure(email, role, { password })` seeds other users in a seed or a
+test; it refuses the `admin` role and a role the site does not define. On Workers these are secrets and vars of
+the Worker (`wrangler secret put`); `BETTER_AUTH_URL` and `MEDIA_URL` are optional.
+
+**Workers bindings.** `DB` (D1), `CACHE` (KV, optional), `MEDIA` (R2,
+optional; uploads stay in memory without it). `scheduled` runs the CMS's
+tasks: add a cron trigger. See [`example/site/wrangler.jsonc`](example/site/wrangler.jsonc).
+The seed, the error pages and the first admin run on each isolate's first
+request. Two cold isolates on an empty site may both try: unique keys
+(language locale, page slug, error class, user email) stop the second, whose
+request fails once, but it can leave a page row without a slug. With a `seed`,
+open the site once after the first deploy, before it takes traffic.
+
+**Migrations on Workers.** D1 has no transactions and an isolate's first
+request may come to several isolates at once, so a Worker never migrates
+itself. The CLI writes the SQL and wrangler applies it on deploy:
+
+```bash
+bunx tbtop-cms d1:migrations --entry worker.ts   # adds missing files to ./migrations
+wrangler d1 migrations apply DB --remote         # in the deploy, before wrangler deploy
+```
+
+`d1:migrations` writes one file per CMS migration (with the default
+language, `--locale uk` or `--no-language`) and one with Better Auth's
+tables, taken from the options `cloudflare(site, options)` was given
+(`--entry`; without it, the defaults). Files already in the folder are never
+rewritten: rerun it after a package update or a new Better Auth plugin and it
+adds only what is missing (a new plugin's columns go in `better_auth_2`).
+Commit the folder. `--out` sets wrangler's `migrations_dir` (default
+`migrations`). A `.ts` entry needs a runtime that imports TypeScript: `bunx`,
+or Node with a loader (`node --import tsx`). No D1 is reached: the SQL is compiled, not read from a database.
+A Worker whose files were not applied fails its first request with that hint.
+
+**Low level.** Everything below (`createCms`, `implementBlocks`,
+`defaultAuth` from `@tbtop/cms/better-auth`, `createCmsAdmin`, `cmsRoutes`, `migrateAll`) stays public:
+`siteApp(site, runtime, options)` from `@tbtop/cms/serve` is built from it,
+and a host with its own auth (`auth: false` + `config.auth`) or its own
+runtime (`runtimeFromEnv`, `d1Kysely`, `workerEntry` from
+`@tbtop/cms/cloudflare`) assembles the parts itself.
 
 ## Host API
 
@@ -69,22 +174,41 @@ await migrateCms(db, { dialect: "sqlite" }); // fresh database only; or merge cm
 export const catalog = defineBlocks({ ...cmsBlocks, Faq: { props: faqProps, placements: ["pages", "layout"] } });
 // placements: "pages" (every page type, the default), "layout", or page type / subtype keys
 // ("article", "news"): the page editor's Add block offers a kind only where it fits.
+// A subtype goes by its own key ("product", not "article/product"); a key that names
+// no registered type is never offered, and createCms warns `block.placement_unknown`.
 
 const cms = createCms({
 	db, // Kysely<CmsDatabase>
 	blocks: implementBlocks(catalog, { ...cmsBlockImpls, Faq: { form: (s) => [...], resolve, toSchema } }),
+	// toSchema: (props, ctx) => ({ ...baseNode(ctx, "Service"), provider: { "@id": identityId(ctx.site) } })
+	// baseNode gives the page's name, url, description, image and dates; identityId links to the site identity.
+	// Lists of cards go in a repeater; its translatable cells are edited per locale:
+	// form: (s) => [s.repeater("items").fields([s.text("q").translatable(), s.text("icon")])]
+	// resolve() gets a `.translatable()` field already in the page's locale (default as fallback),
+	// so it never reads `{ en, de }` itself. A link is a linkField (see below), not a text field:
+	// its target is checked on save and on render, a free-text href is not.
 	pageTypes: [recipeType], // extra page types next to page, category, article (see Page types)
+	schemaTypes: [productSchema], // extra JSON-LD types a page type's schemaTypes can name (see Page types)
+	// The page's JSON-LD, last: add or replace nodes. Keep "@id": identityId(ctx.site) on your own organization node
+	// and Article author/publisher link to it.
+	seo: { extend: (nodes, ctx) => [...nodes.filter((n) => n["@id"] !== identityId(ctx.site)), myOrganization(ctx)] },
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
+	timezone: "Europe/Kyiv", // app.timezone: admin dates, dashboard days, SEO {date}; stored dates stay UTC (default UTC)
 	media: (ref) => ({ url: `/storage/${ref}` }),
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
-	authorize: (user, ability) => can(user, ability), // "tbtop-cms.pages", … (CMS_ABILITIES); default: every section open
+	auth: cmsAuth(betterAuth), // section access, the panel session, sign-in and Users pages (see Users and sign-in)
+	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
+	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
-	hostRules: { ...kyselyRules(db), ...myRules }, // unique/exists and the host's own: for form submits and cms.admin.hostRules
+	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches cms.settings,
+	// like every setting; list a token's key (site.<name>) in secretSettings to seal it instead.
+	siteSettings: { tabs: (s) => [{ label: "Brand & forms", children: [s.text("tagline").label("Tagline")] }] },
+	hostRules: { ...kyselyRules(db), ...myRules }, // the admin's unique/exists and the host's own rules: cms.admin.hostRules
 });
 
 // Frontend
@@ -96,18 +220,50 @@ const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the 
 
 // Admin
 createAdmin({
-	...cms.admin.panel, // brand, topbar-sidebar, compact, nav groups, chrome (bell, inbox, view site): PHP's CmsPanel
-	pages: [...cms.admin.pages, ...mine],
-	driver: kyselyDriver(db),
-	hostRules: cms.admin.hostRules, // the config's hostRules + link_shape, page_ref
-	context: cms.admin.context, // content locales = admin-active languages
+	...cms.admin.options({ pages: mine }), // see Admin panel
 	disks: { public: localDisk("storage", "/storage") }, // the CMS upload fields write to "public"
+	rootView: rootView({ head }),
 });
 ```
 
+### Admin panel
+
+`cms.admin.options()` is createAdmin's config in one spread, read from the
+CMS config: the panel's look (`cms.admin.panel`: brand, topbar-sidebar,
+compact, nav groups, chrome with bell, inbox and view site, as PHP's
+CmsPanel), `prefix` (`adminPrefix`), `pages`, `hostRules` (the config's plus
+`link_shape` and `page_ref`), `context` (content locales from the
+admin-active languages), the auth adapter's `session` and `loginPath`,
+`notifications.store` (`notifications.bell.store`) and
+`driver: kyselyDriver(config.db)`. A key after the spread overrides it.
+
+`pages` is the host's pages, added after the CMS's and the auth adapter's,
+or a function that gets those and returns the panel's:
+
+```ts
+createAdmin({ ...cms.admin.options({ pages: [reportsPage] }), rootView });
+createAdmin({ ...cms.admin.options({ pages: (cms) => cms.filter((page) => page.path !== "audit") }), rootView });
+```
+
+The CMS pages' `path`s are public contract, under the prefix: `dashboard`,
+`pages`, `pages/$page/edit`, `form-submissions`, `form-submissions/$submission`,
+`redirects`, `not-found`, `seo-report`, `layout`, `layout/$slot`,
+`shared-blocks`, `shared-blocks/$block/edit`, `blocks`, `languages`,
+`languages/new`, `languages/$language/edit`, `settings/site`, `settings/seo`,
+`notification-settings`, `site-health`, `audit`, `audit/$activity` and
+`link/page-search`; `@tbtop/cms/better-auth` adds `login`, `users`,
+`users/new` and `users/$user/edit`. CMS pages link to each other (the
+dashboard, the bell and inbox, the page editor's shared blocks, the link
+field's page picker), so a filtered-out page another one links to leaves a
+dead link or a broken field. To hide a section from some users, return false
+from `authorize` instead: the nav drops it and its links answer 403.
+
+`cms.admin.pages`, `panel`, `hostRules` and `context` stay for a host that
+wires createAdmin itself.
+
 ### Page types
 
-A page type's custom fields are a zod object (`fields`) next to their admin
+A page type's custom fields are a zod object (`schema`) next to their admin
 form (`form`); `definePageType` keeps the literal key, and `createCms` infers
 `PageProps` from `pageTypes`, a union by `page.type`:
 
@@ -116,7 +272,7 @@ import { definePageType, pagesField } from "@tbtop/cms";
 
 export const recipeType = definePageType({
 	key: "recipe",
-	fields: z.object({ minutes: z.number().nullable(), related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
+	schema: z.object({ minutes: z.number().nullable(), related: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })) }),
 	form: (s) => [s.number("minutes").label("Minutes"), pagesField("related").of("article")],
 });
 
@@ -136,6 +292,30 @@ if (result.type === "page" && result.props.page.type === "recipe") {
   type is not registered still renders, outside the union.
 - `PageProps<[typeof recipeType]>` names the props type; a bare `PageProps`
   or `Cms` keeps `fields` as untyped JSON.
+
+A page type offers JSON-LD types by key (`schemaTypes`, the first is the
+default); a subtype without its own inherits its base's. A host adds a type
+with `createCms({ schemaTypes })`, for example a catalog item:
+
+```ts
+const productSchema: SchemaTypeDef = {
+	key: "Product",
+	build: (ctx) => [{ "@context": "https://schema.org", "@type": "Product", name: ctx.name, url: ctx.url,
+		offers: { "@type": "Offer", price: ctx.page.fields?.price, priceCurrency: "UAH" } }],
+};
+const productType = definePageType({ key: "product", base: "article", schemaTypes: ["Product"], schema, form });
+```
+
+A def with a built-in key (`page`, `category`, `article`) extends that type
+instead of adding one: its `form`, `schema`, `resolveFields`, `template`,
+`label` and `schemaTypes` replace the built-in's (list the built-in schema
+types too to keep them pickable), and the tree rules stay the package's
+(setting `allowedChildren`, `requiresParent`, `maxDepth` or `base` throws).
+`page.fields` is typed from its schema as for any other type.
+
+```ts
+const page = definePageType({ key: "page", form: (s) => [s.text("tagline").translatable()], schema: z.object({ tagline: z.string().nullable() }) });
+```
 
 `migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
@@ -178,13 +358,15 @@ the PHP names: `tbtop-cms.pages` (pages and the page editor),
 editor), `tbtop-cms.languages`, `tbtop-cms.settings` (site, SEO,
 notifications) and `tbtop-cms.audit` (the audit log). A false hides the section from the nav and answers 403 to
 its pages and to every form, action, table and upload on them. Without
-`authorize`, every section is open to any panel user, as before.
+`authorize`, `auth.authorize` decides; without both, every section is open
+to any panel user.
 `tbtop-cms.users` gates the Users page an auth adapter adds.
 
 ### Users and sign-in (`@tbtop/cms/better-auth`)
 
 The core asks the host for a panel user (createAdmin's `session` or `user`)
-and `authorize`. `@tbtop/cms/better-auth` answers both from a Better Auth
+and `authorize`. `@tbtop/cms/better-auth` answers both, passed once as
+`createCms({ auth })`, from a Better Auth
 instance with email and password and the admin plugin (`better-auth` is an
 optional peer dependency):
 
@@ -199,16 +381,9 @@ export const auth = betterAuth({
 	user: { modelName: "tbtop_users" }, // and session, account, verification
 	plugins: [admin({ ac: cmsAccess, roles: cmsRoles })],
 });
-const panelAuth = cmsAuth(auth);
-const cms = createCms({ db, blocks, authorize: panelAuth.authorize });
+const cms = createCms({ db, blocks, auth: cmsAuth(auth) });
 await migrateCms(db, { dialect: "sqlite", userKey: "string" }); // Better Auth's ids are strings
-const admin = createAdmin({
-	prefix: "/admin",
-	pages: [...cms.admin.pages, ...panelAuth.pages(cms)],
-	session: panelAuth.session,
-	loginPath: panelAuth.loginPath(cms),
-	// driver, context, …
-});
+const admin = createAdmin({ ...cms.admin.options(), rootView }); // session, loginPath, the sign-in and Users pages come with it
 ```
 
 - `session` reads Better Auth's session cookie once per request; the panel's
@@ -261,13 +436,77 @@ Telegram bot token are host config, not settings.
 `PageProps` is typed as JSON (`Jsonify`), so it goes through a framework
 loader as it is: in TanStack Start, return it from a `createServerFn` handler.
 A server function answers on its own URL during client navigation, so build
-the page request from the route path (see `workbench/src/server/page.ts`).
+the page request from the route path (see `workbench/src/server/page.ts`):
+pass the path (`location.href` of the router, which has no origin) and
+resolve it against the caller's URL, never an absolute URL from the client.
+Keep `@tanstack/react-start/server` imports in server-only modules
+(`src/server/*`): a route component that imports it breaks the client bundle.
 
 `seedFixtures(cms, demoFixture)` seeds a declarative fixture through the
 package's own write paths (slugs, shared references). It runs once: a
 database with pages is left alone. A fixture language marked `default` takes over
 from the installed one (which stays, non-default: pass `defaultLanguage` to
-`migrateCms` to install the right one).
+`migrateCms` to install the right one). A page's `body` per locale is plain
+text (blank-line separated paragraphs) or a Lexical document (`{ root: … }`,
+what the editor stores) for headings, lists and links.
+
+A seed whose pages point at each other goes step by step in the host's own
+boot, after `migrateCms`: each step gets the ids of the pages before it. The
+writes below are the public seeding API; they take the package's write paths
+(slugs, tree rules, `tbtop_page_refs`, revisions, audit). `isFreshSite(cms)`
+is the guard `seedFixtures` uses: true while the site has no page.
+
+```ts
+if (await isFreshSite(cms)) {
+	await seedFixtures(cms, { languages, settings }); // or set them yourself
+	const site = cms.site();
+	const catalog = await site.pages.create({ type: "category", name: { uk: "Каталог" }, status: "published" }, { slugs: { uk: "catalog" } });
+	// Without slugs a page gets one from its name (transliterated), as in the editor.
+	const bream = await site.pages.create({ type: "article", subtype: "product", parentId: catalog.id, name: { uk: "Лящ" }, status: "published" }, { slugs: { uk: "bream" } });
+	await site.pages.update(catalog.id, {
+		content: [{ id: "grid", kind: "ProductGrid", active: true, sort: 0, data: { products: [String(bream.id)] } }],
+	});
+	await site.layouts.save("header", [{ id: "nav", kind: "SiteNav", active: true, sort: 0, data: {} }]);
+	const contact = await site.sharedBlocks.create({ name: "Contact", kind: "ContactForm", data: {} }); // a row's `shared: contact`
+}
+```
+
+Stored values are the editor's: a pages field is a list of page ids as
+strings, a link `{ type: "page", page: "<id>", label }`. The seed is neither
+atomic nor resumable: run it from one process (a deploy step or one boot,
+not every instance at once), and if a step fails, empty the database and
+seed again, since `isFreshSite` is false once the first page exists.
+Images go the same way: the seed copies the file onto the disk the upload
+fields write to and stores its ref, as an upload would
+(`await copyFile("seed/hero.jpg", "storage/seed/hero.jpg")`, then
+`pages.create({ ..., image: "seed/hero.jpg" })`); `media` turns the ref into
+a URL.
+
+A list the editor does not pick (a blog index, the products of a category,
+"latest three posts") is the host's own query, in its loader or route: the
+page props carry no children, and a block's `resolve()` does not see the
+request's `?page=`. `site.pages.query()` is a Kysely builder over live
+`tbtop_pages` rows (trashed ones left out); `whereLive` adds the rule the
+frontend uses (published, `published_at` passed, `unpublish_at` ahead), the
+counterpart of PHP's `Page::scopeLive`, `pageFromRow` turns a row into a
+`Page`, and `site.pageViews(pages, locale)` makes each one what `props.page`
+is for an open page (name, title, heading, summary in the locale with the
+default as fallback, body HTML, image URL) plus its `url`; `{ fields: true }`
+adds the resolved custom fields, one resolve per page:
+
+```ts
+import { pageFromRow, whereLive } from "@tbtop/cms";
+
+const site = cms.site(request);
+const perPage = 10;
+const current = Math.max(1, Number(new URL(request.url).searchParams.get("page")) || 1);
+const children = site.pages.query().$call(whereLive).where("parent_id", "=", blog.id).where("subtype", "=", "journal");
+const { total } = await children.select((eb) => eb.fn.countAll<number>().as("total")).executeTakeFirstOrThrow();
+const posts = (await children.selectAll().orderBy("published_at", "desc").orderBy("id", "desc")
+	.limit(perPage).offset((current - 1) * perPage).execute()).map(pageFromRow);
+const cards = await site.pageViews(posts, locale); // [{ id, name, summary, url, image, … }]
+// pages: Math.ceil(Number(total) / perPage)
+```
 
 ## Link and pages fields
 
@@ -294,10 +533,41 @@ Promo: {
 - A pages field stores page ids as strings in the order picked and resolves
   to the live ones as `{ id, name, url }[]`; drafts, trashed and unknown ids
   drop out.
+- A host `resolve()` that needs more of the picked pages (a product's price
+  on a catalog card) asks `ctx.pages(input.products, { fields: true })`: the
+  same refs, each with the page's own columns as `site.pageViews` gives them
+  (`summary`, `image`, `heading`, `body`…) and `fields`, its resolved custom
+  fields as its own props carry them (`Record<string, unknown>`: the picks
+  may be of any type, so narrow them). Any other request-scoped read
+  (settings, `pageViews`) goes through `ctx.site`. It is a convenience: one fields resolve per page,
+  one level deep (inside those resolvers `fields: true` gives `{}`). For a
+  long list, or columns the props never carry, query the database yourself
+  on top of `ctx.pages()`, which has already dropped drafts and built the URLs:
+
+```ts
+resolve: async (input, ctx) => {
+	const refs = await ctx.pages(input.products); // live, in this locale
+	const rows = await db.selectFrom("tbtop_pages").select(["id", "fields"])
+		.where("id", "in", refs.map((ref) => Number(ref.id))).execute(); // raw stored JSON
+	// merge rows into refs by id
+},
+```
+- For "the form, plus a key or two", set `map` instead of `resolve`: the
+  package resolves the form, and `map(resolved, input, ctx)` returns the keys
+  to add or replace, typed as `Partial` of the catalog props (no
+  `resolveForm` call, no cast). A block sets `resolve` or `map`, not both.
+
+```ts
+Pricing: {
+	form: (s) => [s.text("title").translatable(), pagesField("plans").of("article", "plan")],
+	map: async (_resolved, input, ctx) => ({ plans: await ctx.pages(input.plans, { fields: true }) }),
+},
+```
 - On save the admin checks `link_shape` (type, target format, an existing
   page, label locales and length) and `page_ref` (each id exists) as host
-  rules: pass `cms.admin.hostRules` to `createAdmin({ hostRules })`, or a
-  save with these fields fails on an unknown rule.
+  rules: `cms.admin.options()` passes them (`cms.admin.hostRules` when
+  wiring createAdmin by hand), or a save with these fields fails on an
+  unknown rule.
 - The pages field is a plain async multi-select on the wire, so the stock
   admin client renders it. The link field is the custom `link` kind: the
   admin bundle imports its client from `@tbtop/cms/admin-client` (below),
@@ -332,7 +602,7 @@ entry has no server code, so it goes into the browser bundle.
 ```tsx
 import { defineRegistry, JSONUIProvider } from "@json-render/react";
 import { cmsBlocks } from "@tbtop/cms/catalog";
-import { CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
+import { assembleSpec, CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "@tbtop/cms/react";
 
 export const catalog = cmsCatalog({ ...cmsBlocks, Faq: faqMeta });
 export const { registry } = defineRegistry(catalog, { components: { ...cmsComponents, Faq } });
@@ -340,7 +610,9 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 // TanStack Start: head: ({ loaderData }) => seoHead(loaderData.seo)
 // Anything else on React 19: <CmsHead seo={props.seo} /> (title, meta and links hoist into <head>)
 <JSONUIProvider registry={registry}>
+	<CmsRenderer spec={assembleSpec(props.cms.layout.header)} catalog={catalog} registry={registry} />
 	<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={props.isPreview} />
+	<CmsRenderer spec={assembleSpec(props.cms.layout.footer)} catalog={catalog} registry={registry} />
 </JSONUIProvider>;
 ```
 
@@ -356,9 +628,14 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
   catalog, and one that throws while rendering; with `showErrors` it says so
   in the console. Wrap all of a page's specs (header, body, footer) in one
   `JSONUIProvider`.
+- The layout slots (`props.cms.layout.header/footer`) are block lists, as in
+  PHP; `assembleSpec` turns one into a spec for `CmsRenderer`.
 - `Hero` and `ContactForm` are unstyled (`cms-hero`, `cms-contact-form*`).
   `useCmsForm(action)` is the ContactForm's submit logic for a custom form
-  block: JSON post, field errors, a plain form post without JS.
+  block: JSON post, field errors, a plain form post without JS. A controlled
+  form calls `submit(values)` (resolves true once accepted) instead of
+  spreading `formProps`; `setError(field, message)` shows a client check's
+  message like the server's, `reset()` goes back to idle.
 - The Hero's CTA link is read the way a browser reads it (leading controls
   and spaces dropped, tabs and newlines removed): a relative link (`/contact`,
   `blog`, `#form`, `?ref=x`) or an http(s), `mailto:`, `tel:` or messenger
@@ -368,21 +645,30 @@ export const { registry } = defineRegistry(catalog, { components: { ...cmsCompon
 
 ## Forms and notifications
 
-A form block declares `submit` in its implementation: the validation rules
-(Laravel rule strings, run by the admin validator) and an optional `handle`
-for the host's own work (a CRM call). `ContactForm` ships with rules and no
-handler. The block's props carry `action` and `honeypotField`; post the
+A form block declares `submit` in its implementation: a `schema` for the
+payload (any Standard Schema: zod, valibot, arktype) and an optional `handle`
+for the host's own work (a CRM call). `ContactForm` ships with a schema and no
+handler. Wrap it in `defineSubmit` to get `handle`'s payload typed from the schema:
+
+```ts
+submit: defineSubmit({
+	schema: z.object({ name: z.string().max(200), email: z.email().max(200) }),
+	handle: async (payload) => crm.lead(payload.email), // { name: string; email: string }
+}),
+```
+
+`schema` may be a function of the block's data and the submit context
+(`{ locale, page, t }`), for choices an editor sets or messages in the page's
+language: `t("validation.required", { attribute })` reads the CMS strings,
+Laravel's validation lines included. The block's props carry `action` and `honeypotField`; post the
 fields there as JSON (`{ ok }`, 422 `{ errors }`, 500 `{ errors: { form } }`)
 or as a plain form (303 back to the page with `cms_form_status`).
 
-The rules run with the admin's rule set: the built-in Laravel rules, the
-CMS's `link_shape` and `page_ref`, and the config's `hostRules` (pass
-`kyselyRules(db)` there for `unique`/`exists`, and a rule of the host's
-own, `{ check, message }`, for a block that needs one; `createCms` refuses
-a host rule named `link_shape` or `page_ref`). The same set is
-`cms.admin.hostRules` for createAdmin. A rule nobody defines, or a `rules`
-that throws, answers `failed` (500 `{ errors: { form } }`, logged as
-`form.submit.validation_failed`) and stores nothing.
+The schema gets the input trimmed, with blank strings as null (Laravel's
+middleware). Its issues answer 422 by top-level field; one with no path is
+`errors.form`. `unique`/`exists` are async refinements over the host's own
+Kysely. A schema that throws answers `failed` (500 `{ errors: { form } }`,
+logged as `form.submit.validation_failed`) and stores nothing.
 
 A form an editor does not place (one a page type's `template()` or the host
 renders) gets a name: `formName: "service-order"` next to `submit` in its
@@ -451,20 +737,37 @@ On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
 `tbtop-cms scheduled` from cron every minute; both read the default export
 of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
-Set `NODE_ENV=production` there (or `strictBlocks: false`): otherwise a
-block whose props fail the catalog throws and its page answers 500, where
-production drops that block with a warning.
 
-On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite: migrate with
-`dialect: "sqlite"`), set `compatibility_flags = ["nodejs_als"]` (or
-`nodejs_compat`) for `node:async_hooks`, add a `* * * * *` cron trigger
+On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite), set
+`compatibility_flags = ["nodejs_als"]` (or `nodejs_compat`) for `node:async_hooks`, add a `* * * * *` cron trigger
 whose `scheduled()` calls `cms.tasks.scheduled()`, and pass
 `{ waitUntil: ctx.waitUntil }` to `loadPage`. The CLI does not reach D1:
-run `migrateCms` from the Worker (a deploy hook or a guarded route).
-`migrateCms` needs no transaction and reads tables from `sqlite_master`, as
-D1 refuses the `pragma_table_info` join Kysely's own introspector uses.
-Better Auth introspects through that join too: give it the raw binding
-(`database: env.DB`), not the Kysely instance.
+migrate on deploy with `tbtop-cms d1:migrations` and `wrangler d1 migrations
+apply` (see "Migrations on Workers"; `d1Migrations(options)` returns the same
+SQL for a host's own tooling). The files also fill Kysely's
+`tbtop_cms_migrations`, so `migrateCms` on that database later finds the
+baseline applied. Better Auth introspects through the `pragma_table_info`
+join D1 refuses: give it the raw binding (`database: env.DB`), not the
+Kysely instance.
+
+Without the cron, `outbox` submissions stay `pending` and nothing is
+notified (`cms.tasks.health()` warns). TanStack Start's default entry has
+no `scheduled()`, so a Start host on Workers points `main` in
+`wrangler.jsonc` at its own entry that keeps Start's `fetch`:
+
+```ts
+// src/server.ts
+import handler from "@tanstack/react-start/server-entry";
+import { getCms } from "./server/cms"; // the host's Cms for this env
+
+export default {
+	fetch: handler.fetch,
+	scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(getCms(env).tasks.scheduled());
+	},
+};
+```
+
 
 ## What 0.0 has
 
@@ -509,16 +812,20 @@ Better Auth introspects through that join too: give it the raw binding
   runs the checks (site URL, default language, block rows, page types,
   notifications, scheduler, secrets). The `tbtop-cms` bin runs the same over
   a `cms.config.ts` whose default export is the host's Cms: `migrate`,
+  `d1:migrations` (no config: SQL files for wrangler),
   `doctor`, `scheduled`, `deliver`, `not-found:prune`, `page-refs:rebuild`, `seo:snapshot`,
   `audit [--type page] [--id N] [--limit N]`, `audit:prune [--days N]`
   (Bun runs a `.ts` config as is; Node needs a `.js` one or a TS loader).
-- Blocks: `defineBlocks` catalog, `implementBlocks` server half, the built-in
-  Hero and ContactForm, the PHP resolver rules (sort, inactive, unknown and
+- Blocks: `defineBlocks` catalog, `implementBlocks` server half, the
+  optional Hero and ContactForm (`cmsBlocks`/`cmsBlockImpls`: nothing is
+  registered unless the host spreads them in, as PHP's `blocks.types`), the PHP resolver rules (sort, inactive, unknown and
   broken shared rows skipped, locale flattening with fallback, FormResolver by
   field kind), resolved props validated against the catalog's zod schema
-  (a mismatch is dropped with a warning in production and throws
-  `BlockResolutionError` in development: on Node and Bun a `NODE_ENV`
-  other than `production`, unset included; never on Workers; `strictBlocks` true or false overrides it).
+  (a mismatch is dropped with a warning; `strictBlocks: true` throws
+  `BlockResolutionError` instead, in any environment). Valid props ship as
+  resolved, and a `.default()` fills a key the resolver left out; a
+  `.transform()`'s output is not shipped: the browser validates the props
+  again and runs it there (the server parse runs it too, so keep it pure).
 - Frontend: locale routing (default prefix 301, other locales prefixed),
   live/schedule scope, preview, page props and the shared `cms` prop.
 - SEO: the full `seo` prop (title/description templates, Open Graph,
@@ -531,7 +838,8 @@ Better Auth introspects through that join too: give it the raw binding
 - React: `@tbtop/cms/react` with the SEO head, the block renderer and the
   built-in blocks.
 - Admin: the dashboard at `/{prefix}/dashboard` (page, inbox and layout
-  tiles trended over 14 days, leads-by-status and daily submission charts,
+  tiles trended over 14 days, leads-by-status and daily submission charts
+  (days in the config's `timezone`, UTC by default),
   the latest pages and submissions; the page parts need
   `tbtop-cms.pages`, the inbox parts `tbtop-cms.submissions`, the layout tile
   `tbtop-cms.design`; the System section, with host metrics and versions,

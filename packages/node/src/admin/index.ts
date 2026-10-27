@@ -11,6 +11,7 @@ import { languageEdit, languageNew, languagesIndex } from "./languages";
 import { cmsHostRules, linkPageSearch } from "./linkFields";
 import { notFoundLog } from "./notFound";
 import { notificationSettings } from "./notifications";
+import { adminOptions, type CmsAdminConfig, type CmsAdminOptions } from "./options";
 import { seoReport } from "./seoReport";
 import { pageEdit } from "./pageEdit";
 import { pagesIndex } from "./pages";
@@ -18,7 +19,12 @@ import { CMS_NAV_GROUPS, type CmsPanelLook, cmsPanel } from "./panel";
 import { seoSettings, siteSettings } from "./settings";
 
 export type CmsAdmin = {
-	/** Spread into createAdmin({ pages: [...cms.admin.pages, ...mine] }). */
+	/**
+	 * The whole createAdmin config in one spread: createAdmin({ ...cms.admin.options({ pages: mine }), rootView }).
+	 * A key after the spread overrides; `pages` appends to the CMS's or, as a function, filters them.
+	 */
+	options: (options?: CmsAdminOptions) => CmsAdminConfig;
+	/** The CMS's own pages, without the auth adapter's; options() is the usual way in. */
 	pages: PageDef[];
 	/** The CMS nav groups (content, design, settings), in CmsPanel order. */
 	navigationGroups: NavGroupDef[];
@@ -42,6 +48,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 		}
 	}
 	return {
+		options: (options) => adminOptions(cms, options),
 		pages: [
 			// Any CMS editor (no tbtop-cms.* ability, as PHP); its submission parts check the inbox ability.
 			dashboard(cms),
@@ -79,6 +86,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			return {
 				contentLocales: locales.length > 0 ? locales : [fallback || "en"],
 				defaultContentLocale: fallback || locales[0] || "en",
+				...(cms.config.timezone === undefined ? {} : { timezone: cms.config.timezone }),
 			};
 		},
 	};

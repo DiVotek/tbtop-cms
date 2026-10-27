@@ -3,7 +3,7 @@ import { defineRegistry, JSONUIProvider } from "@json-render/react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { cmsBlocks } from "../src";
-import { CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "../src/react";
+import { assembleSpec, CmsHead, CmsRenderer, cmsCatalog, cmsComponents, seoHead } from "../src/react";
 import { makeCms } from "./support";
 
 const catalog = cmsCatalog(cmsBlocks);
@@ -44,12 +44,19 @@ describe("@tbtop/cms/react", () => {
 		expect(html).toContain('<script type="application/ld+json">');
 	});
 
+	test("a layout slot's blocks render through assembleSpec from the client entry", async () => {
+		const props = await home((cms) => cms.site().layouts.save("header", [{ id: "top", kind: "Hero", data: { title: { en: "Header hero" } } }]));
+		const header = props.cms.layout.header;
+		const html = page(<CmsRenderer spec={assembleSpec(header)} catalog={catalog} registry={registry} showErrors={false} />);
+		expect(html).toContain("Header hero");
+	});
+
 	test("CmsRenderer draws the page blocks with the built-in components on the server", async () => {
 		const props = await home();
 		const html = page(<CmsRenderer spec={props.render} catalog={catalog} registry={registry} showErrors={false} />);
 		expect(html).toContain('data-testid="hero"');
 		expect(html).toContain('data-testid="contact-form"');
-		expect(html).toMatch(/action="https:\/\/site\.test\/_cms\/forms\/en\/\d+\/[^"]+"/);
+		expect(html).toMatch(/action="\/_cms\/forms\/en\/\d+\/[^"]+"/);
 		expect(html).toContain('name="website"');
 	});
 

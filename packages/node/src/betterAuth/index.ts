@@ -1,5 +1,6 @@
 import { cookieSessions, type PageDef, type SessionResolver } from "@tbtop/admin";
 import { CMS_ABILITIES, type CmsAbility } from "../admin/abilities";
+import { adminPrefix } from "../admin/support";
 import type { Cms } from "../cms";
 import { SubmitThrottle, type ThrottleLimit } from "../forms/throttle";
 import { type CmsRole, cmsRoles, roleAllows } from "./access";
@@ -9,6 +10,7 @@ import { AuthSession, type CmsAuthUser } from "./session";
 
 export { CMS_SECTIONS, cmsAccess, cmsRoles, cmsStatements, type CmsRole, permissionFor } from "./access";
 export type { CmsAuthUser } from "./session";
+export { type CmsAccessRole, type DefaultAuth, type DefaultAuthOptions, defaultAuth, defaultAuthSchema } from "./defaultAuth";
 
 type Call<B> = { body: B; headers: Headers };
 
@@ -56,14 +58,15 @@ export type CmsAuthOptions = {
 	signInThrottle?: ThrottleLimit | false;
 };
 
+/** createCms({ auth: cmsAuth(betterAuth) }): satisfies CmsAdminAuth, plus signIn for custom login pages. */
 export type CmsAuth = {
-	/** createCms({ authorize }): the user's roles against the section's permission. */
+	/** The user's roles against the section's permission; createCms({ auth }) reads it. */
 	authorize: (user: unknown, ability: CmsAbility) => boolean;
-	/** createAdmin({ session }): the panel's user is Better Auth's; logout signs out there. */
+	/** The panel's user is Better Auth's; logout signs out there. cms.admin.options() passes it. */
 	session: SessionResolver;
-	/** createAdmin({ loginPath }). */
+	/** The sign-in page under the admin prefix; cms.admin.options() passes it. */
 	loginPath: (cms: Cms) => string;
-	/** The sign-in page and the Users pages: createAdmin({ pages: [...cms.admin.pages, ...auth.pages(cms)] }). */
+	/** The sign-in page and the Users pages; cms.admin.options() adds them after the CMS's. */
 	pages: (cms: Cms) => PageDef[];
 	/** Signs in with email and password (remember: Better Auth's rememberMe, default false): the cookies go on the panel's response; false for wrong credentials, a ban or no CMS role. */
 	signIn: (request: Request, email: string, password: string, remember?: boolean) => Promise<boolean>;
@@ -108,7 +111,7 @@ export function cmsAuth(auth: BetterAuthLike, options: CmsAuthOptions = {}): Cms
 	const signIn = async (request: Request, email: string, password: string, remember = false): Promise<boolean> => {
 		const store = stores.get(request);
 		if (store === undefined) {
-			throw new TypeError("signIn() runs inside a panel request: pass createAdmin({ session: auth.session }).");
+			throw new TypeError("signIn() runs inside a panel request: pass createCms({ auth }) and createAdmin(cms.admin.options()).");
 		}
 		const response = await auth.api.signInEmail({ body: { email, password, rememberMe: remember }, headers: request.headers, asResponse: true });
 		if (!response.ok) {
@@ -134,7 +137,7 @@ export function cmsAuth(auth: BetterAuthLike, options: CmsAuthOptions = {}): Cms
 		authorize: (user, ability) => user !== null && typeof user === "object" && allows(user as CmsAuthUser, ability),
 		session,
 		signIn,
-		loginPath: (cms) => `/${(cms.config.adminPrefix ?? "admin").replace(/^\/+|\/+$/g, "")}/login`,
+		loginPath: (cms) => `${adminPrefix(cms)}/login`,
 		pages: (cms) => {
 			const ctx = { cms, auth, roles, usersTable, signIn, throttle };
 			return [loginPage(ctx), usersIndex(ctx), userNew(ctx), userEdit(ctx)] as PageDef[];

@@ -46,6 +46,7 @@ const translations = (raw: unknown): Translations => {
 	return isDict(value) ? value : {};
 };
 
+/** A `tbtop_pages` row (`selectAll()`) as a Page: JSON columns decoded, flags and dates typed. */
 export function pageFromRow(row: Selectable<PagesTable>): Page {
 	const content = decodeJson(row.content);
 	const fields = decodeJson(row.fields);

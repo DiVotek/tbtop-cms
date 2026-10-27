@@ -6,13 +6,9 @@ import type { LinkTargets, Site } from "../site";
 import { type Dict, isDict } from "../support/values";
 import { flattenLocales, translatablePaths } from "./locale";
 
-export type ResolvedBlock = { id: string; kind: string; props: Record<string, unknown> };
+import type { ResolvedBlock } from "./spec";
 
-/** A render spec json-render's Renderer takes: flat elements, `$root` lists the blocks in order. */
-export type RenderSpec = {
-	root: "$root";
-	elements: Record<string, { type: string; props: Record<string, unknown>; children?: string[] }>;
-};
+export { assembleSpec, type RenderSpec, type ResolvedBlock } from "./spec";
 
 export class BlockResolutionError extends Error {}
 
@@ -61,7 +57,25 @@ async function linkedIds(site: Site, content: unknown[], page: Page | null): Pro
 	return ids;
 }
 
-async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets): Promise<Record<string, unknown>> {
+/**
+ * Pages' resolved custom fields, as their own page props carry them: what
+ * `ctx.pages(value, { fields: true })` adds to each ref. Resolved one level
+ * deep: inside, `fields: true` gives empty fields, so two pages that pick
+ * each other do not recurse.
+ */
+export async function resolvePageFields(site: Site, pages: Page[], locale: string): Promise<Record<string, unknown>[]> {
+	const locales = (await site.languages.all()).map((row) => row.locale);
+	// The pages' links in one lookup for the whole list, not one per page.
+	const ids = (await Promise.all(pages.map((page) => linkedIds(site, [], page)))).flat();
+	const targets = await site.linkTargets(ids, locale);
+	const out: Record<string, unknown>[] = [];
+	for (const page of pages) {
+		out.push(await resolveFields(site, page, locale, locales, targets, true));
+	}
+	return out;
+}
+
+async function resolveFields(site: Site, page: Page, locale: string, locales: string[], targets: LinkTargets, nested = false): Promise<Record<string, unknown>> {
 	const stored = page.fields ?? {};
 	const types = site.pageTypes.forPage(page);
 	let out: Record<string, unknown> = {};
@@ -69,7 +83,7 @@ async function resolveFields(site: Site, page: Page, locale: string, locales: st
 		try {
 			const later = new Set(types.slice(i + 1).flatMap((next) => fieldNames(next.form(new S()))));
 			const own = Object.fromEntries(Object.entries(stored).filter(([key]) => !later.has(key)));
-			const ctx = await site.resolveContext(locale, page, out, targets);
+			const ctx = await site.resolveContext(locale, page, out, targets, nested);
 			const input = flattenLocales(own, locale, ctx.fallbackLocale, locales, translatablePaths(type.form(new S())));
 			out = { ...out, ...(await type.resolveFields(input, ctx)) };
 		} catch (error) {
@@ -140,9 +154,12 @@ export function bindForms(site: Site, blocks: ResolvedBlock[], page: Page, local
 	);
 }
 
-/** FormActionProps: the submit URL, and the honeypot input name when one is configured. */
+/**
+ * FormActionProps: the root-relative submit path, and the honeypot input name when one is configured.
+ * No origin: `config.url` may differ from the browser's origin (preview port, www), and a cross-origin post fails CORS.
+ */
 export function formActionProps(site: Site, page: Page | number, blockId: string, locale: string): { action: string; honeypotField?: string } {
-	const action = site.absolute(`/_cms/forms/${encodeURIComponent(locale)}/${typeof page === "number" ? page : page.id}/${encodeURIComponent(blockId)}`);
+	const action = `/_cms/forms/${encodeURIComponent(locale)}/${typeof page === "number" ? page : page.id}/${encodeURIComponent(blockId)}`;
 	const honeypot = honeypotField(site);
 	return honeypot === null ? { action } : { action, honeypotField: honeypot };
 }
@@ -153,50 +170,50 @@ export const honeypotField = (site: Site): string | null => {
 };
 
 /**
+ * The parsed values of the keys the resolver left out that the object's own
+ * shape declares, each only when the browser's parse of it (after JSON) gives
+ * it back: a transform's output, a Date, a prefault or catch would change or
+ * fail there. A schema with no shape (a whole-object transform) fills nothing.
+ */
+function filledDefaults(schema: unknown, props: Record<string, unknown>, parsed: unknown): Record<string, unknown> {
+	const shape = (schema as { shape?: Record<string, { safeParse(value: unknown): { success: boolean; data?: unknown } }> }).shape ?? {};
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(isDict(parsed) ? parsed : {})) {
+		const field = shape[key];
+		if (key in props || field === undefined || value === undefined) {
+			continue;
+		}
+		const wire = JSON.stringify(value);
+		const again = field.safeParse(JSON.parse(wire));
+		if (again.success && JSON.stringify(again.data) === wire) {
+			out[key] = value;
+		}
+	}
+	return out;
+}
+
+/**
  * The catalog's zod schema is the contract: props that do not match it are
  * dropped, not shipped. That is a resolver/catalog drift, a code bug, so it
- * throws under `strictBlocks`, which defaults to on in development.
+ * throws under `strictBlocks` (off by default, as `blocks.strict` in PHP).
+ * Props that match ship as resolved, plus the parsed value of each key the
+ * resolver left out, so a `.default()` fills it as a page type's schema does
+ * for `page.fields`. The browser parses again, so keys the resolver set keep
+ * their value and a default ships only when that parse gives it back (the
+ * parse here still runs transforms: keep them pure).
  */
 export function validateProps(site: Site, blocks: ResolvedBlock[]): ResolvedBlock[] {
-	const strict = site.config.strictBlocks ?? isDevelopment();
-	return blocks.filter((block) => {
-		const result = site.blocks.get(block.kind).props.safeParse(block.props);
+	const strict = site.config.strictBlocks === true;
+	return blocks.flatMap((block) => {
+		const schema = site.blocks.get(block.kind).props;
+		const result = schema.safeParse(block.props);
 		if (result.success) {
-			return true;
+			return [{ ...block, props: { ...filledDefaults(schema, block.props, result.data), ...block.props } }];
 		}
 		if (strict) {
 			throw new BlockResolutionError(`Block [${block.kind}] props do not match the catalog: ${result.error.message}`);
 		}
 		console.warn("block.props_invalid", { kind: block.kind, id: block.id, error: result.error.message });
-		return false;
+		return [];
 	});
-}
-
-/**
- * Development: a `NODE_ENV` other than `production` (unset included) on Node and Bun. Workers
- * have no NODE_ENV (and nodejs_compat leaves it unset), so they count as
- * production, as does any runtime without `process`.
- */
-function isDevelopment(): boolean {
-	if (typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers") {
-		return false;
-	}
-	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-	return env !== undefined && env.NODE_ENV !== "production";
-}
-
-/** PageSpecAssembler: blocks in order under the root; a duplicate or reserved id is skipped. */
-export function assembleSpec(blocks: ResolvedBlock[], rootKind = "Fragment"): RenderSpec {
-	const elements: RenderSpec["elements"] = {};
-	const children: string[] = [];
-	for (const block of blocks) {
-		if (block.id === "$root" || block.id in elements) {
-			console.warn("block.reserved_or_duplicate_id", { id: block.id, kind: block.kind });
-			continue;
-		}
-		children.push(block.id);
-		elements[block.id] = { type: block.kind, props: block.props };
-	}
-	elements.$root = { type: rootKind, props: {}, children };
-	return { root: "$root", elements };
 }

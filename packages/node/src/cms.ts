@@ -79,10 +79,38 @@ export type CmsTasks = {
 const LAST_PRUNE = "system.scheduler.not_found_pruned_at";
 const DAY_MS = 86_400_000;
 
+/**
+ * A placement other than `pages` and `layout` names a page type or subtype by
+ * its own key (`product`, not `article/product`); one that names nothing is
+ * never offered in the editor, so it is reported once at boot.
+ */
+function warnUnknownPlacements(config: CmsConfig, pageTypes: PageTypes): void {
+	for (const block of config.blocks.all()) {
+		const unknown = block.placements.filter((placement) => placement !== "pages" && placement !== "layout" && !pageTypes.has(placement));
+		if (unknown.length > 0) {
+			console.warn("block.placement_unknown", { kind: block.kind, placements: unknown });
+		}
+	}
+}
+
+/** A bad zone would throw on every dashboard load and SEO `{date}`: refuse it once, here. */
+function assertTimezone(timezone: string | undefined): void {
+	if (timezone === undefined) {
+		return;
+	}
+	try {
+		new Intl.DateTimeFormat("en", { timeZone: timezone });
+	} catch {
+		throw new Error(`createCms: timezone "${timezone}" is not a valid IANA name.`);
+	}
+}
+
 const SITEMAP_CHUNK = /^\/sitemap-([1-9][0-9]{0,8})\.xml$/;
 
 export function createCms<const T extends readonly PageTypeDef[] = []>(config: CmsConfig<T>): Cms<T> {
+	assertTimezone(config.timezone);
 	const pageTypes = new PageTypes(config.pageTypes);
+	warnUnknownPlacements(config, pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
 	const throttle = submitThrottle(config.forms);
 	const site = (request?: Request, options: { cached?: boolean } = {}): Site => {
@@ -103,7 +131,7 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 		},
 		handle: async (request) => {
 			if (request.method === "POST") {
-				return submitForm(site(request), request, throttle, cms.admin.hostRules);
+				return submitForm(site(request), request, throttle);
 			}
 			if (request.method !== "GET" && request.method !== "HEAD") {
 				return null;

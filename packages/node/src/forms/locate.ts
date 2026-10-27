@@ -3,6 +3,7 @@ import { flattenLocales } from "../blocks/locale";
 import { formActionProps } from "../blocks/resolver";
 import type { Page } from "../content/page";
 import type { Site } from "../site";
+import { translate } from "../support/strings";
 import { type Dict, isDict } from "../support/values";
 
 /** A form block found for a submit: its handler, its flattened editor data, the submit context. */
@@ -18,7 +19,7 @@ export async function locateForm(site: Site, page: Page, blockId: string, locale
 	const layouts = await site.layouts.content();
 	const row = findRow(page.content ?? [], blockId) ?? findRow(layouts.header, blockId) ?? findRow(layouts.footer, blockId);
 	const fallback = await site.languages.defaultLocale();
-	const ctx: SubmitContext = { locale, fallbackLocale: fallback, page };
+	const ctx: SubmitContext = { locale, fallbackLocale: fallback, page, t: (key, params) => translate(key, locale, fallback, site.config.strings, params) };
 	if (row === null) {
 		const named = namedForm(site, blockId);
 		return named?.submit == null ? null : { block: named, submit: named.submit, data: {}, ctx };

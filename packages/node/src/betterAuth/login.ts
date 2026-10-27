@@ -30,6 +30,8 @@ export function loginPage(ctx: AdapterCtx) {
 					s.stack([s.action("signIn").label("Sign in").color("primary").submit()]),
 				])
 				.record({ email: "", password: "", remember: false })
+				// The redirect after a sign-in is a full visit; the typed password must not raise "Leave site?".
+				.guardUnsaved(false)
 				.onSubmit(async (submitted) => {
 					const form = submitted.form as Dict;
 					const email = String(form.email ?? "");

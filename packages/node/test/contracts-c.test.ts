@@ -223,18 +223,15 @@ describe("props that fail the catalog schema (q05)", () => {
 		return () => cms.loadPage(get("/"));
 	}
 
-	/** Runs `fn` with NODE_ENV (or the Workers user agent) as given, then puts them back. */
-	async function under<T>(env: { nodeEnv?: string; workers?: boolean }, fn: () => Promise<T>): Promise<T> {
+	/** Runs `fn` with NODE_ENV as given, then puts it back. */
+	async function under<T>(env: { nodeEnv: string }, fn: () => Promise<T>): Promise<T> {
 		const nodeEnv = process.env.NODE_ENV;
-		const nav = Object.getOwnPropertyDescriptor(globalThis, "navigator");
-		if (env.nodeEnv !== undefined) process.env.NODE_ENV = env.nodeEnv;
-		if (env.workers === true) Object.defineProperty(globalThis, "navigator", { value: { userAgent: "Cloudflare-Workers" }, configurable: true });
+		process.env.NODE_ENV = env.nodeEnv;
 		try {
 			return await fn();
 		} finally {
 			if (nodeEnv === undefined) delete process.env.NODE_ENV;
 			else process.env.NODE_ENV = nodeEnv;
-			if (nav !== undefined) Object.defineProperty(globalThis, "navigator", nav);
 		}
 	}
 
@@ -244,26 +241,17 @@ describe("props that fail the catalog schema (q05)", () => {
 		return result.props.render.elements.$root?.children;
 	};
 
-	test("in development the page load throws; in production the block is dropped", async () => {
+	test("by default the block is dropped, whatever NODE_ENV says", async () => {
 		const load = await home();
-		await under({ nodeEnv: "development" }, async () => {
-			await expect(load()).rejects.toBeInstanceOf(BlockResolutionError);
-		});
+		expect(await under({ nodeEnv: "development" }, () => children(load))).toEqual(["ok"]);
 		expect(await under({ nodeEnv: "production" }, () => children(load))).toEqual(["ok"]);
 	});
 
-	test("on Workers (no NODE_ENV) the default is to drop", async () => {
-		const load = await home();
-		expect(await under({ nodeEnv: "development", workers: true }, () => children(load))).toEqual(["ok"]);
-	});
-
-	test("strictBlocks set either way wins over the environment", async () => {
+	test("strictBlocks: true throws, in production too", async () => {
 		const strict = await home({ strictBlocks: true });
 		await under({ nodeEnv: "production" }, async () => {
-			await expect(strict()).rejects.toThrow("props do not match the catalog");
+			await expect(strict()).rejects.toBeInstanceOf(BlockResolutionError);
 		});
-		const lenient = await home({ strictBlocks: false });
-		expect(await under({ nodeEnv: "development" }, () => children(lenient))).toEqual(["ok"]);
 	});
 
 	test("rows the editor can break (an unknown kind) are still skipped in development", async () => {

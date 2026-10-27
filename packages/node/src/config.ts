@@ -1,13 +1,23 @@
-import type { HostRule, NotificationStore } from "@tbtop/admin";
+import type { HostRule, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
+import type { Cms } from "./cms";
 import type { CmsDatabase } from "./db/schema";
 import type { PageTypeDef } from "./content/pageTypes";
 import type { SubmissionEvent } from "./forms/submit";
 import type { Channel, DeliveryEvent, MailTransport, NotificationType } from "./notifications/types";
+import type { SchemaContext } from "./seo/schemaContext";
 import type { SchemaTypeDef } from "./seo/schemaTypes";
 import type { CmsCacheStore } from "./support/cache";
+
+/** What the CMS needs from an auth adapter; `cmsAuth()` returns one. */
+export type CmsAdminAuth = {
+	authorize: (user: unknown, ability: CmsAbility) => boolean | Promise<boolean>;
+	session: SessionResolver;
+	loginPath: (cms: Cms) => string;
+	pages: (cms: Cms) => PageDef[];
+};
 
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */
 export type MediaDetails = { url: string; alt?: string | null; mime?: string | null; width?: number | null; height?: number | null };
@@ -21,6 +31,13 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	pageTypes?: T;
 	/** Extra JSON-LD schema types next to the built-in WebPage family, Article family and CollectionPage. */
 	schemaTypes?: SchemaTypeDef[];
+	/**
+	 * The site's IANA timezone (`Europe/Kyiv`), as Laravel's app.timezone:
+	 * the admin formats and reads dates in it, the dashboard counts days in
+	 * it, and SEO templates print `{date}` in it. Stored dates stay UTC.
+	 * Default UTC.
+	 */
+	timezone?: string;
 	/** The public site origin (`https://example.com`); default: the request's origin. */
 	url?: string;
 	/** A media reference to its public URL; default: absolute URLs and `/…` paths as is, other paths under `/storage/`. */
@@ -28,11 +45,27 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	/** Settings keys holding secrets: sealed with `settingsKey`, never sent to the frontend. */
 	secretSettings?: string[];
 	/**
+	 * The host's own tabs on Site settings, after Branding and Contacts. A
+	 * field named `tagline` is stored at `site.tagline`, so it reaches the
+	 * frontend in `cms.settings` (unless listed in `secretSettings`) and
+	 * reads back with `site.settings.get("site.tagline")`. A name the page
+	 * already uses throws.
+	 */
+	siteSettings?: { tabs: (s: S) => { label: string; children: unknown[] }[] };
+	/**
 	 * The key secret settings are sealed with (AES-256-GCM over Web Crypto).
 	 * Keep it in the environment; changing it makes stored secrets unreadable.
 	 * Without it a secret setting reads as its fallback and cannot be saved.
 	 */
 	settingsKey?: string;
+	seo?: {
+		/**
+		 * The page's JSON-LD documents, last: return them with yours added or
+		 * replaced. A node of yours with `"@id": identityId(ctx.site)` is the one
+		 * Article author and publisher already point to.
+		 */
+		extend?: (nodes: Record<string, unknown>[], ctx: SchemaContext) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
+	};
 	/** Paths robots.txt disallows besides the admin prefix and `/login`. */
 	robotsDisallow?: string[];
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */
@@ -43,9 +76,8 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	/** The json-render root element kind; default `Fragment`. */
 	rootKind?: string;
 	/**
-	 * Throw on a broken block row instead of skipping it (`tbtop-cms.blocks.strict`).
-	 * Unset: off, except that resolved props failing the catalog's zod schema
-	 * throw in development (on Node/Bun a NODE_ENV other than `production`, unset included; never on Workers).
+	 * Throw on a broken block row, or on resolved props failing the catalog's zod schema,
+	 * instead of skipping the block with a warning (`tbtop-cms.blocks.strict`). Default off in every environment.
 	 */
 	strictBlocks?: boolean;
 	/** Can this request see drafts (preview)? Default: never, unless it carries a signed preview link (`preview`). */
@@ -61,18 +93,24 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	 * Section access in the admin (`tbtop-cms.roles` + the host's gates): the
 	 * panel user and a section ability (`tbtop-cms.pages`, see CMS_ABILITIES).
 	 * False hides the section from the nav and answers 403 to its pages and
-	 * actions. Without it every section is open to any admin user.
+	 * actions. Without it `auth.authorize` decides, and without both every
+	 * section is open to any admin user. For hosts without an auth adapter.
 	 */
 	authorize?: (user: unknown, ability: CmsAbility) => boolean | Promise<boolean>;
+	/**
+	 * The panel's auth adapter, given once: `cmsAuth(betterAuth)` from
+	 * `@tbtop/cms/better-auth`. Section access, `cms.admin.options()`'s session,
+	 * login path and sign-in and Users pages all come from it.
+	 */
+	auth?: CmsAdminAuth;
 	/** Extra frontend strings per locale, over the package's own. */
 	strings?: Record<string, Record<string, string>>;
 	debug?: boolean;
 	forms?: FormsConfig;
 	/**
-	 * The host's validation rules (`kyselyRules(db)` for `unique`/`exists`,
-	 * its own). Form submits and `cms.admin.hostRules` both carry them next
-	 * to the CMS's `link_shape` and `page_ref`, so a block's `submit.rules`
-	 * and the admin validate with one set. The CMS's own rules win a name clash.
+	 * The admin's host validation rules (`kyselyRules(db)` for `unique`/`exists`,
+	 * its own): `cms.admin.hostRules` carries them next to the CMS's `link_shape`
+	 * and `page_ref`. Frontend forms validate with `submit.schema` instead.
 	 */
 	hostRules?: Record<string, HostRule>;
 	notifications?: NotificationsConfig;

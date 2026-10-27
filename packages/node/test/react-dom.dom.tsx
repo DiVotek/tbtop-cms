@@ -5,7 +5,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 const realFetch = globalThis.fetch;
 GlobalRegistrator.register();
 const { render, fireEvent, findByRole, findByText, waitFor } = await import("@testing-library/react");
-const { ContactForm } = await import("../src/react");
+const { ContactForm, useCmsForm } = await import("../src/react");
 
 afterAll(async () => {
 	await GlobalRegistrator.unregister();
@@ -51,3 +51,38 @@ describe("ContactForm in the browser", () => {
 		view.unmount();
 	});
 });
+
+describe("useCmsForm with a controlled form", () => {
+	test("submit(data) posts the values; setError shows a client message; reset clears it", async () => {
+		const bodies: unknown[] = [];
+		const stub = (async (_url: string, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			return { json: async () => ({ ok: true }) };
+		}) as unknown as typeof fetch;
+		for (const target of [globalThis, window]) {
+			Object.defineProperty(target, "fetch", { value: stub, configurable: true, writable: true });
+		}
+		function Controlled() {
+			const form = useCmsForm("/_cms/forms/en/1/abc");
+			return (
+				<div>
+					<button type="button" onClick={() => form.setError("messenger", "Pick a messenger")}>check</button>
+					<button type="button" onClick={() => form.reset()}>reset</button>
+					<button type="button" onClick={() => void form.submit({ topic: "audit", name: "Ada" })}>send</button>
+					<p data-testid="state">{`${form.status}:${form.errors.messenger?.[0] ?? ""}`}</p>
+				</div>
+			);
+		}
+		const view = render(<Controlled />);
+		const state = () => view.getByTestId("state").textContent;
+		fireEvent.click(view.getByText("check"));
+		await waitFor(() => expect(state()).toBe("failed:Pick a messenger"));
+		fireEvent.click(view.getByText("reset"));
+		await waitFor(() => expect(state()).toBe("idle:"));
+		fireEvent.click(view.getByText("send"));
+		await waitFor(() => expect(state()).toBe("sent:"), { timeout: 5000 });
+		expect(bodies).toEqual([{ topic: "audit", name: "Ada" }]);
+		view.unmount();
+	});
+});
+

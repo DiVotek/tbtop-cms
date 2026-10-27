@@ -289,16 +289,13 @@ function withTitleFallback(name: Dict, title: Dict): Dict {
 }
 
 /**
- * TypeTemplateContent::contentFor: the base type's template() with a fresh id
+ * TypeTemplateContent::contentFor: the type's template() (the subtype's first) with a fresh id
  * per block, and active/sort/data defaults the template may leave out. The
  * frontend renders template() only for a null content, so an admin-made page
  * starts with the rows instead of `[]`.
  */
 function templateContent(cms: Cms, page: Page): Dict[] {
-	if (!cms.pageTypes.has(page.type)) {
-		return [];
-	}
-	return (cms.pageTypes.get(page.type).template(page) ?? [])
+	return (cms.pageTypes.templateFor(page) ?? [])
 		.filter(isDict)
 		.map((block, index) => ({ active: true, sort: index, data: {}, ...block, id: blockId() }));
 }

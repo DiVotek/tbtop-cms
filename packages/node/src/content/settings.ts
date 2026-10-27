@@ -23,6 +23,8 @@ export class Settings {
 			secretKeys: string[];
 			secretKey?: string;
 			mediaUrl: (ref: string) => string | null;
+			/** Host keys holding media refs besides the package's (host Site-settings uploads). */
+			mediaKeys?: string[];
 			/** Frontend reads go through `store` when `read`; every write bumps it. */
 			cache?: { store: ContentCache; read: boolean } | null;
 		},
@@ -93,7 +95,7 @@ export class Settings {
 			}
 			try {
 				const value = raw === null ? null : JSON.parse(raw);
-				out[key] = MEDIA_KEYS.includes(key) ? this.media(value) : value;
+				out[key] = MEDIA_KEYS.includes(key) || (this.options.mediaKeys ?? []).includes(key) ? this.media(value) : value;
 			} catch {
 				console.warn("settings.decode_failed", { key });
 			}

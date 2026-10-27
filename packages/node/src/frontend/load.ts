@@ -1,14 +1,14 @@
 import { assembleSpec, bindForms, type RenderSpec, type ResolvedBlock, resolveBlocks, validateProps } from "../blocks/resolver";
 import { SLOTS, type Slot } from "../content/layouts";
-import { isLive, type Page, translation, translationText } from "../content/page";
+import { isLive, type Page } from "../content/page";
 import type { PageTypeDef, PageTypeUnion } from "../content/pageTypes";
 import { isExternal } from "../content/redirects";
-import { richtextHtml } from "../content/richtext";
 import { resolveSeo, type Seo } from "../seo/resolver";
 import { schemaContext } from "../seo/schemaContext";
 import type { Site } from "../site";
 import type { Jsonify } from "../support/values";
 import { ancestorCrumbs, breadcrumbs, type Crumb } from "./breadcrumbs";
+import { type PageColumns, pageColumns } from "./pageView";
 import { type ErrorPageProps, errorPageProps } from "./errorPage";
 
 /** The shared `cms` prop (ShareCmsProps): site settings, locales, the resolved header and footer. */
@@ -18,7 +18,7 @@ export type SharedProps = Jsonify<SharedShape>;
  * The props of a CMS page, all JSON: a host passes them through its loader as
  * they are. `page` is a union by `page.type` over the built-in types and `T`
  * (createCms infers it from `pageTypes`), so `page.type === "recipe"`
- * narrows `page.fields` to that type's fields schema.
+ * narrows `page.fields` to that type's schema.
  */
 export type PageProps<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = Jsonify<PageShape<PageTypeUnion<T>>>;
 
@@ -33,7 +33,7 @@ export type SharedShape = {
 };
 
 type PageShape<P = { type: string; fields: Record<string, unknown> }> = {
-	page: PageColumns & P;
+	page: Omit<PageColumns, "type"> & P;
 	render: RenderSpec;
 	seo: Seo;
 	breadcrumbs: Crumb[];
@@ -42,17 +42,6 @@ type PageShape<P = { type: string; fields: Record<string, unknown> }> = {
 	cms: SharedShape;
 };
 
-type PageColumns = {
-	id: number;
-	subtype: string | null;
-	status: string;
-	name: string | null;
-	title: string | null;
-	heading: string | null;
-	summary: string | null;
-	body: string;
-	image: string | null;
-};
 
 export type LoadResult<P = PageProps> =
 	| { type: "page"; status: 200; headers: Record<string, string>; props: P }
@@ -171,8 +160,7 @@ export async function resolvePage(site: Site, path: string, locale: string, prev
 }
 
 export async function pageProps(site: Site, page: Page, locale: string, path: string): Promise<PageShape> {
-	const type = site.pageTypes.has(page.type) ? site.pageTypes.get(page.type) : null;
-	const content = page.content ?? type?.template(page) ?? [];
+	const content = page.content ?? site.pageTypes.templateFor(page) ?? [];
 	const { blocks, fields } = await resolveBlocks(site, content, locale, page);
 	const resolved = validateProps(site, bindForms(site, blocks, page, locale));
 	const isPreview = !isLive(page);
@@ -188,19 +176,7 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 	}
 	const fallback = await site.languages.defaultLocale();
 	return {
-		page: {
-			id: page.id,
-			type: page.type,
-			subtype: page.subtype,
-			status: page.status,
-			name: translationText(page, "name", locale, fallback),
-			title: translationText(page, "title", locale, fallback),
-			heading: translationText(page, "heading", locale, fallback),
-			summary: translationText(page, "summary", locale, fallback),
-			body: richtextHtml(translation(page, "body", locale, fallback)),
-			image: page.image !== null && page.image !== "" ? site.mediaUrl(page.image) : null,
-			fields,
-		},
+		page: { ...pageColumns(site, page, locale, fallback), fields },
 		render: assembleSpec(resolved, site.config.rootKind),
 		seo,
 		breadcrumbs: await breadcrumbs(site, page, locale),

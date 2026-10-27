@@ -15,7 +15,7 @@ async function contactAction(cms: Made["cms"]) {
 }
 
 const post = (url: string, body: Record<string, unknown>, headers: Record<string, string> = {}) =>
-	new Request(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+	new Request(new URL(url, "https://site.test"), { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
 
 const valid = { name: "Ada", email: "ada@example.test", message: "Hello" };
 
@@ -109,7 +109,7 @@ function orderForm(seen: Record<string, unknown>[] = []): Partial<CmsConfig> {
 				resolve: () => ({ action: "" }),
 				formName: "service-order",
 				submit: {
-					rules: () => ({ service: "required|string|max:50" }),
+					schema: z.object({ service: z.string().max(50) }),
 					handle: (payload, blockData) => void seen.push({ payload, blockData }),
 				},
 			},
@@ -131,7 +131,7 @@ describe("q14: named forms (HasForm, Forms::props)", () => {
 		const { cms, db } = await makeCms(undefined, orderForm(seen));
 		const id = await homeId(cms);
 		const props = await cms.site().formProps("service-order", id);
-		expect(props).toEqual({ action: `https://site.test/_cms/forms/en/${id}/service-order`, honeypotField: "website" });
+		expect(props).toEqual({ action: `/_cms/forms/en/${id}/service-order`, honeypotField: "website" });
 		expect((await cms.handle(post(props.action, {})))?.status).toBe(422);
 		expect((await cms.handle(post(props.action, { service: "Repair" })))?.status).toBe(200);
 		expect(seen).toEqual([{ payload: { service: "Repair" }, blockData: {} }]);
@@ -161,7 +161,7 @@ describe("q14: named forms (HasForm, Forms::props)", () => {
 
 	test("a form name without a submit handler, or declared twice, is refused", () => {
 		const catalog = defineBlocks({ A: { props: z.object({}) }, B: { props: z.object({}) } });
-		const submit = { rules: () => ({}) };
+		const submit = { schema: z.object({}) };
 		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x" }, B: { form: () => [] } })).toThrow("has no submit handler");
 		expect(() => implementBlocks(catalog, { A: { form: () => [], formName: "x", submit }, B: { form: () => [], formName: "x", submit } })).toThrow(
 			"Form [x] is declared by both [A] and [B].",

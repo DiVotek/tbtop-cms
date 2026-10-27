@@ -21,9 +21,9 @@ export const CMS_ABILITIES = [
 
 export type CmsAbility = (typeof CMS_ABILITIES)[number];
 
-/** Whether the signed-in admin holds `ability`; without `authorize` in the config every section is open. */
+/** Whether the signed-in admin holds `ability`; `authorize` wins over `auth.authorize`, and without both every section is open. */
 export async function allows(cms: Cms, ability: CmsAbility): Promise<boolean> {
-	const check = cms.config.authorize;
+	const check = cms.config.authorize ?? cms.config.auth?.authorize;
 	return check === undefined || (await check(currentContext().user, ability)) === true;
 }
 
