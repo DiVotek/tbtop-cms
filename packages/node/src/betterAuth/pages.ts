@@ -166,10 +166,13 @@ export function userEdit(ctx: AdapterCtx) {
  */
 async function setPassword(ctx: AdapterCtx, action: ActionCtx, userId: string, password: string): Promise<Effects | null> {
 	const headers = action.request.headers;
-	return (
-		(await refused(() => ctx.auth.api.setUserPassword({ body: { userId, newPassword: password }, headers }))) ??
-		(await refused(() =>
-			me(action)?.id === userId ? ctx.auth.api.revokeOtherSessions({ headers }) : ctx.auth.api.revokeUserSessions({ body: { userId }, headers }),
-		))
+	const failed = await refused(() => ctx.auth.api.setUserPassword({ body: { userId, newPassword: password }, headers }));
+	if (failed !== null) {
+		return failed;
+	}
+	// The password is set by now: a refused revoke (a host role without session:revoke) must not read as an unsaved form.
+	const revokeFailed = await refused(() =>
+		me(action)?.id === userId ? ctx.auth.api.revokeOtherSessions({ headers }) : ctx.auth.api.revokeUserSessions({ body: { userId }, headers }),
 	);
+	return revokeFailed === null ? null : Effects.make().notify("Password changed, but the user's other sessions were not signed out.", "error");
 }
