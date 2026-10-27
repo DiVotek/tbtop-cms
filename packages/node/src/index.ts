@@ -38,6 +38,7 @@ export { definePageType, type PageType, type PageTypeDef } from "./content/pageT
 export { RedirectError } from "./content/redirects";
 export { richtextHtml } from "./content/richtext";
 export { baselineMigration, cmsMigrations, type Dialect, type MigrationOptions, migrateCms } from "./db/migrations";
+export { type D1Migration, type D1MigrationOptions, d1Migrations } from "./db/d1Migrations";
 export type { CmsDatabase } from "./db/schema";
 export { demoFixture } from "./fixtures/demo";
 export { type Fixture, type FixtureBlock, type FixturePage, isFreshSite, seedFixtures } from "./fixtures/seed";
