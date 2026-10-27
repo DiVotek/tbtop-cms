@@ -10,9 +10,21 @@ import { type BetterAuthLike, type CmsAuth, type CmsAuthOptions, cmsAuth } from 
 export type CmsAccessRole = ReturnType<typeof cmsAccess.newRole>;
 
 /** Better Auth as the package builds it from the host's `db`, with what the host wires around it. */
+/**
+ * Better Auth's createUser called on the server: with no request it checks no
+ * caller, so `headers` is optional, and the role is any of the site's.
+ */
+type ServerCreateUser = (input: {
+	body: { email: string; password: string; name: string; role?: string | string[]; data?: Record<string, unknown> };
+	headers?: Headers;
+}) => Promise<{ user: { id: string } }>;
+
 export type DefaultAuth = {
 	/** The Better Auth instance, for the host's own client sign-in, OAuth or plugins. */
-	instance: BetterAuthLike & { handler(request: Request): Promise<Response> };
+	instance: Omit<BetterAuthLike, "api"> & {
+		api: Omit<BetterAuthLike["api"], "createUser"> & { createUser: ServerCreateUser };
+		handler(request: Request): Promise<Response>;
+	};
 	/** createCms({ auth }) */
 	adapter: CmsAuth;
 	/** Better Auth's tables next to the CMS's. Idempotent. */
@@ -87,8 +99,7 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 			return found.id;
 		}
 		// No headers: Better Auth's createUser checks the caller's role only when a request is given.
-		const createUser = instance.api.createUser as unknown as (input: { body: Record<string, unknown> }) => Promise<{ user: { id: string } }>;
-		return (await createUser({ body: { email, password, name: name ?? email.split("@")[0] ?? email, role } })).user.id;
+		return (await instance.api.createUser({ body: { email, password, name: name ?? email.split("@")[0] ?? email, role } })).user.id;
 	};
 	const auth: DefaultAuth = {
 		instance,
