@@ -8,7 +8,8 @@ export type SharedBlock = { id: number; name: string; kind: string; data: Dict; 
 
 /** Reusable block data that page rows point at with `{ id, kind, shared: <id> }` (SharedBlocks.php). */
 export class SharedBlocks {
-	private byId: Map<number, SharedBlock> | null = null;
+	/** The rows as one promise: concurrent readers of a render share the query. */
+	private byId: Promise<Map<number, SharedBlock>> | null = null;
 
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
@@ -104,26 +105,35 @@ export class SharedBlocks {
 		return placements(this.db);
 	}
 
-	private async load(): Promise<Map<number, SharedBlock>> {
+	private load(): Promise<Map<number, SharedBlock>> {
 		if (this.byId === null) {
-			const rows = await this.db.selectFrom("tbtop_shared_blocks").selectAll().execute();
-			this.byId = new Map(
-				rows.map((row) => {
-					const data = decodeJson(row.data);
-					return [
-						Number(row.id),
-						{
-							id: Number(row.id),
-							name: row.name,
-							kind: row.kind,
-							data: isDict(data) ? data : {},
-							lockVersion: Number(row.lock_version),
-						},
-					];
-				}),
-			);
+			const loading = this.db.selectFrom("tbtop_shared_blocks").selectAll().execute().then((rows) => this.index(rows));
+			this.byId = loading;
+			loading.catch(() => {
+				if (this.byId === loading) {
+					this.byId = null;
+				}
+			});
 		}
 		return this.byId;
+	}
+
+	private index(rows: { id: number | string | bigint; name: string; kind: string; data: unknown; lock_version: number | string | bigint }[]): Map<number, SharedBlock> {
+		return new Map(
+			rows.map((row) => {
+				const data = decodeJson(row.data);
+				return [
+					Number(row.id),
+					{
+						id: Number(row.id),
+						name: row.name,
+						kind: row.kind,
+						data: isDict(data) ? data : {},
+						lockVersion: Number(row.lock_version),
+					},
+				];
+			}),
+		);
 	}
 }
 

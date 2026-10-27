@@ -15,14 +15,29 @@ type SlugRow = { id: number; slug: string; path: string };
  * path leaves a 301 auto redirect behind (PageSlugRedirects.php).
  */
 export class PageSlugs {
+	/** Every locale's paths by page id, once readOnce() is on. */
+	private memo: Map<number, Promise<Record<string, string>>> | null = null;
+
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
 		private readonly locales: () => Promise<string[]>,
 		private readonly defaultLocale: () => Promise<string>,
 	) {}
 
+	/**
+	 * A frontend render: each page's paths are read once (all locales in one
+	 * query) and answered from memory after. Only for an instance that writes
+	 * no slugs: sync() does not update the memo.
+	 */
+	readOnce(): void {
+		this.memo ??= new Map();
+	}
+
 	/** The page's path in a locale; null when it has none there. */
 	async pathFor(pageId: number, locale: string): Promise<string | null> {
+		if (this.memo !== null) {
+			return (await this.remembered([pageId])).get(pageId)?.[locale] ?? null;
+		}
 		const row = await this.db
 			.selectFrom("tbtop_page_slugs")
 			.select("path")
@@ -37,6 +52,15 @@ export class PageSlugs {
 		if (pageIds.length === 0) {
 			return new Map();
 		}
+		if (this.memo !== null) {
+			const paths = new Map<number, string>();
+			for (const [id, all] of await this.remembered(pageIds)) {
+				if (all[locale] !== undefined) {
+					paths.set(id, all[locale]);
+				}
+			}
+			return paths;
+		}
 		const rows = await this.db
 			.selectFrom("tbtop_page_slugs")
 			.select(["page_id", "path"])
@@ -48,6 +72,9 @@ export class PageSlugs {
 
 	/** Every locale's path of a page. */
 	async allFor(pageId: number): Promise<Record<string, string>> {
+		if (this.memo !== null) {
+			return { ...(await this.remembered([pageId])).get(pageId) };
+		}
 		const rows = await this.db
 			.selectFrom("tbtop_page_slugs")
 			.select(["locale", "path"])
@@ -58,6 +85,27 @@ export class PageSlugs {
 
 	/** Every locale's path of each page, in one query. */
 	async allForMany(pageIds: number[]): Promise<Map<number, Record<string, string>>> {
+		return this.memo === null ? this.loadAll(pageIds) : this.remembered(pageIds);
+	}
+
+	/** allForMany from the memo, loading the pages it does not hold in one query. */
+	private async remembered(pageIds: number[]): Promise<Map<number, Record<string, string>>> {
+		const memo = this.memo ?? new Map<number, Promise<Record<string, string>>>();
+		const missing = [...new Set(pageIds)].filter((id) => !memo.has(id));
+		if (missing.length > 0) {
+			const loading = this.loadAll(missing);
+			for (const id of missing) {
+				memo.set(
+					id,
+					loading.then((paths) => paths.get(id) ?? {}),
+				);
+			}
+		}
+		const entries = await Promise.all(pageIds.map(async (id) => [id, (await memo.get(id)) ?? {}] as const));
+		return new Map(entries.filter(([, paths]) => Object.keys(paths).length > 0));
+	}
+
+	private async loadAll(pageIds: number[]): Promise<Map<number, Record<string, string>>> {
 		const paths = new Map<number, Record<string, string>>();
 		if (pageIds.length === 0) {
 			return paths;

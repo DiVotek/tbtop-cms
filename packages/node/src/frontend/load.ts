@@ -155,57 +155,69 @@ export async function loadPage(
 
 /** PageResolver: the page at a path in a locale, live only unless previewing. */
 export async function resolvePage(site: Site, path: string, locale: string, preview = false): Promise<Page | null> {
-	const id = await site.pages.slugs.pageAt(path.replace(/^\/+|\/+$/g, ""), locale);
-	return id === null ? null : site.pages.find(id, { live: !preview });
+	return site.pages.findAt(path.replace(/^\/+|\/+$/g, ""), locale, { live: !preview });
 }
 
 export async function pageProps(site: Site, page: Page, locale: string, path: string): Promise<PageShape> {
 	const content = page.content ?? site.pageTypes.templateFor(page) ?? [];
-	const { blocks, fields } = await resolveBlocks(site, content, locale, page);
+	// Independent reads start together: on D1 each query is a round trip, and only a chain of them adds up.
+	const [{ blocks, fields }, ctx, parents, trail, cms, fallback] = await Promise.all([
+		resolveBlocks(site, content, locale, page),
+		schemaContext(site, page, locale),
+		ancestorCrumbs(site, page, locale),
+		breadcrumbs(site, page, locale),
+		sharedProps(site, locale, page),
+		site.languages.defaultLocale(),
+	]);
 	const resolved = validateProps(site, bindForms(site, blocks, page, locale));
 	const isPreview = !isLive(page);
-	const ctx = await schemaContext(site, page, locale);
 	const blockNodes = resolved
 		.map((block) => site.blocks.get(block.kind).toSchema(block.props, ctx))
 		.filter((node): node is Record<string, unknown> => node !== null)
 		// Each node is a JSON-LD document of its own: one without @context is not schema.org to a crawler.
 		.map((node) => ("@context" in node ? node : { "@context": "https://schema.org", ...node }));
-	const seo = await resolveSeo(site, page, locale, await ancestorCrumbs(site, page, locale), ctx, blockNodes);
+	const seo = await resolveSeo(site, page, locale, parents, ctx, blockNodes);
 	if (isPreview) {
 		seo.noindex = true;
 	}
-	const fallback = await site.languages.defaultLocale();
 	return {
 		page: { ...pageColumns(site, page, locale, fallback), fields },
 		render: assembleSpec(resolved, site.config.rootKind),
 		seo,
-		breadcrumbs: await breadcrumbs(site, page, locale),
+		breadcrumbs: trail,
 		path,
 		isPreview,
-		cms: await sharedProps(site, locale, page),
+		cms,
 	};
 }
 
 export async function sharedProps(site: Site, locale: string, page: Page | null): Promise<SharedShape> {
-	const languages = await site.languages.frontendActive();
+	const [languages, settings, defaultLocale, slots, previewBanner] = await Promise.all([
+		site.languages.frontendActive(),
+		site.settings.forFrontend(),
+		site.languages.defaultLocale(),
+		(async () => layout(site, locale, page ?? (await site.pages.home())))(),
+		site.t("pages.preview.banner", locale),
+	]);
 	return {
-		settings: await site.settings.forFrontend(),
+		settings,
 		locale,
-		defaultLocale: await site.languages.defaultLocale(),
+		defaultLocale,
 		languages: languages.map((row) => ({ locale: row.locale, name: row.name, is_default: row.is_default })),
-		layout: await layout(site, locale, page ?? (await site.pages.home())),
+		layout: slots,
 		debug: site.config.debug ?? false,
-		strings: { previewBanner: await site.t("pages.preview.banner", locale) },
+		strings: { previewBanner },
 	};
 }
 
 async function layout(site: Site, locale: string, page: Page | null): Promise<Record<Slot, ResolvedBlock[]>> {
 	const content = await site.layouts.content();
 	const out = { header: [], footer: [] } as Record<Slot, ResolvedBlock[]>;
-	for (const slot of SLOTS) {
-		const { blocks } = await resolveBlocks(site, content[slot], locale, null);
+	const resolved = await Promise.all(SLOTS.map((slot) => resolveBlocks(site, content[slot], locale, null)));
+	SLOTS.forEach((slot, index) => {
+		const blocks = resolved[index]?.blocks ?? [];
 		out[slot] = validateProps(site, page === null ? blocks : bindForms(site, blocks, page, locale));
-	}
+	});
 	return out;
 }
 
