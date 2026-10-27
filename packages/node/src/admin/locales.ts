@@ -79,9 +79,14 @@ export function profileLocaleHooks(config: LocaleSource & { db: Kysely<CmsDataba
 			}
 			const now = sqlDate(new Date());
 			try {
-				const updated = await db.updateTable("tbtop_user_profiles").set({ locale, updated_at: now }).where("user_id", "=", key).executeTakeFirst();
-				if (Number(updated.numUpdatedRows) === 0) {
-					await db.insertInto("tbtop_user_profiles").values({ user_id: key, is_owner: flag(false), locale, created_at: now, updated_at: now }).execute();
+				const update = () => db.updateTable("tbtop_user_profiles").set({ locale, updated_at: now }).where("user_id", "=", key).executeTakeFirst();
+				if (Number((await update()).numUpdatedRows) === 0) {
+					// A concurrent first save may insert between the two: then the unique key refuses ours and the update wins.
+					await db
+						.insertInto("tbtop_user_profiles")
+						.values({ user_id: key, is_owner: flag(false), locale, created_at: now, updated_at: now })
+						.execute()
+						.catch(update);
 				}
 			} catch (error) {
 				// The pick still holds for the session; only its saving failed.
