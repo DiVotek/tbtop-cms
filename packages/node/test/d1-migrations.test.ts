@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
@@ -54,6 +54,17 @@ describe("D1 migrations as SQL files", () => {
 		expect([plan.toBeCreated, plan.toBeAdded, plan.toBeAddedIndexes]).toEqual([[], [], []]);
 		const made = await betterAuth(options).api.createUser({ body: { email: "anna@blog.test", password: "correct-horse", name: "Anna", role: "editor" } });
 		expect(made.user.email).toBe("anna@blog.test");
+	});
+
+	test("a directory from before the title move keeps its files; the new migration comes after them", async () => {
+		const dir = await tempDir();
+		await writeD1Migrations(dir, { auth: auth() });
+		// The 0.0 layout: the baseline, then Better Auth as 0002.
+		await rm(join(dir, "0002_2026_10_27_000000_tbtop_page_title_to_seo.sql"));
+		await rename(join(dir, "0003_better_auth.sql"), join(dir, "0002_better_auth.sql"));
+		const added = await writeD1Migrations(dir, { auth: auth() });
+		expect(added.map((path) => path.slice(dir.length + 1))).toEqual(["0003_2026_10_27_000000_tbtop_page_title_to_seo.sql"]);
+		expect((await readdir(dir)).sort()).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_better_auth.sql", "0003_2026_10_27_000000_tbtop_page_title_to_seo.sql"]);
 	});
 
 	test("a second run writes nothing; a Better Auth plugin added later gets its own file with only the new columns", async () => {
