@@ -21,7 +21,7 @@ export function app(db = new Kysely({ dialect: new BunSqliteDialect({ database: 
 		admin,
 		cache: memoryCache(),
 		// The rest of the CMS config: url, preview, forms, notifications, timezone…
-		config: { timezone: "Europe/Kyiv", forms: { throttle: false } },
+		config: { timezone: "Europe/Kyiv" },
 	});
 }
 
