@@ -25,7 +25,7 @@ test("the contact form shows field errors, then the success message, and the lea
 
 test("a filled honeypot looks sent and stores nothing", async ({ request, page }) => {
 	const home = await request.get("/");
-	const action = /action="([^"]+\/_cms\/forms\/[^"]+)"/.exec(await home.text())?.[1] ?? "";
+	const action = /action="([^"]*\/_cms\/forms\/[^"]+)"/.exec(await home.text())?.[1] ?? "";
 	expect(action).not.toBe("");
 	const response = await request.post(action, { data: { name: "Bot", email: "bot@example.test", message: "spam", website: "x" } });
 	expect(await response.json()).toEqual({ ok: true });
