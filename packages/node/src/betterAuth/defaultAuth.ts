@@ -112,7 +112,13 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 			.select("id")
 			.where((eb) => eb.or([eb("role", "=", "admin"), eb("role", "like", "admin,%"), eb("role", "like", "%,admin"), eb("role", "like", "%,admin,%")]))
 			.executeTakeFirst();
-		return admin?.id ?? ensureUser(email, "admin", { password });
+		if (admin !== undefined) {
+			return admin.id;
+		}
+		if ((await users.selectFrom("tbtop_users").select("id").where("email", "=", email).executeTakeFirst()) !== undefined) {
+			throw new Error(`tbtop/cms: TBTOP_ADMIN_EMAIL ${email} belongs to an existing user who is not an admin; use another email or make that user an admin.`);
+		}
+		return ensureUser(email, "admin", { password });
 	});
 	return auth;
 }

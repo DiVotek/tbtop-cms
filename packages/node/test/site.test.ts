@@ -51,6 +51,24 @@ describe("serve(site, { db })", () => {
 		expect(second).toEqual([]);
 	});
 
+	test("TBTOP_ADMIN_EMAIL of an existing non-admin fails the boot instead of leaving the site without an admin", async () => {
+		const fresh = memoryDb();
+		const { TBTOP_ADMIN_EMAIL, TBTOP_ADMIN_PASSWORD } = process.env;
+		delete process.env.TBTOP_ADMIN_EMAIL;
+		delete process.env.TBTOP_ADMIN_PASSWORD;
+		try {
+			const host = app(fresh);
+			await host.ready();
+			await host.users.ensure("editor@site.test", "editor", { password: "editor-password-1" });
+			process.env.TBTOP_ADMIN_EMAIL = "editor@site.test";
+			process.env.TBTOP_ADMIN_PASSWORD = "editor-password-2";
+			await expect(app(fresh).ready()).rejects.toThrow(/not an admin/);
+		} finally {
+			process.env.TBTOP_ADMIN_EMAIL = TBTOP_ADMIN_EMAIL;
+			process.env.TBTOP_ADMIN_PASSWORD = TBTOP_ADMIN_PASSWORD;
+		}
+	});
+
 	test("users.ensure seeds an editor, never an admin", async () => {
 		const host = app(db);
 		await host.ready();
