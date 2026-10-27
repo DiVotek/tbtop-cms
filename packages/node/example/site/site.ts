@@ -42,7 +42,7 @@ export const site = defineSite({
 				label: "Call me back",
 				category: "forms",
 				// The posted payload, validated (any Standard Schema). Stored as a submission; the team's notifications are the CMS's job.
-				submit: { schema: z.object({ name: z.string().min(1), phone: z.string().regex(/^\+?[0-9 ()-]{7,}$/) }) },
+				submit: { schema: z.object({ name: z.string().min(1).max(200), phone: z.string().max(40).regex(/^\+?[0-9 ()-]{7,}$/) }) },
 			},
 		),
 	},
