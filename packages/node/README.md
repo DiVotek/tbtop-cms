@@ -109,7 +109,7 @@ Anything else of the admin: `f.custom((s, name) => s.colorpicker(name), z.string
 adapter, `tbtop_*` tables, admin plugin, email and password with public
 sign-up off), the admin panel, one route handler (admin, auth, robots,
 sitemaps, form posts), then pages through `render`. On Node the first request (or
-`await app.ready()` in a deploy step) migrates the CMS and Better Auth, seeds
+awaiting `ready()` of `serve`'s result in a deploy step) migrates the CMS and Better Auth, seeds
 `seed` into an empty site, creates the 404/5xx pages and the first admin.
 `cloudflare` does the same without migrating: on Workers the tables come on
 deploy from SQL files (see "Migrations on Workers").
@@ -123,12 +123,17 @@ unset `TBTOP_ADMIN_PASSWORD` after the first boot (while both are set, a deleted
 first admin comes back on the next boot). With its own auth (`auth: false` +
 `config.auth`) a host whose user ids are strings passes `userKey: "string"`.
 `users.ensure(email, role, { password })` seeds other users in a seed or a
-test; it refuses the `admin` role. On Workers these are secrets and vars of
+test; it refuses the `admin` role and a role the site does not define. On Workers these are secrets and vars of
 the Worker (`wrangler secret put`); `BETTER_AUTH_URL` and `MEDIA_URL` are optional.
 
 **Workers bindings.** `DB` (D1), `CACHE` (KV, optional), `MEDIA` (R2,
 optional; uploads stay in memory without it). `scheduled` runs the CMS's
 tasks: add a cron trigger. See [`example/site/wrangler.jsonc`](example/site/wrangler.jsonc).
+The seed, the error pages and the first admin run on each isolate's first
+request. Two cold isolates on an empty site may both try: unique keys
+(language locale, page slug, error class, user email) stop the second, whose
+request fails once, but it can leave a page row without a slug. With a `seed`,
+open the site once after the first deploy, before it takes traffic.
 
 **Migrations on Workers.** D1 has no transactions and an isolate's first
 request may come to several isolates at once, so a Worker never migrates

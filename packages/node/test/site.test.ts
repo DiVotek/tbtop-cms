@@ -44,8 +44,9 @@ describe("serve(site, { db })", () => {
 		const host = app(db);
 		await host.ready();
 		await expect(host.users.ensure("intruder@site.test", "admin", { password: "intruder-password-1" })).rejects.toThrow(/admin/);
+		await expect(host.users.ensure("typo@site.test", "editr", { password: "typo-password-1" })).rejects.toThrow(/unknown role/);
 		await host.users.ensure("editor@site.test", "editor", { password: "editor-password-1" });
-		const roles = await (db as unknown as Kysely<{ tbtop_users: { email: string; role: string } }>).selectFrom("tbtop_users").select(["email", "role"]).where("email", "in", ["intruder@site.test", "editor@site.test"]).execute();
+		const roles = await (db as unknown as Kysely<{ tbtop_users: { email: string; role: string } }>).selectFrom("tbtop_users").select(["email", "role"]).where("email", "in", ["intruder@site.test", "typo@site.test", "editor@site.test"]).execute();
 		expect(roles).toEqual([{ email: "editor@site.test", role: "editor" }]);
 	});
 });

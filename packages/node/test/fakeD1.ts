@@ -33,14 +33,14 @@ export function fakeD1(): D1Database {
 	const bodies = new WeakMap<D1PreparedStatement, [string, unknown[]]>();
 	const statement = (sql: string, params: unknown[] = []): D1PreparedStatement => {
 		const prepared: D1PreparedStatement = {
-		bind: (...values) => statement(sql, values),
-		all: async <T>() => exec(sql, params) as D1Result<T>,
-		run: async <T>() => exec(sql, params) as D1Result<T>,
-		first: async <T>(column?: string) => {
-			const row = exec(sql, params).results[0] ?? null;
-			return (column === undefined || row === null ? row : row[column]) as T | null;
-		},
-		raw: async <T>() => exec(sql, params).results.map((row) => Object.values(row)) as T[],
+			bind: (...values) => statement(sql, values),
+			all: async <T>() => exec(sql, params) as D1Result<T>,
+			run: async <T>() => exec(sql, params) as D1Result<T>,
+			first: async <T>(column?: string) => {
+				const row = exec(sql, params).results[0] ?? null;
+				return (column === undefined || row === null ? row : row[column]) as T | null;
+			},
+			raw: async <T>() => exec(sql, params).results.map((row) => Object.values(row)) as T[],
 		};
 		bodies.set(prepared, [sql, params]);
 		return prepared;

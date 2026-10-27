@@ -94,10 +94,15 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		instance,
 		adapter: cmsAuth(instance, { ...options.adapter, roles }),
 		migrate: async () => (await getMigrations(config)).runMigrations(),
-		ensureUser: (email, role, opts) =>
-			role === "admin"
-				? Promise.reject(new Error("tbtop/cms: ensureUser does not create admins; set TBTOP_ADMIN_EMAIL / TBTOP_ADMIN_PASSWORD."))
-				: ensureUser(email, role, opts),
+		ensureUser: (email, role, opts) => {
+			if (role === "admin") {
+				return Promise.reject(new Error("tbtop/cms: ensureUser does not create admins; set TBTOP_ADMIN_EMAIL / TBTOP_ADMIN_PASSWORD."));
+			}
+			if (!Object.hasOwn(roles, role)) {
+				return Promise.reject(new Error(`tbtop/cms: unknown role "${role}"; one of ${Object.keys(roles).join(", ")}.`));
+			}
+			return ensureUser(email, role, opts);
+		},
 		handle: async (request) => (new URL(request.url).pathname.startsWith(`${basePath}/`) ? instance.handler(request) : null),
 	};
 	firstAdmins.set(auth, (email, password) => ensureUser(email, "admin", { password }));
