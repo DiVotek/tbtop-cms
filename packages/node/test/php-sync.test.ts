@@ -182,6 +182,15 @@ describe("the admin UI locale is each admin's own, saved to the profile (#309)",
 		expect(props).not.toContain("tpl__form_submission__html__uk__body");
 	});
 
+	test("a profile store that fails (a string id on a bigint user_id) falls back to the default, never breaks the panel", async () => {
+		const { db, visit } = await signedIn(locales);
+		await db.schema.dropTable("tbtop_user_profiles").execute();
+		const page = (await (await visit("/admin/pages")).json()) as InertiaPage;
+		expect((page.props.tbtop as { locale: string }).locale).toBe("en");
+		const switched = await visit("/admin/locale", { method: "POST", body: JSON.stringify({ locale: "uk" }), headers: { "content-type": "application/json", referer: "http://x/admin" } });
+		expect(switched.status).toBeLessThan(400);
+	});
+
 	test("one locale needs no profile: nothing is read or written", async () => {
 		const { db, visit } = await signedIn({});
 		await visit("/admin/locale", { method: "POST", body: JSON.stringify({ locale: "en" }), headers: { "content-type": "application/json", referer: "http://x/admin" } });
