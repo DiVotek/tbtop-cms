@@ -1,7 +1,7 @@
 import { r2Disk } from "@tbtop/admin";
 import type { BetterAuthOptions } from "better-auth";
 import { defaultAuthSchema } from "../betterAuth/defaultAuth";
-import { D1_AUTH } from "../db/d1Migrations";
+import { D1_SCHEMA, type D1Schema } from "../db/d1Migrations";
 import { firstAdminFrom, type Runtime, type SiteOptions, siteApp } from "../serve/app";
 import type { Site, SiteDef } from "../define/define";
 import { kvCache } from "../support/cache";
@@ -50,7 +50,7 @@ function unmigrated(error: unknown): unknown {
  * of an isolate seeds an empty site and creates the first admin;
  * `scheduled()` runs the CMS's cron (`cms.tasks.scheduled()`). Page loads
  * hand their background writes to `ctx.waitUntil`. The module also carries
- * Better Auth's options under a symbol, for `d1:migrations --entry`.
+ * what decides its tables under a symbol, for `d1:migrations --entry`.
  */
 export function cloudflare<const D extends SiteDef, E extends CloudflareEnv = CloudflareEnv>(site: Site<D>, options: SiteOptions<D> = {}) {
 	const entry = workerEntry((env: E) => {
@@ -65,5 +65,6 @@ export function cloudflare<const D extends SiteDef, E extends CloudflareEnv = Cl
 		};
 	});
 	const auth: BetterAuthOptions | false = options.auth === false || options.config?.auth !== undefined ? false : defaultAuthSchema(options.auth);
-	return Object.assign(entry, { [D1_AUTH]: auth } as { [D1_AUTH]: BetterAuthOptions | false });
+	const schema: D1Schema = { auth, userKey: auth === false ? (options.userKey ?? "int") : "string" };
+	return Object.assign(entry, { [D1_SCHEMA]: schema });
 }

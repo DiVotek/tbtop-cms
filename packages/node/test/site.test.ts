@@ -9,7 +9,7 @@ import worker from "../example/site/worker";
 import type { CloudflareEnv, ExecutionContext } from "../src/cloudflare";
 import { block, defineSite, f, pageType } from "../src/define";
 import { pageTypeDefs } from "../src/define/define";
-import { D1_AUTH, d1Migrations } from "../src/db/d1Migrations";
+import { D1_SCHEMA, d1Migrations } from "../src/db/d1Migrations";
 import { fakeD1 } from "./fakeD1";
 
 // The full-API example (example/site) is the proof: it runs here as a Node
@@ -68,7 +68,7 @@ describe("cloudflare(site)", () => {
 	const pending: Promise<unknown>[] = [];
 	const ctx: ExecutionContext = { waitUntil: (task) => void pending.push(task), passThroughOnException: () => {} };
 	checks(async () => {
-		for (const file of await d1Migrations({ auth: worker[D1_AUTH] })) {
+		for (const file of await d1Migrations(worker[D1_SCHEMA])) {
 			await env.DB.exec(file.sql);
 		}
 		return { fetch: (request) => worker.fetch(request, env, ctx) };

@@ -1,9 +1,8 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { BetterAuthOptions } from "better-auth";
 import { defaultAuthSchema } from "../betterAuth/defaultAuth";
-import { BETTER_AUTH_MIGRATION, D1_AUTH, type D1MigrationOptions, d1Migrations } from "../db/d1Migrations";
+import { BETTER_AUTH_MIGRATION, D1_SCHEMA, type D1MigrationOptions, type D1Schema, d1Migrations } from "../db/d1Migrations";
 import type { CliIo } from "./run";
 
 const FILE = /^(\d+)_(.+)\.sql$/;
@@ -41,14 +40,14 @@ function flag(args: string[], name: string): string | undefined {
 	return index === -1 ? undefined : args[index + 1];
 }
 
-/** Better Auth's options from the Worker module `cloudflare(site, options)` returned; false: the Worker has none. */
-async function authOfEntry(path: string): Promise<BetterAuthOptions | false> {
+/** Better Auth's options and the user key from the Worker module `cloudflare(site, options)` returned. */
+async function schemaOfEntry(path: string): Promise<D1Schema> {
 	const mod = (await import(pathToFileURL(resolve(path)).href)) as { default?: Record<symbol, unknown> };
-	const auth = mod.default?.[D1_AUTH];
-	if (auth === undefined) {
+	const schema = mod.default?.[D1_SCHEMA];
+	if (schema === undefined) {
 		throw new Error(`${path} must default-export cloudflare(site, options) from @tbtop/cms/cloudflare.`);
 	}
-	return auth as BetterAuthOptions | false;
+	return schema as D1Schema;
 }
 
 /**
@@ -61,7 +60,7 @@ export async function runD1Migrations(args: string[], io: CliIo): Promise<number
 	const entry = flag(args, "entry");
 	const locale = flag(args, "locale");
 	const written = await writeD1Migrations(out, {
-		auth: entry === undefined ? defaultAuthSchema() : await authOfEntry(entry),
+		...(entry === undefined ? { auth: defaultAuthSchema() } : await schemaOfEntry(entry)),
 		defaultLanguage: args.includes("--no-language") ? false : (locale ?? "en"),
 	});
 	for (const path of written) {

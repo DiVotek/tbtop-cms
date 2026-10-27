@@ -29,11 +29,15 @@ export type D1MigrationOptions = Pick<MigrationOptions, "userKey"> & {
 };
 
 /**
- * Where `cloudflare(site, options)` keeps its Better Auth options (false: no
- * Better Auth) on the module it returns, so `d1:migrations --entry` writes
- * the tables that Worker uses. A symbol: Workers reads only the handler names.
+ * Where `cloudflare(site, options)` keeps what decides its tables (Better
+ * Auth's options or false, the user key) on the module it returns, so
+ * `d1:migrations --entry` writes the tables that Worker uses. A symbol:
+ * Workers reads only the handler names.
  */
-export const D1_AUTH = Symbol.for("tbtop.cms.d1Auth");
+export const D1_SCHEMA = Symbol.for("tbtop.cms.d1Schema");
+
+/** What the Worker module carries under `D1_SCHEMA`. */
+export type D1Schema = { auth: BetterAuthOptions | false; userKey: "int" | "string" };
 
 /** The Better Auth file's name; a later change to its options writes `better_auth_2`, `_3`, … */
 export const BETTER_AUTH_MIGRATION = "better_auth";
