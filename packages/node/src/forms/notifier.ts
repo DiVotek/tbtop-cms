@@ -1,6 +1,7 @@
 import { type Page, translationText } from "../content/page";
 import type { Site } from "../site";
 import { formatPhpDate } from "@tbtop/admin";
+import { adminLocale, localesFor } from "../admin/locales";
 import type { FormSubmissionPayload } from "../notifications/formSubmission";
 import type { Delivery, Recipient } from "../notifications/types";
 import { hasString } from "../support/strings";
@@ -92,17 +93,21 @@ async function rerun(site: Site, submission: Submission): Promise<string | null>
 	return errors.length === 0 ? null : errors.join(" | ");
 }
 
-/** The recipients, the payload, the send; every distinct error, misconfiguration first. */
+/**
+ * The recipients, a payload per reader locale, the send; every distinct
+ * error, misconfiguration first. Staff read the admin UI locale, not the
+ * page's: the bell each admin's saved one, mail and Telegram the default.
+ */
 export async function deliverSubmission(site: Site, submission: Submission, page: Page): Promise<string[]> {
 	const enabled = await site.notifications.enabledChannels(TYPE);
-	const locale = submission.locale;
+	const locale = adminLocale(site.config);
 	const recipients: Recipient[] = [];
 	const errors: string[] = [];
 	const bell = site.config.notifications?.bell;
 	if (enabled.includes("bell") && bell !== undefined) {
-		for (const user of await bell.staff()) {
-			recipients.push({ audience: "staff", locale, user });
-		}
+		const staff = await bell.staff();
+		const locales = await localesFor(site.config, staff);
+		recipients.push(...staff.map((user, index): Recipient => ({ audience: "staff", locale: locales[index] ?? locale, user })));
 	}
 	if (enabled.includes("mail") && !site.notifications.hasChannel("mail")) {
 		errors.push(await site.t("notifications.errors.mail", locale, { error: "no mail transport is configured" }));
@@ -121,8 +126,9 @@ export async function deliverSubmission(site: Site, submission: Submission, page
 			recipients.push(...ids.map((phone): Recipient => ({ audience: "staff", locale, phone })));
 		}
 	}
-	if (recipients.length > 0) {
-		const deliveries = await site.notifications.send(TYPE, await submissionPayload(site, submission, page), recipients);
+	for (const reader of new Set(recipients.map((recipient) => recipient.locale))) {
+		const group = recipients.filter((recipient) => recipient.locale === reader);
+		const deliveries = await site.notifications.send(TYPE, await submissionPayload(site, submission, page, reader), group);
 		for (const delivery of deliveries.filter((one) => one.status === "failed")) {
 			errors.push(await errorFor(site, delivery, locale));
 		}
@@ -131,14 +137,13 @@ export async function deliverSubmission(site: Site, submission: Submission, page
 }
 
 /** FormSubmissionPayloadFactory: plain values, captured once, rendered per recipient. */
-export async function submissionPayload(site: Site, submission: Submission, page: Page): Promise<FormSubmissionPayload> {
-	const locale = submission.locale;
-	const name = translationText(page, "name", locale, await site.languages.defaultLocale());
+export async function submissionPayload(site: Site, submission: Submission, page: Page, locale = adminLocale(site.config)): Promise<FormSubmissionPayload> {
+	const name = translationText(page, "name", submission.locale, await site.languages.defaultLocale());
 	const prefix = `/${(site.config.adminPrefix ?? "admin").replace(/^\/+|\/+$/g, "")}`;
 	return {
 		leadIdentity: leadIdentity(submission.payload) ?? (await site.t("form-submissions.values.lead_unknown", locale)),
 		pageName: typeof name === "string" && name.trim() !== "" ? name : await site.t("form-submissions.values.page_number", locale, { id: page.id }),
-		locale,
+		locale: submission.locale,
 		submittedAt: String(formatPhpDate(submission.createdAt ?? new Date(), await site.t("form-submissions.date_format", locale))),
 		fields: formatFields(submission.payload),
 		fieldLabels: await fieldLabels(site, submission, page, locale),

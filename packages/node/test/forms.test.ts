@@ -182,6 +182,31 @@ describe("form submissions", () => {
 		expect(store.rows[0]?.data.actions?.[0]).toMatchObject({ label: "View submission" });
 	});
 
+	test("staff read the admin locale: the bell each admin's saved one, mail the default, whatever the page's language", async () => {
+		const store = memoryNotifications();
+		const mail = mailbox();
+		const staff = () => [{ id: 1 }, { id: 2 }, { id: 3 }];
+		const { cms, db } = await makeCms(undefined, {
+			admin: { locales: ["en", "uk"], locale: "en" },
+			notifications: { mail: mail.transport, bell: { store, staff } },
+		});
+		await cms.site().settings.set("notifications.form.submission.channels", ["mail", "bell"]);
+		await cms.site().settings.set("notifications.mail.recipients", "team@example.test");
+		const now = "2026-10-27 00:00:00";
+		await db
+			.insertInto("tbtop_user_profiles")
+			.values([
+				{ user_id: 2, is_owner: 0, locale: "uk", created_at: now, updated_at: now },
+				{ user_id: 3, is_owner: 0, locale: "de", created_at: now, updated_at: now },
+			])
+			.execute();
+		const { action } = await contactAction(cms, "/uk");
+		await cms.handle(post(action, valid));
+		const label = (owner: string) => store.rows.find((row) => row.owner === owner)?.data.actions?.[0]?.label;
+		expect([label("1"), label("2"), label("3")]).toEqual(["View submission", "Переглянути заявку", "View submission"]);
+		expect(mail.sent[0]?.subject).toBe("New form submission");
+	});
+
 	test("a Liquid override replaces the built-in mail; a Blade row from PHP is ignored", async () => {
 		const mail = mailbox();
 		const { cms, db } = await makeCms(undefined, { notifications: { mail: mail.transport } });

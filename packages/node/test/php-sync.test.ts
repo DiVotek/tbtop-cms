@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createAdmin, type InertiaPage } from "@tbtop/admin";
 import { panel } from "./panel";
 import { get, makeCms } from "./support";
 
@@ -137,5 +138,51 @@ describe("ctx.mediaImage (#314)", () => {
 		expect(ctx.mediaImage("svg")).toMatchObject({ src: "https://cdn.test/svg", srcset: null, width: null });
 		expect(ctx.mediaImage("small")?.srcset).toBeNull();
 		expect(ctx.mediaImage("missing")).toBeNull();
+	});
+});
+
+describe("the admin UI locale is each admin's own, saved to the profile (#309)", () => {
+	const locales = { admin: { locales: ["en", "uk"], locale: "en" } };
+
+	async function signedIn(config: Parameters<typeof makeCms>[1]) {
+		const made = await makeCms(null, config);
+		const admin = createAdmin({ ...made.cms.admin.options(), user: () => ({ id: 7, name: "Ann" }) });
+		const visit = async (url: string, init: RequestInit = {}) => {
+			const headers = new Headers(init.headers);
+			headers.set("x-inertia", "true");
+			const res = await admin.handle(new Request(`http://x${url}`, { ...init, headers }));
+			if (res === null) {
+				throw new TypeError(`${url} fell through`);
+			}
+			return res;
+		};
+		return { ...made, visit };
+	}
+
+	test("a pick in the user menu is stored on the profile and read back in a fresh session", async () => {
+		const { db, visit } = await signedIn(locales);
+		const switched = await visit("/admin/locale", { method: "POST", body: JSON.stringify({ locale: "uk" }), headers: { "content-type": "application/json", referer: "http://x/admin" } });
+		expect(switched.status).toBeLessThan(400);
+		const profile = await db.selectFrom("tbtop_user_profiles").select(["user_id", "locale"]).executeTakeFirst();
+		expect([String(profile?.user_id), profile?.locale]).toEqual(["7", "uk"]);
+		// No cookie is sent back, so this is a new session: the locale comes from the profile.
+		const page = (await (await visit("/admin/pages")).json()) as InertiaPage;
+		const shared = page.props.tbtop as { locale: string; locales: string[] };
+		expect([shared.locale, shared.locales]).toEqual(["uk", ["en", "uk"]]);
+		expect(JSON.stringify(shared)).toContain('"userMenu"');
+		expect(JSON.stringify(shared)).not.toContain('"locales":false');
+	});
+
+	test("the template editor offers the admin locales, not the content languages", async () => {
+		const { visit } = await signedIn({ admin: { locales: ["en", "de"] } });
+		const props = JSON.stringify(((await (await visit("/admin/notification-settings")).json()) as InertiaPage).props);
+		expect(props).toContain("tpl__form_submission__html__de__body");
+		expect(props).not.toContain("tpl__form_submission__html__uk__body");
+	});
+
+	test("one locale needs no profile: nothing is read or written", async () => {
+		const { db, visit } = await signedIn({});
+		await visit("/admin/locale", { method: "POST", body: JSON.stringify({ locale: "en" }), headers: { "content-type": "application/json", referer: "http://x/admin" } });
+		expect(await db.selectFrom("tbtop_user_profiles").selectAll().execute()).toEqual([]);
 	});
 });

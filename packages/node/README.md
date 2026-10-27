@@ -100,6 +100,7 @@ const cms = createCms({
 	auth: cmsAuth(betterAuth), // section access, the panel session, sign-in and Users pages (see Users and sign-in)
 	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
 	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
+	admin: { locales: ["en", "uk"], locale: "en" }, // the panel's UI languages (not content languages), saved per admin
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
@@ -134,8 +135,17 @@ compact, nav groups, chrome with bell, inbox and view site, as PHP's
 CmsPanel), `prefix` (`adminPrefix`), `pages`, `hostRules` (the config's plus
 `link_shape` and `page_ref`), `context` (content locales from the
 admin-active languages), the auth adapter's `session` and `loginPath`,
-`notifications.store` (`notifications.bell.store`) and
-`driver: kyselyDriver(config.db)`. A key after the spread overrides it.
+`notifications.store` (`notifications.bell.store`), `locales` and `locale`
+(`admin.locales`, `admin.locale`) and `driver: kyselyDriver(config.db)`. A
+key after the spread overrides it.
+
+`admin.locales` are the languages the panel itself speaks, apart from the
+content languages pages are written in. With two or more, the user menu
+offers them and each admin's pick is saved to `tbtop_user_profiles.locale`
+(through the panel's `userLocale`/`onLocaleChange`), so it outlives the
+session. Staff notifications read the same locales: the bell each admin's
+saved one, mail and Telegram `admin.locale`, never the page's language; the
+template overrides in Settings → Notifications are per admin locale.
 
 `pages` is the host's pages, added after the CMS's and the auth adapter's,
 or a function that gets those and returns the panel's:

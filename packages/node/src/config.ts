@@ -80,6 +80,13 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	robotsDisallow?: string[];
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */
 	adminPrefix?: string;
+	/**
+	 * The panel's UI locales (not the content languages): what the user menu
+	 * switches between and each admin's pick is saved to their profile in,
+	 * what staff notifications and the template editor use. Default `["en"]`;
+	 * `locale` defaults to the first.
+	 */
+	admin?: { locales?: string[]; locale?: string };
 	/** Pages per sitemap chunk before the locale split; default 1000 (`seo.sitemap_per_chunk` overrides it). */
 	sitemapPerChunk?: number;
 	sitemap?: boolean;
