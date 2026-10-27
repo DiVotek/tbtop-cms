@@ -4,7 +4,8 @@
 	"name": "tbtop-site",
 	"main": "worker.ts",
 	"compatibility_date": "2026-10-01",
-	"compatibility_flags": ["nodejs_als"],
+	// nodejs_compat: node:crypto for Better Auth, which cloudflare(site) installs by default, and node:async_hooks.
+	"compatibility_flags": ["nodejs_compat"],
 	// migrations_dir: what `tbtop-cms d1:migrations --entry worker.ts` writes, `wrangler d1 migrations apply DB` runs.
 	"d1_databases": [{ "binding": "DB", "database_name": "tbtop-site", "database_id": "<wrangler d1 create tbtop-site>", "migrations_dir": "migrations" }],
 	"kv_namespaces": [{ "binding": "CACHE", "id": "<wrangler kv namespace create CACHE>" }],

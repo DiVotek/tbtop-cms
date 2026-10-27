@@ -739,7 +739,9 @@ of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
 
 On Cloudflare Workers, use a D1 Kysely dialect (D1 is SQLite), set
-`compatibility_flags = ["nodejs_als"]` (or `nodejs_compat`) for `node:async_hooks`, add a `* * * * *` cron trigger
+`compatibility_flags = ["nodejs_compat"]` (`node:async_hooks`, and `node:crypto` for
+Better Auth, which `cloudflare(site)` installs by default; `nodejs_als` is enough
+without Better Auth), add a `* * * * *` cron trigger
 whose `scheduled()` calls `cms.tasks.scheduled()`, and pass
 `{ waitUntil: ctx.waitUntil }` to `loadPage`. The CLI does not reach D1:
 migrate on deploy with `tbtop-cms d1:migrations` and `wrangler d1 migrations
