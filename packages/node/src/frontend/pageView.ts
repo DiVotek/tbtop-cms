@@ -11,7 +11,6 @@ export type PageColumns = {
 	subtype: string | null;
 	status: string;
 	name: string | null;
-	title: string | null;
 	heading: string | null;
 	summary: string | null;
 	body: string;
@@ -31,7 +30,6 @@ export function pageColumns(site: Site, page: Page, locale: string, fallback: st
 		subtype: page.subtype,
 		status: page.status,
 		name: translationText(page, "name", locale, fallback),
-		title: translationText(page, "title", locale, fallback),
 		heading: translationText(page, "heading", locale, fallback),
 		summary: translationText(page, "summary", locale, fallback),
 		body: richtextHtml(translation(page, "body", locale, fallback)),

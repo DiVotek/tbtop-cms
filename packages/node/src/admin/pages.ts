@@ -39,8 +39,7 @@ const blank = (raw: unknown): boolean => {
 
 /** PageListState::seoTooltip: why the badge says what seo_state says; mirrors seoStateSql arm for arm. */
 function seoReasons(row: Dict): string[] {
-	const noTitle = blank(row.name) && blank(row.title);
-	return [...(noTitle ? ["No name and no title"] : []), ...(blank(row.summary) ? ["No summary"] : []), ...(!truthy(row.is_indexable) ? ["Excluded from indexing"] : [])];
+	return [...(blank(row.name) ? ["No name"] : []), ...(blank(row.summary) ? ["No summary"] : []), ...(!truthy(row.is_indexable) ? ["Excluded from indexing"] : [])];
 }
 
 /**
@@ -48,7 +47,7 @@ function seoReasons(row: Dict): string[] {
  * holds no non-empty string in any locale, spelled per dialect. A column that
  * is not a locale map (null, a bare string) holds no translation, on every dialect.
  */
-function emptyTranslatable(db: { getExecutor(): { adapter: object } }, column: "name" | "title" | "summary") {
+function emptyTranslatable(db: { getExecutor(): { adapter: object } }, column: "name" | "summary") {
 	const col = sql.ref(`tbtop_pages.${column}`);
 	switch (dialectOfDb(db)) {
 		case "postgres":
@@ -62,8 +61,8 @@ function emptyTranslatable(db: { getExecutor(): { adapter: object } }, column: "
 
 /** PageListState::seoStateSql: the SEO badge's state, in SQL so the SEO filter matches what each row shows. */
 function seoStateSql(db: { getExecutor(): { adapter: object } }) {
-	const [name, title, summary] = (["name", "title", "summary"] as const).map((column) => emptyTranslatable(db, column));
-	return sql<string>`case when ${name} and ${title} then 'fail' when ${summary} or not tbtop_pages.is_indexable then 'warn' else 'pass' end`;
+	const [name, summary] = (["name", "summary"] as const).map((column) => emptyTranslatable(db, column));
+	return sql<string>`case when ${name} then 'fail' when ${summary} or not tbtop_pages.is_indexable then 'warn' else 'pass' end`;
 }
 
 const displayStateSql = (now: string) =>
@@ -290,7 +289,6 @@ function createAction(s: S, cms: Cms, categories: Option[]) {
 			s
 				.form("pageCreate", [
 					s.text("name").label("Name").required().translatable().rules("max:255"),
-					s.text("title").label("Title").translatable().rules("nullable|max:255"),
 					s.select("type").label("Type").options(types).required().default("page"),
 					...subtypes,
 					parent,
@@ -323,25 +321,12 @@ export function parentOptions(rows: { id: number; name: string | null }[], local
 	return rows.map((row) => ({ value: String(row.id), label: firstText(pageLabel(row), ["name"], locale, locale) || `#${row.id}` }));
 }
 
-/** PageFormWriter::save on create: the title falls back to the name, the content starts from the type's template. */
+/** PageFormWriter::save on create: the content starts from the type's template. */
 async function createPage(cms: Cms, ctx: ActionCtx, tree: { type: string; parentId: number | null; subtype: string | null }): Promise<Page> {
 	const form = ctx.form as Dict;
 	const name = isDict(form.name) ? form.name : {};
-	const title = withTitleFallback(name, isDict(form.title) ? form.title : {});
-	const content = templateContent(cms, draftPage({ ...tree, name, title }));
-	return siteOf(cms, ctx).pages.create({ ...tree, name, title, content }, { by: userKey(ctx) });
-}
-
-/** PageFormAttributes::withTitleFallback: per locale, a blank title takes the name. Create only. */
-function withTitleFallback(name: Dict, title: Dict): Dict {
-	const out: Dict = { ...title };
-	for (const [locale, value] of Object.entries(name)) {
-		const current = out[locale];
-		if (typeof value === "string" && value !== "" && (typeof current !== "string" || current === "")) {
-			out[locale] = value;
-		}
-	}
-	return out;
+	const content = templateContent(cms, draftPage({ ...tree, name }));
+	return siteOf(cms, ctx).pages.create({ ...tree, name, content }, { by: userKey(ctx) });
 }
 
 /**
@@ -357,7 +342,7 @@ function templateContent(cms: Cms, page: Page): Dict[] {
 }
 
 /** The page about to be created, for template(): PHP passes the unsaved model. */
-const draftPage = (input: Pick<Page, "type" | "parentId" | "subtype" | "name" | "title">): Page => ({
+const draftPage = (input: Pick<Page, "type" | "parentId" | "subtype" | "name">): Page => ({
 	id: 0,
 	sourceId: null,
 	status: "draft",

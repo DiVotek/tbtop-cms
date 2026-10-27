@@ -2,7 +2,7 @@ import type { Selectable } from "kysely";
 import type { PagesTable } from "../db/schema";
 import { bool, type Dict, decodeJson, isBlank, isDict, parseDate } from "../support/values";
 
-export const TRANSLATABLE = ["name", "title", "heading", "summary", "body"] as const;
+export const TRANSLATABLE = ["name", "heading", "summary", "body"] as const;
 export type TranslatableField = (typeof TRANSLATABLE)[number];
 
 /** A spatie-translatable column: one value per locale. */
@@ -24,7 +24,6 @@ export type Page = {
 	fields: Dict | null;
 	starterBlocks: Dict | null;
 	name: Translations;
-	title: Translations;
 	heading: Translations;
 	summary: Translations;
 	body: Translations;
@@ -65,7 +64,6 @@ export function pageFromRow(row: Selectable<PagesTable>): Page {
 		fields: isDict(fields) ? fields : null,
 		starterBlocks: isDict(starter) ? starter : null,
 		name: translations(row.name),
-		title: translations(row.title),
 		heading: translations(row.heading),
 		summary: translations(row.summary),
 		body: translations(row.body),

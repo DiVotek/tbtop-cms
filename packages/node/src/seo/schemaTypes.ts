@@ -65,7 +65,7 @@ const collectionPage: SchemaTypeDef = {
 		);
 		const parts: Record<string, unknown>[] = [];
 		for (const child of children) {
-			const name = firstText(child, ["title", "name"], ctx.locale, fallback);
+			const name = firstText(child, ["name"], ctx.locale, fallback);
 			const path = paths.get(child.id);
 			if (name !== "" && path !== undefined) {
 				parts.push({ "@type": "WebPage", name, url: ctx.site.absolute(await ctx.site.url(path, ctx.locale)) });

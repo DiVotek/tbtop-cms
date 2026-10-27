@@ -11,7 +11,7 @@ describe("loadPage", () => {
 			throw new Error(`expected a page, got ${result.type}`);
 		}
 		const { props } = result;
-		expect(props.page).toMatchObject({ id: ids.home, type: "page", status: "published", name: "Home", title: "Welcome" });
+		expect(props.page).toMatchObject({ id: ids.home, type: "page", status: "published", name: "Home" });
 		expect(props.path).toBe("");
 		expect(props.isPreview).toBe(false);
 		expect(props.breadcrumbs).toEqual([]);
@@ -196,7 +196,7 @@ describe("handle", () => {
 		const result = await cms.loadPage(get("/"));
 		if (result.type !== "page") throw new Error(result.type);
 		expect(result.props.seo.jsonLd.find((node) => node["@type"] === "Service")).toMatchObject({
-			name: "Welcome",
+			name: "Home",
 			url: "https://site.test",
 			offers: { price: "100" },
 			provider: { "@id": "https://site.test#identity" },

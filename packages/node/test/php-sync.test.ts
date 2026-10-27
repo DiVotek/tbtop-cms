@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { panel } from "./panel";
 import { get, makeCms } from "./support";
 
-describe("<title> in a translated page (#311)", () => {
-	test("the page's own locale name beats the default language's title", async () => {
+describe("<title> in a translated page (#311, #326)", () => {
+	test("a blank meta title falls back to the page's own locale name, never another language's", async () => {
 		const { cms, ids } = await makeCms();
 		const site = cms.site();
-		await site.pages.update(ids.about as number, { title: { en: "About the studio" } });
+		await site.pages.update(ids.about as number, { seo: { title: { en: "About the studio" } } });
 		const paths = await site.pages.slugs.allFor(ids.about as number);
 		const uk = await cms.loadPage(get(`/uk/${paths.uk}`));
 		const en = await cms.loadPage(get(`/${paths.en}`));
@@ -90,5 +90,26 @@ describe("the pages list filters (#310)", () => {
 		expect(row?.seo_state).toBe("Needs work");
 		expect((row?._tooltips as Record<string, string>).seo_state).toBe("No summary");
 		expect(ids(await table(visit, "filters[seo_state]=warn"))).toContain(Number(made.about));
+	});
+});
+
+describe("the page title lives only in SEO (#326)", () => {
+	const fieldNames = (node: unknown): string[] => {
+		if (Array.isArray(node)) {
+			return node.flatMap(fieldNames);
+		}
+		if (typeof node !== "object" || node === null) {
+			return [];
+		}
+		const own = (node as { kind?: unknown; name?: unknown }).name;
+		return [...(typeof own === "string" ? [own] : []), ...Object.values(node).flatMap(fieldNames)];
+	};
+
+	test("neither the editor nor the create dialog has a Title field; the SEO tab keeps Meta title", async () => {
+		const { page, ids } = await panel();
+		const editor = fieldNames((await page(`/admin/pages/${ids.about}/edit`)).props);
+		expect(editor).not.toContain("title");
+		expect(editor).toContain("seo_title");
+		expect(fieldNames((await page("/admin/pages")).props)).not.toContain("title");
 	});
 });

@@ -389,7 +389,7 @@ request's `?page=`. `site.pages.query()` is a Kysely builder over live
 frontend uses (published, `published_at` passed, `unpublish_at` ahead), the
 counterpart of PHP's `Page::scopeLive`, `pageFromRow` turns a row into a
 `Page`, and `site.pageViews(pages, locale)` makes each one what `props.page`
-is for an open page (name, title, heading, summary in the locale with the
+is for an open page (name, heading, summary in the locale with the
 default as fallback, body HTML, image URL) plus its `url`; `{ fields: true }`
 adds the resolved custom fields, one resolve per page:
 

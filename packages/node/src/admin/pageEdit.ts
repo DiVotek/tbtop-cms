@@ -296,7 +296,6 @@ function saveRefusal(error: unknown): Effects {
 function generalFields(s: S, page: Page): unknown[] {
 	return [
 		s.text("name").label("Name").required().translatable().helperText("Short name for the admin lists and tree; the site uses it as the breadcrumb and link label."),
-		s.text("title").label("Title").translatable().helperText("Browser-tab and SEO title — falls back to Name when left empty."),
 		...(page.isSystem
 			? []
 			: [

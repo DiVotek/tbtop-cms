@@ -79,7 +79,6 @@ export function baselineMigration(options: MigrationOptions): Migration {
 					.addColumn("fields", t.json)
 					.addColumn("starter_blocks", t.json)
 					.addColumn("name", t.json)
-					.addColumn("title", t.json)
 					.addColumn("heading", t.json)
 					.addColumn("summary", t.json)
 					.addColumn("body", t.json)

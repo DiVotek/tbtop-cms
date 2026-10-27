@@ -31,7 +31,7 @@ async function crumbs(site: Site, pages: Page[], locale: string): Promise<Crumb[
 	const out: Crumb[] = [];
 	for (const page of pages) {
 		const path = paths.get(page.id) ?? "";
-		out.push({ label: firstText(page, ["name", "title"], locale, fallback), path, url: await site.url(path, locale) });
+		out.push({ label: firstText(page, ["name"], locale, fallback), path, url: await site.url(path, locale) });
 	}
 	return out;
 }

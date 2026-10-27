@@ -48,16 +48,12 @@ export const publishedAt = (page: Page): string | null =>
 
 export const modifiedAt = (page: Page): string | null => (page.updatedAt === null ? null : atom(page.updatedAt));
 
-/**
- * PageOwnSeo::title: seo.title, else title, else name. The whole chain runs in
- * this locale before the default one: this locale's name beats the default
- * language's title, or a translated page ships an untranslated <title>.
- */
+/** PageOwnSeo::title: seo.title, else the name, this locale before the default one. Node has no separate page title (the meta title is it). */
 export async function ownTitle(site: Site, page: Page, locale: string): Promise<string> {
 	const fallback = await site.languages.defaultLocale();
 	return (
 		localized(page.seo.title, locale) ||
-		firstText(page, ["title", "name"], locale, fallback)
+		firstText(page, ["name"], locale, fallback)
 	);
 }
 
@@ -119,7 +115,7 @@ export async function schemaContext(site: Site, page: Page, locale: string): Pro
 	const image = namesImage(page) ? ownImage(site, page) : typeof global === "string" && global !== "" ? imageDetails(site, global) : null;
 	const metaTitle = await ownTitle(site, page, locale);
 	const ogTitle = localized(page.seo.og_title, locale) || metaTitle;
-	const label = firstText(page, ["title", "name"], locale, fallback);
+	const label = firstText(page, ["name"], locale, fallback);
 	return {
 		page,
 		locale,

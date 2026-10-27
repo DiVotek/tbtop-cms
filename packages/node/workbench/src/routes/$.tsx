@@ -49,7 +49,7 @@ function CmsPage({ page, render, breadcrumbs, isPreview, cms: shared }: CmsView)
 				))}
 			</nav>
 			<main>
-				<h1>{page.heading ?? page.title ?? page.name}</h1>
+				<h1>{page.heading ?? page.name}</h1>
 				{/* richtextHtml output: the Lexical allowlist, already escaped. */}
 				<div data-testid="page-body" dangerouslySetInnerHTML={{ __html: page.body }} />
 				<JSONUIProvider registry={registry}>

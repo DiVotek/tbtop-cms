@@ -44,7 +44,7 @@ ${seo.alternates.map((a) => `<link rel="alternate" hreflang="${esc(a.locale)}" h
 ${seo.jsonLd.map((node) => `<script type="application/ld+json">${JSON.stringify(node).replaceAll("<", "\\u003c")}</script>`).join("")}
 </head><body>
 <nav>${breadcrumbs.map((c) => `<a href="${esc(c.url)}">${esc(c.label)}</a>`).join(" / ")}</nav>
-<h1>${esc(page.heading ?? page.title ?? page.name)}</h1>${page.body}
+<h1>${esc(page.heading ?? page.name)}</h1>${page.body}
 ${blocks.map((block) => `<section data-kind="${esc(block?.type)}"><pre>${esc(JSON.stringify(block?.props, null, 2))}</pre></section>`).join("")}
 </body></html>`;
 }

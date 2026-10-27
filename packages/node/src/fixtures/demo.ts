@@ -34,7 +34,7 @@ export const demoFixture: Fixture = {
 			key: "home",
 			system: true,
 			name: { en: "Home", uk: "Головна" },
-			title: { en: "Welcome", uk: "Ласкаво просимо" },
+			seo: { title: { en: "Welcome", uk: "Ласкаво просимо" } },
 			summary: { en: "The tbtop CMS demo home page.", uk: "Головна сторінка демо tbtop CMS." },
 			blocks: [
 				{

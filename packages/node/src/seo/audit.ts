@@ -43,9 +43,9 @@ export const SEO_ISSUE_LABELS: Record<SeoIssueKey, string> = {
 };
 
 const DETAILS: Record<Exclude<SeoIssueKey, "duplicate_title" | "duplicate_description">, string> = {
-	missing_title: "Neither an SEO title nor the page's own title/name is set for this locale.",
+	missing_title: "Neither an SEO title nor the page's name is set for this locale.",
 	missing_description: "Neither an SEO description nor the page's own summary is set for this locale.",
-	missing_translation: "No title and no name set for this locale — a hreflang gap for active crawlers.",
+	missing_translation: "No name set for this locale — a hreflang gap for active crawlers.",
 	missing_og_image: "No OG image resolves for this page — not on the page, and no site-wide default is configured.",
 	noindex: "This published page is set to noindex. Shown here for visibility — it may be intentional.",
 };
@@ -61,7 +61,7 @@ export async function runSeoAudit(site: Site): Promise<SeoAuditResult> {
 	const pages = (await whereLive(site.pages.query()).selectAll("tbtop_pages").where("error_class", "is", null).orderBy("id").execute()).map(pageFromRow);
 	const locales = (await site.languages.frontendActive()).map((row) => row.locale);
 	const fallback = await site.languages.defaultLocale();
-	const label = (page: Page, locale: string) => firstText(page, ["title", "name"], locale, fallback) || `Untitled page #${page.id}`;
+	const label = (page: Page, locale: string) => firstText(page, ["name"], locale, fallback) || `Untitled page #${page.id}`;
 	const issue = (severity: SeoIssue["severity"], key: SeoIssueKey, page: Page, locale: string, detail: string): SeoIssue => ({
 		severity,
 		key,
@@ -81,7 +81,7 @@ export async function runSeoAudit(site: Site): Promise<SeoAuditResult> {
 				issues.push(issue("fail", "missing_description", page, locale, DETAILS.missing_description));
 			}
 			// This locale's own words: a fallback value is another locale's content.
-			if (!own(page.title[locale]) && !own(page.name[locale])) {
+			if (!own(page.name[locale])) {
 				issues.push(issue("warn", "missing_translation", page, locale, DETAILS.missing_translation));
 			}
 		}
