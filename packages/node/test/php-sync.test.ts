@@ -82,4 +82,13 @@ describe("the pages list filters (#310)", () => {
 		expect(warned.map((row) => row.seo_state)).toEqual(warned.map(() => "Needs work"));
 		expect(ids(await table(visit, "filters[seo_state]=pass"))).not.toContain(Number(made.about));
 	});
+
+	test("a summary that is not a locale map counts as missing in the badge, its tooltip and the filter alike", async () => {
+		const { visit, db, ids: made } = await panel();
+		await db.updateTable("tbtop_pages").set({ summary: JSON.stringify("Who we are.") }).where("id", "=", made.about as number).execute();
+		const [row] = (await table(visit, "search=About")).filter((one) => Number(one.id) === made.about);
+		expect(row?.seo_state).toBe("Needs work");
+		expect((row?._tooltips as Record<string, string>).seo_state).toBe("No summary");
+		expect(ids(await table(visit, "filters[seo_state]=warn"))).toContain(Number(made.about));
+	});
 });

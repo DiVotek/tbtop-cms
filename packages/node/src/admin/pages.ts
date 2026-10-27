@@ -45,7 +45,8 @@ function seoReasons(row: Dict): string[] {
 
 /**
  * PageListState::emptyTranslatableSql: true when a JSON translatable column
- * holds no non-empty string in any locale, spelled per dialect.
+ * holds no non-empty string in any locale, spelled per dialect. A column that
+ * is not a locale map (null, a bare string) holds no translation, on every dialect.
  */
 function emptyTranslatable(db: { getExecutor(): { adapter: object } }, column: "name" | "title" | "summary") {
 	const col = sql.ref(`tbtop_pages.${column}`);
@@ -55,7 +56,7 @@ function emptyTranslatable(db: { getExecutor(): { adapter: object } }, column: "
 		case "mysql":
 			return sql`(${col} is null or json_type(${col}) <> 'OBJECT' or json_search(${col}, 'one', '_%') is null)`;
 		default:
-			return sql`not exists (select 1 from json_each(coalesce(${col}, '{}')) where type = 'text' and value <> '')`;
+			return sql`(json_type(coalesce(${col}, '{}')) <> 'object' or not exists (select 1 from json_each(${col}) where type = 'text' and value <> ''))`;
 	}
 }
 
