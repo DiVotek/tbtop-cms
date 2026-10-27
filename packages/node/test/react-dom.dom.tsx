@@ -1,13 +1,16 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 // A DOM for this file only, in its own `bun test` process (`test:dom`): in CI a second happy-dom register in one process left this suite hanging.
 const realFetch = globalThis.fetch;
 GlobalRegistrator.register();
-const { render, fireEvent, findByRole, findByText, waitFor } = await import("@testing-library/react");
+const { cleanup, render, fireEvent, findByRole, findByText, waitFor } = await import("@testing-library/react");
 const { ContactForm, useCmsForm } = await import("../src/react");
 
+// Unmount each test's roots, then let React's scheduler drain before the DOM goes: a callback it queued after the last test read `window` once happy-dom was gone.
+afterEach(() => cleanup());
 afterAll(async () => {
+	await new Promise((resolve) => setTimeout(resolve, 0));
 	await GlobalRegistrator.unregister();
 	Object.defineProperty(globalThis, "fetch", { value: realFetch, configurable: true, writable: true });
 });
