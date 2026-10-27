@@ -11,9 +11,10 @@ export function adminLocales(config: LocaleSource): string[] {
 	return locales.length === 0 ? [adminLocale(config)] : locales;
 }
 
-/** AdminLocales::default(). */
+/** AdminLocales::default(): `admin.locale` when the list has it (or there is no list), else the list's first. */
 export function adminLocale(config: LocaleSource): string {
-	return config.admin?.locale ?? config.admin?.locales?.[0] ?? "en";
+	const { locale, locales = [] } = config.admin ?? {};
+	return locale !== undefined && (locales.length === 0 || locales.includes(locale)) ? locale : (locales[0] ?? "en");
 }
 
 /** The user key the profile rows are stored under; null for a user without one. */
@@ -73,7 +74,7 @@ export function profileLocaleHooks(config: LocaleSource & { db: Kysely<CmsDataba
 		},
 		onLocaleChange: async (user: unknown, locale: string): Promise<void> => {
 			const key = profileKey(user);
-			if (key === null) {
+			if (key === null || !adminLocales(config).includes(locale)) {
 				return;
 			}
 			const now = sqlDate(new Date());

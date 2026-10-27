@@ -383,6 +383,17 @@ export function pageTitleToSeoMigration(options: MigrationOptions): Migration {
 			}
 			await db.schema.alterTable("tbtop_pages").dropColumn("title").execute();
 		},
+		/** The column back, filled from `seo.title`; the meta title stays where it is. */
+		async down(db: Kysely<unknown>) {
+			await db.schema.alterTable("tbtop_pages").addColumn("title", types(options.dialect).json).execute();
+			const pages = db as unknown as Kysely<{ tbtop_pages: { id: number; title: string | null; seo: unknown } }>;
+			for (const row of await pages.selectFrom("tbtop_pages").select(["id", "seo"]).where("seo", "is not", null).execute()) {
+				const title = localeMap(localeMap(row.seo).title);
+				if (Object.keys(title).length > 0) {
+					await pages.updateTable("tbtop_pages").set({ title: JSON.stringify(title) }).where("id", "=", row.id).execute();
+				}
+			}
+		},
 	};
 }
 

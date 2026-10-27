@@ -191,6 +191,12 @@ describe("the admin UI locale is each admin's own, saved to the profile (#309)",
 		expect(switched.status).toBeLessThan(400);
 	});
 
+	test("a default the list lacks falls back to the list's first locale", async () => {
+		const { visit } = await signedIn({ admin: { locales: ["en", "uk"], locale: "de" } });
+		const page = (await (await visit("/admin/pages")).json()) as InertiaPage;
+		expect((page.props.tbtop as { locale: string }).locale).toBe("en");
+	});
+
 	test("one locale needs no profile: nothing is read or written", async () => {
 		const { db, visit } = await signedIn({});
 		await visit("/admin/locale", { method: "POST", body: JSON.stringify({ locale: "en" }), headers: { "content-type": "application/json", referer: "http://x/admin" } });
@@ -231,5 +237,12 @@ describe("an upgraded database moves page titles into SEO (#326)", () => {
 		expect(await seo(2)).toEqual({ title: { en: "Only" } });
 		expect(await seo(3)).toBeNull();
 		expect(Object.keys((await db.selectFrom("tbtop_pages").selectAll().where("id", "=", 1).executeTakeFirst()) ?? {})).not.toContain("title");
+
+		// Rolling back brings the column back, filled from the meta titles.
+		expect((await migrator.migrateDown()).error).toBeUndefined();
+		const back = (await (db as unknown as Kysely<{ tbtop_pages: { id: number; title: unknown } }>).selectFrom("tbtop_pages").select(["id", "title"]).orderBy("id").execute()).map((row) =>
+			typeof row.title === "string" ? JSON.parse(row.title) : row.title,
+		);
+		expect(back).toEqual([{ en: "Kept", uk: "Студія" }, { en: "Only" }, null]);
 	});
 });
