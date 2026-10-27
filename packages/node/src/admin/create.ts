@@ -12,12 +12,12 @@ export type CmsAdminOverrides = Omit<Partial<AdminConfig>, "pages" | "disks"> & 
  * restart, so that default warns.
  */
 export function createCmsAdmin(cms: Cms, options: CmsAdminOverrides = {}): Admin {
-	const { pages, disks, ...rest } = options;
+	const { pages, disks, rootView: view, ...rest } = options;
 	return createAdmin({
 		...adminOptions(cms, pages === undefined ? {} : { pages }),
-		disks: disks ?? memoryDisks(),
-		rootView: rest.rootView ?? rootView(),
 		...rest,
+		disks: disks ?? memoryDisks(),
+		rootView: view ?? rootView(),
 	});
 }
 

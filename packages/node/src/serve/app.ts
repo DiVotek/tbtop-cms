@@ -28,6 +28,8 @@ export type SiteOptions<D extends SiteDef> = Partial<PageRenderers<PageProps<Sit
 	config?: SiteConfig;
 	/** Better Auth's options past the defaults; false: no Better Auth (the host gives `config.auth` or `config.authorize`). */
 	auth?: false | Omit<DefaultAuthOptions, "secret" | "baseURL" | "database">;
+	/** The type of the host's user ids when it brings its own auth (`config.auth`); Better Auth's are strings. Default "int". */
+	userKey?: "int" | "string";
 	/**
 	 * The admin panel past the CMS's: the host's pages (array appended,
 	 * function filters), rootView, any createAdmin option. A function gets
@@ -105,7 +107,7 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 	const adminOptions = typeof options.admin === "function" ? options.admin(cms) : options.admin;
 	const admin = createCmsAdmin(cms, { ...adminOptions, ...(runtime.disk === undefined ? {} : { disks: { public: runtime.disk } }) });
 	const route = cmsRoutes(cms, admin, auth);
-	const migrate = () => migrateAll(db, auth);
+	const migrate = () => migrateAll(db, auth, options.userKey);
 	const { render, renderError } = options;
 	/** The seed into an empty site, the 404/5xx pages and the first admin, on migrated tables. Idempotent. */
 	const setup = async () => {

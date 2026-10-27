@@ -117,6 +117,11 @@ deploy from SQL files (see "Migrations on Workers").
 
 **Secrets.** `BETTER_AUTH_SECRET` is required (no default secret: it throws).
 The first admin comes only from `TBTOP_ADMIN_EMAIL` / `TBTOP_ADMIN_PASSWORD`.
+The boot creates that admin only when the email is missing: an existing user
+keeps its password and role, so rotate the password on the Users page, and
+unset `TBTOP_ADMIN_PASSWORD` after the first boot (while both are set, a deleted
+first admin comes back on the next boot). With its own auth (`auth: false` +
+`config.auth`) a host whose user ids are strings passes `userKey: "string"`.
 `users.ensure(email, role, { password })` seeds other users in a seed or a
 test; it refuses the `admin` role. On Workers these are secrets and vars of
 the Worker (`wrangler secret put`); `BETTER_AUTH_URL` and `MEDIA_URL` are optional.
