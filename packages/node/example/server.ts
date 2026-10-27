@@ -1,6 +1,6 @@
 /**
  * A minimal host on Bun: SQLite file, the demo fixture, the CMS admin and a
- * bare HTML frontend. `bun example/server.ts`, then open http://localhost:3100.
+ * bare HTML frontend. `TBTOP_DEMO=1 bun example/server.ts`, then open http://localhost:3100.
  * The admin answers Inertia JSON here; it needs the @tbtop/inertia-admin
  * client (see tbtop's apps/node-demo) to render in a browser.
  */
@@ -11,8 +11,8 @@ import { Kysely } from "kysely";
 import { BunSqliteDialect } from "kysely-bun-sqlite";
 import { type CmsDatabase, cmsBlockImpls, cmsBlocks, createCms, demoFixture, implementBlocks, migrateCms, type PageProps, seedFixtures } from "../src";
 
-// Everyone is an admin here (see `user` below): refuse to run as a production server.
-if (process.env.NODE_ENV === "production") throw new Error("example/server.ts is a demo: every visitor is signed in. Start from example/site instead.");
+// Everyone is an admin here (see `user` below): run only on an explicit opt-in.
+if (process.env.TBTOP_DEMO !== "1") throw new Error("example/server.ts is a demo: every visitor is signed in. Run it with TBTOP_DEMO=1, or start a host from example/site.");
 
 const db = new Kysely<CmsDatabase>({ dialect: new BunSqliteDialect({ database: new Database(process.env.DB ?? "example/site.sqlite") }) });
 await migrateCms(db as Kysely<unknown>, { dialect: "sqlite" });

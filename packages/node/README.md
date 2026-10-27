@@ -16,7 +16,7 @@ cd packages/node
 ./scripts/fetch-admin.sh   # builds @tbtop/admin from DiVotek/tbtop at ADMIN_SHA
 bun install
 bun run test && bun run typecheck
-bun example/server.ts      # demo site on :3100, admin JSON under /admin
+TBTOP_DEMO=1 bun example/server.ts   # demo site on :3100, admin JSON under /admin (everyone is signed in)
 ```
 
 `TBTOP_TEST_DB=postgres` or `mysql` runs the suite on a server instead of
