@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
@@ -61,14 +61,17 @@ describe("D1 migrations as SQL files", () => {
 		await writeD1Migrations(dir, { auth: auth() });
 		expect(await writeD1Migrations(dir, { auth: auth() })).toEqual([]);
 
+		// A hand-written file: the apostrophe in its comment must not hide the column it adds.
+		await writeFile(join(dir, "0003_display_name.sql"), '-- don\'t touch\ncreate table "notes" ("body" text);\nalter table "tbtop_users" add column "displayUsername" text;\n');
 		const sqlite = new Database(":memory:");
 		await apply(sqlite, dir);
 		const added = await writeD1Migrations(dir, { auth: auth({ plugins: [username()] }) });
-		expect(added.map((path) => path.slice(dir.length + 1))).toEqual(["0003_better_auth_2.sql"]);
+		expect(added.map((path) => path.slice(dir.length + 1))).toEqual(["0004_better_auth_2.sql"]);
 		const sql = await readFile(added[0] as string, "utf8");
 		expect(sql).toContain('alter table "tbtop_users" add column "username"');
 		expect(sql).not.toContain("create table");
-		await apply(sqlite, dir, ["0003_better_auth_2.sql"]);
+		expect(sql).not.toContain('"displayUsername"');
+		await apply(sqlite, dir, ["0004_better_auth_2.sql"]);
 
 		const db = new Kysely<unknown>({ dialect: new BunSqliteDialect({ database: sqlite }) });
 		const plan = await getMigrations({ ...auth({ plugins: [username()] }), database: { db, type: "sqlite" } });

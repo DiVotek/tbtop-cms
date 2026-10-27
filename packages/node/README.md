@@ -146,7 +146,8 @@ tables, taken from the options `cloudflare(site, options)` was given
 rewritten: rerun it after a package update or a new Better Auth plugin and it
 adds only what is missing (a new plugin's columns go in `better_auth_2`).
 Commit the folder. `--out` sets wrangler's `migrations_dir` (default
-`migrations`). No D1 is reached: the SQL is compiled, not read from a database.
+`migrations`). A `.ts` entry needs a runtime that imports TypeScript: `bunx`,
+or Node with a loader (`node --import tsx`). No D1 is reached: the SQL is compiled, not read from a database.
 A Worker whose files were not applied fails its first request with that hint.
 
 **Low level.** Everything below (`createCms`, `implementBlocks`,

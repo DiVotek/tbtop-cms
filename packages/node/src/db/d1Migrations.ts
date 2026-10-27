@@ -180,8 +180,10 @@ function column(definition: string): TableMetadata["columns"][number] | null {
 export function schemaOf(applied: string[]): { tables: TableMetadata[]; indexes: Set<string> } {
 	const tables = new Map<string, TableMetadata>();
 	const indexes = new Set<string>();
-	for (const raw of applied.flatMap((sql) => splitTopLevel(sql, ";"))) {
-		const sql = raw.replace(/^\s*--.*$/gm, "").trim();
+	// Comments go first: an apostrophe in one would open a quote for the split.
+	const uncommented = applied.map((sql) => sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, ""));
+	for (const raw of uncommented.flatMap((sql) => splitTopLevel(sql, ";"))) {
+		const sql = raw.trim();
 		const create = /^create\s+table\s+(?:if\s+not\s+exists\s+)?(\S+)\s*\((.*)\)$/is.exec(sql);
 		if (create !== null) {
 			const name = unquote(create[1] as string);
