@@ -118,8 +118,10 @@ deploy from SQL files (see "Migrations on Workers").
 **Secrets.** `BETTER_AUTH_SECRET` is required (no default secret: it throws).
 The first admin comes only from `TBTOP_ADMIN_EMAIL` / `TBTOP_ADMIN_PASSWORD`.
 The boot creates that admin only while the site has no admin user at all:
-changing the secrets later changes nothing, so rotate the password on the
-Users page, and unset `TBTOP_ADMIN_PASSWORD` after the first boot. With its own auth (`auth: false` +
+while one exists, changing the secrets changes nothing, so rotate the password
+on the Users page. With the last admin removed, the next boot creates one from
+the secrets again: unset `TBTOP_ADMIN_PASSWORD` after the first boot unless
+you want that recovery path. With its own auth (`auth: false` +
 `config.auth`) a host whose user ids are strings passes `userKey: "string"`.
 `users.ensure(email, role, { password })` seeds other users in a seed or a
 test; it refuses the `admin` role and a role the site does not define. On Workers these are secrets and vars of

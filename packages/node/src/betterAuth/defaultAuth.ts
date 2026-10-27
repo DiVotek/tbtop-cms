@@ -105,7 +105,7 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		},
 		handle: async (request) => (new URL(request.url).pathname.startsWith(`${basePath}/`) ? instance.handler(request) : null),
 	};
-	// Only while the site has no admin: a deleted or demoted first admin stays so, whatever the secrets say.
+	// Only while the site has no admin at all: with another admin a deleted or demoted first admin stays so; with none left, the secrets restore one.
 	firstAdmins.set(auth, async (email, password) => {
 		const admin = await users
 			.selectFrom("tbtop_users")
