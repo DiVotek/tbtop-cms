@@ -5,7 +5,8 @@
 	"main": "worker.ts",
 	"compatibility_date": "2026-10-01",
 	"compatibility_flags": ["nodejs_als"],
-	"d1_databases": [{ "binding": "DB", "database_name": "tbtop-site", "database_id": "<wrangler d1 create tbtop-site>" }],
+	// migrations_dir: what `tbtop-cms d1:migrations --entry worker.ts` writes, `wrangler d1 migrations apply DB` runs.
+	"d1_databases": [{ "binding": "DB", "database_name": "tbtop-site", "database_id": "<wrangler d1 create tbtop-site>", "migrations_dir": "migrations" }],
 	"kv_namespaces": [{ "binding": "CACHE", "id": "<wrangler kv namespace create CACHE>" }],
 	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tbtop-site-media" }],
 	"vars": { "MEDIA_URL": "https://media.example.com" },

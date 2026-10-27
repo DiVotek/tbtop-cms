@@ -1,4 +1,7 @@
 import { Database } from "bun:sqlite";
+import { mkdtemp, readdir, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { memoryDisk } from "@tbtop/admin";
 import { Kysely } from "kysely";
@@ -9,11 +12,15 @@ import worker from "../example/site/worker";
 import type { CloudflareEnv, ExecutionContext } from "../src/cloudflare";
 import { block, defineSite, f, pageType } from "../src/define";
 import { pageTypeDefs } from "../src/define/define";
+import { writeD1Migrations } from "../src/cli/d1";
+import { D1_SCHEMA } from "../src/db/d1Migrations";
 import { fakeD1 } from "./fakeD1";
 
 // The full-API example (example/site) is the proof: it runs here as a Node
 // host on SQLite (booted twice on one database) and as a Worker on a D1-like
-// binding, KV and R2, and both answer the same checks.
+// binding, KV and R2 (its tables from the SQL files `tbtop-cms d1:migrations`
+// writes, as `wrangler d1 migrations apply` runs them), and both answer the
+// same checks.
 
 const ADMIN = { email: "owner@site.test", password: "correct-horse-battery" };
 process.env.BETTER_AUTH_SECRET ??= "site-test-secret-site-test-secret";
@@ -64,7 +71,21 @@ describe("cloudflare(site)", () => {
 	};
 	const pending: Promise<unknown>[] = [];
 	const ctx: ExecutionContext = { waitUntil: (task) => void pending.push(task), passThroughOnException: () => {} };
-	checks(async () => ({ fetch: (request) => worker.fetch(request, env, ctx) }));
+	checks(async () => {
+		// The files as the CLI writes them, applied in order as wrangler does.
+		const dir = await mkdtemp(join(tmpdir(), "tbtop-worker-"));
+		await writeD1Migrations(dir, worker[D1_SCHEMA]);
+		for (const file of (await readdir(dir)).sort()) {
+			await env.DB.exec(await readFile(join(dir, file), "utf8"));
+		}
+		return { fetch: (request) => worker.fetch(request, env, ctx) };
+	});
+
+	test("a Worker whose D1 files were not applied does not migrate, and says how to", async () => {
+		const bare = { ...env, DB: fakeD1() };
+		await expect(worker.fetch(new Request("http://site.test/"), bare, ctx)).rejects.toThrow(/tbtop-cms d1:migrations/);
+		expect(await bare.DB.prepare("select name from sqlite_master where name = 'tbtop_pages'").all()).toMatchObject({ results: [] });
+	});
 
 	test("the cron's scheduled() runs the CMS's tasks", async () => {
 		await worker.scheduled({ scheduledTime: Date.now(), cron: "* * * * *" }, env, ctx);
