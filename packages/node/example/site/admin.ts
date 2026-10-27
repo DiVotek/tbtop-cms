@@ -13,10 +13,11 @@ export const admin: SiteAdmin<typeof site.def> = (cms: Cms) => ({
 			path: "callbacks",
 			title: "Callbacks",
 			nav: { group: "Sales", label: "Callbacks", icon: "phone", order: 10 },
-			// Submissions are personal data: the same ability as the CMS inbox.
+			// Submissions are personal data: the same ability as the CMS inbox, and closed
+			// when the host has no auth adapter (`serve` installs Better Auth by default).
 			authorize: async () => {
 				const check = cms.config.authorize ?? cms.config.auth?.authorize;
-				return check === undefined || (await check(currentContext().user, "tbtop-cms.submissions")) === true;
+				return check !== undefined && (await check(currentContext().user, "tbtop-cms.submissions")) === true;
 			},
 			view: async (s) => {
 				const rows = await cms.config.db.selectFrom("tbtop_form_submissions").select(["id", "payload"]).where("kind", "=", "Callback").orderBy("id", "desc").limit(20).execute();
