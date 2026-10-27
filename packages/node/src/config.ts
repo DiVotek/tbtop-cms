@@ -1,4 +1,4 @@
-import type { HostRule, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
+import type { HostRule, NavLink, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
@@ -17,6 +17,8 @@ export type CmsAdminAuth = {
 	session: SessionResolver;
 	loginPath: (cms: Cms) => string;
 	pages: (cms: Cms) => PageDef[];
+	/** Links at the top of the user menu (the adapter's Profile); cms.admin.options() passes them. */
+	userMenuItems?: (cms: Cms) => NavLink[];
 };
 
 /** What a media reference (an upload path or URL) resolves to; width/height/alt feed og:image. */

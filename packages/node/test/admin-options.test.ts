@@ -76,6 +76,7 @@ describe("cms.admin.options()", () => {
 		const signedIn = await post("/cp/login/forms/login", { email: "owner@site.test", password: PASSWORD }, "/cp/login");
 		expect(signedIn.headers.get("location")).toBe("/cp/dashboard");
 		expect((await page("/cp/pages")).component).toBeDefined();
+		expect(JSON.stringify((await page("/cp/pages")).props)).toContain('"/cp/profile"');
 
 		const id = ids.about as number;
 		await cms.site().pages.update(id, { content: [{ id: "promo1", kind: "Promo", active: true, sort: 0, data: {} }] });

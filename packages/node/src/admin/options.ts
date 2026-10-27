@@ -36,6 +36,7 @@ export function adminOptions(cms: Cms, options: CmsAdminOptions = {}): CmsAdminC
 		locale: adminLocale(config),
 		...profileLocaleHooks(config),
 		...(config.auth === undefined ? {} : { session: config.auth.session, loginPath: config.auth.loginPath(cms) }),
+		...(config.auth?.userMenuItems === undefined ? {} : { userMenuItems: config.auth.userMenuItems(cms) }),
 		...(bell === undefined ? {} : { notifications: { store: bell.store } }),
 	};
 }

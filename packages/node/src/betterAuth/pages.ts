@@ -152,12 +152,24 @@ export function userEdit(ctx: AdapterCtx) {
 						const failed =
 							(await refused(() => ctx.auth.api.adminUpdateUser({ body: { userId, data: { name: String(form.name ?? "") } }, headers }))) ??
 							(role === (row.role ?? "") ? null : await refused(() => ctx.auth.api.setRole({ body: { userId, role: role as never }, headers }))) ??
-							(typeof form.password === "string" && form.password !== ""
-								? await refused(() => ctx.auth.api.setUserPassword({ body: { userId, newPassword: String(form.password) }, headers }))
-								: null);
+							(typeof form.password === "string" && form.password !== "" ? await setPassword(ctx, submitted, userId, form.password) : null);
 						return failed ?? Effects.make().notify("Saved").redirect(`${prefix}/users`);
 					});
 			},
 		}),
+	);
+}
+
+/**
+ * A new password from the Users page signs the user's sessions out, as
+ * AuthenticateSession does in PHP; one's own keeps the current session.
+ */
+async function setPassword(ctx: AdapterCtx, action: ActionCtx, userId: string, password: string): Promise<Effects | null> {
+	const headers = action.request.headers;
+	return (
+		(await refused(() => ctx.auth.api.setUserPassword({ body: { userId, newPassword: password }, headers }))) ??
+		(await refused(() =>
+			me(action)?.id === userId ? ctx.auth.api.revokeOtherSessions({ headers }) : ctx.auth.api.revokeUserSessions({ body: { userId }, headers }),
+		))
 	);
 }

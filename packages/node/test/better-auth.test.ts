@@ -44,6 +44,7 @@ async function authPanel(adapter: Parameters<typeof cmsAuth>[1] = {}) {
 		driver: kyselyDriver(db),
 		session: auth.session,
 		loginPath: auth.loginPath(cms),
+		userMenuItems: auth.userMenuItems(cms),
 		context: cms.admin.context,
 	});
 	const jar = new Map<string, string>();
@@ -84,7 +85,17 @@ async function authPanel(adapter: Parameters<typeof cmsAuth>[1] = {}) {
 		const res = await visit("/admin/users/tables/users", { inertia: false });
 		return ((await res.json()) as { data: { data: Record<string, unknown>[] } }).data.data;
 	};
-	return { cms, better, ids, jar, visit, post, page, signIn, notice, rows };
+	/** A second device: a Better Auth session of its own, and whether it is still alive. */
+	const otherDevice = async (who: string, password = PASSWORD) => {
+		const res = await better.api.signInEmail({ body: { email: `${who}@site.test`, password }, asResponse: true });
+		const cookie = res.headers
+			.getSetCookie()
+			.map((line) => line.split(";")[0])
+			.join("; ");
+		return async () => (await better.api.getSession({ headers: new Headers({ cookie }) })) !== null;
+	};
+	const flash = async (url: string) => JSON.stringify((await page(url)).flash);
+	return { cms, better, ids, jar, visit, post, page, signIn, notice, rows, otherDevice, flash };
 }
 
 describe("Better Auth adapter", () => {
@@ -213,5 +224,59 @@ describe("Better Auth adapter", () => {
 		jar.clear();
 		await signIn("owner", PASSWORD, "198.51.100.4");
 		expect(signedIn()).toBe(true);
+	});
+	test("an editor edits their own name and password on Profile; other devices are signed out, this one stays", async () => {
+		const { better, signIn, post, visit, page, otherDevice, flash } = await authPanel();
+		await signIn("editor");
+		const menu = JSON.stringify((await page("/admin/pages")).props);
+		expect(menu).toContain('"/admin/profile"');
+		expect((await visit("/admin/profile")).status).toBe(200);
+
+		await post("/admin/profile/forms/personal", { name: "Boris" }, "/admin/profile");
+		expect((await better.api.signInEmail({ body: { email: "editor@site.test", password: PASSWORD } })).user.name).toBe("Boris");
+
+		const phone = await otherDevice("editor");
+		await post("/admin/profile/forms/password", { current_password: "wrong-password", password: "brand-new-pass", password_confirmation: "brand-new-pass" }, "/admin/profile");
+		expect(await flash("/admin/profile")).toContain("Invalid password");
+		expect(await phone()).toBe(true);
+
+		await post("/admin/profile/forms/password", { current_password: PASSWORD, password: "brand-new-pass", password_confirmation: "brand-new-pass" }, "/admin/profile");
+		expect(await phone()).toBe(false);
+		expect((await visit("/admin/pages")).status).toBe(200);
+		expect((await better.api.signInEmail({ body: { email: "editor@site.test", password: "brand-new-pass" } })).user.name).toBe("Boris");
+	});
+
+	test("Profile's wrong current passwords are throttled per user", async () => {
+		const { signIn, post, flash } = await authPanel({ signInThrottle: { max: 2, perSeconds: 60 } });
+		await signIn("editor");
+		const attempt = (current: string) =>
+			post("/admin/profile/forms/password", { current_password: current, password: "brand-new-pass", password_confirmation: "brand-new-pass" }, "/admin/profile");
+		await attempt("wrong-one");
+		await attempt("wrong-two");
+		await attempt(PASSWORD);
+		expect(await flash("/admin/profile")).toContain("Too many attempts");
+	});
+
+	test("profile: false leaves out the page and its user-menu link", async () => {
+		const { signIn, visit, page } = await authPanel({ profile: false });
+		await signIn("editor");
+		expect((await visit("/admin/profile")).status).toBe(404);
+		expect(JSON.stringify((await page("/admin/pages")).props)).not.toContain("/admin/profile");
+	});
+
+	test("a password set on the Users page signs that user out everywhere; one's own keeps this session", async () => {
+		const { ids, signIn, post, visit, otherDevice } = await authPanel();
+		const editorPhone = await otherDevice("editor");
+		const ownerPhone = await otherDevice("owner");
+		await signIn("owner");
+
+		const editor = `/admin/users/${ids.editor}/edit`;
+		await post(`${editor}/forms/user`, { name: "editor", role: "editor", password: "brand-new-pass" }, editor);
+		expect(await editorPhone()).toBe(false);
+
+		const own = `/admin/users/${ids.owner}/edit`;
+		await post(`${own}/forms/user`, { name: "owner", role: "admin", password: "brand-new-pass" }, own);
+		expect(await ownerPhone()).toBe(false);
+		expect((await visit("/admin/pages")).status).toBe(200);
 	});
 });

@@ -1,4 +1,4 @@
-import { cookieSessions, type PageDef, type SessionResolver } from "@tbtop/admin";
+import { cookieSessions, type NavLink, type PageDef, SESSION_USER, type SessionResolver } from "@tbtop/admin";
 import { CMS_ABILITIES, type CmsAbility } from "../admin/abilities";
 import { adminPrefix } from "../admin/support";
 import type { Cms } from "../cms";
@@ -6,6 +6,7 @@ import { SubmitThrottle, type ThrottleLimit } from "../forms/throttle";
 import { type CmsRole, cmsRoles, roleAllows } from "./access";
 import { loginPage } from "./login";
 import { userEdit, userNew, usersIndex } from "./pages";
+import { profilePage } from "./profile";
 import { AuthSession, type CmsAuthUser } from "./session";
 
 export { CMS_SECTIONS, cmsAccess, cmsRoles, cmsStatements, type CmsRole, permissionFor } from "./access";
@@ -33,6 +34,10 @@ export type BetterAuthLike = {
 		setRole(input: Call<{ userId: string; role: RoleName }>): Promise<unknown>;
 		adminUpdateUser(input: Call<{ userId: string; data: Record<string, unknown> }>): Promise<unknown>;
 		setUserPassword(input: Call<{ userId: string; newPassword: string }>): Promise<unknown>;
+		revokeUserSessions(input: Call<{ userId: string }>): Promise<unknown>;
+		revokeOtherSessions(input: { headers: Headers }): Promise<unknown>;
+		updateUser(input: Call<{ name: string }> & { asResponse: true }): Promise<Response>;
+		changePassword(input: Call<{ currentPassword: string; newPassword: string; revokeOtherSessions?: boolean }> & { asResponse: true }): Promise<Response>;
 		banUser(input: Call<{ userId: string }>): Promise<unknown>;
 		unbanUser(input: Call<{ userId: string }>): Promise<unknown>;
 		removeUser(input: Call<{ userId: string }>): Promise<unknown>;
@@ -56,6 +61,8 @@ export type CmsAuthOptions = {
 	 * comes from `forms.clientIp` or the proxy headers.
 	 */
 	signInThrottle?: ThrottleLimit | false;
+	/** The Profile page (own name and password) and its user-menu link; false leaves both out, e.g. behind SSO. Default true. */
+	profile?: boolean;
 };
 
 /** createCms({ auth: cmsAuth(betterAuth) }): satisfies CmsAdminAuth, plus signIn for custom login pages. */
@@ -66,8 +73,10 @@ export type CmsAuth = {
 	session: SessionResolver;
 	/** The sign-in page under the admin prefix; cms.admin.options() passes it. */
 	loginPath: (cms: Cms) => string;
-	/** The sign-in page and the Users pages; cms.admin.options() adds them after the CMS's. */
+	/** The sign-in, Users and Profile pages; cms.admin.options() adds them after the CMS's. */
 	pages: (cms: Cms) => PageDef[];
+	/** The Profile link at the top of the user menu; cms.admin.options() passes it. */
+	userMenuItems: (cms: Cms) => NavLink[];
 	/** Signs in with email and password (remember: Better Auth's rememberMe, default false): the cookies go on the panel's response; false for wrong credentials, a ban or no CMS role. */
 	signIn: (request: Request, email: string, password: string, remember?: boolean) => Promise<boolean>;
 };
@@ -133,16 +142,31 @@ export function cmsAuth(auth: BetterAuthLike, options: CmsAuthOptions = {}): Cms
 
 	const usersTable = options.usersTable ?? auth.options.user?.modelName ?? "user";
 	const throttle = options.signInThrottle === false ? null : new SubmitThrottle(options.signInThrottle ?? { max: 5, perSeconds: 60 });
+	const profile = options.profile ?? true;
+	const user = (request: Request) => (stores.get(request)?.get(SESSION_USER) as CmsAuthUser | null | undefined) ?? null;
+	const carry = (request: Request, response: Response) => stores.get(request)?.carry(response);
 	return {
 		authorize: (user, ability) => user !== null && typeof user === "object" && allows(user as CmsAuthUser, ability),
 		session,
 		signIn,
 		loginPath: (cms) => `${adminPrefix(cms)}/login`,
 		pages: (cms) => {
-			const ctx = { cms, auth, roles, usersTable, signIn, throttle };
-			return [loginPage(ctx), usersIndex(ctx), userNew(ctx), userEdit(ctx)] as PageDef[];
+			const ctx = { cms, auth, roles, usersTable, signIn, throttle, user, carry };
+			return [loginPage(ctx), usersIndex(ctx), userNew(ctx), userEdit(ctx), ...(profile ? [profilePage(ctx)] : [])] as PageDef[];
 		},
+		userMenuItems: (cms) => (profile ? [{ label: "Profile", url: `${adminPrefix(cms)}/profile`, icon: "user" }] : []),
 	};
 }
 
-export type AdapterCtx = { cms: Cms; auth: BetterAuthLike; roles: Record<string, CmsRole>; usersTable: string; signIn: CmsAuth["signIn"]; throttle: SubmitThrottle | null };
+export type AdapterCtx = {
+	cms: Cms;
+	auth: BetterAuthLike;
+	roles: Record<string, CmsRole>;
+	usersTable: string;
+	signIn: CmsAuth["signIn"];
+	throttle: SubmitThrottle | null;
+	/** The panel's user on this request (null for a guest). */
+	user: (request: Request) => CmsAuthUser | null;
+	/** Puts a Better Auth answer's Set-Cookie on the panel's response. */
+	carry: (request: Request, response: Response) => void;
+};
