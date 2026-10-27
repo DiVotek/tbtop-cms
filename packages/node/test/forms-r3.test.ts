@@ -239,7 +239,7 @@ describe("R3-forms-10: the inbox page label falls back like PHP", () => {
 		const site = cms.site();
 		const pages = [
 			await site.pages.create({ type: "page", name: { uk: "Контакти" }, status: "published" }),
-			await site.pages.create({ type: "page", name: { en: " " }, title: { uk: "Ціни" }, status: "published" }),
+			await site.pages.create({ type: "page", name: { en: " ", uk: "Ціни" }, status: "published" }),
 			await site.pages.create({ type: "page", status: "published" }, { slugs: { en: "bare" } }),
 		];
 		for (const [index, page] of pages.entries()) {

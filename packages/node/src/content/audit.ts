@@ -27,7 +27,7 @@ export const AUDIT_SUBJECTS = {
 	page: {
 		type: "page",
 		table: "tbtop_pages",
-		fields: ["type", "subtype", "parent_id", "status", "published_at", "unpublish_at", "name", "title", "heading", "summary", "body", "image", "content", "fields", "seo", "is_indexable", "is_system", "error_class", "sort_order"],
+		fields: ["type", "subtype", "parent_id", "status", "published_at", "unpublish_at", "name", "heading", "summary", "body", "image", "content", "fields", "seo", "is_indexable", "is_system", "error_class", "sort_order"],
 		markers: ["body", "content", "fields", "seo"],
 		label: (row) => firstText(row.name) ?? `Page #${String(row.id)}`,
 	},

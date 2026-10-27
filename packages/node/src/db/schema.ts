@@ -44,7 +44,6 @@ export type PagesTable = Stamps & {
 	fields: Json | null;
 	starter_blocks: Json | null;
 	name: Json | null;
-	title: Json | null;
 	heading: Json | null;
 	summary: Json | null;
 	body: Json | null;

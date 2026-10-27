@@ -4,6 +4,7 @@ import type { NotificationType } from "../notifications/types";
 import { runsAsPhp, templateError } from "../notifications/templates";
 import type { Site } from "../site";
 import { sqlDate } from "../support/values";
+import { adminLocales } from "./locales";
 import { adminPrefix, editFooter, listHeader, NAV, siteOf } from "./support";
 
 type AnyType = NotificationType<Record<string, unknown>>;
@@ -52,7 +53,8 @@ export function notificationSettings(cms: Cms) {
 		nav: { group: NAV.settings, label: "Notifications", icon: "bell", order: 40 },
 		view: async (s, { request }) => {
 			const site = cms.site(request);
-			const locales = (await site.languages.adminActive()).map((row) => row.locale);
+			// Staff read templates in the admin UI locale, never a page's content locale.
+			const locales = adminLocales(cms.config);
 			const all = slots(site, locales);
 			return s
 				.form("notification_settings", [

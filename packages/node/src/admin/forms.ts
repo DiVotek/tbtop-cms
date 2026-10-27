@@ -28,7 +28,7 @@ const leadLabel = (payload: Record<string, unknown>): string => leadIdentity(pay
 
 /**
  * FormSubmissionsPage::formatPage: the first non-blank name in any locale,
- * then title, then (in the inbox, not on the detail page) a slug path, then
+ * then (in the inbox, not on the detail page) a slug path, then
  * "Page #id"; a deleted page says so.
  */
 async function pageLabels(site: Site, ids: number[], options: { slug?: boolean } = {}): Promise<Map<number, string>> {
@@ -39,7 +39,7 @@ async function pageLabels(site: Site, ids: number[], options: { slug?: boolean }
 	const labels = new Map<number, string>();
 	for (const id of unique) {
 		const page = pages.get(id);
-		labels.set(id, page === undefined ? "Deleted page" : (firstLocaleText(page.name) ?? firstLocaleText(page.title) ?? slugPath(slugs.get(id) ?? {}, fallback) ?? `Page #${id}`));
+		labels.set(id, page === undefined ? "Deleted page" : (firstLocaleText(page.name) ?? slugPath(slugs.get(id) ?? {}, fallback) ?? `Page #${id}`));
 	}
 	return labels;
 }

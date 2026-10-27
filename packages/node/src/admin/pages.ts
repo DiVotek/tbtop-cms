@@ -27,20 +27,48 @@ const SEO_STATES = { fail: { label: "Missing", color: "danger" }, warn: { label:
 
 const badges = (states: Record<string, { label: string; color: string }>) => Object.fromEntries(Object.values(states).map((state) => [state.label, { color: state.color }]));
 
-/** A translatable column with no non-blank value in any locale. */
+/**
+ * A translatable column with no non-empty string in any locale. Whitespace
+ * counts as content, as in emptyTranslatable(): the badge and its tooltip
+ * read the same facts the SEO filter's SQL does.
+ */
 const blank = (raw: unknown): boolean => {
 	const value = decodeJson(raw);
-	return !(isDict(value) ? Object.values(value) : [value]).some((text) => typeof text === "string" && text.trim() !== "");
+	return !(isDict(value) ? Object.values(value) : []).some((text) => typeof text === "string" && text !== "");
 };
 
-/** PageListState::seoState and seoTooltip: what the badge says, and why. */
-function seoState(row: Dict): { state: keyof typeof SEO_STATES; reasons: string[] } {
-	const noTitle = blank(row.name) && blank(row.title);
-	const noSummary = blank(row.summary);
-	const hidden = !truthy(row.is_indexable);
-	const reasons = [...(noTitle ? ["No name and no title"] : []), ...(noSummary ? ["No summary"] : []), ...(hidden ? ["Excluded from indexing"] : [])];
-	return { state: noTitle ? "fail" : noSummary || hidden ? "warn" : "pass", reasons };
+/** PageListState::seoTooltip: why the badge says what seo_state says; mirrors seoStateSql arm for arm. */
+function seoReasons(row: Dict): string[] {
+	return [...(blank(row.name) ? ["No name"] : []), ...(blank(row.summary) ? ["No summary"] : []), ...(!truthy(row.is_indexable) ? ["Excluded from indexing"] : [])];
 }
+
+/**
+ * PageListState::emptyTranslatableSql: true when a JSON translatable column
+ * holds no non-empty string in any locale, spelled per dialect. A column that
+ * is not a locale map (null, a bare string) holds no translation, on every dialect.
+ */
+function emptyTranslatable(db: { getExecutor(): { adapter: object } }, column: "name" | "summary") {
+	const col = sql.ref(`tbtop_pages.${column}`);
+	switch (dialectOfDb(db)) {
+		case "postgres":
+			return sql`not jsonb_path_exists(coalesce(${col}::jsonb, 'null'::jsonb), 'lax $.* ? (@.type() == "string" && @ <> "")')`;
+		case "mysql":
+			return sql`(${col} is null or json_type(${col}) <> 'OBJECT' or json_search(${col}, 'one', '_%') is null)`;
+		default:
+			return sql`(json_type(coalesce(${col}, '{}')) <> 'object' or not exists (select 1 from json_each(${col}) where type = 'text' and value <> ''))`;
+	}
+}
+
+/** PageListState::seoStateSql: the SEO badge's state, in SQL so the SEO filter matches what each row shows. */
+function seoStateSql(db: { getExecutor(): { adapter: object } }) {
+	const [name, summary] = (["name", "summary"] as const).map((column) => emptyTranslatable(db, column));
+	return sql<string>`case when ${name} then 'fail' when ${summary} or not tbtop_pages.is_indexable then 'warn' else 'pass' end`;
+}
+
+const displayStateSql = (now: string) =>
+	sql<string>`case when tbtop_pages.status <> 'published' then 'draft' when tbtop_pages.published_at is not null and tbtop_pages.published_at > ${now} then 'scheduled' when tbtop_pages.unpublish_at is not null and tbtop_pages.unpublish_at <= ${now} then 'expired' else 'published' end`;
+
+const stateOptions = (states: Record<string, { label: string }>): Option[] => Object.entries(states).map(([value, state]) => ({ value, label: state.label }));
 
 const truthy = (value: unknown): boolean => value === true || value === 1 || value === "1" || value === "t" || value === "true";
 
@@ -68,6 +96,14 @@ export function pagesIndex(cms: Cms) {
 			const names = new Map(all.map((row) => [Number(row.id), row.name]));
 			const categories = await site.pages.query().select(["id", "name"]).where("type", "=", "category").orderBy("sort_order").orderBy("id").execute();
 			createParents.set(request, parentOptions(categories, locale));
+			// Only a page with a child is a useful parent to filter by (PagesPage::parentOptions).
+			const parents = await site.pages
+				.query()
+				.select(["id", "name"])
+				.where((eb) => eb.exists(eb.selectFrom("tbtop_pages as child").select("child.id").whereRef("child.parent_id", "=", "tbtop_pages.id").where("child.deleted_at", "is", null)))
+				.orderBy("sort_order")
+				.orderBy("id")
+				.execute();
 			const present = (await site.pages.query().select("type").distinct().execute()).map((row) => row.type);
 			const keys = cms.pageTypes.bases().map((type) => type.key);
 			const tabTypes = [...keys.filter((key) => present.includes(key)), ...present.filter((key) => !keys.includes(key)).sort()];
@@ -104,8 +140,8 @@ export function pagesIndex(cms: Cms) {
 							.badge(badges(DISPLAY_STATES)),
 						Column.make("seo_state")
 							.label("SEO")
-							.formatUsing((_, row) => SEO_STATES[seoState(row as Dict).state].label)
-							.tooltip((row) => seoState(row as Dict).reasons.join("\n"))
+							.formatUsing((value) => SEO_STATES[String(value) as keyof typeof SEO_STATES]?.label ?? String(value))
+							.tooltip((row) => seoReasons(row as Dict).join("\n"))
 							.badge(badges(SEO_STATES))
 							.toggleable(),
 						Column.make("updated_at").label("Updated").date("M j, Y").muted().sortable(),
@@ -121,6 +157,24 @@ export function pagesIndex(cms: Cms) {
 							.count()
 							.description("Pages moved to the trash — restore them or delete permanently.")
 							.query((qb) => (qb as PagesTable).where("tbtop_pages.deleted_at", "is not", null)),
+					])
+					.filters([
+						// The derived table below projects display_state and seo_state, so a filter compares against the badges' own values.
+						s
+							.select("parent_id")
+							.label("Parent")
+							.options(parentOptions(parents, locale))
+							.filterUsing((qb, value) => (qb as PagesTable).where("tbtop_pages.parent_id", "=", Number(value))),
+						s
+							.select("display_state")
+							.label("Status")
+							.options(stateOptions(DISPLAY_STATES))
+							.filterUsing((qb, value) => (qb as PagesTable).where(sql.ref("tbtop_pages.display_state"), "=", String(value))),
+						s
+							.select("seo_state")
+							.label("SEO")
+							.options(stateOptions(SEO_STATES))
+							.filterUsing((qb, value) => (qb as PagesTable).where(sql.ref("tbtop_pages.seo_state"), "=", String(value))),
 					])
 					.searchable(["tbtop_pages.name_text"])
 					.defaultSort("id", "asc")
@@ -140,7 +194,8 @@ export function pagesIndex(cms: Cms) {
 								.select((eb) => [
 									sql<string>`cast(tbtop_pages.name as ${sql.raw(textType(db))})`.as("name_text"),
 									eb.selectFrom("tbtop_page_slugs").select("tbtop_page_slugs.path").whereRef("tbtop_page_slugs.page_id", "=", "tbtop_pages.id").where("tbtop_page_slugs.locale", "=", locale).limit(1).as("path"),
-									sql<string>`case when tbtop_pages.status <> 'published' then 'draft' when tbtop_pages.published_at is not null and tbtop_pages.published_at > ${now} then 'scheduled' when tbtop_pages.unpublish_at is not null and tbtop_pages.unpublish_at <= ${now} then 'expired' else 'published' end`.as("display_state"),
+									displayStateSql(now).as("display_state"),
+									seoStateSql(db).as("seo_state"),
 								])
 								.as("tbtop_pages"),
 						),
@@ -234,7 +289,6 @@ function createAction(s: S, cms: Cms, categories: Option[]) {
 			s
 				.form("pageCreate", [
 					s.text("name").label("Name").required().translatable().rules("max:255"),
-					s.text("title").label("Title").translatable().rules("nullable|max:255"),
 					s.select("type").label("Type").options(types).required().default("page"),
 					...subtypes,
 					parent,
@@ -267,25 +321,12 @@ export function parentOptions(rows: { id: number; name: string | null }[], local
 	return rows.map((row) => ({ value: String(row.id), label: firstText(pageLabel(row), ["name"], locale, locale) || `#${row.id}` }));
 }
 
-/** PageFormWriter::save on create: the title falls back to the name, the content starts from the type's template. */
+/** PageFormWriter::save on create: the content starts from the type's template. */
 async function createPage(cms: Cms, ctx: ActionCtx, tree: { type: string; parentId: number | null; subtype: string | null }): Promise<Page> {
 	const form = ctx.form as Dict;
 	const name = isDict(form.name) ? form.name : {};
-	const title = withTitleFallback(name, isDict(form.title) ? form.title : {});
-	const content = templateContent(cms, draftPage({ ...tree, name, title }));
-	return siteOf(cms, ctx).pages.create({ ...tree, name, title, content }, { by: userKey(ctx) });
-}
-
-/** PageFormAttributes::withTitleFallback: per locale, a blank title takes the name. Create only. */
-function withTitleFallback(name: Dict, title: Dict): Dict {
-	const out: Dict = { ...title };
-	for (const [locale, value] of Object.entries(name)) {
-		const current = out[locale];
-		if (typeof value === "string" && value !== "" && (typeof current !== "string" || current === "")) {
-			out[locale] = value;
-		}
-	}
-	return out;
+	const content = templateContent(cms, draftPage({ ...tree, name }));
+	return siteOf(cms, ctx).pages.create({ ...tree, name, content }, { by: userKey(ctx) });
 }
 
 /**
@@ -301,7 +342,7 @@ function templateContent(cms: Cms, page: Page): Dict[] {
 }
 
 /** The page about to be created, for template(): PHP passes the unsaved model. */
-const draftPage = (input: Pick<Page, "type" | "parentId" | "subtype" | "name" | "title">): Page => ({
+const draftPage = (input: Pick<Page, "type" | "parentId" | "subtype" | "name">): Page => ({
 	id: 0,
 	sourceId: null,
 	status: "draft",

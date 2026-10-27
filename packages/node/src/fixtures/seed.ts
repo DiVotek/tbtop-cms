@@ -20,7 +20,6 @@ export type FixturePage = {
 	type?: string;
 	subtype?: string;
 	name: Translations;
-	title?: Translations;
 	heading?: Translations;
 	summary?: Translations;
 	/**
@@ -152,7 +151,6 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 				subtype: page.subtype ?? null,
 				parentId,
 				name: page.name,
-				title: page.title ?? {},
 				heading: page.heading ?? {},
 				summary: page.summary ?? {},
 				body: Object.fromEntries(Object.entries(page.body ?? {}).map(([locale, text]) => [locale, lexical(text)])),

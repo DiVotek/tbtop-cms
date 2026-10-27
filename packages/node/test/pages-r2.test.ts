@@ -132,15 +132,15 @@ describe("R2-content-7: unparsable dates", () => {
 	});
 });
 
-describe("R2-content-8: a new page's title and content", () => {
-	test("the title falls back to the name, and the content starts from the type's template", async () => {
+describe("R2-content-8: a new page's content", () => {
+	test("the content starts from the type's template, and no title column is written", async () => {
 		const { cms, post } = await panel({
 			pageTypes: [{ key: "landing", template: () => [{ kind: "Hero", data: { title: { en: "Hi" } } }, { kind: "Faq", active: false }] }],
 		});
 		await post("/admin/pages/forms/pageCreate", { name: { en: "Fresh", uk: "Свіжа" }, type: "landing" }, "/admin/pages");
 		const page = await cms.site().pages.query().selectAll().orderBy("id", "desc").executeTakeFirst();
 		const created = await cms.site().pages.find(Number(page?.id));
-		expect(created?.title).toEqual({ en: "Fresh", uk: "Свіжа" });
+		expect(created?.seo).toEqual({});
 		const content = (created?.content ?? []) as Record<string, unknown>[];
 		expect(content.map((row) => [row.kind, row.active, row.sort, row.data])).toEqual([
 			["Hero", true, 0, { title: { en: "Hi" } }],
@@ -176,6 +176,6 @@ describe("R2-content-8: a new page's title and content", () => {
 		await post("/admin/pages/forms/pageCreate", { name: { en: "Fresh" }, type: "page" }, "/admin/pages");
 		const page = await cms.site().pages.query().selectAll().orderBy("id", "desc").executeTakeFirst();
 		const created = await cms.site().pages.find(Number(page?.id));
-		expect([created?.title, created?.content]).toEqual([{ en: "Fresh" }, []]);
+		expect(created?.content).toEqual([]);
 	});
 });

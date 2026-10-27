@@ -64,6 +64,14 @@ export type SubmitHandler<S extends PayloadSchema = PayloadSchema> = {
 	 * mail/Telegram/bell notifications are the CMS's job, not this.
 	 */
 	handle?(payload: StandardSchemaV1.InferOutput<S>, blockData: Record<string, unknown>, ctx: SubmitContext): void | Promise<void>;
+	/**
+	 * HasFieldLabels: each submitted field's label for the team's notification,
+	 * in `locale` (the readers' language, not the page's). `blockData` is the
+	 * submitting block's data in that locale (`{}` for a form posted by name);
+	 * `ctx.t` reads the CMS strings in it. A field without a non-blank label
+	 * keeps its payload key.
+	 */
+	labels?(locale: string, blockData: Record<string, unknown>, ctx: SubmitContext): Record<string, string> | Promise<Record<string, string>>;
 };
 
 /** A submit handler whose `handle` gets the payload typed from `schema`. */
@@ -239,7 +247,11 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 				action: "",
 			};
 		},
-		submit: { schema: (_data, ctx) => contactSchema(ctx) },
+		submit: {
+			schema: (_data, ctx) => contactSchema(ctx),
+			// The labels resolve() renders on the form, in the readers' language.
+			labels: (_locale, _data, ctx) => Object.fromEntries(CONTACT_FIELDS.map((field) => [field.name, ctx.t(`forms.contact.fields.${field.name}`)])),
+		},
 	},
 };
 

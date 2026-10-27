@@ -35,7 +35,8 @@ export function cmsPanel(cms: Cms): CmsPanelLook {
 /**
  * CmsChrome: the sidebar is the nav alone (the brand sits in the topbar);
  * the header carries the bell, the inbox with its unread count, a link to
- * the site under its name, and the user menu without the locale switcher.
+ * the site under its name, and the user menu (its locale switcher shows
+ * with two or more `admin.locales`).
  */
 export function cmsChrome(cms: Cms): ChromeDef {
 	return {
@@ -43,7 +44,7 @@ export function cmsChrome(cms: Cms): ChromeDef {
 		// The whole area, so the inbox can be left out for an admin without its ability.
 		header: async (s) => {
 			const box = await inbox(s, cms);
-			return s.flex([s.notifications(), ...(box === null ? [] : [box]), await viewSite(s, cms), s.userMenu({ locales: false })], { align: "center" });
+			return s.flex([s.notifications(), ...(box === null ? [] : [box]), await viewSite(s, cms), s.userMenu()], { align: "center" });
 		},
 	};
 }

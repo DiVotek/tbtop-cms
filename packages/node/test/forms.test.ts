@@ -143,11 +143,11 @@ describe("form submissions", () => {
 
 		expect(mail.sent).toHaveLength(1);
 		expect(mail.sent[0]).toMatchObject({ to: "team@example.test", from: "site@example.test", subject: "New form submission" });
-		expect(mail.sent[0]?.html).toContain("<p><strong>message:</strong> Hello<br>\nthere</p>");
+		expect(mail.sent[0]?.html).toContain("<p><strong>Message:</strong> Hello<br>\nthere</p>");
 		expect(mail.sent[0]?.html).toMatch(/href="https:\/\/site\.test\/admin\/form-submissions\/\d+"/);
 		expect(bot.calls.map((call) => call.body.chat_id)).toEqual(["-1001", "42"]);
 		expect(bot.calls[0]?.url).toBe("https://api.telegram.org/botT0KEN/sendMessage");
-		expect(String(bot.calls[0]?.body.text)).toContain("Ada · ada@example.test");
+		expect(String(bot.calls[0]?.body.text)).toContain("<b>New form submission</b>\nAda\nada@example.test\nPage: Home");
 
 		const [row] = await rows(db);
 		expect(row).toMatchObject({ status: "handled", error: null });
@@ -178,8 +178,33 @@ describe("form submissions", () => {
 		const { action } = await contactAction(cms);
 		await cms.handle(post(action, valid));
 		expect(store.rows.map((row) => row.owner).sort()).toEqual(["1", "2"]);
-		expect(store.rows[0]?.data).toMatchObject({ title: "New form submission", body: "Ada · ada@example.test\nPage: Home" });
+		expect(store.rows[0]?.data).toMatchObject({ title: "New form submission", body: "Ada\nada@example.test\nPage: Home" });
 		expect(store.rows[0]?.data.actions?.[0]).toMatchObject({ label: "View submission" });
+	});
+
+	test("staff read the admin locale: the bell each admin's saved one, mail the default, whatever the page's language", async () => {
+		const store = memoryNotifications();
+		const mail = mailbox();
+		const staff = () => [{ id: 1 }, { id: 2 }, { id: 3 }];
+		const { cms, db } = await makeCms(undefined, {
+			admin: { locales: ["en", "uk"], locale: "en" },
+			notifications: { mail: mail.transport, bell: { store, staff } },
+		});
+		await cms.site().settings.set("notifications.form.submission.channels", ["mail", "bell"]);
+		await cms.site().settings.set("notifications.mail.recipients", "team@example.test");
+		const now = "2026-10-27 00:00:00";
+		await db
+			.insertInto("tbtop_user_profiles")
+			.values([
+				{ user_id: 2, is_owner: 0, locale: "uk", created_at: now, updated_at: now },
+				{ user_id: 3, is_owner: 0, locale: "de", created_at: now, updated_at: now },
+			])
+			.execute();
+		const { action } = await contactAction(cms, "/uk");
+		await cms.handle(post(action, valid));
+		const label = (owner: string) => store.rows.find((row) => row.owner === owner)?.data.actions?.[0]?.label;
+		expect([label("1"), label("2"), label("3")]).toEqual(["View submission", "Переглянути заявку", "View submission"]);
+		expect(mail.sent[0]?.subject).toBe("New form submission");
 	});
 
 	test("a Liquid override replaces the built-in mail; a Blade row from PHP is ignored", async () => {
@@ -250,5 +275,42 @@ describe("form submissions", () => {
 		expect((await rows(db))[0]?.status).toBe("handled");
 		expect(mail.sent).toHaveLength(1);
 		expect(await cms.tasks.deliver()).toBe(0);
+	});
+});
+
+describe("field labels in the team's mail (PHP #313)", () => {
+	async function mailed(config: Partial<CmsConfig>, path = "/") {
+		const mail = mailbox();
+		const { cms } = await makeCms(undefined, { ...config, notifications: { mail: mail.transport } });
+		await cms.site().settings.set("notifications.form.submission.channels", ["mail"]);
+		await cms.site().settings.set("notifications.mail.recipients", "team@example.test");
+		const { action } = await contactAction(cms, path);
+		expect((await cms.handle(post(action, valid)))?.status).toBe(200);
+		return mail.sent[0]?.html ?? "";
+	}
+
+	test("ContactForm labels its fields from the CMS strings; values stay as sent", async () => {
+		const html = await mailed({});
+		expect(html).toContain("<p><strong>Name:</strong> Ada</p>");
+		expect(html).toContain("<p><strong>Email:</strong> ada@example.test</p>");
+	});
+
+	test("a form's labels(): a blank or missing label and a throwing labels() keep the raw key", async () => {
+		const withLabels = (labels: () => Record<string, string>): Partial<CmsConfig> => ({
+			blocks: implementBlocks(cmsBlocks, {
+				...cmsBlockImpls,
+				ContactForm: { ...cmsBlockImpls.ContactForm, submit: { ...cmsBlockImpls.ContactForm.submit, schema: cmsBlockImpls.ContactForm.submit?.schema ?? z.object({}), labels } },
+			}),
+		});
+		const html = await mailed(withLabels(() => ({ name: "Full name", email: " " })));
+		expect(html).toContain("<p><strong>Full name:</strong> Ada</p>");
+		expect(html).toContain("<p><strong>email:</strong> ada@example.test</p>");
+		expect(html).toContain("<p><strong>message:</strong>");
+		const thrown = await mailed(
+			withLabels(() => {
+				throw new Error("no labels");
+			}),
+		);
+		expect(thrown).toContain("<p><strong>name:</strong> Ada</p>");
 	});
 });

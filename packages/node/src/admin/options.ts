@@ -1,6 +1,7 @@
 import type { AdminConfig, PageDef } from "@tbtop/admin";
 import { kyselyDriver } from "@tbtop/admin/kysely";
 import type { Cms } from "../cms";
+import { adminLocale, adminLocales, profileLocaleHooks } from "./locales";
 import { adminPrefix } from "./support";
 
 /** The host's pages after the CMS's, or a function that gets the CMS's (auth pages included) and returns the panel's. */
@@ -15,7 +16,8 @@ export type CmsAdminConfig = Partial<AdminConfig> & Pick<AdminConfig, "prefix" |
 
 /**
  * Everything createAdmin needs from the CMS, read from its config: the look,
- * the prefix, the pages, the rules, the context, the auth adapter's session
+ * the prefix, the pages, the rules, the context, the UI locales saved per
+ * admin profile, the auth adapter's session
  * and login path, the bell's store and a Kysely driver over `config.db`.
  */
 export function adminOptions(cms: Cms, options: CmsAdminOptions = {}): CmsAdminConfig {
@@ -30,6 +32,9 @@ export function adminOptions(cms: Cms, options: CmsAdminOptions = {}): CmsAdminC
 		driver: kyselyDriver(config.db),
 		hostRules: admin.hostRules,
 		context: admin.context,
+		locales: adminLocales(config),
+		locale: adminLocale(config),
+		...profileLocaleHooks(config),
 		...(config.auth === undefined ? {} : { session: config.auth.session, loginPath: config.auth.loginPath(cms) }),
 		...(bell === undefined ? {} : { notifications: { store: bell.store } }),
 	};

@@ -159,7 +159,6 @@ describe("Dogfood: a host lists a category's live children a page at a time", ()
 				subtype: null,
 				status: "published",
 				name: "First post",
-				title: null,
 				heading: null,
 				summary: "The first article.",
 				body: "<p>Hello from the first article.</p>",

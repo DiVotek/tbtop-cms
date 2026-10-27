@@ -4,7 +4,7 @@ import { kyselyDriver, kyselyRules } from "@tbtop/admin/kysely";
 import { makeCms } from "./support";
 
 const en = [{ locale: "en", name: "English", default: true }];
-const fixture = { languages: en, pages: [{ key: "about", name: { en: "About" }, title: { en: "First" } }] };
+const fixture = { languages: en, pages: [{ key: "about", name: { en: "About" }, heading: { en: "First" } }] };
 
 async function edit(cms: Awaited<ReturnType<typeof makeCms>>["cms"], id: number, input: Parameters<ReturnType<typeof cms.site>["pages"]["update"]>[1]) {
 	const page = await cms.site().pages.find(id);
@@ -15,12 +15,12 @@ describe("page revisions", () => {
 	test("create, then each editorial save, is a revision; a status-only save is not", async () => {
 		const { cms, ids } = await makeCms(fixture);
 		const id = ids.about as number;
-		await edit(cms, id, { title: { en: "Second" } });
+		await edit(cms, id, { heading: { en: "Second" } });
 		await edit(cms, id, { status: "published" });
 		await edit(cms, id, { sortOrder: 3 });
 
 		const revisions = await cms.site().pages.revisions.list(id);
-		expect(revisions.map((revision) => [revision.kind, revision.payload.title])).toEqual([
+		expect(revisions.map((revision) => [revision.kind, revision.payload.heading])).toEqual([
 			["save", { en: "Second" }],
 			["create", { en: "First" }],
 		]);
@@ -32,11 +32,11 @@ describe("page revisions", () => {
 		const id = ids.about as number;
 		const site = cms.site();
 		const [created] = await site.pages.revisions.list(id);
-		await edit(cms, id, { title: { en: "Second" }, content: [{ id: "a", type: "Hero", data: {} }], status: "published" });
+		await edit(cms, id, { heading: { en: "Second" }, content: [{ id: "a", type: "Hero", data: {} }], status: "published" });
 		const slugs = await site.pages.slugs.allFor(id);
 
 		const restored = await site.pages.restore(id, created?.id as number, { by: 7 });
-		expect(restored.title).toEqual({ en: "First" });
+		expect(restored.heading).toEqual({ en: "First" });
 		expect(restored.content).toEqual([]);
 		expect(restored.status).toBe("published");
 		expect(await site.pages.slugs.allFor(id)).toEqual(slugs);
@@ -46,12 +46,12 @@ describe("page revisions", () => {
 	test("only the newest `keep` revisions stay; keep 0 records none", async () => {
 		const { cms, ids } = await makeCms(fixture, { revisions: { keep: 2 } });
 		for (const title of ["B", "C", "D"]) {
-			await edit(cms, ids.about as number, { title: { en: title } });
+			await edit(cms, ids.about as number, { heading: { en: title } });
 		}
-		expect((await cms.site().pages.revisions.list(ids.about as number)).map((revision) => revision.payload.title)).toEqual([{ en: "D" }, { en: "C" }]);
+		expect((await cms.site().pages.revisions.list(ids.about as number)).map((revision) => revision.payload.heading)).toEqual([{ en: "D" }, { en: "C" }]);
 
 		const off = await makeCms(fixture, { revisions: { keep: 0 } });
-		await edit(off.cms, off.ids.about as number, { title: { en: "B" } });
+		await edit(off.cms, off.ids.about as number, { heading: { en: "B" } });
 		expect(await off.db.selectFrom("tbtop_page_revisions").select("id").execute()).toEqual([]);
 	});
 
@@ -65,7 +65,7 @@ describe("page revisions", () => {
 		const { cms, db, ids } = await makeCms(fixture);
 		const id = ids.about as number;
 		const [created] = await cms.site().pages.revisions.list(id);
-		await edit(cms, id, { title: { en: "Second" } });
+		await edit(cms, id, { heading: { en: "Second" } });
 		const admin = createAdmin({
 			prefix: "/admin",
 			pages: cms.admin.pages,
@@ -87,7 +87,7 @@ describe("page revisions", () => {
 			}),
 		);
 		expect(res?.status).toBeLessThan(400);
-		expect((await cms.site().pages.find(id))?.title).toEqual({ en: "First" });
+		expect((await cms.site().pages.find(id))?.heading).toEqual({ en: "First" });
 		expect((await cms.site().pages.revisions.list(id))[0]).toMatchObject({ kind: "restore", userId: 1 });
 	});
 });

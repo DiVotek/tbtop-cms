@@ -80,6 +80,7 @@ export function baselineMigration(options: MigrationOptions): Migration {
 					.addColumn("fields", t.json)
 					.addColumn("starter_blocks", t.json)
 					.addColumn("name", t.json)
+					// Dropped by pageTitleToSeoMigration: the title lives in seo.title.
 					.addColumn("title", t.json)
 					.addColumn("heading", t.json)
 					.addColumn("summary", t.json)
@@ -324,10 +325,98 @@ const TABLES = [
 	"tbtop_page_refs",
 ];
 
+const jsonValue = (raw: unknown): unknown => {
+	if (typeof raw !== "string") {
+		return raw;
+	}
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return null;
+	}
+};
+
+const localeMap = (raw: unknown): Record<string, unknown> => {
+	const value = jsonValue(raw);
+	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+};
+
+/** Not blank: something besides spaces, tabs and line breaks, the set the SQLite statement trims too. */
+const filled = (value: unknown): value is string => typeof value === "string" && /[^ \t\r\n]/.test(value);
+
+/**
+ * The SQLite (D1 included) copy as one statement, so the D1 SQL files carry
+ * it too: the meta titles a page keeps, plus each non-blank title whose
+ * locale has none. A malformed `seo` starts over as `{}`.
+ */
+const SQLITE_TITLE_TO_SEO = sql`
+	update "tbtop_pages" set "seo" = json_set(seo_json, '$.title', json((
+		select json_group_object(key, value) from (
+			select key, value from json_each(seo_title)
+			where key not in (select key from json_each("title") where type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')
+				or (type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')
+			union all
+			select key, value from json_each("title")
+			where type = 'text' and trim(value, char(32, 9, 10, 13)) <> ''
+				and key not in (select key from json_each(seo_title) where type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')
+		)
+	)))
+	from (select "id" as page_id,
+		coalesce(case when json_valid("seo") and json_type("seo") = 'object' then "seo" end, '{}') as seo_json,
+		case when json_valid("seo") and json_type("seo", '$.title') = 'object' then json_extract("seo", '$.title') else '{}' end as seo_title
+		from "tbtop_pages") as current
+	where "id" = current.page_id and json_valid("title") and json_type("title") = 'object'
+		and exists (select 1 from json_each("title") where type = 'text' and trim(value, char(32, 9, 10, 13)) <> '')`;
+
+/**
+ * PHP #326: the page title lives only in SEO. Each locale's non-blank title
+ * moves into an empty `seo.title` (a set meta title wins), then the column
+ * goes, so an upgraded database and a fresh one end up alike.
+ */
+export function pageTitleToSeoMigration(options: MigrationOptions): Migration {
+	return {
+		async up(db: Kysely<unknown>) {
+			if (options.dialect === "sqlite") {
+				await SQLITE_TITLE_TO_SEO.execute(db);
+			} else {
+				await copyTitles(db);
+			}
+			await db.schema.alterTable("tbtop_pages").dropColumn("title").execute();
+		},
+		/** The column back, filled from `seo.title`; the meta title stays where it is. */
+		async down(db: Kysely<unknown>) {
+			await db.schema.alterTable("tbtop_pages").addColumn("title", types(options.dialect).json).execute();
+			const pages = db as unknown as Kysely<{ tbtop_pages: { id: number; title: string | null; seo: unknown } }>;
+			for (const row of await pages.selectFrom("tbtop_pages").select(["id", "seo"]).where("seo", "is not", null).execute()) {
+				const title = localeMap(localeMap(row.seo).title);
+				if (Object.keys(title).length > 0) {
+					await pages.updateTable("tbtop_pages").set({ title: JSON.stringify(title) }).where("id", "=", row.id).execute();
+				}
+			}
+		},
+	};
+}
+
+async function copyTitles(db: Kysely<unknown>): Promise<void> {
+	const pages = db as unknown as Kysely<{ tbtop_pages: { id: number; title: unknown; seo: unknown } }>;
+	for (const row of await pages.selectFrom("tbtop_pages").select(["id", "title", "seo"]).where("title", "is not", null).execute()) {
+		const seo = localeMap(row.seo);
+		const current = localeMap(seo.title);
+		const moved = Object.entries(localeMap(row.title)).filter(([locale, text]) => filled(text) && !filled(current[locale]));
+		if (moved.length > 0) {
+			const title = { ...current, ...Object.fromEntries(moved) };
+			await pages.updateTable("tbtop_pages").set({ seo: JSON.stringify({ ...seo, title }) }).where("id", "=", row.id).execute();
+		}
+	}
+}
+
 /** A Kysely MigrationProvider: merge it into the host's own migrations, or run `migrateCms`. */
 export function cmsMigrations(options: MigrationOptions): MigrationProvider {
 	return {
-		getMigrations: async () => ({ "2026_10_22_000000_tbtop_cms_baseline": baselineMigration(options) }),
+		getMigrations: async () => ({
+			"2026_10_22_000000_tbtop_cms_baseline": baselineMigration(options),
+			"2026_10_27_000000_tbtop_page_title_to_seo": pageTitleToSeoMigration(options),
+		}),
 	};
 }
 

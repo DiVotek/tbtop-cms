@@ -42,7 +42,6 @@ type ErrorPageShape = {
 		subtype: string | null;
 		status: string | null;
 		name: string | null;
-		title: string | null;
 		heading: string | null;
 		summary: string | null;
 		body: string;
@@ -112,7 +111,6 @@ async function pageShape(site: Site, page: Page, locale: string): Promise<Conten
 			subtype: page.subtype,
 			status: page.status,
 			name: translationText(page, "name", locale, fallback),
-			title: translationText(page, "title", locale, fallback),
 			heading: translationText(page, "heading", locale, fallback),
 			summary: translationText(page, "summary", locale, fallback),
 			body: richtextHtml(translation(page, "body", locale, fallback)),
@@ -139,7 +137,6 @@ function fallbackContent(site: Site, status: number, locale: string, fallback: s
 			subtype: null,
 			status: null,
 			name: null,
-			title: null,
 			heading,
 			summary: null,
 			body: "",
@@ -222,7 +219,6 @@ export async function ensureErrorPages(cms: Cms): Promise<ErrorClass[]> {
 			isIndexable: false,
 			sortOrder: 0,
 			name: { [locale]: heading },
-			title: { [locale]: heading },
 			heading: { [locale]: heading },
 		});
 		created.push(errorClass);

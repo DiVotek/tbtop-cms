@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
@@ -34,7 +34,7 @@ describe("D1 migrations as SQL files", () => {
 	test("the files give a working site with Better Auth, and migrateCms then finds nothing to do", async () => {
 		const dir = await tempDir();
 		const written = await writeD1Migrations(dir, { auth: auth() });
-		expect(written.map((path) => path.slice(dir.length + 1))).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_better_auth.sql"]);
+		expect(written.map((path) => path.slice(dir.length + 1))).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_2026_10_27_000000_tbtop_page_title_to_seo.sql", "0003_better_auth.sql"]);
 
 		const sqlite = new Database(":memory:");
 		await apply(sqlite, dir);
@@ -54,6 +54,17 @@ describe("D1 migrations as SQL files", () => {
 		expect([plan.toBeCreated, plan.toBeAdded, plan.toBeAddedIndexes]).toEqual([[], [], []]);
 		const made = await betterAuth(options).api.createUser({ body: { email: "anna@blog.test", password: "correct-horse", name: "Anna", role: "editor" } });
 		expect(made.user.email).toBe("anna@blog.test");
+	});
+
+	test("a directory from before the title move keeps its files; the new migration comes after them", async () => {
+		const dir = await tempDir();
+		await writeD1Migrations(dir, { auth: auth() });
+		// The 0.0 layout: the baseline, then Better Auth as 0002.
+		await rm(join(dir, "0002_2026_10_27_000000_tbtop_page_title_to_seo.sql"));
+		await rename(join(dir, "0003_better_auth.sql"), join(dir, "0002_better_auth.sql"));
+		const added = await writeD1Migrations(dir, { auth: auth() });
+		expect(added.map((path) => path.slice(dir.length + 1))).toEqual(["0003_2026_10_27_000000_tbtop_page_title_to_seo.sql"]);
+		expect((await readdir(dir)).sort()).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_better_auth.sql", "0003_2026_10_27_000000_tbtop_page_title_to_seo.sql"]);
 	});
 
 	test("a second run writes nothing; a Better Auth plugin added later gets its own file with only the new columns", async () => {
@@ -78,9 +89,10 @@ describe("D1 migrations as SQL files", () => {
 		expect([plan.toBeCreated, plan.toBeAdded]).toEqual([[], []]);
 	});
 
-	test("without auth only the CMS file; the default language is chosen or left out", async () => {
+	test("without auth only the CMS files; the default language is chosen or left out", async () => {
 		const [uk] = await d1Migrations({ defaultLanguage: "uk" });
-		expect((await d1Migrations()).map((file) => file.name)).toEqual(["2026_10_22_000000_tbtop_cms_baseline"]);
+		expect((await d1Migrations()).map((file) => file.name)).toEqual(["2026_10_22_000000_tbtop_cms_baseline", "2026_10_27_000000_tbtop_page_title_to_seo"]);
+		expect((await d1Migrations())[1]?.sql).toContain('update "tbtop_pages" set "seo"');
 		expect(uk?.sql).toContain("'uk'");
 		expect((await d1Migrations({ defaultLanguage: false }))[0]?.sql).not.toContain('insert into "tbtop_languages"');
 		await expect(d1Migrations({ defaultLanguage: "xx" })).rejects.toThrow("Unknown locale");
@@ -91,8 +103,8 @@ describe("D1 migrations as SQL files", () => {
 		const lines: string[] = [];
 		const io = { out: (line: string) => lines.push(line), err: (line: string) => lines.push(`ERR ${line}`) };
 		expect(await runD1Migrations(["d1:migrations", "--out", dir, "--entry", "example/site/worker.ts", "--locale", "uk"], io)).toBe(0);
-		expect((await readdir(dir)).sort()).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_better_auth.sql"]);
-		expect(await readFile(join(dir, "0002_better_auth.sql"), "utf8")).toContain('create table "tbtop_sessions"');
+		expect((await readdir(dir)).sort()).toEqual(["0001_2026_10_22_000000_tbtop_cms_baseline.sql", "0002_2026_10_27_000000_tbtop_page_title_to_seo.sql", "0003_better_auth.sql"]);
+		expect(await readFile(join(dir, "0003_better_auth.sql"), "utf8")).toContain('create table "tbtop_sessions"');
 		expect(lines.at(-1)).toContain("wrangler d1 migrations apply");
 
 		lines.length = 0;

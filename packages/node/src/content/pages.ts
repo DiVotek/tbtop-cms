@@ -116,7 +116,8 @@ export class Pages {
 		return this.audit.track(AUDIT_SUBJECTS.page, null, () => this.insert(input, options), { idOf: (page) => page.id });
 	}
 
-	private async insert(input: PageInput & { type: string }, options: { slugs?: Record<string, string>; by?: string | number | null }): Promise<Page> {
+	private async insert(given: PageInput & { type: string }, options: { slugs?: Record<string, string>; by?: string | number | null }): Promise<Page> {
+		const input = { ...given, ...firstPublishStamp(given, null) };
 		assertTypePair(this.types, input.type, input.subtype ?? null);
 		await assertHierarchy(this.db, this.types, { id: null, type: input.type, subtype: input.subtype ?? null, parentId: input.parentId ?? null });
 		const now = sqlDate(new Date());
@@ -190,7 +191,7 @@ export class Pages {
 		let qb = this.db
 			.updateTable("tbtop_pages")
 			.set({
-				...this.columns(input),
+				...this.columns({ ...input, ...firstPublishStamp(input, current) }),
 				...(input.type !== undefined ? { type: input.type } : {}),
 				...(input.status !== undefined ? { status: input.status } : {}),
 				...(input.isIndexable !== undefined ? { is_indexable: flag(input.isIndexable) } : {}),
@@ -378,4 +379,16 @@ export class PageConflictError extends Error {
 	constructor(readonly pageId: number) {
 		super(`Page #${pageId} was changed by someone else.`);
 	}
+}
+
+/**
+ * PageObserver::stampFirstPublish: the first publish with no date set stamps
+ * published_at with now, so the page has a datePublished. A date the editor
+ * set (a future one schedules the page) is left alone, and a republish keeps
+ * the first stamp: unpublishing does not clear published_at.
+ */
+function firstPublishStamp(input: PageInput, current: Page | null): Pick<PageInput, "publishedAt"> {
+	const publishes = input.status === "published" && current?.status !== "published";
+	const publishedAt = input.publishedAt !== undefined ? input.publishedAt : (current?.publishedAt ?? null);
+	return publishes && publishedAt === null ? { publishedAt: new Date() } : {};
 }

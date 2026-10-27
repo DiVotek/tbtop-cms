@@ -41,6 +41,12 @@ export function leadIdentity(payload: Record<string, unknown>): string | null {
 	return null;
 }
 
+/** LeadIdentity::name: the payload's `name`, or null. */
+export const leadName = (payload: Record<string, unknown>): string | null => nonEmpty(payload.name);
+
+/** LeadIdentity::contact: how to reach the lead, the email, else a phone a custom form collects. */
+export const leadContact = (payload: Record<string, unknown>): string | null => nonEmpty(payload.email) ?? nonEmpty(payload.phone);
+
 /** SubmissionFieldFormatter: scalars as text, arrays and objects as JSON (never "[object Object]"). */
 export function formatField(value: unknown): string {
 	if (value === null || value === undefined) {

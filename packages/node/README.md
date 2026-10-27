@@ -194,12 +194,14 @@ const cms = createCms({
 	seo: { extend: (nodes, ctx) => [...nodes.filter((n) => n["@id"] !== identityId(ctx.site)), myOrganization(ctx)] },
 	url: "https://example.com", // default: the request origin; set it behind a TLS-terminating proxy
 	timezone: "Europe/Kyiv", // app.timezone: admin dates, dashboard days, SEO {date}; stored dates stay UTC (default UTC)
-	media: (ref) => ({ url: `/storage/${ref}` }),
+	media: (ref) => ({ url: `/storage/${ref}` }), // width/height/alt too, for og:image and ctx.mediaImage()
+	imageLoader: (ref, width) => `/cdn-cgi/image/width=${width}/storage/${ref}`, // srcset copies for ctx.mediaImage()
 	canPreview: (request) => isEditor(request),
 	preview: { secret: env.PREVIEW_SECRET, ttlHours: 72 }, // signed preview links for pages that are not live
 	auth: cmsAuth(auth), // a betterAuth({...}) instance: section access, the panel session, sign-in and Users pages (see Users and sign-in)
 	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
 	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
+	admin: { locales: ["en", "uk"], locale: "en" }, // the panel's UI languages (not content languages), saved per admin
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
@@ -234,8 +236,17 @@ compact, nav groups, chrome with bell, inbox and view site, as PHP's
 CmsPanel), `prefix` (`adminPrefix`), `pages`, `hostRules` (the config's plus
 `link_shape` and `page_ref`), `context` (content locales from the
 admin-active languages), the auth adapter's `session` and `loginPath`,
-`notifications.store` (`notifications.bell.store`) and
-`driver: kyselyDriver(config.db)`. A key after the spread overrides it.
+`notifications.store` (`notifications.bell.store`), `locales` and `locale`
+(`admin.locales`, `admin.locale`) and `driver: kyselyDriver(config.db)`. A
+key after the spread overrides it.
+
+`admin.locales` are the languages the panel itself speaks, apart from the
+content languages pages are written in. With two or more, the user menu
+offers them and each admin's pick is saved to `tbtop_user_profiles.locale`
+(through the panel's `userLocale`/`onLocaleChange`), so it outlives the
+session. Staff notifications read the same locales: the bell each admin's
+saved one, mail and Telegram `admin.locale`, never the page's language; the
+template overrides in Settings → Notifications are per admin locale.
 
 `pages` is the host's pages, added after the CMS's and the auth adapter's,
 or a function that gets those and returns the panel's:
@@ -482,6 +493,13 @@ fields write to and stores its ref, as an upload would
 `pages.create({ ..., image: "seed/hero.jpg" })`); `media` turns the ref into
 a URL.
 
+A block that renders a large image calls `ctx.mediaImage(ref)` in `resolve()`
+instead of `ctx.mediaUrl(ref)`: `{ src, srcset, width, height, alt }` for
+`<img srcset sizes width height>`. The srcset lists `imageLoader(ref, w)` at
+640, 960, 1280 and 1920 below the original's width (from `media()`), then the
+original; without a loader, a known width or a narrower step it is null and
+`src` renders alone. An unknown ref is null, as with `mediaUrl`.
+
 A list the editor does not pick (a blog index, the products of a category,
 "latest three posts") is the host's own query, in its loader or route: the
 page props carry no children, and a block's `resolve()` does not see the
@@ -490,7 +508,7 @@ request's `?page=`. `site.pages.query()` is a Kysely builder over live
 frontend uses (published, `published_at` passed, `unpublish_at` ahead), the
 counterpart of PHP's `Page::scopeLive`, `pageFromRow` turns a row into a
 `Page`, and `site.pageViews(pages, locale)` makes each one what `props.page`
-is for an open page (name, title, heading, summary in the locale with the
+is for an open page (name, heading, summary in the locale with the
 default as fallback, body HTML, image URL) plus its `url`; `{ fields: true }`
 adds the resolved custom fields, one resolve per page:
 
@@ -657,6 +675,13 @@ submit: defineSubmit({
 }),
 ```
 
+An optional `labels(locale, blockData, ctx)` names the fields in the team's
+mail (`{ email: "Пошта", topic: "Тема" }`), in the readers' language rather
+than the page's; `ctx.t` reads the CMS strings in it. Templates get the map as
+`fieldLabels` (`fields` stays keyed by the raw names); a field without a
+label keeps its key. `ContactForm` labels its fields from
+`forms.contact.fields.*`.
+
 `schema` may be a function of the block's data and the submit context
 (`{ locale, page, t }`), for choices an editor sets or messages in the page's
 language: `t("validation.required", { attribute })` reads the CMS strings,
@@ -727,7 +752,8 @@ sent or has failed (`status`, `stage` render or send, `error`, `to` the
 recipient), on retries too. Both are awaited; a throw in either is logged
 and never fails the submit or the delivery.
 
-Template overrides are Liquid (`{{ leadIdentity }}`, `{% for f in fields %}`),
+Template overrides are Liquid (`{{ leadIdentity }}`, or `{{ leadName }}` and
+`{{ leadContact }}` apart, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored
 in `tbtop_notification_templates`.
 
@@ -773,8 +799,9 @@ export default {
 
 ## What 0.0 has
 
-- Schema and one baseline migration equal to the PHP migrations (SQLite,
-  Postgres and MySQL column types).
+- Schema and a baseline migration equal to the PHP migrations (SQLite,
+  Postgres and MySQL column types), then the page title moved into
+  `seo.title` (PHP #326).
 - Languages, settings (`site.*`/`seo.*` dotted keys), pages with per-locale
   slugs and paths (collision suffixes, cascade to children), optimistic
   locking, layouts (header/footer), shared blocks, redirects (chains, cycles,
