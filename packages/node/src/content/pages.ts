@@ -29,6 +29,8 @@ export type PageInput = Partial<
 /** Pages and their slugs (Page.php + PageObserver's slug sync). */
 export class Pages {
 	readonly slugs: PageSlugs;
+	/** home() and ancestors() by page id, once readOnce() is on. */
+	private memo: { home: Promise<Page | null> | null; ancestors: Map<number, Promise<Page[]>> } | null = null;
 
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
@@ -44,8 +46,32 @@ export class Pages {
 		this.slugs = new PageSlugs(db, frontendLocales, defaultLocale);
 	}
 
+	/**
+	 * A frontend render: the home page, each page's ancestors and the slugs
+	 * are read once and answered from memory after. Only for an instance that
+	 * writes no pages.
+	 */
+	readOnce(): void {
+		this.memo ??= { home: null, ancestors: new Map() };
+		this.slugs.readOnce();
+	}
+
 	query(): PagesQuery {
 		return this.db.selectFrom("tbtop_pages").where("tbtop_pages.deleted_at", "is", null);
+	}
+
+	/** The page at a path in a locale (the slug lookup and the page in one query); live only when asked. */
+	async findAt(path: string, locale: string, options: { live?: boolean } = {}): Promise<Page | null> {
+		let qb = this.query()
+			.innerJoin("tbtop_page_slugs", "tbtop_page_slugs.page_id", "tbtop_pages.id")
+			.selectAll("tbtop_pages")
+			.where("tbtop_page_slugs.locale", "=", locale)
+			.where("tbtop_page_slugs.path", "=", path);
+		if (options.live === true) {
+			qb = whereLive(qb);
+		}
+		const row = await qb.executeTakeFirst();
+		return row === undefined ? null : pageFromRow(row);
 	}
 
 	async find(id: number, options: { live?: boolean } = {}): Promise<Page | null> {
@@ -66,6 +92,14 @@ export class Pages {
 
 	/** HomePage::find(): the root system page that is not an error page. */
 	async home(): Promise<Page | null> {
+		if (this.memo !== null) {
+			this.memo.home ??= this.loadHome();
+			return this.memo.home;
+		}
+		return this.loadHome();
+	}
+
+	private async loadHome(): Promise<Page | null> {
 		const row = await this.query()
 			.selectAll("tbtop_pages")
 			.where("is_system", "=", 1)
@@ -91,6 +125,15 @@ export class Pages {
 
 	/** AncestorChain::forPage: root first, the page itself excluded, cycles cut. */
 	async ancestors(page: Page, maxSteps = 64): Promise<Page[]> {
+		if (this.memo === null || maxSteps !== 64) {
+			return this.loadAncestors(page, maxSteps);
+		}
+		const known = this.memo.ancestors.get(page.id) ?? this.loadAncestors(page, maxSteps);
+		this.memo.ancestors.set(page.id, known);
+		return [...(await known)];
+	}
+
+	private async loadAncestors(page: Page, maxSteps: number): Promise<Page[]> {
 		const chain: Page[] = [];
 		const seen = new Set<number>([page.id]);
 		let parentId = page.parentId;

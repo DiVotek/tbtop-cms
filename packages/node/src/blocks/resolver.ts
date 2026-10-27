@@ -37,13 +37,8 @@ export async function resolveBlocks(
 	const targets = await site.linkTargets(await linkedIds(site, content, page), locale);
 	const fields = page === null ? {} : await resolveFields(site, page, locale, locales, targets);
 	const ctx = await site.resolveContext(locale, page, fields, targets);
-	const blocks: ResolvedBlock[] = [];
-	for (const raw of sorted(content)) {
-		const block = await resolveOne(site, raw, ctx, locales);
-		if (block !== null) {
-			blocks.push(block);
-		}
-	}
+	// The blocks resolve together: a host resolver's own queries overlap instead of chaining.
+	const blocks = (await Promise.all(sorted(content).map((raw) => resolveOne(site, raw, ctx, locales)))).filter((block): block is ResolvedBlock => block !== null);
 	return { blocks, fields };
 }
 

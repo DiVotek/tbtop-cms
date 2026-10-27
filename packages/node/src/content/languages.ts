@@ -31,7 +31,8 @@ export type LanguageInput = {
  * with `cache` its reads go through it and every write bumps it.
  */
 export class Languages {
-	private rows: Language[] | null = null;
+	/** The rows as one promise: concurrent readers of a render share the query. */
+	private rows: Promise<Language[]> | null = null;
 
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
@@ -39,8 +40,16 @@ export class Languages {
 		private readonly audit: AuditLog = new AuditLog(db),
 	) {}
 
-	async all(): Promise<Language[]> {
-		this.rows ??= this.cache?.read === true ? await this.cache.store.remember("languages", () => this.query()) : await this.query();
+	all(): Promise<Language[]> {
+		if (this.rows === null) {
+			const loading = this.cache?.read === true ? this.cache.store.remember("languages", () => this.query()) : this.query();
+			this.rows = loading;
+			loading.catch(() => {
+				if (this.rows === loading) {
+					this.rows = null;
+				}
+			});
+		}
 		return this.rows;
 	}
 

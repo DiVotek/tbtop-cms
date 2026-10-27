@@ -14,7 +14,8 @@ const FRONTEND_PREFIXES = ["site.", "seo."];
  * without a key a secret reads as the fallback and cannot be written.
  */
 export class Settings {
-	private raw: Map<string, string | null> | null = null;
+	/** The rows as one promise: concurrent readers of a render share the query. */
+	private raw: Promise<Map<string, string | null>> | null = null;
 	private readonly box: SecretBox | null;
 
 	constructor(
@@ -72,7 +73,7 @@ export class Settings {
 		} else {
 			await this.db.updateTable("tbtop_settings").set({ value: encoded, updated_at: now }).where("id", "=", existing.id).execute();
 		}
-		await this.changed();
+		await this.changed(key);
 	}
 
 	async setMany(values: Record<string, unknown>): Promise<void> {
@@ -83,7 +84,7 @@ export class Settings {
 
 	async forget(key: string): Promise<void> {
 		await this.db.deleteFrom("tbtop_settings").where("key", "=", key).execute();
-		await this.changed();
+		await this.changed(key);
 	}
 
 	/** Every `site.*` and `seo.*` key that is not secret, media keys as URLs (`cms.settings`). */
@@ -122,11 +123,16 @@ export class Settings {
 		return typeof value === "string" || typeof value === "number" ? this.options.mediaUrl(String(value)) : null;
 	}
 
-	private async rawAll(): Promise<Map<string, string | null>> {
+	private rawAll(): Promise<Map<string, string | null>> {
 		if (this.raw === null) {
 			const cache = this.options.cache;
-			const rows = cache?.read === true ? await cache.store.remember("settings", () => this.query()) : await this.query();
-			this.raw = new Map(rows);
+			const loading = (cache?.read === true ? cache.store.remember("settings", () => this.query()) : this.query()).then((rows) => new Map(rows));
+			this.raw = loading;
+			loading.catch(() => {
+				if (this.raw === loading) {
+					this.raw = null;
+				}
+			});
 		}
 		return this.raw;
 	}
@@ -135,8 +141,16 @@ export class Settings {
 		return (await this.db.selectFrom("tbtop_settings").select(["key", "value"]).execute()).map((row) => [row.key, row.value]);
 	}
 
-	private async changed(): Promise<void> {
+	/**
+	 * A `system.*` key (the scheduler's heartbeat, every minute) is never on
+	 * the frontend, so it does not bump the content cache: PHP keeps it in
+	 * the cache, out of the content version.
+	 */
+	private async changed(key: string): Promise<void> {
 		this.raw = null;
+		if (key.startsWith("system.")) {
+			return;
+		}
 		await this.options.cache?.store.bump();
 	}
 }

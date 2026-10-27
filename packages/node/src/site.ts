@@ -48,6 +48,8 @@ export class Site {
 	readonly notFound: NotFoundLog;
 	/** Admin writes by a signed-in user (`activity_log`). */
 	readonly audit: AuditLog;
+	/** Link targets by locale and page id, on a frontend render (`cached`). */
+	private readonly targets: Map<string, Map<number, Promise<LinkTarget>>> | null;
 
 	constructor(
 		readonly config: CmsConfig,
@@ -84,6 +86,11 @@ export class Site {
 		this.submissions = new Submissions(db);
 		this.notFound = new NotFoundLog(db, this.settings, config.notFound?.ignore);
 		this.notifications = new Notifications(this);
+		// A frontend render reads; each page, slug and link target is loaded once for all its blocks and layouts.
+		this.targets = options.cached === true ? new Map() : null;
+		if (options.cached === true) {
+			this.pages.readOnce();
+		}
 	}
 
 	media(ref: string | null | undefined): MediaDetails | null {
@@ -149,7 +156,7 @@ export class Site {
 			return null;
 		}
 		const fallback = await this.languages.defaultLocale();
-		const target = link.type === "page" ? (targets?.get(Number(link.page)) ?? (await this.linkTarget(Number(link.page), locale))) : null;
+		const target = link.type === "page" ? (targets?.get(Number(link.page)) ?? (await this.linkTargets([Number(link.page)], locale)).get(Number(link.page))) : null;
 		const page = target?.page ?? null;
 		let href: string | null = null;
 		if (link.type === "page") {
@@ -172,6 +179,25 @@ export class Site {
 	 */
 	async linkTargets(ids: number[], locale: string): Promise<LinkTargets> {
 		const unique = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+		if (this.targets === null) {
+			return this.loadTargets(unique, locale);
+		}
+		const known = this.targets.get(locale) ?? new Map<number, Promise<LinkTarget>>();
+		this.targets.set(locale, known);
+		const missing = unique.filter((id) => !known.has(id));
+		if (missing.length > 0) {
+			const loading = this.loadTargets(missing, locale);
+			for (const id of missing) {
+				known.set(
+					id,
+					loading.then((targets) => targets.get(id) ?? { page: null, url: null }),
+				);
+			}
+		}
+		return new Map(await Promise.all(unique.map(async (id) => [id, await (known.get(id) as Promise<LinkTarget>)] as const)));
+	}
+
+	private async loadTargets(unique: number[], locale: string): Promise<LinkTargets> {
 		const targets: LinkTargets = new Map(unique.map((id) => [id, { page: null, url: null }]));
 		if (unique.length === 0) {
 			return targets;
@@ -186,11 +212,6 @@ export class Site {
 			targets.set(page.id, { page, url: path === undefined ? null : await this.url(path, locale) });
 		}
 		return targets;
-	}
-
-	private async linkTarget(id: number, locale: string): Promise<LinkTarget> {
-		const page = await this.pages.find(id, { live: true });
-		return { page, url: page === null ? null : await this.pageUrl(page, locale) };
 	}
 
 	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}, targets?: LinkTargets, nested = false): Promise<ResolveContext> {
