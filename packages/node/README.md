@@ -235,7 +235,8 @@ CMS config: the panel's look (`cms.admin.panel`: brand, topbar-sidebar,
 compact, nav groups, chrome with bell, inbox and view site, as PHP's
 CmsPanel), `prefix` (`adminPrefix`), `pages`, `hostRules` (the config's plus
 `link_shape` and `page_ref`), `context` (content locales from the
-admin-active languages), the auth adapter's `session` and `loginPath`,
+admin-active languages), the auth adapter's `session`, `loginPath` and
+`userMenuItems`,
 `notifications.store` (`notifications.bell.store`), `locales` and `locale`
 (`admin.locales`, `admin.locale`) and `driver: kyselyDriver(config.db)`. A
 key after the spread overrides it.
@@ -263,7 +264,7 @@ The CMS pages' `path`s are public contract, under the prefix: `dashboard`,
 `languages/new`, `languages/$language/edit`, `settings/site`, `settings/seo`,
 `notification-settings`, `site-health`, `audit`, `audit/$activity` and
 `link/page-search`; `@tbtop/cms/better-auth` adds `login`, `users`,
-`users/new` and `users/$user/edit`. CMS pages link to each other (the
+`users/new`, `users/$user/edit` and `profile`. CMS pages link to each other (the
 dashboard, the bell and inbox, the page editor's shared blocks, the link
 field's page picker), so a filtered-out page another one links to leaves a
 dead link or a broken field. To hide a section from some users, return false
@@ -394,7 +395,7 @@ export const auth = betterAuth({
 });
 const cms = createCms({ db, blocks, auth: cmsAuth(auth) });
 await migrateCms(db, { dialect: "sqlite", userKey: "string" }); // Better Auth's ids are strings
-const admin = createAdmin({ ...cms.admin.options(), rootView }); // session, loginPath, the sign-in and Users pages come with it
+const admin = createAdmin({ ...cms.admin.options(), rootView }); // session, loginPath, the sign-in, Users and Profile pages come with it
 ```
 
 - `session` reads Better Auth's session cookie once per request; the panel's
@@ -413,9 +414,20 @@ const admin = createAdmin({ ...cms.admin.options(), rootView }); // session, log
   chrome, the product mark, a card headed by the Site name, Remember me,
   a link to the site), and `users`, `users/new`, `users/{id}/edit`
   (Settings → Users): name, email, role, banned; add with a password, edit
-  name and role (not one's own), set a new password, ban (signs out
+  name and role (not one's own), set a new password (signs that user out
+  everywhere; on one's own row, every other session), ban (signs out
   everywhere), unban, delete. Better Auth refuses banning or deleting
-  oneself.
+  oneself. And `profile`, linked at the top of the user menu, open to every
+  role that gets in: one's own name, and a new password that needs the
+  current one and signs every other session out (this one stays). Wrong
+  current passwords count against `signInThrottle` per user. Email is shown,
+  not edited. `cmsAuth(auth, { profile: false })` (or `defaultAuth`'s
+  `adapter: { profile: false }`) leaves the page and its link out, e.g.
+  behind SSO.
+- Forgotten password: there is no email reset. Another admin sets a new
+  password on the Users page. With no admin left to do it, delete the admin
+  users (or demote them) and boot with `TBTOP_ADMIN_EMAIL` /
+  `TBTOP_ADMIN_PASSWORD`: the boot creates an admin while the site has none.
 - Sign-in attempts are throttled per client and email (`signInThrottle`,
   default 5 a minute, `false` turns it off; a success clears the count):
   Better Auth's own rate limit covers only its HTTP routes, and every
