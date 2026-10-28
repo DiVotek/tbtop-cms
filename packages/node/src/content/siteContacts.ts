@@ -1,6 +1,7 @@
 import type { Site } from "../site";
 import { OFFICES, SOCIALS } from "./builtInCollections";
 import type { ResolvedEntry } from "./entryList";
+import { safeHref } from "./safeHref";
 
 /** One social link as blocks and the identity read it. */
 export type SocialLink = { label: string; name: string | null; href: string };
@@ -41,12 +42,12 @@ export class SiteContacts {
 		return column((await this.offices(locale))[0]?.emails, "address");
 	}
 
-	/** Entries missing a label or a link are skipped. */
+	/** Entries missing a label or a link, or with a script link stored past the form, are skipped. */
 	async socials(locale?: string): Promise<SocialLink[]> {
 		const out: SocialLink[] = [];
 		for (const entry of await this.site.collection(SOCIALS, locale)) {
 			const label = text(entry.label);
-			const href = text(entry.href);
+			const href = safeHref(text(entry.href));
 			if (label !== null && href !== null) {
 				out.push({ label, name: text(entry.name), href });
 			}

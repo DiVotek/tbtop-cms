@@ -1,4 +1,5 @@
 import type { CollectionDef } from "./collections";
+import { safeHrefRule } from "./safeHref";
 
 /** schema.org day names, as the opening hours store them (SiteIdentity::DAYS). */
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -63,7 +64,7 @@ export const socialsCollection: CollectionDef = {
 	form: (s) => [
 		s.text("name").label("Name").placeholder("Telegram").rules("nullable|max:40"),
 		s.text("label").label("Short label").placeholder("TG").required().rules("max:8"),
-		s.text("href").label("Link").required().rules("url|max:255"),
+		s.text("href").label("Link").required().rules(["url", "max:255", safeHrefRule]),
 	],
 };
 

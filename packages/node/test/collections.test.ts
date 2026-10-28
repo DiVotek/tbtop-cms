@@ -291,6 +291,20 @@ describe("collections: offices and socials", () => {
 		expect(rules(socials.form(new S()), "label")).toEqual(expect.arrayContaining(["required", "max:8"]));
 		expect(rules(socials.form(new S()), "href")).toEqual(expect.arrayContaining(["required", "url"]));
 	});
+	test("a social link with a script scheme is refused by the form and never reaches the site", async () => {
+		const socials = new Collections(BUILT_IN_COLLECTIONS).get("socials");
+		const href = (socials.form(new S()) as { name: string; ruleEntries(): string[] }[]).find((field) => field.name === "href")?.ruleEntries() ?? [];
+		const pattern = href.find((rule) => rule.startsWith("regex:"))?.slice("regex:".length) ?? "";
+		const regex = new RegExp(pattern.slice(1, pattern.lastIndexOf("/")), pattern.slice(pattern.lastIndexOf("/") + 1));
+		expect(regex.test("javascript://%0Aalert(1)")).toBe(false);
+		expect(regex.test("https://t.me/acme")).toBe(true);
+
+		const { cms } = await makeCms({ languages: [{ locale: "en", name: "English", default: true }] });
+		const site = cms.site();
+		await site.entries.create({ collection: "socials", status: "published", data: { label: "X", href: "javascript://%0Aalert(1)" } });
+		await site.entries.create({ collection: "socials", status: "published", data: { label: "TG", href: "https://t.me/acme" } });
+		expect((await site.contacts.socials()).map((social) => social.href)).toEqual(["https://t.me/acme"]);
+	});
 });
 
 describe("collections: the site file", () => {

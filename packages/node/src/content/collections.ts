@@ -1,6 +1,7 @@
-import { Field, S, walk } from "@tbtop/admin";
+import { S, walk } from "@tbtop/admin";
 import type { ResolveContext } from "../blocks/context";
 import { PagesField } from "../blocks/cmsFields";
+import { CollectionField } from "../blocks/collectionField";
 import { formFields } from "../blocks/fields";
 
 /**
@@ -110,6 +111,5 @@ export class Collections {
 	}
 }
 
-/** A `collection` field without importing the field class here (it imports this module). */
 /** Any depth: a collection field inside a repeater picks entries all the same. */
-const isCollectionField = (value: unknown): boolean => value instanceof Field && value.toNode().kind === "collection";
+const isCollectionField = (value: unknown): boolean => value instanceof CollectionField;
