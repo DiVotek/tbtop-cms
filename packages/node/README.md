@@ -99,6 +99,24 @@ export default cloudflare(site, { render, renderError });
 `page.fields.readingTime` is `number | null` in `render` without a hand-written
 type. A form block gets `action` and `honeypotField` props: post the form there.
 
+**Block props from `resolve`.** The fields are the editor's input; the props
+are what the component gets. Without `resolve` they are the same. With it, the
+props are what `resolve` returns, and their type comes from that return:
+
+```ts
+Contacts: block({ heading: f.text().translatable() }, {
+	// `fields` is the fields resolved and parsed: { heading: string | null }
+	resolve: async (fields, ctx) => ({ heading: fields.heading ?? "", phone: String(await ctx.site.settings.get("site.phone", "")) }),
+}),
+
+// the component, in the browser
+import type { BlockProps } from "@tbtop/cms/site";
+function Contacts(props: BlockProps<typeof site, "Contacts">) { /* { heading: string; phone: string } */ }
+```
+
+No zod schema follows from a function, so the catalog checks no shape for a
+block with `resolve` (any object passes): its return type is the check.
+
 **Fields (`f.*`).** `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
 `select(options)` (one value or null), `select(options, { multiple: true })`
 (an array), `tags`, `image`, `link(types?)`, `pages(type?)`, `repeater(fields)`.

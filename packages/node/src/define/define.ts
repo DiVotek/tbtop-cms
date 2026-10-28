@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Placement } from "../blocks/catalog";
+import type { ResolveContext } from "../blocks/context";
 import type { BlockImpl } from "../blocks/registry";
 import type { PageTypeDef } from "../content/pageTypes";
 import type { SchemaContext } from "../seo/schemaContext";
@@ -16,37 +17,65 @@ export type SeoHelpers = {
 /** The page's JSON-LD documents, last: return them with yours added or replaced. */
 export type SeoExtend = (nodes: Record<string, unknown>[], ctx: SchemaContext, h: SeoHelpers) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
 
-type BlockOptions<P> = {
+type BlockOptions<R extends Fields, P> = {
 	label?: string;
 	description?: string;
 	category?: string;
 	/** Where the block may go; default `["pages"]`. */
 	placements?: Placement[];
-} & Pick<BlockImpl<P>, "resolve" | "toSchema">;
+	/**
+	 * The props from the editor's fields (resolved and parsed): the block's
+	 * output may differ from its admin input. The props type is what it
+	 * returns, the catalog checks no shape for it. Default: the fields.
+	 */
+	resolve?: (fields: Output<R>, ctx: ResolveContext) => P | Promise<P>;
+	/** A JSON-LD node the block adds to the page, or null. */
+	toSchema?: (props: P, ctx: SchemaContext) => Record<string, unknown> | null;
+};
 
-type FormBlockOptions<P> = BlockOptions<P> & Required<Pick<BlockImpl<P>, "submit">> & Pick<BlockImpl<P>, "formName">;
+type FormBlockOptions<R extends Fields, P> = BlockOptions<R, P> & Required<Pick<BlockImpl<P>, "submit">> & Pick<BlockImpl<P>, "formName">;
 
 /** What a form block's props carry besides its fields: where it posts, and the honeypot input's name. */
 export type FormProps = { action: string; honeypotField?: string };
 
-/** A block is its fields: the props are what they resolve to (plus FormProps for a form block). */
-export type Block<R extends Fields = Fields, Form extends boolean = boolean> = {
+/** A block is its fields: the props are what they resolve to, or what its `resolve` returns (plus FormProps for a form block). */
+export type Block<R extends Fields = Fields, Form extends boolean = boolean, P = Output<R>> = {
 	readonly fields: R;
-	readonly options: Form extends true ? FormBlockOptions<Output<R>> : BlockOptions<Output<R>>;
+	readonly options: Form extends true ? FormBlockOptions<R, P> : BlockOptions<R, P>;
 	readonly form: Form;
+	/** Type only: the props. */
+	readonly props?: P;
 };
 
-/** `block({ title: f.text() }, { label: "Promo" })` */
-export const block = <const R extends Fields>(fields: R, options: BlockOptions<Output<R>> = {}): Block<R, false> => ({ fields, options, form: false });
+type Resolves<R extends Fields, P> = { resolve: NonNullable<BlockOptions<R, P>["resolve"]> };
+
+/** `block({ title: f.text() }, { label: "Promo" })`; with `resolve`, the props are what it returns. */
+export function block<const R extends Fields, P>(fields: R, options: BlockOptions<R, P> & Resolves<R, P>): Block<R, false, P>;
+export function block<const R extends Fields>(fields: R, options?: BlockOptions<R, Output<R>>): Block<R, false>;
+// biome-ignore lint/suspicious/noExplicitAny: the overloads type it.
+export function block(fields: Fields, options: BlockOptions<any, any> = {}): Block<any, false, any> {
+	return { fields, options, form: false };
+}
 
 /** A block that posts: `submit` takes the validated payload (`submit.schema`), the CMS binds `action` into its props. */
-export const formBlock = <const R extends Fields>(fields: R, options: FormBlockOptions<Output<R>>): Block<R, true> => ({ fields, options, form: true });
+export function formBlock<const R extends Fields, P>(fields: R, options: FormBlockOptions<R, P> & Resolves<R, P>): Block<R, true, P>;
+export function formBlock<const R extends Fields>(fields: R, options: FormBlockOptions<R, Output<R>>): Block<R, true>;
+// biome-ignore lint/suspicious/noExplicitAny: the overloads type it.
+export function formBlock(fields: Fields, options: FormBlockOptions<any, any>): Block<any, true, any> {
+	return { fields, options, form: true };
+}
 
 const formProps = { action: z.string(), honeypotField: z.string().optional() };
 
-/** A block's props as zod. */
+/**
+ * A block's props as zod: the fields', or any object when `resolve` builds
+ * them (no runtime schema follows from a function; its return type is the check).
+ */
 // biome-ignore lint/suspicious/noExplicitAny: any block.
-export const blockProps = (b: Block<any>) => (b.form ? zodOf(b.fields).extend(formProps) : zodOf(b.fields));
+export const blockProps = (b: Block<any, boolean, any>) => {
+	const base = b.options.resolve === undefined ? zodOf(b.fields) : z.looseObject({});
+	return b.form ? base.extend(formProps) : base;
+};
 
 type PageOptions = Omit<PageTypeDef, "key" | "form" | "schema" | "schemaTypes" | "resolveFields"> & {
 	/** JSON-LD type keys the editor may pick (the site's `jsonLd` or the built-in ones); the first is the default. */
@@ -61,7 +90,7 @@ export const pageType = <const R extends Fields>(fields: R, options: PageOptions
 
 export type SiteDef = {
 	// biome-ignore lint/suspicious/noExplicitAny: each block keeps its own props type.
-	blocks?: Record<string, Block<any>>;
+	blocks?: Record<string, Block<any, boolean, any>>;
 	/** Page types by key; a built-in key (`page`, `category`, `article`) adds fields to that type. */
 	pages?: Record<string, PageType | Fields>;
 	/** JSON-LD types by key, offered to the page types that list them in `jsonLd`. */
@@ -83,11 +112,16 @@ export type SitePageTypes<D extends SiteDef> = {
 }[keyof NonNullable<D["pages"]> & string][];
 
 /** The json-render catalog of a site's blocks. */
-type PropsSchema<B> = B extends Block<infer R, infer Form> ? (Form extends true ? z.ZodType<Output<R> & FormProps> : z.ZodType<Output<R>>) : never;
+// biome-ignore lint/suspicious/noExplicitAny: the fields are not needed here.
+type PropsSchema<B> = B extends Block<any, infer Form, infer P> ? (Form extends true ? z.ZodType<P & FormProps> : z.ZodType<P>) : never;
 
 export type SiteCatalog<D extends SiteDef> = {
-	[K in keyof NonNullable<D["blocks"]>]: { props: PropsSchema<NonNullable<D["blocks"]>[K]> } & Omit<BlockOptions<unknown>, "resolve" | "toSchema">;
+	[K in keyof NonNullable<D["blocks"]>]: { props: PropsSchema<NonNullable<D["blocks"]>[K]> } & Omit<BlockOptions<Fields, unknown>, "resolve" | "toSchema">;
 };
+
+/** A block's props as its component takes them: `BlockProps<typeof site, "Hero">`. */
+// biome-ignore lint/suspicious/noExplicitAny: any site.
+export type BlockProps<T extends Site<any>, K extends keyof T["catalog"]> = z.output<T["catalog"][K]["props"]>;
 
 export type Site<D extends SiteDef = SiteDef> = {
 	readonly def: D;

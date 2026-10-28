@@ -1,10 +1,11 @@
-import type { Admin, Disk } from "@tbtop/admin";
+import { type Admin, type Disk, S } from "@tbtop/admin";
 import { kyselyRules } from "@tbtop/admin/kysely";
 import type { Kysely } from "kysely";
 import { type CmsAdminOverrides, createCmsAdmin } from "../admin/create";
 import { type DefaultAuth, type DefaultAuthOptions, defaultAuth, ensureFirstAdmin } from "../betterAuth/defaultAuth";
 import type { Catalog } from "../blocks/catalog";
 import { linkField, pagesField } from "../blocks/cmsFields";
+import { resolveForm } from "../blocks/fields";
 import { type BlockImpl, implementBlocks } from "../blocks/registry";
 import { type Cms, createCms } from "../cms";
 import type { CmsConfig } from "../config";
@@ -13,8 +14,8 @@ import { ensureErrorPages } from "../frontend/errorPage";
 import type { PageProps } from "../frontend/load";
 import { type Fixture, seedFixtures } from "../fixtures/seed";
 import { baseNode, identityId, type SchemaContext } from "../seo/schemaContext";
-import { pageTypeDefs, type SeoHelpers, type Site, type SiteDef, type SitePageTypes } from "../define/define";
-import { type CmsFields, formOf } from "../define/fields";
+import { type Block, pageTypeDefs, type SeoHelpers, type Site, type SiteDef, type SitePageTypes } from "../define/define";
+import { type CmsFields, formOf, zodOf } from "../define/fields";
 import type { CmsCacheStore } from "../support/cache";
 import { cmsRoutes, migrateAll, type PageRenderers, renderPage } from "./routes";
 
@@ -85,9 +86,7 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 					...(runtime.baseURL === undefined ? {} : { baseURL: runtime.baseURL }),
 					...(runtime.authDatabase === undefined ? {} : { database: runtime.authDatabase }),
 				});
-	const impls = Object.fromEntries(
-		Object.entries(def.blocks ?? {}).map(([kind, b]) => [kind, { ...b.options, form: (s) => formOf(b.fields)(s, cmsFields) } as BlockImpl]),
-	);
+	const impls = Object.fromEntries(Object.entries(def.blocks ?? {}).map(([kind, b]) => [kind, blockImpl(b, cmsFields)]));
 	const extend = def.seo;
 	const settings = def.settings;
 	const cms = createCms({
@@ -171,3 +170,15 @@ export type SiteApp<D extends SiteDef = SiteDef> = {
 	/** The whole site as one fetch: routes, then pages through `render` (404 without one). */
 	fetch(request: Request, waitUntil?: (task: Promise<unknown>) => void): Promise<Response>;
 };
+
+/** A site block as the registry takes it: a `resolve` gets the fields resolved and parsed, as a block without one ships them. */
+// biome-ignore lint/suspicious/noExplicitAny: any block.
+function blockImpl(b: Block<any, boolean, any>, cmsFields: CmsFields): BlockImpl {
+	const { resolve, ...options } = b.options;
+	const form = (s: S) => formOf(b.fields)(s, cmsFields);
+	if (resolve === undefined) {
+		return { ...options, form } as BlockImpl;
+	}
+	const schema = zodOf(b.fields);
+	return { ...options, form, resolve: async (input, ctx) => resolve(schema.parse(await resolveForm(form(new S()), input, ctx)), ctx) } as BlockImpl;
+}

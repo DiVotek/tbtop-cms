@@ -2,6 +2,7 @@
 // imports the same site file for its block catalog.
 export {
 	type Block,
+	type BlockProps,
 	block,
 	blockProps,
 	defineSite,

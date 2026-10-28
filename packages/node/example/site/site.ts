@@ -5,7 +5,8 @@ import { z } from "zod";
 // `site.catalog` from this same file for its block registry.
 //
 // Every extension point of `defineSite` is used once:
-// - blocks: the opt-in Hero, a link block, a repeater block, a form block
+// - blocks: the opt-in Hero, a link block, a repeater block, a block whose
+//   props come from its own resolve, a form block
 // - pages: the built-in `page` type extended, a new `service` type with its own JSON-LD
 // - jsonLd: the `Service` schema type the service pages default to
 // - seo: every page's JSON-LD, last (the company's Organization at the identity @id)
@@ -34,6 +35,18 @@ export const site = defineSite({
 					props.items.length === 0
 						? null
 						: { "@type": "FAQPage", mainEntity: props.items.map((item) => ({ "@type": "Question", name: item.question, acceptedAnswer: { "@type": "Answer", text: item.answer } })) },
+			},
+		),
+		Contacts: block(
+			{ heading: f.text().label("Heading").translatable() },
+			{
+				label: "Contacts",
+				category: "content",
+				// The editor fills the heading; the props are what resolve returns, typed from it.
+				resolve: async (fields, ctx) => ({
+					heading: fields.heading ?? "",
+					phone: String(await ctx.site.settings.get("site.phone", "")),
+				}),
 			},
 		),
 		Callback: formBlock(
