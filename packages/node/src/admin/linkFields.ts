@@ -5,7 +5,6 @@ import { linkShape } from "../content/link";
 import { pageExists, pageId, pageNameOf, searchPages } from "../content/pageRefs";
 import type { Site } from "../site";
 import { adminPrefix } from "./support";
-import { COLLECTION_VALUE_RULE, collectionValueValid, entrySearchEndpoint } from "./collections";
 
 const SEARCH_PATH = "link/page-search";
 const SEARCH_FIELD = "page";
@@ -14,6 +13,12 @@ const SEARCH_LIMIT = 50;
 
 /** The page search the link field's page picker posts `{search}` / `{value}` to (LinkPageSearchRoute). */
 export const linkSearchEndpoint = (cms: Cms): string => `${adminPrefix(cms)}/${SEARCH_PATH}/select-options/${SEARCH_FIELD}`;
+
+/** A collection's entry list in the admin; its entry search sits under it. */
+export const collectionListUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections/${key}`;
+export const ENTRY_SEARCH_FIELD = "entry";
+/** The picker of a `collection` field posts `{search}` / `{values}` here (EntrySearchRoute). */
+export const entrySearchEndpoint = (cms: Cms, key: string): string => `${collectionListUrl(cms, key)}/entry-search/select-options/${ENTRY_SEARCH_FIELD}`;
 
 export const fieldBinding = (cms: Cms): CmsFieldBinding => ({
 	site: cms.site(),
@@ -28,10 +33,10 @@ async function editorLocales(site: Site): Promise<string[]> {
 }
 
 /**
- * The validation rules the link, pages and collection fields declare, for
+ * The validation rules the link and pages fields declare, for
  * createAdmin({ hostRules }): `link_shape` (LinkShapeValidator) and
- * `page_ref` (PageRefRule) look pages up in the CMS database,
- * `collection_value` (CollectionValueValidator) entries.
+ * `page_ref` (PageRefRule) look pages up in the CMS database. The
+ * collection field's rule is collectionHostRules.
  */
 export function cmsHostRules(cms: Cms): Record<string, HostRule> {
 	return {
@@ -54,10 +59,6 @@ export function cmsHostRules(cms: Cms): Record<string, HostRule> {
 				// Drafts and trashed pages pass: the site drops non-live pages from the list, a retyped target must not lock the page out of saving.
 				return id !== null && id !== (except === undefined ? null : pageId(except.slice("except=".length))) && pageExists(cms.site(), id, { withTrashed: true });
 			},
-		},
-		[COLLECTION_VALUE_RULE]: {
-			message: "This selection is not valid.",
-			check: (value, params) => collectionValueValid(cms, value, params),
 		},
 	};
 }

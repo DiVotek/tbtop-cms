@@ -1,14 +1,14 @@
 import { definePage, Effects, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
+import { OFFICES, SOCIALS } from "../content/builtInCollections";
 import { tabFields } from "../content/hostSettings";
 import { BUSINESS_SUBTYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
+import { collectionListUrl } from "./linkFields";
 import { adminPrefix, editFooter, listHeader, NAV, siteOf } from "./support";
-import { collectionListUrl } from "./collections";
-import { OFFICES, SOCIALS } from "../content/builtInCollections";
 
 /** A settings page (SettingsPageBase): form fields mapped to dotted settings keys. */
 function settingsPage(

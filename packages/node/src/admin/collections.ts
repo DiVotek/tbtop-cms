@@ -1,4 +1,4 @@
-import { Column, definePage, Effects, Field, HttpError, type PageDef, S } from "@tbtop/admin";
+import { Column, definePage, Effects, Field, type HostRule, HttpError, type PageDef, S } from "@tbtop/admin";
 import { bindCmsFields } from "../blocks/cmsFields";
 import { COLLECTION_VALUE_RULE, entryIds, PICK_MODES, type PickMode } from "../blocks/collectionField";
 import type { Cms } from "../cms";
@@ -6,10 +6,9 @@ import type { Collection } from "../content/collections";
 import { ENTRY_DRAFT, ENTRY_PUBLISHED, type Entry, EntryConflictError, type EntryStatus } from "../content/entries";
 import { type Dict, isDict } from "../support/values";
 import { gated } from "./abilities";
-import { fieldBinding } from "./linkFields";
-import { adminPrefix, editFooter, editorValues, siteOf } from "./support";
+import { collectionListUrl, ENTRY_SEARCH_FIELD, fieldBinding } from "./linkFields";
+import { editFooter, editorValues, siteOf } from "./support";
 
-const SEARCH_FIELD = "entry";
 const SEARCH_LIMIT = 20;
 
 const STATUS_OPTIONS = [
@@ -19,10 +18,7 @@ const STATUS_OPTIONS = [
 
 const GROUP_LABELS: Record<string, string> = { content: "Content", design: "Design", settings: "Settings" };
 
-export const collectionListUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections/${key}`;
 export const entryEditUrl = (cms: Cms, key: string, id: number | string): string => `${collectionListUrl(cms, key)}/${String(id)}/edit`;
-/** The picker of a `collection` field posts `{search}` / `{values}` here (EntrySearchRoute). */
-export const entrySearchEndpoint = (cms: Cms, key: string): string => `${collectionListUrl(cms, key)}/entry-search/select-options/${SEARCH_FIELD}`;
 
 /**
  * Each collection's admin pages, behind the pages ability: its list (menu
@@ -174,7 +170,7 @@ function entrySearch(cms: Cms, collection: Collection) {
 		view: (s, { request }) => {
 			const site = cms.site(request);
 			const field = s
-				.select(SEARCH_FIELD)
+				.select(ENTRY_SEARCH_FIELD)
 				.label(collection.singularLabel)
 				.searchable()
 				.query(async (_deps, search) => {
@@ -248,4 +244,12 @@ export async function collectionValueValid(cms: Cms, value: unknown, params: str
 	return Number(found?.n ?? 0) === ids.length;
 }
 
-export { COLLECTION_VALUE_RULE };
+/** `collection_value` (CollectionValueValidator), for createAdmin({ hostRules }) next to cmsHostRules. */
+export function collectionHostRules(cms: Cms): Record<string, HostRule> {
+	return {
+		[COLLECTION_VALUE_RULE]: {
+			message: "This selection is not valid.",
+			check: (value, params) => collectionValueValid(cms, value, params),
+		},
+	};
+}

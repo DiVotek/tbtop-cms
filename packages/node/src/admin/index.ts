@@ -3,7 +3,7 @@ import type { Cms } from "../cms";
 import { allows, gated } from "./abilities";
 import { auditActivity, auditLog } from "./audit";
 import { blocksShowcase } from "./blocks";
-import { collectionPages } from "./collections";
+import { collectionHostRules, collectionPages } from "./collections";
 import { dashboard } from "./dashboard";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
@@ -42,7 +42,7 @@ export type CmsAdmin = {
 };
 
 export function adminPages(cms: Cms): CmsAdmin {
-	const own = cmsHostRules(cms);
+	const own = { ...cmsHostRules(cms), ...collectionHostRules(cms) };
 	for (const name of Object.keys(cms.config.hostRules ?? {})) {
 		if (Object.hasOwn(own, name)) {
 			throw new TypeError(`hostRules.${name} is the CMS's own rule (the link, pages and collection fields'): give the host's rule another name.`);
