@@ -122,7 +122,7 @@ block with `resolve` (any object passes): its return type is the check.
 locale: the built-in `name`, `logo` and `favicon` (URLs), the published
 `phones` and `emails` (strings) and `socials` (`{label, name, href}`) from the
 built-in collections, then every field of the site's tabs by name (those
-seven names are taken), resolved as a block field is (a translatable field
+six names are taken), resolved as a block field is (a translatable field
 to its value in the locale, an image to its URL, a link to its target). Secret
 keys are not in it. It is `ctx.settings()` in a resolve or a JSON-LD
 callback, `props.cms.settings` on the page and `cms.settings(locale)` on a
