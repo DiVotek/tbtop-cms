@@ -23,6 +23,7 @@ function entriesAware(driver: Driver, changed: () => Promise<void>): Driver {
 	};
 }
 
+/** The driver gets the table's row query (a select), not an update builder: its table is the `from`. */
 function fromTable(query: unknown): string | null {
 	const node = (query as { toOperationNode?: () => { from?: { froms?: { table?: { identifier?: { name?: string } } }[] } } }).toOperationNode?.();
 	return node?.from?.froms?.[0]?.table?.identifier?.name ?? null;
