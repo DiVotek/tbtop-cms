@@ -153,9 +153,15 @@ function checks(start: () => Promise<Host>): void {
 			expect(body).toContain(`data-kind="${kind}"`);
 		}
 		// A block's resolve gets its fields resolved, and its return is the props.
-		expect(body).toContain(JSON.stringify({ heading: "Контакти", phone: "+380 44 000 00 00" }).replaceAll('"', "&#34;"));
+		expect(body).toContain(JSON.stringify({ heading: "Контакти", phone: "+380 44 000 00 00", address: "Київ" }).replaceAll('"', "&#34;"));
+		// The settings object, typed by the site's tabs, in the page's locale.
+		expect(body).toContain("<footer>Divotek · +380 44 000 00 00 · Київ</footer>");
 		expect(body).toContain("https://divotek.com.ua/audit");
 		expect(jsonLd(body).find((node) => node["@type"] === "FAQPage")?.mainEntity?.[0]?.name).toBe("Скільки?");
+	});
+
+	test("the settings object is in the page's locale: a translatable setting falls to its English value", async () => {
+		expect(await (await visit("/en")).text()).toContain("<footer>Divotek · +380 44 000 00 00 · Kyiv</footer>");
 	});
 
 	test("service page: typed fields, the site's Service JSON-LD, the Organization from `seo` at the identity @id", async () => {
@@ -230,12 +236,21 @@ describe("defineSite", () => {
 
 	test("a block with resolve: the catalog takes any object, the props type is its return", () => {
 		expect(site.catalog.Contacts.props.safeParse({ heading: "Hi", phone: "1", extra: true }).success).toBe(true);
-		const props: BlockProps<typeof site, "Contacts"> = { heading: "Hi", phone: "1" };
+		const props: BlockProps<typeof site, "Contacts"> = { heading: "Hi", phone: "1", address: null };
 		// @ts-expect-error phone is a string, from resolve's return
-		const wrong: BlockProps<typeof site, "Contacts"> = { heading: "Hi", phone: 1 };
+		const wrong: BlockProps<typeof site, "Contacts"> = { heading: "Hi", phone: 1, address: null };
 		// @ts-expect-error a block without resolve keeps its fields' type
 		const promo: BlockProps<typeof site, "Promo"> = { title: 1, cta: null };
 		expect([props, wrong, promo]).toHaveLength(3);
+	});
+
+	test("the settings object is typed by the tabs: built-in keys, every tab's fields, nothing else", () => {
+		const typed: typeof site.settings = { name: "Divotek", logo: null, favicon: null, phone: null, address: "Kyiv", brandColor: null, links: [] };
+		// @ts-expect-error not a field of any tab
+		const unknownKey: typeof site.settings = { ...typed, fax: "1" };
+		// @ts-expect-error phone is text
+		const wrongType: typeof site.settings = { ...typed, phone: 1 };
+		expect([typed, unknownKey, wrongType]).toHaveLength(3);
 	});
 
 	test("a bare field record and pageType() both declare a page type, even with fields named `fields` and `options`", () => {

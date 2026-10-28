@@ -8,7 +8,7 @@ const fixture = { languages: en, settings: { "site.name": "Acme" }, pages: [{ ke
 async function siteName(cms: Awaited<ReturnType<typeof makeCms>>["cms"]) {
 	const result = await cms.loadPage(get("/"));
 	if (result.type !== "page") throw new Error(result.type);
-	return (result.props.cms as { settings: Record<string, unknown> }).settings["site.name"];
+	return (result.props.cms as { settings: Record<string, unknown> }).settings.name;
 }
 
 describe("content cache", () => {

@@ -106,7 +106,7 @@ props are what `resolve` returns, and their type comes from that return:
 ```ts
 Contacts: block({ heading: f.text().translatable() }, {
 	// `fields` is the fields resolved and parsed: { heading: string | null }
-	resolve: async (fields, ctx) => ({ heading: fields.heading ?? "", phone: String(await ctx.site.settings.get("site.phone", "")) }),
+	resolve: async (fields, ctx) => ({ heading: fields.heading ?? "", phone: (await settings.of(ctx)).phone ?? "" }),
 }),
 
 // the component, in the browser
@@ -116,6 +116,25 @@ function Contacts(props: BlockProps<typeof site, "Contacts">) { /* { heading: st
 
 No zod schema follows from a function, so the catalog checks no shape for a
 block with `resolve` (any object passes): its return type is the check.
+
+**Settings.** The Site settings reach code as one object in the request's
+locale: the built-in `name`, `logo` and `favicon` (URLs), then every field of
+the site's tabs by name, resolved as a block field is (a translatable field to
+its value in the locale, an image to its URL, a link to its target). Secret
+keys are not in it. It is `ctx.settings()` in a resolve or a JSON-LD
+callback, `props.cms.settings` on the page and `cms.settings(locale)` on a
+server route; its rows come through the content cache, once per request.
+Declared apart with `defineSettings`, the tabs type it:
+
+```ts
+export const settings = defineSettings({ Company: { phone: f.text(), address: f.textarea().translatable() } });
+export const site = defineSite({ settings, blocks: { /* resolve: (await settings.of(ctx)).phone */ } });
+
+type Props = PageProps<typeof site.pageTypes, typeof site.settings>; // props.cms.settings.address: string | null
+```
+
+On `createCms`, `siteSettings.schema` (zod over the host keys) parses the
+object, and `PageProps<T, BuiltinSettings & z.output<typeof schema>>` types it.
 
 **Fields (`f.*`).** `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
 `select(options)` (one value or null), `select(options, { multiple: true })`
@@ -141,6 +160,10 @@ on the Users page. With the last admin removed, the next boot creates one from
 the secrets again: unset `TBTOP_ADMIN_PASSWORD` after the first boot unless
 you want that recovery path. With its own auth (`auth: false` +
 `config.auth`) a host whose user ids are strings passes `userKey: "string"`.
+On `createCms` with `defaultAuth`, pass the same secrets as
+`defaultAuth(db, { firstAdmin: { email, password } })`: `migrate()` creates
+the admin by the same rule, and `setup()` alone does it where the tables come
+from elsewhere (D1 migration files).
 `users.ensure(email, role, { password })` seeds other users in a seed or a
 test; it refuses the `admin` role and a role the site does not define. On Workers these are secrets and vars of
 the Worker (`wrangler secret put`); `BETTER_AUTH_URL` and `MEDIA_URL` are optional.
@@ -225,9 +248,9 @@ const cms = createCms({
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
 	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
-	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches cms.settings,
-	// like every setting; list a token's key (site.<name>) in secretSettings to seal it instead.
-	siteSettings: { tabs: (s) => [{ label: "Brand & forms", children: [s.text("tagline").label("Tagline")] }] },
+	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches the settings
+	// object as `tagline`; list a token's key (site.<name>) in secretSettings to seal it instead.
+	siteSettings: { tabs: (s) => [{ label: "Brand & forms", children: [s.text("tagline").label("Tagline")] }], schema: z.object({ tagline: z.string().nullable() }) },
 	hostRules: { ...kyselyRules(db), ...myRules }, // the admin's unique/exists and the host's own rules: cms.admin.hostRules
 });
 
@@ -470,7 +493,7 @@ path and has not expired; `canPreview` still grants preview on its own.
 
 The keys in `secretSettings` are sealed with `settingsKey` (AES-256-GCM over
 Web Crypto, so Workers too): `settings.set` writes `enc:v1:…`, `settings.get`
-opens it, and `cms.settings` never carries them. Without `settingsKey` a
+opens it, and the settings object never carries them. Without `settingsKey` a
 secret cannot be saved; a value sealed with another key, or stored in plain
 text, reads as the fallback with a `settings.secret_unreadable` warning.
 Changing the key loses the stored secrets. The mail transport and the

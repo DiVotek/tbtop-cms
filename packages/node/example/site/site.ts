@@ -1,4 +1,4 @@
-import { block, defineSite, f, formBlock, hero, pageType } from "@tbtop/cms/site";
+import { block, defineSettings, defineSite, f, formBlock, hero, pageType } from "@tbtop/cms/site";
 import { z } from "zod";
 
 // The whole site, as records of fields. Client-safe: the browser imports
@@ -10,7 +10,17 @@ import { z } from "zod";
 // - pages: the built-in `page` type extended, a new `service` type with its own JSON-LD
 // - jsonLd: the `Service` schema type the service pages default to
 // - seo: every page's JSON-LD, last (the company's Organization at the identity @id)
-// - settings: two Site settings tabs
+// - settings: two Site settings tabs, declared apart so a block reads them typed
+
+export const settings = defineSettings({
+	Company: {
+		phone: f.text().label("Phone"),
+		address: f.textarea().label("Address").translatable(),
+		// Any admin field the f.* set does not cover, with the value it resolves to.
+		brandColor: f.custom((s, name) => s.colorpicker(name), z.string().nullable()).label("Brand color"),
+	},
+	Social: { links: f.repeater({ network: f.select({ github: "GitHub", telegram: "Telegram" }), url: f.text() }).label("Links") },
+});
 
 export const site = defineSite({
 	blocks: {
@@ -43,10 +53,10 @@ export const site = defineSite({
 				label: "Contacts",
 				category: "content",
 				// The editor fills the heading; the props are what resolve returns, typed from it.
-				resolve: async (fields, ctx) => ({
-					heading: fields.heading ?? "",
-					phone: String(await ctx.site.settings.get("site.phone", "")),
-				}),
+				resolve: async (fields, ctx) => {
+					const { phone, address } = await settings.of(ctx);
+					return { heading: fields.heading ?? "", phone: phone ?? "", address };
+				},
 			},
 		),
 		Callback: formBlock(
@@ -83,24 +93,12 @@ export const site = defineSite({
 			},
 		],
 	},
-	seo: async (nodes, ctx, h) => [
-		...nodes.filter((node) => node["@id"] !== h.identityId),
-		{
-			"@context": "https://schema.org",
-			"@type": "Organization",
-			"@id": h.identityId,
-			name: String(await ctx.site.settings.get("site.name", "")),
-			telephone: String(await ctx.site.settings.get("site.phone", "")),
-			sameAs: ["https://github.com/DiVotek"],
-		},
-	],
-	settings: {
-		Company: {
-			phone: f.text().label("Phone"),
-			address: f.textarea().label("Address").translatable(),
-			// Any admin field the f.* set does not cover, with the value it resolves to.
-			brandColor: f.custom((s, name) => s.colorpicker(name), z.string().nullable()).label("Brand color"),
-		},
-		Social: { links: f.repeater({ network: f.select({ github: "GitHub", telegram: "Telegram" }), url: f.text() }).label("Links") },
+	seo: async (nodes, ctx, h) => {
+		const { name, phone } = await settings.of(ctx);
+		return [
+			...nodes.filter((node) => node["@id"] !== h.identityId),
+			{ "@context": "https://schema.org", "@type": "Organization", "@id": h.identityId, name, telephone: phone, sameAs: ["https://github.com/DiVotek"] },
+		];
 	},
+	settings,
 });

@@ -4,7 +4,8 @@ import type { site } from "./site";
 // The host's renderer: plain HTML here, a React page in a real host
 // (`@tbtop/cms/react` renders `props.render` with the site's registry).
 
-type Props = PageProps<typeof site.pageTypes>;
+// The second argument types `props.cms.settings` by the site's settings tabs.
+type Props = PageProps<typeof site.pageTypes, typeof site.settings>;
 
 const esc = (text: unknown) => String(text ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -37,6 +38,7 @@ export function render(props: Props): string {
 ${props.seo.jsonLd.map((node) => `<script type="application/ld+json">${json(node)}</script>`).join("")}</head>
 <body><h1>${esc(props.page.name)}</h1><p class="fields">${esc(fieldsLine(props.page))}</p>
 ${blocks.map((block) => (block === undefined ? "" : blockHtml(block.type, block.props as Record<string, unknown>))).join("\n")}
+<footer>${esc(props.cms.settings.name)} · ${esc(props.cms.settings.phone)} · ${esc(props.cms.settings.address)}</footer>
 </body></html>`;
 }
 

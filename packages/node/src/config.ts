@@ -1,5 +1,6 @@
 import type { HostRule, NavLink, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
+import type { z } from "zod";
 import type { CmsAbility } from "./admin/abilities";
 import type { BlockRegistry } from "./blocks/registry";
 import type { Cms } from "./cms";
@@ -58,12 +59,14 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	secretSettings?: string[];
 	/**
 	 * The host's own tabs on Site settings, after Branding and Contacts. A
-	 * field named `tagline` is stored at `site.tagline`, so it reaches the
-	 * frontend in `cms.settings` (unless listed in `secretSettings`) and
-	 * reads back with `site.settings.get("site.tagline")`. A name the page
-	 * already uses throws.
+	 * field named `tagline` is stored at `site.tagline` and reaches the
+	 * settings object (`ctx.settings()`, `props.cms.settings`,
+	 * `cms.settings(locale)`) as `tagline`, resolved like a block field,
+	 * unless listed in `secretSettings`. A name the page already uses throws.
+	 * `schema` parses that object's host keys (defaults, the type of
+	 * `PageProps<T, S>`'s settings); `defineSite` derives it from the fields.
 	 */
-	siteSettings?: { tabs: (s: S) => { label: string; children: unknown[] }[] };
+	siteSettings?: { tabs: (s: S) => { label: string; children: unknown[] }[]; schema?: z.ZodType<Record<string, unknown>> };
 	/**
 	 * The key secret settings are sealed with (AES-256-GCM over Web Crypto).
 	 * Keep it in the environment; changing it makes stored secrets unreadable.
