@@ -90,6 +90,10 @@ use Tbtop\Cms\Admin\Collections\CollectionTable;
 CollectionTable::make($s, 'review')->relatedTo($page)->build()
 ```
 
+The table answers to the embedding page's gate. Its row delete also needs
+`tbtop-cms.pages` when roles are on; drag reorder does not, so embed it on a
+page gated at least as tightly as the collection's own.
+
 ## Site
 
 ### In a block: the `collection` field
