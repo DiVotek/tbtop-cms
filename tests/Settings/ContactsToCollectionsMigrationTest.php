@@ -67,3 +67,17 @@ it('creates no office when the settings hold nothing for one', function (): void
 
     expect(Entry::query()->count())->toBe(0);
 });
+
+it('keeps the settings of a collection that already has entries', function (): void {
+    $settings = app(Settings::class);
+    $settings->set('site.contacts.phones', [['number' => '+380 44 000 0001']]);
+    $settings->set('site.contacts.socials', [['label' => 'TG', 'href' => 'https://t.me/acme']]);
+    Entry::query()->create(['collection' => 'offices', 'data' => ['name' => ['en' => 'Seeded']], 'title' => 'Seeded']);
+
+    contactsToCollectionsMigration()->up();
+
+    expect(Entry::query()->where('collection', 'offices')->count())->toBe(1)
+        ->and($settings->get('site.contacts.phones'))->toBe([['number' => '+380 44 000 0001']])
+        ->and(Entry::query()->where('collection', 'socials')->count())->toBe(1)
+        ->and($settings->get('site.contacts.socials'))->toBeNull();
+});

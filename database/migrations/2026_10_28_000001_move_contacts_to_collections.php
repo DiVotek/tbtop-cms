@@ -15,7 +15,8 @@ use Tbtop\Cms\Settings\Settings;
  *
  * Plain Settings reads and query-builder inserts (no model, no registry), so
  * a later change to the collections cannot break this step. A collection
- * that already has entries is left alone, and a rerun finds no keys.
+ * that already has entries is left alone, its settings keys included (they
+ * were not copied, so they stay recoverable); a rerun finds no keys.
  */
 return new class extends Migration
 {
@@ -41,21 +42,27 @@ return new class extends Migration
             if ($office !== null) {
                 self::insert('offices', 0, $office, self::text($settings->get('site.name')) ?? '');
             }
+            self::forget($settings, self::OFFICE_KEYS);
         }
 
         if (! self::hasEntries('socials')) {
             foreach (self::socials($settings->get('site.contacts.socials')) as $i => $row) {
                 self::insert('socials', $i, $row, $row['name'] ?? $row['label']);
             }
-        }
-
-        foreach ([...self::OFFICE_KEYS, 'site.contacts.socials'] as $key) {
-            $settings->forget($key);
+            self::forget($settings, ['site.contacts.socials']);
         }
     }
 
     /** The settings keys are gone for good: the collections are the source now. */
     public function down(): void {}
+
+    /** @param  list<string>  $keys */
+    private static function forget(Settings $settings, array $keys): void
+    {
+        foreach ($keys as $key) {
+            $settings->forget($key);
+        }
+    }
 
     /** @return array<string, mixed>|null null when settings hold nothing an office would show */
     private static function office(Settings $settings): ?array
@@ -128,8 +135,11 @@ return new class extends Migration
         return $out;
     }
 
-    /** A per-locale map stays one; a plain string (written by a script) is kept as is. @return array<string, string>|string|null */
-    /** @return array<string, string>|string|null */
+    /**
+     * A per-locale map stays one; a plain string (written by a script) is kept as is.
+     *
+     * @return array<string, string>|string|null
+     */
     private static function localized(mixed $value): array | string | null
     {
         if (is_array($value)) {
