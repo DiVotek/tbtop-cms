@@ -18,6 +18,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Settings\SiteContacts;
 
 class ShareCmsProps
 {
@@ -39,7 +40,7 @@ class ShareCmsProps
         }
 
         Inertia::share('cms', fn (): array => [
-            'settings' => $this->settings->forFrontend(),
+            'settings' => [...$this->settings->forFrontend(), ...$this->contacts()],
             'locale' => (string) app()->getLocale(),
             'defaultLocale' => $this->languages->defaultLocale(),
             'languages' => $this->frontendLanguages(),
@@ -55,6 +56,24 @@ class ShareCmsProps
         Inertia::share('errors', Inertia::always($this->validationErrors($request)));
 
         return $next($request);
+    }
+
+    /**
+     * The contacts under the settings keys they were stored at before the
+     * Offices and Socials collections took over, in the same row shapes, so
+     * a template reading `cms.settings['site.contacts.phones']` keeps working.
+     *
+     * @return array<string, list<array<string, string|null>>>
+     */
+    private function contacts(): array
+    {
+        $contacts = app(SiteContacts::class);
+
+        return [
+            SiteContacts::PHONES => array_map(static fn (string $number): array => ['number' => $number], $contacts->phones()),
+            SiteContacts::EMAILS => array_map(static fn (string $address): array => ['address' => $address], $contacts->emails()),
+            SiteContacts::SOCIALS => $contacts->socials(),
+        ];
     }
 
     /** @return list<array{locale: string, name: string, is_default: bool}> */

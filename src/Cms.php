@@ -7,6 +7,8 @@ namespace Tbtop\Cms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\Response;
+use Tbtop\Cms\Collection\CollectionEntries;
+use Tbtop\Cms\Collection\EntryList;
 use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
@@ -34,6 +36,7 @@ class Cms
         private readonly Forms $forms,
         private readonly PageRefIndex $refs,
         private readonly PageRefList $refList,
+        private readonly CollectionEntries $collections,
     ) {}
 
     /**
@@ -126,6 +129,16 @@ class Cms
         $locale ??= (string) app()->getLocale();
 
         return $this->refList->items($this->referencedBy($page, $field, $from, $locale), $locale);
+    }
+
+    /**
+     * The published entries of a collection, resolved for the locale, in the
+     * editor's order: `Cms::collection('review')->relatedTo($page)->take(6)`.
+     * Cached whole per locale; the filters run in memory. collections.md.
+     */
+    public function collection(string $key, ?string $locale = null): EntryList
+    {
+        return $this->collections->of($key, $locale);
     }
 
     /** Every HasForm block by name, e.g. `forms()->props('ServiceForm', $page)` for a template-rendered form. */

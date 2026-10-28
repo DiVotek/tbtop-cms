@@ -8,8 +8,9 @@ use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Settings\SiteContacts;
 
 /**
- * The site identity node's type rules and its organisation details, read
- * from `seo.identity.*` — telephone and email from Site settings → Contacts. One place for "which schema.org type is this site"
+ * The site identity node's type rules and its organisation details: type,
+ * legal name and subtype from `seo.identity.*`, address, telephone, email,
+ * geo and hours from the built-in Offices collection (SiteContacts). One place for "which schema.org type is this site"
  * so the standalone identity node and the Article author/publisher never
  * disagree about the entity they share an `@id` with.
  *
@@ -57,7 +58,7 @@ final class SiteIdentity
 
     public function __construct(private readonly Settings $settings, ?SiteContacts $contacts = null)
     {
-        $this->contacts = $contacts ?? new SiteContacts($settings);
+        $this->contacts = $contacts ?? app(SiteContacts::class);
     }
 
     public function type(): string
@@ -103,7 +104,10 @@ final class SiteIdentity
 
     /**
      * The organisation details beyond name/url/logo/sameAs, in node order,
-     * with empty values omitted. Empty for `none`/`person`.
+     * with empty values omitted. Empty for `none`/`person`. The address,
+     * telephone, email, geo and hours are the main office's (the first
+     * published entry of the built-in Offices collection); every other office
+     * is a `department` with its own.
      *
      * @return array<string, mixed>
      */
@@ -113,15 +117,40 @@ final class SiteIdentity
             return [];
         }
 
+        $offices = $this->contacts->offices($locale);
+        $main = array_shift($offices);
+
         $properties = array_filter([
             'legalName' => $this->string('seo.identity.legal_name'),
-            // Site settings → Contacts is the only source; the first entry is the main one.
-            'telephone' => $this->contacts->phones()[0] ?? '',
-            'email' => $this->contacts->emails()[0] ?? '',
+        ], static fn (string $value): bool => $value !== '');
+        $properties = [...$properties, ...($main === null ? [] : $this->office($main))];
+
+        $departments = array_map(
+            fn (array $office): array => ['@type' => $this->schemaType() ?? 'Organization', ...$this->named($office), ...$this->office($office)],
+            $offices,
+        );
+        if ($departments !== []) {
+            $properties['department'] = $departments;
+        }
+
+        return $properties;
+    }
+
+    /**
+     * One office's contact points, address, and — for a local business —
+     * geo and opening hours, empty ones omitted.
+     *
+     * @param  array<string, mixed>  $office  a resolved Offices entry
+     * @return array<string, mixed>
+     */
+    private function office(array $office): array
+    {
+        $properties = array_filter([
+            'telephone' => SiteContacts::column($office['phones'] ?? null, 'number')[0] ?? '',
+            'email' => SiteContacts::column($office['emails'] ?? null, 'address')[0] ?? '',
         ], static fn (string $value): bool => $value !== '');
 
-        $address = $this->address($locale, $defaultLocale);
-
+        $address = self::address($office);
         if ($address !== null) {
             $properties['address'] = $address;
         }
@@ -130,19 +159,28 @@ final class SiteIdentity
             return $properties;
         }
 
-        $geo = $this->geo();
-
+        $geo = self::geo($office['latitude'] ?? null, $office['longitude'] ?? null);
         if ($geo !== null) {
             $properties['geo'] = $geo;
         }
 
-        $hours = $this->openingHours();
-
+        $hours = self::openingHours($office['opening_hours'] ?? null);
         if ($hours !== []) {
             $properties['openingHoursSpecification'] = $hours;
         }
 
         return $properties;
+    }
+
+    /**
+     * @param  array<string, mixed>  $office
+     * @return array{name?: string}
+     */
+    private function named(array $office): array
+    {
+        $name = is_string($office['name'] ?? null) ? trim($office['name']) : '';
+
+        return $name === '' ? [] : ['name' => $name];
     }
 
     /**
@@ -166,30 +204,28 @@ final class SiteIdentity
     }
 
     /**
-     * Emitted only when street or locality is set. The translatable parts
-     * fall back to the default locale's value, so a locale nobody translated
-     * the address into still publishes the business's address.
+     * Emitted only when street or locality is set. The office arrives
+     * resolved for the locale, its translatable parts already falling back
+     * to the default locale's value.
      *
+     * @param  array<string, mixed>  $office
      * @return array<string, string>|null
      */
-    private function address(string $locale, string $defaultLocale): ?array
+    private static function address(array $office): ?array
     {
-        $translated = static fn (mixed $raw): string => LocalizedSeo::valueWithFallback($raw, $locale, $defaultLocale);
+        $text = static fn (string $key): string => is_string($office[$key] ?? null) ? trim($office[$key]) : '';
 
-        $street = $translated($this->settings->get('seo.identity.address.street'));
-        $locality = $translated($this->settings->get('seo.identity.address.locality'));
-
-        if ($street === '' && $locality === '') {
+        if ($text('street') === '' && $text('locality') === '') {
             return null;
         }
 
-        $country = strtoupper($this->string('seo.identity.address.country'));
+        $country = strtoupper($text('country'));
 
         return ['@type' => 'PostalAddress', ...array_filter([
-            'streetAddress' => $street,
-            'addressLocality' => $locality,
-            'addressRegion' => $translated($this->settings->get('seo.identity.address.region')),
-            'postalCode' => $this->string('seo.identity.address.postal_code'),
+            'streetAddress' => $text('street'),
+            'addressLocality' => $text('locality'),
+            'addressRegion' => $text('region'),
+            'postalCode' => $text('postal_code'),
             'addressCountry' => preg_match('/^[A-Z]{2}$/', $country) === 1 ? $country : '',
         ], static fn (string $value): bool => $value !== '')];
     }
@@ -200,11 +236,8 @@ final class SiteIdentity
      *
      * @return array{'@type': string, latitude: float, longitude: float}|null
      */
-    private function geo(): ?array
+    private static function geo(mixed $latitude, mixed $longitude): ?array
     {
-        $latitude = $this->settings->get('seo.identity.geo.latitude');
-        $longitude = $this->settings->get('seo.identity.geo.longitude');
-
         if (! is_numeric($latitude) || ! is_numeric($longitude)) {
             return null;
         }
@@ -220,23 +253,17 @@ final class SiteIdentity
     }
 
     /**
-     * One OpeningHoursSpecification per stored row, days as schema.org day
-     * URLs. Unknown days are dropped; a row left with no day, or with a time
-     * that is not HH:MM, is dropped whole.
+     * One OpeningHoursSpecification per row, days as schema.org day URLs.
+     * Unknown days are dropped; a row left with no day, or with a time that
+     * is not HH:MM, is dropped whole — rows can be written by scripts too.
      *
      * @return list<array{'@type': string, dayOfWeek: list<string>, opens: string, closes: string}>
      */
-    private function openingHours(): array
+    private static function openingHours(mixed $rows): array
     {
-        $rows = $this->settings->get('seo.identity.opening_hours', []);
-
-        if (! is_array($rows)) {
-            return [];
-        }
-
         $specs = [];
 
-        foreach ($rows as $row) {
+        foreach (is_array($rows) ? $rows : [] as $row) {
             if (! is_array($row)) {
                 continue;
             }

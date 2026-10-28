@@ -15,6 +15,7 @@ use Tbtop\Cms\Cms as CmsManager;
  * @method static \Tbtop\Cms\Form\Forms forms()
  * @method static list<\Tbtop\Cms\Page\Models\Page> referencedBy(\Tbtop\Cms\Page\Models\Page|null $page, string $field, ?string $from = null, ?string $locale = null)
  * @method static list<array{id: string, name: string, url: string}> referencedByLinks(\Tbtop\Cms\Page\Models\Page|null $page, string $field, ?string $from = null, ?string $locale = null)
+ * @method static \Tbtop\Cms\Collection\EntryList collection(string $key, ?string $locale = null)
  *
  * @see CmsManager
  */

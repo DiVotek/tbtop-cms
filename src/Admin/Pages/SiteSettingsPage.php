@@ -9,7 +9,10 @@ use Tbtop\Admin\Dsl\HtmlBlock;
 use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
-use Tbtop\Cms\Settings\SiteContacts;
+use Tbtop\Cms\Admin\Collections\CollectionTable;
+use Tbtop\Cms\Collection\BuiltIn\Offices;
+use Tbtop\Cms\Collection\BuiltIn\Socials;
+use Tbtop\Cms\Collection\CollectionRegistry;
 
 class SiteSettingsPage extends SettingsPageBase
 {
@@ -58,9 +61,6 @@ class SiteSettingsPage extends SettingsPageBase
             'site_name' => 'site.name',
             'site_logo' => 'site.logo',
             'site_favicon' => 'site.favicon',
-            'phones' => SiteContacts::PHONES,
-            'emails' => SiteContacts::EMAILS,
-            'socials' => SiteContacts::SOCIALS,
         ];
     }
 
@@ -101,11 +101,8 @@ class SiteSettingsPage extends SettingsPageBase
     }
 
     /**
-     * No row field is plainly required: validation runs before
-     * normalizeForm(), so a required() would reject the entirely empty row
-     * that the save promises to drop. A one-field row is empty or complete;
-     * a social row needs its label and link once any of its fields is
-     * filled (`required_with` reads the same row through `*`).
+     * Phones, emails, addresses and profile links are entries of the
+     * built-in Offices and Socials collections now; the tab points there.
      *
      * @return list<Field|HtmlBlock|Node|TextBlock>
      */
@@ -113,79 +110,12 @@ class SiteSettingsPage extends SettingsPageBase
     {
         return [
             $s->displayText(__('tbtop-cms::settings.site.helpers.contacts'))->variant('muted'),
-            $s->displayHtml(self::twoColumnRows('phones', 'emails', 'socials')),
-            $s->repeater('phones')->label(__('tbtop-cms::settings.site.fields.phones'))->fields([
-                $s->text('number')->label(__('tbtop-cms::settings.site.fields.phone_number'))->placeholder('+380 44 000 00 00')->rules('nullable|max:40'),
-            ]),
-            $s->repeater('emails')->label(__('tbtop-cms::settings.site.fields.emails'))->fields([
-                $s->text('address')->label(__('tbtop-cms::settings.site.fields.email_address'))->rules('nullable|email|max:190'),
-            ]),
-            $s->repeater('socials')->label(__('tbtop-cms::settings.site.fields.socials'))->fields([
-                $s->text('label')->label(__('tbtop-cms::settings.site.fields.social_label'))->placeholder('TG')->requiredWith('socials.*.name', 'socials.*.href')->rules('nullable|max:8'),
-                $s->text('name')->label(__('tbtop-cms::settings.site.fields.social_name'))->placeholder('Telegram')->rules('nullable|max:40'),
-                $s->text('href')->label(__('tbtop-cms::settings.site.fields.social_href'))->requiredWith('socials.*.label', 'socials.*.name')->rules('nullable|url|max:255'),
-            ]),
+            $s->flex([
+                $s->action('openOffices')->label(app(CollectionRegistry::class)->get(Offices::KEY)->label())
+                    ->icon('map-pin')->url(CollectionTable::listUrl(Offices::KEY)),
+                $s->action('openSocials')->label(app(CollectionRegistry::class)->get(Socials::KEY)->label())
+                    ->icon('share-2')->url(CollectionTable::listUrl(Socials::KEY)),
+            ], gap: 2),
         ];
-    }
-
-    /**
-     * Lays the rows of the named repeaters out two per line on wide screens:
-     * a contact is one short input, a full-width row per contact wastes most
-     * of the page. The repeater itself has no column option, so this styles
-     * its root (`[data-field]`, a flex column) from the outside; the "add"
-     * button stays on its own line. If the markup changes, rows fall back
-     * to the stacked layout — nothing breaks.
-     */
-    private static function twoColumnRows(string ...$fields): string
-    {
-        $roots = implode(', ', array_map(static fn (string $f): string => sprintf('[data-field="%s"]', $f), $fields));
-        $buttons = implode(', ', array_map(static fn (string $f): string => sprintf('[data-field="%s"] > button', $f), $fields));
-
-        return "<style>@media (min-width: 768px) { {$roots} { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } {$buttons} { grid-column: 1 / -1; justify-self: start; } }</style>";
-    }
-
-    /**
-     * Stores trimmed rows without the blank ones, so readers compare clean
-     * values and an untouched empty row does not count as a contact.
-     *
-     * @param  array<string, mixed>  $form
-     * @return array<string, mixed>
-     */
-    #[\Override]
-    protected function normalizeForm(array $form): array
-    {
-        foreach (['phones' => ['number'], 'emails' => ['address'], 'socials' => ['label', 'name', 'href']] as $field => $keys) {
-            if (array_key_exists($field, $form)) {
-                $form[$field] = self::cleanRows($form[$field], $keys);
-            }
-        }
-
-        return $form;
-    }
-
-    /**
-     * @param  list<string>  $keys
-     * @return list<array<string, string>>
-     */
-    private static function cleanRows(mixed $rows, array $keys): array
-    {
-        $clean = [];
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $values = [];
-            foreach ($keys as $key) {
-                $value = $row[$key] ?? null;
-                if (is_string($value) && trim($value) !== '') {
-                    $values[$key] = trim($value);
-                }
-            }
-            if ($values !== []) {
-                $clean[] = $values;
-            }
-        }
-
-        return $clean;
     }
 }

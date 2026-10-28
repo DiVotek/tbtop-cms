@@ -93,16 +93,8 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_identity_name' => 'seo.identity.name',
             'seo_identity_logo' => 'seo.identity.logo',
             'seo_identity_legal_name' => 'seo.identity.legal_name',
-            'seo_identity_street' => 'seo.identity.address.street',
-            'seo_identity_locality' => 'seo.identity.address.locality',
-            'seo_identity_region' => 'seo.identity.address.region',
-            'seo_identity_postal_code' => 'seo.identity.address.postal_code',
-            'seo_identity_country' => 'seo.identity.address.country',
             'seo_identity_subtype' => 'seo.identity.subtype',
             'seo_identity_subtype_custom' => 'seo.identity.subtype_custom',
-            'seo_identity_opening_hours' => 'seo.identity.opening_hours',
-            'seo_identity_latitude' => 'seo.identity.geo.latitude',
-            'seo_identity_longitude' => 'seo.identity.geo.longitude',
             'seo_twitter_card' => 'seo.twitter_card',
             'seo_not_found_enabled' => 'seo.not_found.enabled',
             'seo_not_found_retention_days' => 'seo.not_found.retention_days',
@@ -313,37 +305,18 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * Street and locality are required for a local business in the default
-     * locale only: RuleWalker applies a translatable field's own rules to
-     * the default content locale and `nullable` to the rest, and the
-     * frontend falls back to the default locale for an untranslated part.
+     * Address, phones, emails, hours and coordinates are entries of the
+     * built-in Offices collection; the identity takes the main office's.
      *
      * @return list<Field|Node|TextBlock>
      */
     private function organisationFields(S $s): array
     {
         $organisation = SiteIdentity::ORGANISATION_TYPES;
-        $requiredForLocalBusiness = self::onlyFor($organisation, 'nullable|required_if:seo_identity_type,local_business|max:255');
 
         return [
             $s->text('seo_identity_legal_name')->label(__('tbtop-cms::settings.seo.fields.identity_legal_name'))
                 ->rules(self::onlyFor($organisation, 'nullable|string|max:255')),
-            $s->displayText(__('tbtop-cms::settings.seo.helpers.identity_address'))->variant('muted'),
-            $s->text('seo_identity_street')->label(__('tbtop-cms::settings.seo.fields.identity_street'))
-                ->translatable()
-                ->rules($requiredForLocalBusiness),
-            $s->text('seo_identity_locality')->label(__('tbtop-cms::settings.seo.fields.identity_locality'))
-                ->translatable()
-                ->rules($requiredForLocalBusiness),
-            $s->text('seo_identity_region')->label(__('tbtop-cms::settings.seo.fields.identity_region'))
-                ->translatable()
-                ->rules(self::onlyFor($organisation, 'nullable|max:255')),
-            $s->text('seo_identity_postal_code')->label(__('tbtop-cms::settings.seo.fields.identity_postal_code'))
-                ->rules(self::onlyFor($organisation, 'nullable|string|max:20')),
-            $s->text('seo_identity_country')->label(__('tbtop-cms::settings.seo.fields.identity_country'))
-                ->placeholder('UA')
-                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_country'))
-                ->rules(self::onlyFor($organisation, ['nullable', 'regex:/^[A-Za-z]{2}$/'])),
         ];
     }
 
@@ -361,10 +334,6 @@ class SeoSettingsPage extends SettingsPageBase
             static fn (string $subtype): array => ['value' => $subtype, 'label' => $subtype],
             SiteIdentity::SUBTYPES,
         );
-        $days = array_map(
-            static fn (string $day): array => ['value' => $day, 'label' => __('tbtop-cms::settings.seo.days.' . strtolower($day))],
-            SiteIdentity::DAYS,
-        );
 
         return [
             $s->select('seo_identity_subtype')->label(__('tbtop-cms::settings.seo.fields.identity_subtype'))
@@ -381,27 +350,6 @@ class SeoSettingsPage extends SettingsPageBase
                     'nullable',
                     'regex:' . SiteIdentity::SUBTYPE_PATTERN,
                 ])),
-            $s->repeater('seo_identity_opening_hours')->label(__('tbtop-cms::settings.seo.fields.identity_opening_hours'))
-                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_opening_hours'))
-                // Excluding the repeater key excludes its row keys too.
-                ->rules(self::onlyFor($localBusiness, 'nullable|array'))
-                ->fields([
-                    $s->select('days')->label(__('tbtop-cms::settings.seo.fields.identity_days'))
-                        ->multiple()
-                        ->options($days)
-                        ->rules('required|in:' . implode(',', SiteIdentity::DAYS)),
-                    $s->time('opens')->label(__('tbtop-cms::settings.seo.fields.identity_opens'))
-                        ->rules('required|date_format:H:i'),
-                    $s->time('closes')->label(__('tbtop-cms::settings.seo.fields.identity_closes'))
-                        ->rules('required|date_format:H:i'),
-                ]),
-            $s->number('seo_identity_latitude')->label(__('tbtop-cms::settings.seo.fields.identity_latitude'))
-                ->step('any')
-                ->helperText(__('tbtop-cms::settings.seo.helpers.identity_geo'))
-                ->rules(self::onlyFor($localBusiness, 'nullable|numeric|between:-90,90')),
-            $s->number('seo_identity_longitude')->label(__('tbtop-cms::settings.seo.fields.identity_longitude'))
-                ->step('any')
-                ->rules(self::onlyFor($localBusiness, 'nullable|numeric|between:-180,180')),
         ];
     }
 
@@ -537,10 +485,6 @@ class SeoSettingsPage extends SettingsPageBase
 
         if (isset($form['seo_verification_bing']) && is_string($form['seo_verification_bing'])) {
             $form['seo_verification_bing'] = self::guardVerification(VerificationToken::bing(), 'seo_verification_bing', $form['seo_verification_bing']);
-        }
-
-        if (isset($form['seo_identity_country']) && is_string($form['seo_identity_country'])) {
-            $form['seo_identity_country'] = strtoupper($form['seo_identity_country']);
         }
 
         return $form;

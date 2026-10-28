@@ -7,6 +7,10 @@ namespace Tbtop\Cms\Support\Wiring;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Event;
 use Tbtop\Cms\Cache\InvalidatesContentCache;
+use Tbtop\Cms\Collection\CollectionEntries;
+use Tbtop\Cms\Collection\Events\EntriesUpdated;
+use Tbtop\Cms\Collection\Events\EntryDeleted;
+use Tbtop\Cms\Collection\Events\EntrySaved;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
@@ -93,6 +97,10 @@ final class ContentEventsWiring
         foreach ([SharedBlockSaved::class, SharedBlockDeleted::class] as $event) {
             Event::listen($event, fn () => $app->make(SharedBlocks::class)->forget());
         }
+        // Same for the per-request collection memo.
+        foreach ([EntrySaved::class, EntryDeleted::class, EntriesUpdated::class] as $event) {
+            Event::listen($event, fn () => $app->make(CollectionEntries::class)->forget());
+        }
 
         foreach ([
             PageSaved::class,
@@ -103,6 +111,9 @@ final class ContentEventsWiring
             LayoutSaved::class,
             SharedBlockSaved::class,
             SharedBlockDeleted::class,
+            EntrySaved::class,
+            EntryDeleted::class,
+            EntriesUpdated::class,
             SettingsSaved::class,
             LanguagesChanged::class,
         ] as $event) {

@@ -12,12 +12,14 @@ use Tbtop\Cms\Admin\CmsPanel;
 use Tbtop\Cms\Admin\Http\Controllers\LogoutController;
 use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
 use Tbtop\Cms\Admin\Listeners\SeedsLocaleFromProfile;
+use Tbtop\Cms\Collection\Http\EntrySearchController;
+use Tbtop\Cms\Collection\Http\EntrySearchRoute;
 use Tbtop\Cms\Link\Http\LinkPageSearchController;
 use Tbtop\Cms\Link\LinkPageSearchRoute;
 
 /**
  * Admin entry points cms owns on the host: the panel registration, the `login`
- * redirect, logout, the link page search route, and the login listener that
+ * redirect, logout, the link page search and entry search routes, and the login listener that
  * seeds the admin locale.
  *
  * Called from CmsServiceProvider::packageBooted().
@@ -29,6 +31,7 @@ final class AdminWiring
         self::wireAdminLoginRedirect();
         self::wireAdminLogout();
         self::wireLinkPageSearch();
+        self::wireEntrySearch();
         self::wireLocaleSeeding();
     }
 
@@ -127,6 +130,21 @@ final class AdminWiring
         Route::middleware(['web', 'auth:' . $guard, EnsureCmsAdmin::class])
             ->post($prefix . '/' . LinkPageSearchRoute::RELATIVE_PATH, LinkPageSearchController::class)
             ->name(LinkPageSearchRoute::NAME);
+    }
+
+    /** The collection field's picker; same guard as the link page search. */
+    private static function wireEntrySearch(): void
+    {
+        if (! (bool) config('tbtop-cms.admin.autoregister', true)) {
+            return;
+        }
+
+        $guard = (string) config('tbtop-cms.admin.guard', 'web');
+        $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
+
+        Route::middleware(['web', 'auth:' . $guard, EnsureCmsAdmin::class])
+            ->post($prefix . '/' . EntrySearchRoute::RELATIVE_PATH, EntrySearchController::class)
+            ->name(EntrySearchRoute::NAME);
     }
 
     /**

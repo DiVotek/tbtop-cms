@@ -20,16 +20,6 @@ beforeEach(function (): void {
     $this->actingAs($user, 'web');
 });
 
-it('rejects a local business without a default-locale street and city', function (): void {
-    test()->post('/admin/seo-settings/forms/seo-settings', [
-        'seo_identity_type' => 'local_business',
-        'seo_identity_street' => ['en' => ''],
-        'seo_identity_locality' => ['en' => ''],
-    ])->assertSessionHasErrors(['seo_identity_street.en', 'seo_identity_locality.en']);
-
-    expect(app(Settings::class)->get('seo.identity.type'))->toBeNull();
-});
-
 it('rejects a custom business type that is not a schema.org type name', function (): void {
     test()->post('/admin/seo-settings/forms/seo-settings', [
         'seo_identity_type' => 'local_business',
