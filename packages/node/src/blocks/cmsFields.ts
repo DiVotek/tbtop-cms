@@ -137,6 +137,9 @@ export class PagesField<N extends string = string> extends Select<N, string[]> {
 		if (using !== undefined) {
 			return super.creatable(fields, using);
 		}
+		if (fields.length > 0) {
+			throw new Error(`"${this.name}": creatable(fields) needs a using closure: without one the CMS creates the page from a name.`);
+		}
 		return super.creatable([new S().text("name").label("Name").required().rules("max:255")], (validated) => {
 			if (this.site === null) {
 				throw new Error(`"${this.name}": creatable() runs only on a form the CMS admin built.`);

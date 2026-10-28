@@ -1,7 +1,7 @@
 import { type ExpressionBuilder, type SelectQueryBuilder, sql } from "kysely";
 import type { CmsDatabase } from "../db/schema";
-import { sqlDate } from "../support/values";
 import type { Page } from "./page";
+import { whereLive } from "./pages";
 import type { Site } from "../site";
 
 type PagesQuery = SelectQueryBuilder<CmsDatabase, "tbtop_pages", object>;
@@ -18,7 +18,7 @@ export async function isEmptyArchive(site: Site, page: Page): Promise<boolean> {
 	if (field === null) {
 		return false;
 	}
-	const row = await referrers(site.config.db.selectFrom("tbtop_page_refs as r"), field)
+	const row = await referrers(site, site.config.db.selectFrom("tbtop_page_refs as r"), field)
 		.select("r.page_id")
 		.where("r.target_id", "=", page.id)
 		.limit(1)
@@ -40,21 +40,14 @@ export function excludeEmptyArchives<Q extends PagesQuery>(site: Site, query: Q)
 		out = out.where((eb) =>
 			eb.or([
 				isBase ? eb.or([eb("tbtop_pages.type", "!=", type.key), ...(subtypes.length === 0 ? [] : [eb("tbtop_pages.subtype", "in", subtypes)])]) : eb.or([eb("tbtop_pages.subtype", "is", null), eb("tbtop_pages.subtype", "!=", type.key)]),
-				eb.exists(referrers((eb as Refs).selectFrom("tbtop_page_refs as r"), field).select("r.page_id").where("r.target_id", "=", sql.ref<number>("tbtop_pages.id"))),
+				eb.exists(referrers(site, (eb as Refs).selectFrom("tbtop_page_refs as r"), field).select("r.page_id").where("r.target_id", "=", sql.ref<number>("tbtop_pages.id"))),
 			]),
 		) as Q;
 	}
 	return out;
 }
 
-/** Index rows of live pages picking through `field`. */
-function referrers<Q extends SelectQueryBuilder<CmsDatabase & { r: CmsDatabase["tbtop_page_refs"] }, "r", object>>(query: Q, field: string) {
-	const now = sqlDate(new Date());
-	return query
-		.innerJoin("tbtop_pages as s", "s.id", "r.page_id")
-		.where("r.field", "=", field)
-		.where("s.deleted_at", "is", null)
-		.where("s.status", "=", "published")
-		.where((eb) => eb.or([eb("s.published_at", "is", null), eb("s.published_at", "<=", now)]))
-		.where((eb) => eb.or([eb("s.unpublish_at", "is", null), eb("s.unpublish_at", ">", now)]));
+/** Index rows of live pages (whereLive, the listings' own rule) picking through `field`. */
+function referrers<Q extends SelectQueryBuilder<CmsDatabase & { r: CmsDatabase["tbtop_page_refs"] }, "r", object>>(site: Site, query: Q, field: string) {
+	return query.where("r.field", "=", field).where("r.page_id", "in", whereLive(site.pages.query()).select("tbtop_pages.id"));
 }

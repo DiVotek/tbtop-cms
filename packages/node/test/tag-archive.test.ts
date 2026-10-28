@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { S } from "@tbtop/admin";
 import { definePageType, pagesField } from "../src";
 import { sitemapChunkXml } from "../src/seo/sitemap";
 import { panel } from "./panel";
@@ -162,5 +163,9 @@ describe("tags as a category subtype (A-thin)", () => {
 		const page = await site.childrenLinksPaged(await site.pages.find(ids.blog as number), { from: "article", perPage: 2, page: 2 });
 		expect(page.items.map((ref) => ref.name)).toEqual(["Ramen"]);
 		expect(page.pagination).toEqual({ page: 2, pages: 2, total: 3, perPage: 2 });
+	});
+
+	test("creatable() fields without a closure throw: the CMS makes the page from a name", () => {
+		expect(() => pagesField("tags").creatable([new S().text("code")])).toThrow(/needs a using closure/);
 	});
 });
