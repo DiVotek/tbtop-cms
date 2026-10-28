@@ -1,0 +1,161 @@
+# Manual release button — one run ships both packages under one version.
+#
+# tbtop/cms (Packagist) and @tbtop/cms (npm) share one version number and one
+# CHANGELOG. The single source of truth is the `version` field in
+# packages/node/package.json; the PHP package has no version field, its
+# version is the git tag. Bump the version and add its `## X.Y.Z` section to
+# CHANGELOG.md in the release PR, merge to main, then run this workflow from
+# main. It:
+#   1. reads the version and checks CHANGELOG.md has a section for it
+#   2. fails if that tag already exists
+#   3. npm publish (Trusted Publishing / OIDC, no token) -> @tbtop/cms
+#   4. creates and pushes the tag -> Packagist publishes tbtop/cms via webhook
+#   5. creates a GitHub Release from the CHANGELOG section
+#
+# npm goes BEFORE the tag on purpose: a npm failure then leaves no dangling
+# tag, so a re-run stays clean.
+#
+# IMPORTANT: this filename (release.yml) is registered as the npm trusted
+# publisher of @tbtop/cms on npmjs.com. Renaming it breaks publishing.
+#
+# Concurrency: only one release run at a time, and the second queues rather
+# than cancels; a run killed between "Publish to npm" and "Create and push
+# tag" leaves a published npm package with no tag.
+name: Release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the tag + create the GitHub Release
+  id-token: write # OIDC for npm trusted publishing + provenance
+
+jobs:
+  release:
+    name: Tag + publish both packages
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/node
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require dispatch from main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Release must be run from main, not $REF"
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      # Node 22 bundles npm 10.9.x; OIDC publishing needs npm >= 11.5.1.
+      # Pinned like DiVotek/tbtop: npm 12.0.0 ships a broken publish.
+      - name: Upgrade npm for OIDC
+        run: npm install -g npm@11.18.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Read version
+        id: ver
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          echo "resolved version $v"
+
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        working-directory: .
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## " { if (found) exit; if ($2 == v) { found = 1; next } }
+            found { print }
+            END { if (!found) exit 1 }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md" || {
+            echo "::error::CHANGELOG.md has no '## $VERSION' section"
+            exit 1
+          }
+
+      # git ls-remote --exit-code returns 0 (ref matched), 2 (no match), or
+      # another code for a real failure. Only 2 means "tag is free".
+      - name: Fail if tag already exists
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>/dev/null; then
+            status=0
+          else
+            status=$?
+          fi
+          if [ "$status" -eq 0 ]; then
+            echo "::error::$TAG already exists — bump the version in packages/node/package.json first"
+            exit 1
+          elif [ "$status" -ne 2 ]; then
+            echo "::error::could not verify $TAG is free (git ls-remote exited $status)"
+            exit 1
+          fi
+          echo "$TAG is free"
+
+      # Until @tbtop/admin (node) is on npm the dev build comes from
+      # DiVotek/tbtop at ADMIN_SHA, as in ci.yml.
+      - name: Build @tbtop/admin
+        run: ./scripts/fetch-admin.sh
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      # npm first: if this fails, no tag is pushed, so a re-run stays clean.
+      # OIDC is auto-detected; provenance comes from publishConfig.
+      - name: Publish to npm
+        run: npm publish
+
+      - name: Fail if tag already exists (re-check)
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>/dev/null; then
+            status=0
+          else
+            status=$?
+          fi
+          if [ "$status" -eq 0 ]; then
+            echo "::error::$TAG already exists — npm published but the tag step was aborted to avoid a duplicate tag/release"
+            exit 1
+          elif [ "$status" -ne 2 ]; then
+            echo "::error::could not verify $TAG is still free (git ls-remote exited $status) — npm published, refusing to guess before tagging"
+            exit 1
+          fi
+
+      # Pushing the tag lets Packagist publish the PHP package via its webhook.
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: gh release create "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"

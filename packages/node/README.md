@@ -26,7 +26,7 @@ own database, `tbtop_test_*`, which is left behind: drop them for a clean
 server. On MySQL, `TIMESTAMP` columns end in 2038, as in the PHP package.
 
 The suites run on Bun (`bun:test`, `bun:sqlite`). The package itself runs on
-Node 20+ too: the workbench's E2E job serves it from Node (`vite preview`).
+Node 22+ too: the workbench's E2E job serves it from Node (`vite preview`).
 
 ## Workbench (TanStack Start)
 
@@ -774,7 +774,7 @@ in `tbtop_notification_templates`.
 
 ## Deploy
 
-On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
+On a VPS (Node 22+ or Bun), run `tbtop-cms migrate` on each release and
 `tbtop-cms scheduled` from cron every minute; both read the default export
 of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.
