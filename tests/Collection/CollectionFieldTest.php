@@ -90,6 +90,11 @@ it('caps the entries at max()', function (): void {
     expect(array_column($props['reviews'], 'author'))->toBe(['A', 'B']);
 });
 
+it('starts the latest count within max()', function (): void {
+    expect((new S)->collection('reviews')->of('review')->max(1)->toNode()->options)->toMatchArray(['cap' => 1, 'defaultLimit' => 1])
+        ->and((new S)->collection('reviews')->of('review')->toNode()->options)->toMatchArray(['cap' => null, 'defaultLimit' => 3]);
+});
+
 it('offers the related mode only when the collection has a pages field', function (): void {
     $reviews = (new S)->collection('reviews')->of('review')->toNode()->options;
     $team = (new S)->collection('team')->of('team')->toNode()->options;
