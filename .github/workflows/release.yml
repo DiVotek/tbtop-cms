@@ -124,8 +124,16 @@ jobs:
 
       # npm first: if this fails, no tag is pushed, so a re-run stays clean.
       # OIDC is auto-detected; provenance comes from publishConfig.
+      # Skips a version already on npm, so a re-run after the tag step failed
+      # does not die here.
       - name: Publish to npm
-        run: npm publish
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          if npm view "@tbtop/cms@$v" version >/dev/null 2>&1; then
+            echo "@tbtop/cms@$v is already on npm, skipping"
+          else
+            npm publish
+          fi
 
       - name: Fail if tag already exists (re-check)
         env:
