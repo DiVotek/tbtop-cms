@@ -19,6 +19,7 @@ export const officesCollection: CollectionDef = {
 	icon: "map-pin",
 	navigationGroup: "settings",
 	navigationOrder: 21,
+	deletable: false,
 	form: (s) => [
 		s.text("name").label("Name").translatable().required().rules("max:255"),
 		s.text("street").label("Street address").translatable().rules("nullable|max:255"),
@@ -61,6 +62,7 @@ export const socialsCollection: CollectionDef = {
 	icon: "share-2",
 	navigationGroup: "settings",
 	navigationOrder: 22,
+	deletable: false,
 	form: (s) => [
 		s.text("name").label("Name").placeholder("Telegram").rules("nullable|max:40"),
 		s.text("label").label("Short label").placeholder("TG").required().rules("max:8"),

@@ -555,7 +555,7 @@ import { block, collection, defineSite, f } from "@tbtop/cms/site";
 
 const reviews = collection(
 	{ author: f.text().required(), text: f.textarea().translatable(), services: f.pages("service") },
-	{ label: "Reviews", singularLabel: "review" }, // titleField, relatedField, icon, navigationGroup, navigationOrder, resolve
+	{ label: "Reviews", singularLabel: "review" }, // titleField, relatedField, icon, navigationGroup, navigationOrder, deletable, resolve
 );
 
 export const site = defineSite({
@@ -597,8 +597,9 @@ picker posts to `{prefix}/collections/{key}/entry-search/select-options/entry`.
 
 **Built-ins.** `offices` (name, street, city, region, postal code, country,
 phones, emails, opening hours, coordinates) and `socials` (name, short label,
-link) are always there, under Settings. The first published office is the
-main one: its phones, emails, address, hours and coordinates are the site's
+link) are always there, under Settings. Their entries cannot be deleted
+(`deletable: false`); set one to draft to take it off the site. The first
+published office is the main one: its phones, emails, address, hours and coordinates are the site's
 and its identity's; the other offices are published as the identity's
 `department`s, and `sameAs` lists the social links. They replace the
 `site.contacts.*` settings and the SEO identity's address, hours and

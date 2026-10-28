@@ -217,6 +217,15 @@ describe("collections: admin", () => {
 		expect((await visit("/admin/collections/review/99999/edit")).status).toBe(404);
 	});
 
+	test("a built-in collection offers no delete and refuses one posted anyway", async () => {
+		const { cms, page, post } = await admin();
+		const social = await cms.site().entries.create({ collection: "socials", data: { label: "TG", href: "https://t.me/acme" } });
+		expect(JSON.stringify((await page(url)).props.structure)).toContain("entries_reviewDelete");
+		expect(JSON.stringify((await page("/admin/collections/socials")).props.structure)).not.toContain("entries_socialsDelete");
+		expect((await post("/admin/collections/socials/actions/entries_socialsDelete", { payload: { row: { id: social } } })).status).toBeGreaterThanOrEqual(400);
+		expect(await cms.site().entries.find(social)).not.toBeNull();
+	});
+
 	test("a drag reorder writes through the driver and bumps the cached collection", async () => {
 		const { cms, ids, post, anna, bob, draft } = await admin({ cache: { store: memoryCache() } });
 		await cms.site().pages.update(ids.home as number, { content: [{ id: "r1", kind: "Reviews", data: {} }] });

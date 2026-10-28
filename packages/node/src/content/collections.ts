@@ -29,6 +29,13 @@ export type CollectionDef = {
 	/** Default 50. */
 	navigationOrder?: number;
 	/**
+	 * Whether the admin may delete an entry; default true. False drops the
+	 * row's delete action, so the action endpoint refuses it too; an editor
+	 * hides an entry from the site by setting it to draft. The built-in
+	 * offices and socials say false.
+	 */
+	deletable?: boolean;
+	/**
 	 * One entry as the site gets it, from values flattened to the locale;
 	 * default FormResolver over `form`. `ctx.page` is null: an entry is
 	 * resolved once per locale, not per page.
@@ -118,6 +125,7 @@ export class Collections {
 			icon: def.icon ?? "list",
 			navigationGroup: def.navigationGroup ?? "content",
 			navigationOrder: def.navigationOrder ?? 50,
+			deletable: def.deletable ?? true,
 			resolve: def.resolve ?? null,
 			fieldNames: names,
 		});

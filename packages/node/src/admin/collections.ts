@@ -49,7 +49,23 @@ function dataOf(collection: Collection, form: Dict): Dict {
 
 const statusOf = (value: unknown): EntryStatus => (value === ENTRY_PUBLISHED ? ENTRY_PUBLISHED : ENTRY_DRAFT);
 
-/** CollectionEntriesPage: the entries table (search, drag reorder, delete) and the "Add" modal. */
+/** The row's delete; a collection with `deletable: false` gets none. */
+function deleteAction(s: S, cms: Cms, key: string, table: string) {
+	return s
+		.action(`${table}Delete`)
+		.label("Delete")
+		.color("danger")
+		.confirm("Delete this entry?", "Blocks stop showing it; this cannot be undone.")
+		.handle(async (ctx) => {
+			const entry = await siteOf(cms, ctx).entries.find(Number(ctx.key()));
+			if (entry !== null && entry.collection === key) {
+				await siteOf(cms, ctx).entries.delete(entry.id);
+			}
+			return Effects.make().notify("Deleted").refreshTable(table);
+		}, ["row"]);
+}
+
+/** CollectionEntriesPage: the entries table (search, drag reorder, delete unless `deletable: false`) and the "Add" modal. */
 function entriesIndex(cms: Cms, collection: Collection) {
 	const { key, label } = collection;
 	const table = `entries_${key.replaceAll("-", "_")}`;
@@ -92,20 +108,7 @@ function entriesIndex(cms: Cms, collection: Collection) {
 					.reorderable("sort_order")
 					.recordUrl((row) => entryEditUrl(cms, key, String(row.id)))
 					.emptyState("No entries yet", "Add the first one; blocks show the published entries.")
-					.rowActions([
-						s
-							.action(`${table}Delete`)
-							.label("Delete")
-							.color("danger")
-							.confirm("Delete this entry?", "Blocks stop showing it; this cannot be undone.")
-							.handle(async (ctx) => {
-								const entry = await siteOf(cms, ctx).entries.find(Number(ctx.key()));
-								if (entry !== null && entry.collection === key) {
-									await siteOf(cms, ctx).entries.delete(entry.id);
-								}
-								return Effects.make().notify("Deleted").refreshTable(table);
-							}, ["row"]),
-					])
+					.rowActions(collection.deletable ? [deleteAction(s, cms, key, table)] : [])
 					.query(() => cms.site(request).config.db.selectFrom("tbtop_entries").where("collection", "=", key)),
 			]),
 	});
