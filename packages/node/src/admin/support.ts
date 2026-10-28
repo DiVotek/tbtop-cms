@@ -34,8 +34,9 @@ export const adminPrefix = (cms: Cms): string => `/${(cms.config.adminPrefix ?? 
 /** A page action's per-request Site, from the action's request. */
 export const siteOf = (cms: Cms, ctx: { request: Request }): Site => cms.site(ctx.request);
 
-/** A fresh block id: the PHP editor's 8-character random ids. */
-export const blockId = (): string => crypto.randomUUID().replaceAll("-", "").slice(0, 8);
+import { blockId } from "../support/values";
+
+export { blockId };
 
 /** Stored block rows that carry an id and a kind, in `sort` order (PageEditBlocks::blocks). */
 export function blockRows(content: unknown[] | null): Dict[] {

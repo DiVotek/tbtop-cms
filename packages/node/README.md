@@ -378,6 +378,49 @@ default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).
 A host that merges `cmsMigrations` into its own Migrator calls
 `ensureDefaultLanguage(db, "en")` after it.
 
+### Tags and category archives
+
+A tag is a page: a category subtype the articles pick in a `pagesField`. Its
+URL, name per locale, SEO, 301 on a slug change and editor come with it.
+
+```ts
+import { definePageType, pagesField } from "@tbtop/cms";
+
+const tag = definePageType({
+	key: "tag",
+	base: "category",
+	listedInAll: false, // off the Pages "All" tab, on a "Tag" tab of its own
+	archiveOf: "tags", // noindex and out of the sitemap while nothing live picks it
+	form: () => [],
+	resolveFields: async (_input, ctx) => ({ articles: await ctx.referencedByPaged("tags", { from: "article", perPage: 20 }) }),
+});
+const post = definePageType({
+	key: "post",
+	base: "article",
+	form: () => [pagesField("tags").of("category", "tag").creatable().max(10)],
+});
+```
+
+- Make a "Tags" category and the first tag under it in Pages. After that
+  `creatable()` lets the editor type a new tag into the select: it is created
+  published, next to the newest tag (`/tags/street-food`). Until a first tag
+  exists the select refuses with a validation error, since only then is it
+  known where tags live.
+- `ctx.referencedByPaged(field, { from, perPage })` and
+  `ctx.childrenPaged({ from, perPage })` (a category's own articles) give
+  `{ items, pagination: { page, pages, total, perPage } }`, newest first by
+  `publishedAt`. The page number is the request's `?page=`. From page 2 on the
+  canonical and `og:url` carry `?page=N`; a page past the last is a 404.
+  Outside a page render, `site.referencedByLinksPaged(page, field, options)`
+  and `site.childrenLinksPaged(page, options)` take the same options plus
+  `locale` and `page`.
+- With `defineSite`, put the options on `pageType(fields, { base, listedInAll,
+  archiveOf })`, pick tags with `f.pages("category", { subtype: "tag",
+  creatable: true, max: 10 })`, and read the archive in a block's `resolve`
+  through `ctx`.
+- Merging tags, `article:tag` meta and an archive that also lists its child
+  categories' articles are not there yet.
+
 ### Error pages
 
 A 404 from `loadPage` and `cms.errorPage(request, status)` carry
@@ -942,6 +985,8 @@ export default {
   `tbtop_page_refs` on every save; `site.referencedBy(page, field, { from })`
   and `site.referencedByLinks(...)` list the live pages that pick a page, and
   a type's `resolveFields` reads them as `ctx.referencedBy(field, from)`.
+  `ctx.referencedByPaged` / `ctx.childrenPaged` page an archive by `?page=`
+  (tags, see Page types).
   `rebuildPageRefs(db, site.pageTypes)` rewrites the index.
 - 404 log: `loadPage` counts each miss per locale and path (scanner probes
   in `notFound.ignore` and redirected paths left out); pass

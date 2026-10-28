@@ -10,7 +10,8 @@ import { NotFoundLog } from "./content/notFoundLog";
 import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from "./content/link";
 import { firstText, type Page, pageFromRow, translationText } from "./content/page";
 import { Pages, whereLive } from "./content/pages";
-import { livePageRefs, type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
+import { childrenLinksPaged, livePageRefs, type PagedOptions, type PageRef, referencedBy, referencedByLinks, referencedByLinksPaged, resolvePageRefs } from "./content/pageRefs";
+import { type PagedRefs, Paging } from "./content/pagedPages";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { PageRevisions } from "./content/revisions";
@@ -64,6 +65,8 @@ export class Site {
 	private readonly cache: { store: ContentCache; read: boolean } | null;
 	/** Admin writes by a signed-in user (`activity_log`). */
 	readonly audit: AuditLog;
+	/** The request's `?page=` and the paged archive its page listed (`referencedByLinksPaged`, `childrenLinksPaged`). */
+	readonly paging = new Paging();
 	/** The settings object by locale, once per request. */
 	private readonly settingsByLocale = new Map<string, Promise<CmsSettings>>();
 	/** Link targets by locale and page id, on a frontend render (`cached`). */
@@ -259,6 +262,8 @@ export class Site {
 			pages: ((value: unknown, options?: { fields?: boolean }) =>
 				options?.fields === true ? this.pagesWithFields(value, locale, nested) : resolvePageRefs(this, value, locale)) as ResolveContext["pages"],
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
+			referencedByPaged: (field, options = {}) => referencedByLinksPaged(this, page, field, { ...options, locale }),
+			childrenPaged: (options = {}) => childrenLinksPaged(this, page, { ...options, locale }),
 			collection: (key) => this.collection(key, locale),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
@@ -300,6 +305,21 @@ export class Site {
 	/** Cms::referencedByLinks: referencedBy as `{id, name, url}` links in the locale. */
 	referencedByLinks(page: Page | null, field: string, options: { from?: string; locale?: string } = {}): Promise<PageRef[]> {
 		return this.withLocale(options, (locale) => referencedByLinks(this, page, field, { ...options, locale }));
+	}
+
+	/**
+	 * Cms::referencedByLinksPaged: one page of referencedByLinks for an
+	 * archive (a tag's articles), newest first by published_at. `page` is the
+	 * request's `?page=` unless given; on a frontend render page 2 on gets a
+	 * `?page=N` canonical and a page past the end is a 404.
+	 */
+	referencedByLinksPaged(page: Page | null, field: string, options: Partial<PagedOptions> = {}): Promise<PagedRefs<PageRef>> {
+		return this.withLocale(options, (locale) => referencedByLinksPaged(this, page, field, { ...options, locale }));
+	}
+
+	/** Cms::childrenLinksPaged: one page of a page's live children (of type or subtype `from` when given), the same way. */
+	childrenLinksPaged(page: Page | null, options: Partial<PagedOptions> = {}): Promise<PagedRefs<PageRef>> {
+		return this.withLocale(options, (locale) => childrenLinksPaged(this, page, { ...options, locale }));
 	}
 
 	private async withLocale<R>(options: { locale?: string }, run: (locale: string) => Promise<R>): Promise<R> {
