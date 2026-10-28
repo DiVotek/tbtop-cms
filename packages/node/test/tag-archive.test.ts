@@ -135,6 +135,11 @@ describe("tags as a category subtype (A-thin)", () => {
 
 		const again = await send(`${url}/select-create/field_tagged_post__tags`, { name: " japan " }, url);
 		expect(await again.json()).toEqual({ value: String(ids.japan), label: "Japan" });
+
+		// A trashed tag of the same name is not picked: Pages.query() leaves deleted rows out.
+		await cms.site().pages.delete(ids.empty as number);
+		const fresh = (await (await send(`${url}/select-create/field_tagged_post__tags`, { name: "Empty" }, url)).json()) as { value: string };
+		expect(fresh.value).not.toBe(String(ids.empty));
 	});
 
 	test("the select refuses the first tag: the first one shows where tags live", async () => {
