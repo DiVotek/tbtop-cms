@@ -119,8 +119,9 @@ No zod schema follows from a function, so the catalog checks no shape for a
 block with `resolve` (any object passes): its return type is the check.
 
 **Settings.** The Site settings reach code as one object in the request's
-locale: the built-in `name`, `logo` and `favicon` (URLs), then every field of
-the site's tabs by name, resolved as a block field is (a translatable field to
+locale: the built-in `name`, `logo` and `favicon` (URLs), the published
+`phones` and `emails` (strings) and `socials` (`{label, name, href}`) from the
+built-in collections, then every field of the site's tabs by name, resolved as a block field is (a translatable field to
 its value in the locale, an image to its URL, a link to its target). Secret
 keys are not in it. It is `ctx.settings()` in a resolve or a JSON-LD
 callback, `props.cms.settings` on the page and `cms.settings(locale)` on a
@@ -644,9 +645,9 @@ phone and email are the identity's `telephone` and `email`, and `sameAs`
 lists the social links; the identity's address, hours and coordinates stay
 in SEO settings. They replace the `site.contacts.*` settings: re-enter those
 values as entries (there is no data migration). `site.contacts` reads them
-(`phones()`, `emails()`, `socials()`); a block reads them with
-`ctx.collection("phones")` or a `collection` field. The settings object
-(`props.cms.settings`) does not carry them.
+(`phones()`, `emails()`, `socials()`), and the settings object carries the
+same lists as `phones`, `emails` and `socials` (`props.cms.settings.phones[0]`
+in a header). A block can also pick them with a `collection` field.
 
 ## Link and pages fields
 

@@ -3,6 +3,7 @@ import { resolveForm } from "../blocks/fields";
 import { flattenLocales, translatablePaths } from "../blocks/locale";
 import type { Site } from "../site";
 import { tabFields } from "./hostSettings";
+import type { SocialLink } from "./siteContacts";
 
 /** The package's own Site settings in the settings object. */
 export type BuiltinSettings = {
@@ -11,6 +12,12 @@ export type BuiltinSettings = {
 	logo: string | null;
 	/** The favicon's URL. */
 	favicon: string | null;
+	/** The published Phones entries' numbers, in the editor's order. */
+	phones: string[];
+	/** The published Emails entries' addresses. */
+	emails: string[];
+	/** The published Socials entries with a label and a safe link. */
+	socials: SocialLink[];
 };
 
 /** The settings object without the host's types: the built-in keys, then each host field by name. */
@@ -25,8 +32,15 @@ export type CmsSettings = BuiltinSettings & Record<string, unknown>;
  */
 export async function settingsObject(site: Site, locale: string): Promise<CmsSettings> {
 	const settings = site.settings;
-	const [name, logo, favicon] = await Promise.all([settings.get("site.name"), settings.get("site.logo"), settings.get("site.favicon")]);
-	const builtin: BuiltinSettings = { name: typeof name === "string" ? name : null, logo: media(site, logo), favicon: media(site, favicon) };
+	const [name, logo, favicon, phones, emails, socials] = await Promise.all([
+		settings.get("site.name"),
+		settings.get("site.logo"),
+		settings.get("site.favicon"),
+		site.contacts.phones(locale),
+		site.contacts.emails(locale),
+		site.contacts.socials(locale),
+	]);
+	const builtin: BuiltinSettings = { name: typeof name === "string" ? name : null, logo: media(site, logo), favicon: media(site, favicon), phones, emails, socials };
 	const hostTabs = site.config.siteSettings;
 	if (hostTabs === undefined) {
 		return builtin;

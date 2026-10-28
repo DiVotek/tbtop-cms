@@ -245,7 +245,7 @@ describe("defineSite", () => {
 	});
 
 	test("the settings object is typed by the tabs: built-in keys, every tab's fields, nothing else", () => {
-		const typed: typeof site.settings = { name: "Divotek", logo: null, favicon: null, phone: null, address: "Kyiv", brandColor: null, links: [] };
+		const typed: typeof site.settings = { name: "Divotek", logo: null, favicon: null, phones: [], emails: [], socials: [], phone: null, address: "Kyiv", brandColor: null, links: [] };
 		// @ts-expect-error not a field of any tab
 		const unknownKey: typeof site.settings = { ...typed, fax: "1" };
 		// @ts-expect-error phone is text

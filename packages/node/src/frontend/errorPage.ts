@@ -183,7 +183,7 @@ function fallbackContent(site: Site, status: number, locale: string, fallback: s
 function staticProps(site: Site, status: number, path: string): ErrorPageProps {
 	const locale = "en";
 	const cms: SharedShape = {
-		settings: { name: null, logo: null, favicon: null },
+		settings: { name: null, logo: null, favicon: null, phones: [], emails: [], socials: [] },
 		locale,
 		defaultLocale: locale,
 		languages: [],
