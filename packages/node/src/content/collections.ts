@@ -81,6 +81,11 @@ export class Collections {
 		if (this.byKey.has(def.key)) {
 			throw new Error(`Collection [${def.key}] is registered twice.`);
 		}
+		// The admin names a collection's table `entries_{key}` with - as _, so team-a and team_a would share it.
+		const clash = [...this.byKey.keys()].find((known) => known.replaceAll("-", "_") === def.key.replaceAll("-", "_"));
+		if (clash !== undefined) {
+			throw new Error(`Collection [${def.key}] clashes with [${clash}]: keys may not differ only by - and _.`);
+		}
 		const form = def.form(new S());
 		const fields = formFields(form);
 		const names = fields.map((field) => field.name);
