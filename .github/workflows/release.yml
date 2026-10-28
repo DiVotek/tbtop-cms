@@ -6,11 +6,16 @@
 # version is the git tag. Bump the version and add its `## X.Y.Z` section to
 # CHANGELOG.md in the release PR, merge to main, then run this workflow from
 # main. It:
-#   1. reads the version and checks CHANGELOG.md has a section for it
-#   2. fails if that tag already exists
-#   3. npm publish (Trusted Publishing / OIDC, no token) -> @tbtop/cms
-#   4. creates and pushes the tag -> Packagist publishes tbtop/cms via webhook
-#   5. creates a GitHub Release from the CHANGELOG section
+#   1. checks CI is green on the commit and CHANGELOG.md has the version's section
+#   2. builds and packs the npm tarball (read-only token, no OIDC)
+#   3. fails if that tag already exists
+#   4. npm publish of that tarball (Trusted Publishing / OIDC) -> @tbtop/cms
+#   5. creates and pushes the tag -> Packagist publishes tbtop/cms via webhook
+#   6. creates a GitHub Release from the CHANGELOG section
+#
+# Two jobs on purpose: dependency installs and the build run in `build`, which
+# can neither push nor mint an npm token; only `publish`, which installs
+# nothing, holds `contents: write` and `id-token: write`.
 #
 # npm goes BEFORE the tag on purpose: a npm failure then leaves no dangling
 # tag. Every step is safe to re-run: a version already on npm is skipped, a
@@ -31,18 +36,21 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions:
-  contents: write # push the tag + create the GitHub Release
-  checks: read # require green CI on the released commit
-  id-token: write # OIDC for npm trusted publishing + provenance
+permissions: {}
 
 jobs:
-  release:
-    name: Tag + publish both packages
+  build:
+    name: Build the npm package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read # require green CI on the released commit
     defaults:
       run:
         working-directory: packages/node
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      tag: ${{ steps.ver.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +72,7 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           runs="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-            --jq '[.check_runs[] | select(.name != "Tag + publish both packages")]')"
+            --jq '[.check_runs[] | select(.name != "Build the npm package" and .name != "Tag + publish both packages")]')"
           if [ "$(jq length <<<"$runs")" -eq 0 ]; then
             echo "::error::no CI ran on $SHA — wait for ci.yml on main"
             exit 1
@@ -75,6 +83,89 @@ jobs:
             echo "$bad"
             exit 1
           fi
+
+      - name: Read version
+        id: ver
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          echo "resolved version $v"
+
+      - name: Require the CHANGELOG.md section
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        working-directory: .
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## " { if (found) exit; if ($2 == v) { found = 1; next } }
+            found { print }
+            END { if (!found) exit 1 }
+          ' CHANGELOG.md > notes.md || {
+            echo "::error::CHANGELOG.md has no '## $VERSION' section"
+            exit 1
+          }
+
+      # A wildcard or local spec in what consumers install cannot be fixed
+      # after publish. devDependencies are not installed by consumers.
+      - name: Refuse unpinned dependency ranges
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const bad = [];
+            for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
+              for (const [name, range] of Object.entries(pkg[field] ?? {})) {
+                if (range === "*" || /^(file|link|workspace):/.test(range)) bad.push(`${field}.${name}: ${range}`);
+              }
+            }
+            if (bad.length) {
+              console.error("::error::pin these before releasing:\n" + bad.join("\n"));
+              process.exit(1);
+            }
+          '
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      # Until @tbtop/admin (node) is on npm the dev build comes from
+      # DiVotek/tbtop at ADMIN_SHA, as in ci.yml.
+      - name: Build @tbtop/admin
+        run: ./scripts/fetch-admin.sh
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          npm pack --pack-destination "$RUNNER_TEMP/dist"
+          cp ../../notes.md "$RUNNER_TEMP/dist/notes.md"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/dist
+          if-no-files-found: error
+
+  publish:
+    name: Tag + publish both packages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the tag + create the GitHub Release
+      id-token: write # OIDC for npm trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/dist
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -87,33 +178,6 @@ jobs:
       - name: Upgrade npm for OIDC
         run: npm install -g npm@11.18.0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.2"
-
-      - name: Read version
-        id: ver
-        run: |
-          v="$(node -p "require('./package.json').version")"
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "tag=v$v" >> "$GITHUB_OUTPUT"
-          echo "resolved version $v"
-
-      - name: Extract release notes from CHANGELOG.md
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
-        working-directory: .
-        run: |
-          awk -v v="$VERSION" '
-            $0 ~ "^## " { if (found) exit; if ($2 == v) { found = 1; next } }
-            found { print }
-            END { if (!found) exit 1 }
-          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md" || {
-            echo "::error::CHANGELOG.md has no '## $VERSION' section"
-            exit 1
-          }
-
       # git ls-remote --exit-code returns 0 (ref matched), 2 (no match), or
       # another code for a real failure. Only 2 means "tag is free". A tag that
       # already points at this commit is a re-run after a failed GitHub Release
@@ -121,7 +185,7 @@ jobs:
       - name: Fail if tag already exists
         id: tag
         env:
-          TAG: ${{ steps.ver.outputs.tag }}
+          TAG: ${{ needs.build.outputs.tag }}
           SHA: ${{ github.sha }}
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>/dev/null; then
@@ -144,34 +208,23 @@ jobs:
           fi
           echo "$TAG is free"
 
-      # Until @tbtop/admin (node) is on npm the dev build comes from
-      # DiVotek/tbtop at ADMIN_SHA, as in ci.yml.
-      - name: Build @tbtop/admin
-        run: ./scripts/fetch-admin.sh
-
-      - name: Install
-        run: bun install --frozen-lockfile
-
-      - name: Build
-        run: bun run build
-
       # npm first: if this fails, no tag is pushed, so a re-run stays clean.
-      # OIDC is auto-detected; provenance comes from publishConfig.
-      # Skips a version already on npm, so a re-run after the tag step failed
-      # does not die here.
+      # OIDC is auto-detected; provenance comes from publishConfig. Skips a
+      # version already on npm, so a re-run after a later step failed goes on.
       - name: Publish to npm
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          v="$(node -p "require('./package.json').version")"
-          if npm view "@tbtop/cms@$v" version >/dev/null 2>&1; then
-            echo "@tbtop/cms@$v is already on npm, skipping"
+          if npm view "@tbtop/cms@$VERSION" version >/dev/null 2>&1; then
+            echo "@tbtop/cms@$VERSION is already on npm, skipping"
           else
-            npm publish
+            npm publish "$RUNNER_TEMP"/dist/*.tgz --provenance --access public
           fi
 
       - name: Fail if tag already exists (re-check)
         if: steps.tag.outputs.resume != 'true'
         env:
-          TAG: ${{ steps.ver.outputs.tag }}
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>/dev/null; then
             status=0
@@ -190,7 +243,7 @@ jobs:
       - name: Create and push tag
         if: steps.tag.outputs.resume != 'true'
         env:
-          TAG: ${{ steps.ver.outputs.tag }}
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -200,10 +253,10 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.ver.outputs.tag }}
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "GitHub Release $TAG already exists"
           else
-            gh release create "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/dist/notes.md"
           fi
