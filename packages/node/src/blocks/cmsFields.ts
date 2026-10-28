@@ -14,7 +14,7 @@ export type StoredLink = {
 };
 
 /** What the CMS editors hand a link, pages or collection field: its lookups and the admin's search URLs. */
-export type CmsFieldBinding = { site: Site; searchEndpoint: string; entrySearchEndpoint?: (collection: string) => string };
+export type CmsFieldBinding = { site: Site; searchEndpoint: string; entrySearchEndpoint: (collection: string) => string };
 
 export const LINK_SHAPE_RULE = "link_shape";
 export const PAGE_REF_RULE = "page_ref";
@@ -188,7 +188,7 @@ export function bindCmsFields<T extends unknown[]>(fields: T, binding: CmsFieldB
 	for (const field of walk.collectAll(fields, (value) => value instanceof CollectionField)) {
 		(field as CollectionField).bindCms({
 			collection: (key) => (site.collections.has(key) ? site.collections.get(key) : null),
-			searchEndpoint: (key) => entrySearchEndpoint?.(key) ?? "",
+			searchEndpoint: entrySearchEndpoint,
 		});
 	}
 	return fields;
