@@ -3,7 +3,24 @@
 	"version": "0.0.0",
 	"description": "Code-first site CMS for Bun, Node and Cloudflare Workers: pages, blocks and SEO over Kysely, edited in @tbtop/admin.",
 	"license": "MIT",
-	"private": true,
+	"author": "DiVotek <support@divotek.com>",
+	"homepage": "https://github.com/DiVotek/tbtop-cms/tree/main/packages/node#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/DiVotek/tbtop-cms.git",
+		"directory": "packages/node"
+	},
+	"bugs": {
+		"url": "https://github.com/DiVotek/tbtop-cms/issues"
+	},
+	"keywords": [
+		"cms",
+		"headless-cms",
+		"tbtop",
+		"kysely",
+		"cloudflare-workers",
+		"bun"
+	],
 	"type": "module",
 	"sideEffects": [
 		"./dist/admin-client.js"
@@ -12,7 +29,7 @@
 		"tbtop-cms": "./dist/cli.js"
 	},
 	"engines": {
-		"node": ">=20"
+		"node": ">=22"
 	},
 	"exports": {
 		".": {
@@ -92,7 +109,8 @@
 	},
 	"files": [
 		"dist",
-		"README.md"
+		"README.md",
+		"LICENSE.md"
 	],
 	"peerDependenciesMeta": {
 		"@json-render/core": {
@@ -110,5 +128,9 @@
 		"react": {
 			"optional": true
 		}
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }
