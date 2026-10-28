@@ -4,6 +4,7 @@ import type { ResolveContext } from "../blocks/context";
 import type { BlockImpl } from "../blocks/registry";
 import type { CollectionDef } from "../content/collections";
 import type { PageTypeDef } from "../content/pageTypes";
+import type { BuiltinSettings, CmsSettings } from "../content/siteSettings";
 import type { SchemaContext } from "../seo/schemaContext";
 import { type CmsFields, F, f, type Fields, formOf, type Output, zodOf } from "./fields";
 import { type CollectionType, nameCollections } from "./collections";
@@ -90,6 +91,35 @@ export type PageType<R extends Fields = Fields> = { readonly fields: R; readonly
 /** `pageType({ price: f.number() }, { label: "Service", jsonLd: "Service" })` */
 export const pageType = <const R extends Fields>(fields: R, options: PageOptions = {}): PageType<R> => ({ fields, options });
 
+/** Site settings tabs by label, each a field record. */
+export type SettingsTabs = Record<string, Fields>;
+
+type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (x: infer I) => void ? I : never;
+type TabsFields<R extends SettingsTabs> = [keyof R] extends [never] ? {} : UnionToIntersection<R[keyof R]> extends infer F extends Fields ? F : never;
+
+/** The settings object of these tabs: the built-in keys plus every tab's fields, resolved. */
+export type SettingsOf<R extends SettingsTabs> = BuiltinSettings & Output<TabsFields<R>>;
+
+export type SiteSettings<R extends SettingsTabs = SettingsTabs> = {
+	readonly tabs: R;
+	/** The settings object, typed by the tabs: `await settings.of(ctx)` in a resolve, `settings.of(cms)` on the server. */
+	of(source: { settings(): Promise<CmsSettings> }): Promise<SettingsOf<R>>;
+};
+
+/**
+ * Settings tabs declared apart from the site, so a block's resolve can read
+ * them typed (`await settings.of(ctx)`) without referring to the site it is part of.
+ */
+export const defineSettings = <const R extends SettingsTabs>(tabs: R): SiteSettings<R> => ({ tabs, of: async (source) => (await source.settings()) as SettingsOf<R> });
+
+const isSiteSettings = (value: SettingsTabs | SiteSettings): value is SiteSettings => typeof value.of === "function" && !(value.of instanceof F);
+
+/** The tabs of `defineSite({ settings })`, either form. */
+export const settingsTabs = (settings: SettingsTabs | SiteSettings | undefined): SettingsTabs | undefined =>
+	settings === undefined ? undefined : isSiteSettings(settings) ? settings.tabs : settings;
+
+type TabsOf<V> = V extends SiteSettings<infer R> ? R : V extends SettingsTabs ? V : {};
+
 export type SiteDef = {
 	// biome-ignore lint/suspicious/noExplicitAny: each block keeps its own props type.
 	blocks?: Record<string, Block<any, boolean, any>>;
@@ -102,8 +132,8 @@ export type SiteDef = {
 	/** Collections by key: records with no page of their own, picked in blocks with `f.collection()`. */
 	// biome-ignore lint/suspicious/noExplicitAny: each collection keeps its own fields type.
 	collections?: Record<string, CollectionType<any>>;
-	/** Site settings tabs by label; a field's value is at `site.<name>` in the settings. */
-	settings?: Record<string, Fields>;
+	/** Site settings tabs by label (or `defineSettings(...)`); a field's value is `name` in the settings object, stored at `site.<name>`. */
+	settings?: SettingsTabs | SiteSettings;
 };
 
 /** A field record may itself hold fields named `fields` and `options`; a PageType holds a record there. */
@@ -134,6 +164,8 @@ export type Site<D extends SiteDef = SiteDef> = {
 	readonly catalog: SiteCatalog<D>;
 	/** Type only: the page types, for `Cms<…>` and `PageProps<…>`. */
 	readonly pageTypes: SitePageTypes<D>;
+	/** Type only: the settings object, for `PageProps<typeof site.pageTypes, typeof site.settings>`. */
+	readonly settings: SettingsOf<TabsOf<D["settings"]>>;
 };
 
 /** A site's collections as createCms takes them: fields to `form`. */
@@ -169,7 +201,7 @@ export function defineSite<const D extends SiteDef>(def: D): Site<D> {
 			return [kind, { label, description, category, placements, props: blockProps(b) }];
 		}),
 	);
-	return { def, catalog: catalog as unknown as SiteCatalog<D>, pageTypes: [] as unknown as SitePageTypes<D> };
+	return { def, catalog: catalog as unknown as SiteCatalog<D>, pageTypes: [] as unknown as SitePageTypes<D>, settings: {} as unknown as Site<D>["settings"] };
 }
 
 /**

@@ -4,6 +4,7 @@ import type { Page, TranslatableField } from "../content/page";
 import type { PageRef } from "../content/pageRefs";
 import type { PageColumns } from "../frontend/pageView";
 import type { EntryList } from "../content/entryList";
+import type { CmsSettings } from "../content/siteSettings";
 import type { Site } from "../site";
 
 /**
@@ -41,6 +42,8 @@ export type ResolveContext = {
 	pageText(field: TranslatableField): string | null;
 	/** A package string (`forms.contact.heading`) in this locale. */
 	t(key: string): string;
+	/** The Site settings as one object in this locale; `defineSettings(...).of(ctx)` types the host's keys. */
+	settings(): Promise<CmsSettings>;
 	/** The request's site: settings, pages, pageViews and the rest, for what the helpers above do not cover. */
 	site: Site;
 };

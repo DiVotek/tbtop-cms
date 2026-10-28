@@ -37,18 +37,6 @@ export class SiteContacts {
 		return out;
 	}
 
-	/**
-	 * The `cms.settings` keys the lists had before the collections (ShareCmsProps::contacts),
-	 * in their old row shapes, so templates that read them keep working.
-	 */
-	async legacySettings(locale: string): Promise<Record<string, unknown>> {
-		return {
-			"site.contacts.phones": (await this.phones(locale)).map((number) => ({ number })),
-			"site.contacts.emails": (await this.emails(locale)).map((address) => ({ address })),
-			"site.contacts.socials": await this.socials(locale),
-		};
-	}
-
 	/** One field of a collection's published entries, blanks skipped. */
 	private async column(collection: string, field: string, locale?: string): Promise<string[]> {
 		const out: string[] = [];

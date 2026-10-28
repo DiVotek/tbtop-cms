@@ -189,7 +189,7 @@ describe("host tabs on Site settings (siteSettings)", () => {
 		expect(await cms.site().settings.get("site.tagline")).toBe("We build");
 		expect(await cms.site().settings.get("site.monogram")).toBeNull();
 		const result = await cms.loadPage(get("/"));
-		expect(result.type === "page" ? result.props.cms.settings["site.tagline"] : null).toBe("We build");
+		expect(result.type === "page" ? result.props.cms.settings.tagline : null).toBe("We build");
 	});
 
 	test("a host media field reaches cms.settings as a URL, like the logo", async () => {
@@ -197,7 +197,7 @@ describe("host tabs on Site settings (siteSettings)", () => {
 		const { cms } = await hostPanel(undefined, { siteSettings: media });
 		await cms.site().settings.set("site.og_logo", "brand/og.png");
 		const result = await cms.loadPage(get("/"));
-		const shipped = result.type === "page" ? result.props.cms.settings["site.og_logo"] : null;
+		const shipped = result.type === "page" ? result.props.cms.settings.og_logo : null;
 		expect(shipped).toBe(cms.site().mediaUrl("brand/og.png"));
 		expect(shipped).not.toBe("brand/og.png");
 	});

@@ -10,20 +10,24 @@ import type { Jsonify } from "../support/values";
 import { ancestorCrumbs, breadcrumbs, type Crumb } from "./breadcrumbs";
 import { type PageColumns, pageColumns } from "./pageView";
 import { type ErrorPageProps, errorPageProps } from "./errorPage";
+import type { CmsSettings } from "../content/siteSettings";
 
 /** The shared `cms` prop (ShareCmsProps): site settings, locales, the resolved header and footer. */
-export type SharedProps = Jsonify<SharedShape>;
+export type SharedProps<S extends Record<string, unknown> = CmsSettings> = Jsonify<SharedShape<S>>;
 
 /**
  * The props of a CMS page, all JSON: a host passes them through its loader as
  * they are. `page` is a union by `page.type` over the built-in types and `T`
  * (createCms infers it from `pageTypes`), so `page.type === "recipe"`
- * narrows `page.fields` to that type's schema.
+ * narrows `page.fields` to that type's schema. `S` types `cms.settings`:
+ * `typeof site.settings` (defineSite), or the built-ins plus the output of
+ * `siteSettings.schema`.
  */
-export type PageProps<T extends readonly PageTypeDef[] = readonly PageTypeDef[]> = Jsonify<PageShape<PageTypeUnion<T>>>;
+export type PageProps<T extends readonly PageTypeDef[] = readonly PageTypeDef[], S extends Record<string, unknown> = CmsSettings> = Jsonify<PageShape<PageTypeUnion<T>, S>>;
 
-export type SharedShape = {
-	settings: Record<string, unknown>;
+export type SharedShape<S extends Record<string, unknown> = CmsSettings> = {
+	/** The Site settings object in the page's locale (`ctx.settings()`). */
+	settings: S;
 	locale: string;
 	defaultLocale: string;
 	languages: { locale: string; name: string; is_default: boolean }[];
@@ -32,14 +36,14 @@ export type SharedShape = {
 	strings: { previewBanner: string };
 };
 
-type PageShape<P = { type: string; fields: Record<string, unknown> }> = {
+type PageShape<P = { type: string; fields: Record<string, unknown> }, S extends Record<string, unknown> = CmsSettings> = {
 	page: Omit<PageColumns, "type"> & P;
 	render: RenderSpec;
 	seo: Seo;
 	breadcrumbs: Crumb[];
 	path: string;
 	isPreview: boolean;
-	cms: SharedShape;
+	cms: SharedShape<S>;
 };
 
 
@@ -192,16 +196,15 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 }
 
 export async function sharedProps(site: Site, locale: string, page: Page | null): Promise<SharedShape> {
-	const [languages, settings, contacts, defaultLocale, slots, previewBanner] = await Promise.all([
+	const [languages, settings, defaultLocale, slots, previewBanner] = await Promise.all([
 		site.languages.frontendActive(),
-		site.settings.forFrontend(),
-		site.contacts.legacySettings(locale),
+		site.settingsIn(locale),
 		site.languages.defaultLocale(),
 		(async () => layout(site, locale, page ?? (await site.pages.home())))(),
 		site.t("pages.preview.banner", locale),
 	]);
 	return {
-		settings: { ...settings, ...contacts },
+		settings,
 		locale,
 		defaultLocale,
 		languages: languages.map((row) => ({ locale: row.locale, name: row.name, is_default: row.is_default })),

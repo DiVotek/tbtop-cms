@@ -275,11 +275,6 @@ describe("collections: phones, emails and socials", () => {
 			address: { "@type": "PostalAddress", addressLocality: "Kyiv" },
 			sameAs: ["https://facebook.com/acme"],
 		});
-		expect(result.props.cms.settings).toMatchObject({
-			"site.contacts.phones": [{ number: "+380 44 000 0001" }, { number: "+380 44 000 0002" }],
-			"site.contacts.emails": [{ address: "hi@example.com" }],
-			"site.contacts.socials": [{ label: "FB", name: "Facebook", href: "https://facebook.com/acme" }],
-		});
 		expect(await site.contacts.phones()).toEqual(["+380 44 000 0001", "+380 44 000 0002"]);
 	});
 

@@ -1,3 +1,4 @@
+import type { CmsSettings } from "../content/siteSettings";
 import { firstText, isLive, type Page } from "../content/page";
 import type { Site } from "../site";
 import { atom } from "../support/values";
@@ -19,6 +20,8 @@ export type SchemaContext = {
 	imageHeight: number | null;
 	author: Record<string, unknown> | null;
 	publisher: Record<string, unknown> | null;
+	/** The Site settings as one object in this locale, as a block's `ctx.settings()`. */
+	settings(): Promise<CmsSettings>;
 };
 
 type ImageDetails = { url: string; alt: string | null; mime: string | null; width: number | null; height: number | null };
@@ -130,6 +133,7 @@ export async function schemaContext(site: Site, page: Page, locale: string): Pro
 		imageHeight: image?.height ?? null,
 		author: await identityAuthor(site),
 		publisher: await identityPublisher(site),
+		settings: () => site.settingsIn(locale),
 	};
 }
 

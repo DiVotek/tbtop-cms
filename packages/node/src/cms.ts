@@ -17,6 +17,7 @@ import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
 import { chunkCount, sitemapChunkXml, sitemapIndexXml } from "./seo/sitemap";
 import { indexingEnabled } from "./seo/resolver";
+import type { CmsSettings } from "./content/siteSettings";
 import { Site } from "./site";
 
 /**
@@ -39,6 +40,11 @@ export type Cms<T extends readonly PageTypeDef[] = any> = {
 	 * `ctx.waitUntil`) to write it after the answer instead of before.
 	 */
 	loadPage(request: Request, options?: { waitUntil?: (task: Promise<unknown>) => void }): Promise<LoadResult<PageProps<T>>>;
+	/**
+	 * The Site settings as one object (`ctx.settings()` on a server route), in
+	 * `locale` or the default; `defineSettings(...).of(cms)` types it.
+	 */
+	settings(locale?: string): Promise<CmsSettings>;
 	/** robots.txt, sitemap.xml and its chunks, and form posts to /_cms/forms/...; null for every other URL. */
 	handle(request: Request): Promise<Response | null>;
 	/**
@@ -138,6 +144,10 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			// An editor (canPreview) or a signed preview link (PageController::hasPreviewAccess).
 			const preview = (await config.canPreview?.(request)) === true || (await hasValidPreviewSignature(scope, request));
 			return (await loadPage(scope, request, { preview, ...(waitUntil === undefined ? {} : { waitUntil }) })) as LoadResult<PageProps<T>>;
+		},
+		settings: async (locale) => {
+			const scope = site(undefined, { cached: true });
+			return scope.settingsIn(locale ?? (await scope.languages.defaultLocale()));
 		},
 		handle: async (request) => {
 			if (request.method === "POST") {

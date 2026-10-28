@@ -2,7 +2,7 @@ import { type Admin, type Disk, S } from "@tbtop/admin";
 import { kyselyRules } from "@tbtop/admin/kysely";
 import type { Kysely } from "kysely";
 import { type CmsAdminOverrides, createCmsAdmin } from "../admin/create";
-import { type DefaultAuth, type DefaultAuthOptions, defaultAuth, ensureFirstAdmin } from "../betterAuth/defaultAuth";
+import { type DefaultAuth, type DefaultAuthOptions, defaultAuth } from "../betterAuth/defaultAuth";
 import type { Catalog } from "../blocks/catalog";
 import { linkField, pagesField } from "../blocks/cmsFields";
 import { collectionField } from "../blocks/collectionField";
@@ -15,7 +15,7 @@ import { ensureErrorPages } from "../frontend/errorPage";
 import type { PageProps } from "../frontend/load";
 import { type Fixture, seedFixtures } from "../fixtures/seed";
 import { baseNode, identityId, type SchemaContext } from "../seo/schemaContext";
-import { type Block, collectionDefs, pageTypeDefs, type SeoHelpers, type Site, type SiteDef, type SitePageTypes } from "../define/define";
+import { type Block, collectionDefs, pageTypeDefs, settingsTabs, type SeoHelpers, type Site, type SiteDef, type SitePageTypes } from "../define/define";
 import { type CmsFields, formOf, zodOf } from "../define/fields";
 import type { CmsCacheStore } from "../support/cache";
 import { cmsRoutes, migrateAll, type PageRenderers, renderPage } from "./routes";
@@ -24,12 +24,12 @@ import { cmsRoutes, migrateAll, type PageRenderers, renderPage } from "./routes"
 export type SiteConfig = Omit<CmsConfig, "db" | "blocks" | "pageTypes" | "collections" | "schemaTypes" | "seo" | "siteSettings" | "cache">;
 
 /** What `serve` and `cloudflare` take besides the site and what it runs on. */
-export type SiteOptions<D extends SiteDef> = Partial<PageRenderers<PageProps<SitePageTypes<D>>>> & {
+export type SiteOptions<D extends SiteDef> = Partial<PageRenderers<PageProps<SitePageTypes<D>, Site<D>["settings"]>>> & {
 	/** Seeded once, into an empty site. */
 	seed?: Fixture;
 	config?: SiteConfig;
 	/** Better Auth's options past the defaults; false: no Better Auth (the host gives `config.auth` or `config.authorize`). */
-	auth?: false | Omit<DefaultAuthOptions, "secret" | "baseURL" | "database">;
+	auth?: false | Omit<DefaultAuthOptions, "secret" | "baseURL" | "database" | "firstAdmin">;
 	/** The type of the host's user ids when it brings its own auth (`config.auth`); Better Auth's are strings. Default "int". */
 	userKey?: "int" | "string";
 	/**
@@ -86,10 +86,11 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 					...(runtime.secret === undefined ? {} : { secret: runtime.secret }),
 					...(runtime.baseURL === undefined ? {} : { baseURL: runtime.baseURL }),
 					...(runtime.authDatabase === undefined ? {} : { database: runtime.authDatabase }),
+					...(runtime.firstAdmin === undefined ? {} : { firstAdmin: runtime.firstAdmin }),
 				});
 	const impls = Object.fromEntries(Object.entries(def.blocks ?? {}).map(([kind, b]) => [kind, blockImpl(b, cmsFields)]));
 	const extend = def.seo;
-	const settings = def.settings;
+	const settings = settingsTabs(def.settings);
 	const cms = createCms({
 		hostRules: kyselyRules(db),
 		...config,
@@ -101,7 +102,12 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 		...(extend === undefined ? {} : { seo: { extend: (nodes, ctx) => extend(nodes, ctx, helpers(ctx)) } }),
 		...(settings === undefined
 			? {}
-			: { siteSettings: { tabs: (s) => Object.entries(settings).map(([label, fields]) => ({ label, children: formOf(fields)(s, cmsFields) })) } }),
+			: {
+					siteSettings: {
+						tabs: (s) => Object.entries(settings).map(([label, fields]) => ({ label, children: formOf(fields)(s, cmsFields) })),
+						schema: zodOf(Object.assign({}, ...Object.values(settings))),
+					},
+				}),
 		...(auth === null ? {} : { auth: auth.adapter }),
 		...(runtime.cache === undefined ? {} : { cache: { store: runtime.cache } }),
 	}) as unknown as Cms<SitePageTypes<D>>;
@@ -116,9 +122,7 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 			await seedFixtures(cms, options.seed);
 		}
 		await ensureErrorPages(cms);
-		if (auth !== null && runtime.firstAdmin !== undefined) {
-			await ensureFirstAdmin(auth, runtime.firstAdmin.email, runtime.firstAdmin.password);
-		}
+		await auth?.setup();
 	};
 	return {
 		cms,
@@ -149,7 +153,9 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 			if (render === undefined) {
 				return new Response("Not found", { status: 404 });
 			}
-			return renderPage(cms, request, { render, ...(renderError === undefined ? {} : { renderError }) }, waitUntil);
+			// The settings object is the site's, parsed by the fields' schema: its type is the site's.
+			const pages = cms as unknown as Parameters<typeof renderPage<PageProps<SitePageTypes<D>, Site<D>["settings"]>>>[0];
+			return renderPage(pages, request, { render, ...(renderError === undefined ? {} : { renderError }) }, waitUntil);
 		},
 	};
 }

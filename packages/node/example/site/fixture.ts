@@ -6,7 +6,7 @@ export const fixture: Fixture = {
 		{ locale: "uk", name: "Українська", default: true },
 		{ locale: "en", name: "English" },
 	],
-	settings: { "site.name": "Divotek", "site.phone": "+380 44 000 00 00" },
+	settings: { "site.name": "Divotek", "site.phone": "+380 44 000 00 00", "site.address": { uk: "Київ", en: "Kyiv" } },
 	pages: [
 		{
 			key: "home",

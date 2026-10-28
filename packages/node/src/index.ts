@@ -51,6 +51,7 @@ export { LEAD_STATUSES, type LeadStatus, type Submission, Submissions, type Subm
 export type { SubmissionEvent } from "./forms/submit";
 export type { Crumb } from "./frontend/breadcrumbs";
 export type { LoadResult, PageProps, SharedProps } from "./frontend/load";
+export type { BuiltinSettings, CmsSettings } from "./content/siteSettings";
 export { type ErrorClass, type ErrorPageProps, type ErrorSeo, ensureErrorPages } from "./frontend/errorPage";
 export { previewLink } from "./frontend/previewLink";
 export { htmlToText } from "./notifications/channels";

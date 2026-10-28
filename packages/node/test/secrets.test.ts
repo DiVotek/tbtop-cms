@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { makeCms } from "./support";
 
-const secretConfig = { secretSettings: ["site.api_token"], settingsKey: "test-settings-key" };
+import type { S } from "@tbtop/admin";
+
+const secretConfig = {
+	secretSettings: ["site.api_token"],
+	settingsKey: "test-settings-key",
+	siteSettings: { tabs: (s: S) => [{ label: "API", children: [s.text("api_token"), s.text("public_note")] }] },
+};
 
 describe("secret settings", () => {
 	test("a secret is stored sealed, read back, and kept off the frontend", async () => {
@@ -13,7 +19,10 @@ describe("secret settings", () => {
 		expect(row.value).toStartWith("enc:v1:");
 		expect(row.value).not.toContain("s3cr3t");
 		expect(await settings.get("site.api_token")).toBe("s3cr3t");
-		expect(await settings.forFrontend()).not.toHaveProperty("site.api_token");
+		await settings.set("site.public_note", "hi");
+		const object = await cms.site().settingsIn("en");
+		expect(object).toMatchObject({ public_note: "hi" });
+		expect(object).not.toHaveProperty("api_token");
 	});
 
 	test("without settingsKey a secret cannot be saved", async () => {
