@@ -33,6 +33,8 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `seo.robots.disallow` | `list<string>` | `[]` | Extra paths robots.txt closes to crawlers, on top of the admin prefix and `/login` (`Frontend/Seo/RobotsRegistry.php`) | seo.md |
 | `seo.sitemap.enabled` | `bool` | `true` | Turns the sitemap routes on/off (`Cms.php`, `Frontend/Seo/RobotsTxt.php`) | seo.md |
 | `seo.sitemap.per_chunk` | `int` | `1000` | Fallback URLs-per-chunk when the Settings key `seo.sitemap_per_chunk` is unset (`Frontend/Seo/SitemapEntryBuilder.php`, capped by an internal `MAX_PER_CHUNK`). Two similarly-named knobs exist — this config key is the inline default; `seo.sitemap_per_chunk` in Settings (§7) is the live, admin-edited override | seo.md |
+| `seo.llms_txt.enabled` | `bool` | `true` | `false` removes the `/llms.txt` route; `true` leaves the switch to the Settings key `seo.llms_txt.enabled` (off by default) (`Cms.php`, `Frontend/Seo/LlmsTxt/LlmsTxtSettings.php`) | seo.md |
+| `seo.llms_txt.sections` | `list<class-string<LlmsTxtSection>>` | `[]` | Host sections appended to llms.txt after the page-type sections, resolved from the container (`Frontend/Seo/LlmsTxt/LlmsTxt.php`) | seo.md |
 | `preview.link_ttl_hours` | `int` | `72` | Hours a signed draft-preview link stays valid (`Frontend/PreviewLink.php`, admin status bar) | pages.md |
 | `cache.enabled` | `bool` | `true` | Turns on `CmsCache`'s cross-request cache for frontend content reads; admin reads always stay live | wiring.md |
 | `cache.ttl` | `int` | `3600` | Seconds a cached entry lives before recomputing (`Cache/CmsCache.php`) | wiring.md |
@@ -97,6 +99,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|---|---|
 | `tbtop-cms.form.submit` | POST | `_cms/forms/{locale}/{page}/{block}` | `FormSubmitController` — handles a form block submission; `{block}` is a placed block id or a `HasForm` form name (blocks.md); throttled by `tbtop-cms.forms.throttle` |
 | `tbtop-cms.robots` | GET | `robots.txt` | `RobotsController` — dynamic robots.txt |
+| `tbtop-cms.llms-txt` | GET | `llms.txt` | `LlmsTxtController` — llms.txt in the default locale; only if `tbtop-cms.seo.llms_txt.enabled` (default true); 404 until the editor turns it on and while indexing is off |
 | `tbtop-cms.sitemap` | GET | `sitemap.xml` | `SitemapController@index` — sitemap index; only if `tbtop-cms.seo.sitemap.enabled` (default true) |
 | `tbtop-cms.sitemap.chunk` | GET | `sitemap-{chunk}.xml` | `SitemapController@chunk` — one sitemap chunk; registered before the catch-all so it isn't shadowed by a page slug |
 | `tbtop-cms.page` | GET | `{path?}` (catch-all, `.*`) | `PageController` — resolves and renders any CMS page; must be registered last |
@@ -230,6 +233,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `CmsAdmin` | `src/Admin/Contracts/CmsAdmin.php` | `canAccessCmsAdmin(): bool` | Host's admin-model gate for panel access |
 | `Channel` (Notifications) | `src/Notifications/Contracts/Channel.php` | `key(): string`, `label(): string`, `format(): Format`, `settings(S $s): list<Field\|Node\|TextBlock>`, `supports(Recipient $to): bool`, `send(Rendered $message, Recipient $to, Settings $settings): void` | A delivery channel (mail/telegram/bell/sms). `label()` is the option label in the settings channel picker (built-ins: `tbtop-cms::notifications.channels.{key}`, Email/Telegram/Bell); `send()` gets `Rendered::$subject` as plain text (entities decoded once by `TemplateRenderer`) |
 | `TemplateStore` | `src/Notifications/Contracts/TemplateStore.php` | `override(string $type, Format $format, string $locale): ?string` | Merchant-editable template lookup; package ships `DatabaseTemplateStore` (backed by `tbtop_notification_templates`, strict locale match, no fallback) |
+| `LlmsTxtSection` | `src/Frontend/Seo/LlmsTxt/LlmsTxtSection.php` | `title(string $locale): string`, `links(string $locale): list<LlmsTxtLink>` (`LlmsTxtLink(string $name, string $url, ?string $notes = null)`) | One H2 file list a host adds to llms.txt via `seo.llms_txt.sections`; a section with no links is left out |
 | `HealthCheck` | `src/Health/HealthCheck.php` | `id(): string`, `run(): HealthCheckResult` | One diagnostic check; must not throw |
 | `LogsCmsActivity` (trait) | `src/Audit/Concerns/LogsCmsActivity.php` | Required: `auditFields(): list<string>`, `auditLabel(): string`. Overridable: `auditMarkerFields()`, `auditBlockFields()` (default `[]`) | Wires Spatie `LogsActivity` plus CMS audit enrichment onto a model |
 | `TracksAuthors` (trait) | `src/Support/Concerns/TracksAuthors.php` | None — just `use` it | Auto-stamps `created_by`/`updated_by` from `CurrentAdmin::user()` on model boot hooks; requires nullable, FK-less `created_by`/`updated_by` columns (see §9's user-key column shape) |
@@ -309,6 +313,13 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.twitter_card` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.enabled` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.retention_days` | `SeoSettingsPage` | no | yes |
+| `seo.llms_txt.enabled` | `SeoSettingsPage` (*For AI* tab) | no | yes |
+| `seo.llms_txt.summary` (translatable locale map) | `SeoSettingsPage` | no | yes |
+| `seo.llms_txt.intro` (translatable locale map) | `SeoSettingsPage` | no | yes |
+| `seo.llms_txt.types` (list of base page-type keys; empty = all) | `SeoSettingsPage` | no | yes |
+| `seo.llms_txt.per_type` (1–500, default 50) | `SeoSettingsPage` | no | yes |
+| `seo.content_signals.enabled` | `SeoSettingsPage` (*For AI* tab) | no | yes |
+| `seo.content_signals.search` / `.ai_input` / `.ai_train` (defaults yes / yes / no) | `SeoSettingsPage` | no | yes |
 | `seo.type_templates.{type}.title` / `seo.type_templates.{type}.description` (per registered page type) | `SeoSettingsPage`, built dynamically from `PageTypeRegistry` via `SeoTemplates::key()` | no | yes |
 | `notifications.mail.recipients` | `NotificationSettingsPage` | no | no |
 | `mail.host` | `NotificationSettingsPage` | no | no |

@@ -13,6 +13,7 @@ use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
+use Tbtop\Cms\Frontend\Http\Controllers\LlmsTxtController;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
 use Tbtop\Cms\Frontend\Http\Controllers\RobotsController;
 use Tbtop\Cms\Frontend\Http\Controllers\SitemapController;
@@ -63,6 +64,10 @@ class Cms
     private function seoRoutes(): void
     {
         Route::get('robots.txt', RobotsController::class)->name('tbtop-cms.robots');
+
+        if (config('tbtop-cms.seo.llms_txt.enabled', true)) {
+            Route::get('llms.txt', LlmsTxtController::class)->name('tbtop-cms.llms-txt');
+        }
 
         if (! config('tbtop-cms.seo.sitemap.enabled', true)) {
             return;

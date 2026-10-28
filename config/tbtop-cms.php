@@ -109,6 +109,15 @@ return [
             // host configs override whole sections and won't have this key.
             'per_chunk' => 1000,
         ],
+        'llms_txt' => [
+            // false removes the /llms.txt route; true leaves the switch to the
+            // «For AI» tab of the SEO settings page (off until turned on).
+            'enabled' => true,
+            // Host classes implementing LlmsTxtSection, each adding one H2
+            // file list after the page-type sections. Resolved from the
+            // container, so they may take constructor dependencies.
+            'sections' => [],
+        ],
     ],
     'preview' => [
         // Hours a signed draft-preview link stays valid for. Read with an
