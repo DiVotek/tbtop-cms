@@ -15,7 +15,9 @@ use Tbtop\Cms\Page\Refs\PageTypeFilter;
  * select: published, of the field's one of() type, under the parent of the
  * newest page of that type (a new tag lands next to the others, under
  * `/tags`), with slugs derived from the name like any new page. The first
- * page of the type is made in Pages: until then the select refuses.
+ * page of the type is made in Pages: until then the select refuses. A name
+ * a page of that type already has in the locale (any case) picks that page
+ * instead: typing "japan" twice makes one tag.
  */
 final class PageQuickCreate
 {
@@ -28,6 +30,10 @@ final class PageQuickCreate
 
         if ($sibling === null) {
             throw ValidationException::withMessages(['name' => __('tbtop-cms::pages.refs.create_needs_parent')]);
+        }
+        $existing = self::sameName($type, $subtype, trim($name), $locale);
+        if ($existing !== null) {
+            return $existing;
         }
         $parentId = $sibling->parent_id;
 
@@ -47,6 +53,22 @@ final class PageQuickCreate
         $page->save();
 
         return ['value' => (string) $page->getKey(), 'label' => trim($name)];
+    }
+
+    /** @return array{value: string, label: string}|null The newest page of the type named $name in $locale, ignoring case. */
+    private static function sameName(string $type, ?string $subtype, string $name, string $locale): ?array
+    {
+        $wanted = mb_strtolower($name);
+        $pages = Page::query()->where('type', $type)->where('subtype', $subtype)->latest('id')->get();
+
+        foreach ($pages as $page) {
+            $own = $page->getTranslation('name', $locale, false);
+            if (is_string($own) && mb_strtolower(trim($own)) === $wanted) {
+                return ['value' => (string) $page->getKey(), 'label' => $own];
+            }
+        }
+
+        return null;
     }
 
     /** @return array{0: string, 1: string|null} */

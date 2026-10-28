@@ -126,6 +126,10 @@ it('creates a published tag from the select, next to the other tags', function (
         ->and($tag->parent_id)->toBe(tagsHome()->id)
         ->and($tag->status)->toBe(PageStatus::Published)
         ->and($tag->pathFor('en'))->toBe('tags/street-food');
+
+    $japan = Page::query()->where('subtype', 'tag')->where('name->en', 'Japan')->firstOrFail();
+    test()->postJson("/admin/pages/{$post->id}/edit/select-create/field_tagged_post__tags", ['name' => ' japan '])
+        ->assertOk()->assertExactJson(['value' => (string) $japan->id, 'label' => 'Japan']);
 });
 
 it('refuses to create the first tag from the select: the first one shows where tags live', function (): void {

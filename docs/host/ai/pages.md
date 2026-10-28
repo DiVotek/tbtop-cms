@@ -619,7 +619,9 @@ public function resolveFields(array $input, ResolveContext $ctx): array
   page of that type, slugs derived from the name in every locale like any
   new page; the name is stored in the admin's locale. The first page of the
   type is made in Pages: until one exists the select answers a validation
-  error. `creatable($fields, $using)` with your own closure is tbtop/admin's
+  error. A name a page of that type already has in the locale (any case)
+  picks that page instead of making a second one.
+  `creatable($fields, $using)` with your own closure is tbtop/admin's
   `Select::creatable()` unchanged.
 - **Archive types.** A type whose `archiveOf(): ?string` names the field
   that picks its pages (`'tags'`) is an archive: while no live page picks a
