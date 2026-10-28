@@ -19,9 +19,10 @@ use Tbtop\Cms\Page\Models\Page;
 
 /**
  * A collection's entries as an admin table: name, status, last change; drag
- * to reorder, click to edit, delete per row. The collection's own page shows
- * it whole; any admin page can embed it narrowed to one page's related
- * entries — a service editor listing its reviews:
+ * to reorder, click to edit, delete per row unless Collection::deletable()
+ * says no. The collection's own page shows it whole; any admin page can
+ * embed it narrowed to one page's related entries — a service editor
+ * listing its reviews:
  *
  *     CollectionTable::make($s, 'review')->relatedTo($page)->build()
  *
@@ -71,7 +72,7 @@ final class CollectionTable
             ->searchable(['title'])
             ->reorderable('sort_order')
             ->recordUrl(static fn (object $row): string => self::editUrl($key, (int) ($row->id ?? 0)))
-            ->rowActions([self::deleteAction($s, $name, fn (): Builder => $this->query())])
+            ->rowActions(app(CollectionRegistry::class)->get($key)->deletable() ? [self::deleteAction($s, $name, fn (): Builder => $this->query())] : [])
             ->emptyState(__('tbtop-cms::collections.empty.title'), __('tbtop-cms::collections.empty.description'));
 
         return $this->pageId === null ? $table : $table->embedded();

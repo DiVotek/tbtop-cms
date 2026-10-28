@@ -38,6 +38,12 @@ class Socials extends Collection
     }
 
     #[\Override]
+    public function deletable(): bool
+    {
+        return false;
+    }
+
+    #[\Override]
     public function icon(): string
     {
         return 'share-2';

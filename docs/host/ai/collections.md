@@ -59,6 +59,7 @@ or from a provider with `CollectionRegistry::extend(fn () => [Reviews::class])`
 | `titleField()` | the first field | The entry's name in the admin list and pickers; kept in the `title` column (default locale) on every save |
 | `relatedField()` | the first `pages` field, else null | What "related to this page" filters on |
 | `icon()` / `navigationGroup()` / `navigationOrder()` | `list` / `content` / `50` | The menu item |
+| `deletable()` | `true` | `false` drops the row's delete action (a posted one is a 404); the editor sets an entry to draft instead. The built-ins say `false` |
 | `resolve(array $input, ResolveContext $ctx): array` | `FormResolver` by field kind | One entry as the site gets it, from values flattened to the locale. `$ctx->page` is null: an entry is resolved once per locale, not per page |
 
 The registry throws on a bad key, a duplicate key, a reserved field name or a
@@ -70,7 +71,7 @@ admin, not a page render.
 Each collection gets a menu item (`navigationGroup()`), linking to
 `{admin.prefix}/collections/{key}` (`CollectionEntriesPage`): a table of
 entries (name, status, last change) with search, drag-to-reorder, click to
-edit and per-row delete, and an "Add" modal with the collection's form. The
+edit and per-row delete (unless `deletable()` is false), and an "Add" modal with the collection's form. The
 entry editor is `{admin.prefix}/collections/{key}/{entry}/edit`
 (`CollectionEntryEditPage`), with a draft/published status and the same
 optimistic lock as shared blocks. The "Add" modal has the status switch too
@@ -165,7 +166,9 @@ Always registered (override one by binding a subclass in the container):
 | `socials` | `Collection/BuiltIn/Socials.php` | `name`, `label` (≤8), `href` | `SiteContacts::socials()`, identity `sameAs` |
 
 The first published office is the main one: its phones, emails, address,
-hours and coordinates are the site's. Both sit under Settings in the menu;
+hours and coordinates are the site's. Their entries cannot be deleted
+(`deletable()` is false): an editor sets one to draft to take it off the
+site. Both sit under Settings in the menu;
 Site settings → Contacts links to them. They replaced the
 `site.contacts.*` settings and the SEO identity's address, hours and
 coordinates (migration `2026_10_28_000001_move_contacts_to_collections`). The

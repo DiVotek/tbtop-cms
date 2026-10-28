@@ -64,6 +64,17 @@ abstract class Collection
         return null;
     }
 
+    /**
+     * Whether the admin may delete an entry. False drops the row's delete
+     * action, so the action endpoint refuses it too; an editor hides an
+     * entry from the site by setting it to draft. The built-in Offices and
+     * Socials say false.
+     */
+    public function deletable(): bool
+    {
+        return true;
+    }
+
     /** A lucide icon name for the menu item. */
     public function icon(): string
     {

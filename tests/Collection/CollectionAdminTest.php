@@ -93,11 +93,23 @@ it('does not open an entry under another collection', function (): void {
 });
 
 it('deletes an entry from its row', function (): void {
-    $entry = adminSocial('TG');
+    config(['tbtop-cms.collections' => [ReviewsCollection::class]]);
+    app()->instance(CollectionRegistry::class, new CollectionRegistry);
+    $entry = Entry::query()->create(['collection' => 'review', 'data' => ['author' => 'A']]);
 
-    $this->postJson('/admin/collections/socials/actions/entries_socialsDelete', ['payload' => ['row' => ['id' => $entry->id]]])->assertOk();
+    $this->postJson('/admin/collections/review/actions/entries_reviewDelete', ['payload' => ['row' => ['id' => $entry->id]]])->assertOk();
 
     expect(Entry::query()->count())->toBe(0);
+});
+
+it('offers no delete for a built-in collection and refuses one posted anyway', function (): void {
+    $entry = adminSocial('TG');
+
+    $props = json_encode($this->get('/admin/collections/socials', ['X-Inertia' => 'true'])->assertOk()->json('props'));
+    $this->postJson('/admin/collections/socials/actions/entries_socialsDelete', ['payload' => ['row' => ['id' => $entry->id]]])->assertNotFound();
+
+    expect($props)->not->toContain('entries_socialsDelete')
+        ->and(Entry::query()->whereKey($entry->id)->exists())->toBeTrue();
 });
 
 it('narrows an embedded table to the entries related to a page', function (): void {
