@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'title' => 'Колекції',
     'columns' => [
         'title' => 'Назва',
         'status' => 'Статус',
@@ -46,27 +47,18 @@ return [
         'add' => 'Додати',
         'remove' => 'Прибрати',
     ],
-    'offices' => [
-        'label' => 'Офіси',
-        'singular' => 'офіс',
-        'hint' => 'Перший опублікований офіс — головний: його адреса, телефони, email, години роботи й координати належать ідентичності сайту; решта публікуються як його підрозділи.',
+    'phones' => [
+        'label' => 'Телефони',
+        'singular' => 'телефон',
         'fields' => [
-            'name' => 'Назва',
-            'street' => 'Вулиця, будинок',
-            'locality' => 'Місто',
-            'region' => 'Область',
-            'postal_code' => 'Поштовий індекс',
-            'country' => 'Країна (ISO-код, напр. UA)',
-            'latitude' => 'Широта',
-            'longitude' => 'Довгота',
-            'phones' => 'Телефони',
             'number' => 'Номер',
-            'emails' => 'Email',
+        ],
+    ],
+    'emails' => [
+        'label' => 'Email',
+        'singular' => 'email',
+        'fields' => [
             'address' => 'Адреса',
-            'opening_hours' => 'Години роботи',
-            'days' => 'Дні',
-            'opens' => 'Відкривається',
-            'closes' => 'Зачиняється',
         ],
     ],
     'socials' => [

@@ -20,32 +20,18 @@ beforeEach(function (): void {
     $settings->set('site.name', 'Autofocus');
     $settings->set('seo.identity.type', 'local_business');
     $settings->set('seo.identity.subtype', 'AutoRepair');
+    $settings->set('seo.identity.address.street', ['en' => '1 Main St']);
+    $settings->set('seo.identity.address.locality', ['en' => 'Kyiv']);
 
     app(Cms::class)->frontendRoutes();
 });
 
-/**
- * The main office (the first published one) unless $sort says otherwise.
- *
- * @param  array<string, mixed>  $data
- */
-function identityOffice(array $data = [], int $sort = 0): Entry
+/** @param  list<array<string, mixed>>  $rows  published entries, in this order */
+function contactEntries(string $collection, array $rows): void
 {
-    return Entry::query()->create([
-        'collection' => 'offices',
-        'status' => Entry::PUBLISHED,
-        'sort_order' => $sort,
-        'data' => ['name' => ['en' => 'Main'], 'street' => ['en' => '1 Main St'], 'locality' => ['en' => 'Kyiv'], ...$data],
-    ]);
-}
-
-function identitySocial(string $label, string $href, ?string $name = null): Entry
-{
-    return Entry::query()->create([
-        'collection' => 'socials',
-        'status' => Entry::PUBLISHED,
-        'data' => ['label' => $label, 'name' => $name, 'href' => $href],
-    ]);
+    foreach ($rows as $i => $data) {
+        Entry::query()->create(['collection' => $collection, 'status' => Entry::PUBLISHED, 'sort_order' => $i, 'data' => $data]);
+    }
 }
 
 /** @return list<array<string, mixed>> */
@@ -64,9 +50,10 @@ function identityNodes(array $jsonLd): array
 }
 
 it('publishes a local business as the single identity node with address, telephone and opening hours', function (): void {
-    identityOffice([
-        'phones' => [['number' => '+380 44 123 4567']],
-        'opening_hours' => [['days' => ['Monday', 'Friday'], 'opens' => '09:00', 'closes' => '18:00']],
+    $settings = app(Settings::class);
+    contactEntries('phones', [['number' => '+380 44 123 4567']]);
+    $settings->set('seo.identity.opening_hours', [
+        ['days' => ['Monday', 'Friday'], 'opens' => '09:00', 'closes' => '18:00'],
     ]);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
@@ -92,7 +79,7 @@ it('publishes a local business as the single identity node with address, telepho
 
 it('falls back to the default locale for an untranslated address part', function (): void {
     Language::factory()->create(['locale' => 'uk']);
-    identityOffice(['street' => ['en' => '1 Main St', 'uk' => 'вул. Головна, 1']]);
+    app(Settings::class)->set('seo.identity.address.street', ['en' => '1 Main St', 'uk' => 'вул. Головна, 1']);
     $page = Page::factory()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'About', 'uk' => 'Pro nas'],
@@ -133,10 +120,13 @@ it('links the article author and publisher to the identity node', function (stri
     'person' => ['person', 'Person', false],
 ]);
 
-it('takes telephone and email from the main office and sameAs from the social links', function (): void {
-    identityOffice(['phones' => [['number' => '+380 44 555 0001'], ['number' => '+380 44 555 0002']], 'emails' => [['address' => 'hello@example.com']]]);
-    identitySocial('FB', 'https://facebook.com/acme', 'Facebook');
-    identitySocial('TG', 'https://t.me/acme');
+it('takes telephone, email and sameAs from the built-in contact collections', function (): void {
+    contactEntries('phones', [['number' => '+380 44 555 0001'], ['number' => '+380 44 555 0002']]);
+    contactEntries('emails', [['address' => 'hello@example.com']]);
+    contactEntries('socials', [
+        ['label' => 'FB', 'name' => 'Facebook', 'href' => 'https://facebook.com/acme'],
+        ['label' => 'TG', 'href' => 'https://t.me/acme'],
+    ]);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $identity = identityNodes(localBusinessJsonLd('/about'));
@@ -147,9 +137,10 @@ it('takes telephone and email from the main office and sameAs from the social li
         ->and($identity[0]['sameAs'])->toBe(['https://facebook.com/acme', 'https://t.me/acme']);
 });
 
-it('gives an Organization the telephone of the main office when nothing else is set', function (): void {
-    app(Settings::class)->set('seo.identity.type', 'organization');
-    identityOffice(['phones' => [['number' => '+380 44 555 0001']]]);
+it('gives an Organization the first phone when nothing else is set', function (): void {
+    $settings = app(Settings::class);
+    $settings->set('seo.identity.type', 'organization');
+    contactEntries('phones', [['number' => '+380 44 555 0001']]);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $identity = identityNodes(localBusinessJsonLd('/about'));
@@ -160,8 +151,9 @@ it('gives an Organization the telephone of the main office when nothing else is 
 
 it('no longer reads the legacy SEO identity telephone, email and profile links', function (): void {
     $settings = app(Settings::class);
-    identityOffice(['phones' => [['number' => '+380 44 555 0001']], 'emails' => [['address' => 'hello@example.com']]]);
-    identitySocial('FB', 'https://facebook.com/acme');
+    contactEntries('phones', [['number' => '+380 44 555 0001']]);
+    contactEntries('emails', [['address' => 'hello@example.com']]);
+    contactEntries('socials', [['label' => 'FB', 'href' => 'https://facebook.com/acme']]);
     $settings->set('seo.identity.telephone', '+380 44 123 4567');
     $settings->set('seo.identity.email', 'press@example.com');
     $settings->set('seo.identity.same_as', ['https://www.wikidata.org/wiki/Q1']);
@@ -172,23 +164,4 @@ it('no longer reads the legacy SEO identity telephone, email and profile links',
     expect($identity[0]['telephone'])->toBe('+380 44 555 0001')
         ->and($identity[0]['email'])->toBe('hello@example.com')
         ->and($identity[0]['sameAs'])->toBe(['https://facebook.com/acme']);
-});
-
-it('publishes the other offices as departments of the identity, drafts left out', function (): void {
-    identityOffice(['phones' => [['number' => '+380 44 000 0001']]]);
-    identityOffice(['name' => ['en' => 'Lviv branch'], 'street' => ['en' => '2 Market Sq'], 'locality' => ['en' => 'Lviv'], 'phones' => [['number' => '+380 32 000 0002']], 'latitude' => 49.84, 'longitude' => 24.03], 1);
-    Entry::query()->create(['collection' => 'offices', 'status' => Entry::DRAFT, 'sort_order' => 2, 'data' => ['name' => ['en' => 'Soon']]]);
-    Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
-
-    $identity = identityNodes(localBusinessJsonLd('/about'))[0];
-
-    expect($identity['telephone'])->toBe('+380 44 000 0001')
-        ->and($identity['address']['addressLocality'])->toBe('Kyiv')
-        ->and($identity['department'])->toBe([[
-            '@type' => 'AutoRepair',
-            'name' => 'Lviv branch',
-            'telephone' => '+380 32 000 0002',
-            'address' => ['@type' => 'PostalAddress', 'streetAddress' => '2 Market Sq', 'addressLocality' => 'Lviv'],
-            'geo' => ['@type' => 'GeoCoordinates', 'latitude' => 49.84, 'longitude' => 24.03],
-        ]]);
 });

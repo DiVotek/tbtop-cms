@@ -115,7 +115,7 @@ Field-by-field:
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type and subtype; a page reads its subtype's pair first, then its type's |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
-| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.type`, `.legal_name`, `.subtype`, `.subtype_custom`); address, telephone, email, hours and geo from the main office of the built-in Offices collection, profile links from Socials (collections.md) | SEO settings → *Identity* tab exposes type, legal name and the LocalBusiness subtype; Settings → *Offices* / *Social links* hold the rest; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win) |
+| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`; telephone, email and profile links only from the built-in Phones/Emails/Socials collections) | SEO settings → *Identity* tab exposes type and, for the organisation types, legal name, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win); telephone, email and sameAs are edited on the admin's Collections page only |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
 | Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
@@ -356,15 +356,13 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    every page, with `@id` = `{home url}#identity` (`SiteIdentity::id()`), or
    nothing when `seo.identity.type` is `none`. Name and logo fall back to
    the site's own `site.name`/`site.logo` when no
-   `seo.identity.name`/`seo.identity.logo` is set. `telephone`, `email`,
-   `address`, `geo` and `openingHoursSpecification` come from the **main
-   office** — the first published entry of the built-in Offices collection
-   (`SiteContacts::offices()`, collections.md): its first phone and first
-   email. `sameAs` is every published Socials `href`. Every other published
-   office is a `department` of the identity, `@type` the identity's own,
-   with its `name` and the same per-office properties. The
-   `2026_10_28_000001` migration moved `site.contacts.*` and the
-   `seo.identity.address/opening_hours/geo` keys into those collections.
+   `seo.identity.name`/`seo.identity.logo` is set. `telephone`, `email`
+   and `sameAs` come only from the built-in Phones, Emails and Socials
+   collections (see `SiteContacts`, collections.md): the first published
+   phone, the first published email and every social `href`. There are no
+   `seo.identity.telephone/email/same_as` keys any more — the
+   `2026_10_07_000001` migration moved them into the contacts, and
+   `2026_10_28_000001` moved those into the collections.
 
    | `seo.identity.type` | `@type` | Extra properties |
    |---|---|---|
@@ -373,20 +371,16 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    | `online_store` | `OnlineStore` | same as `organization` |
    | `local_business` | `seo.identity.subtype` (curated list in `SiteIdentity::SUBTYPES`, or `seo.identity.subtype_custom` when the subtype is `other`) | as `organization`, plus `geo` and `openingHoursSpecification` |
 
-   Any organisation type with more than one published office adds
-   `department: [{@type, name, telephone, email, address, geo?, openingHoursSpecification?}]`.
-
    Empty values are omitted, never emitted as `""`/`null`. `address` is a
    `PostalAddress` emitted only when street or locality is set; its
-   `streetAddress`/`addressLocality`/`addressRegion` are translatable office
-   fields and fall back to the default locale's value (the office arrives
-   flattened to the locale), `postalCode` and `addressCountry` (ISO 3166-1
-   alpha-2) are not. Each
+   `streetAddress`/`addressLocality`/`addressRegion` are translatable and
+   fall back to the default locale's value (`LocalizedSeo::valueWithFallback()`),
+   `postalCode` and `addressCountry` (ISO 3166-1 alpha-2) are not. Each
    opening-hours row becomes an `OpeningHoursSpecification` with schema.org
    day URLs (`https://schema.org/Monday`), all-day is `00:00`–`23:59`, a
    closed day has no row. `geo` is `GeoCoordinates`, emitted only when both
    latitude and longitude are set. Every stored value is re-validated at
-   emit time (scripts can write settings and entries): an unknown subtype falls back to
+   emit time (scripts can write settings): an unknown subtype falls back to
    `LocalBusiness`, a row with no valid day or a non-`HH:MM` time is
    dropped, non-numeric coordinates drop `geo`. In the SEO settings form,
    fields of a section hidden for the chosen type are neither validated nor

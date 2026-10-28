@@ -1,14 +1,14 @@
 # Collections — records that are not pages
 
 A **collection** is a kind of record with no page of its own: reviews, team
-members, vacancies, FAQ entries, offices. Its schema is code, like a block's
+members, vacancies, FAQ entries, phone numbers. Its schema is code, like a block's
 form; its records (**entries**) are rows in `tbtop_entries`, edited in the
 admin and read on the site through a block field or `Cms::collection()`.
 
 Collection or page type? A page type when the record has its own URL, SEO and
 blocks (a service, an article). A collection when the record only appears
 inside other pages — reviews shown on a service and on the home page, a team
-grid, the offices in the footer. A collection entry has no URL, slug,
+grid, the phone numbers in the footer. A collection entry has no URL, slug,
 revisions, scheduling or trash; its history is the audit log.
 
 ## Declaring one
@@ -53,13 +53,11 @@ or from a provider with `CollectionRegistry::extend(fn () => [Reviews::class])`
 | Method | Default | Meaning |
 |---|---|---|
 | `key(): string` | — | `[a-z][a-z0-9_-]*`, ≤64 chars; stored in `tbtop_entries.collection` and used in admin URLs |
-| `label(): string` | — | Plural name: menu item, list title |
+| `label(): string` | — | Plural name: the collection's tab on the Collections page |
 | `fields(S $s): list<Field>` | — | The entry form. Any field kind a block form takes. `status`, `lock_version`, `id` are reserved; a `collection` field is refused (an entry cannot pick entries) |
 | `singularLabel()` | `label()` | The "Add …" button |
 | `titleField()` | the first field | The entry's name in the admin list and pickers; kept in the `title` column (default locale) on every save |
 | `relatedField()` | the first `pages` field, else null | What "related to this page" filters on |
-| `icon()` / `navigationGroup()` / `navigationOrder()` | `list` / `content` / `50` | The menu item |
-| `deletable()` | `true` | `false` drops the row's delete action (a posted one is a 404); the editor sets an entry to draft instead. The built-ins say `false` |
 | `resolve(array $input, ResolveContext $ctx): array` | `FormResolver` by field kind | One entry as the site gets it, from values flattened to the locale. `$ctx->page` is null: an entry is resolved once per locale, not per page |
 
 The registry throws on a bad key, a duplicate key, a reserved field name or a
@@ -68,18 +66,20 @@ admin, not a page render.
 
 ## Admin
 
-Each collection gets a menu item (`navigationGroup()`), linking to
-`{admin.prefix}/collections/{key}` (`CollectionEntriesPage`): a table of
-entries (name, status, last change) with search, drag-to-reorder, click to
-edit and per-row delete (unless `deletable()` is false), and an "Add" modal with the collection's form. The
-entry editor is `{admin.prefix}/collections/{key}/{entry}/edit`
+Every collection lives on one page, `{admin.prefix}/collections`
+(`CollectionEntriesPage`, one menu item under Content): a tab per collection,
+the built-ins first, then the configured ones in config order. Each tab has a
+table of entries (name, status, last change) with search, drag-to-reorder,
+click to edit and per-row delete, and an "Add" modal with the collection's
+form. The open tab is in the URL, `?tab[collections]={key}`;
+`CollectionTable::listUrl($key)` builds it. The entry editor is `{admin.prefix}/collections/{key}/{entry}/edit`
 (`CollectionEntryEditPage`), with a draft/published status and the same
 optimistic lock as shared blocks. The "Add" modal has the status switch too
 and starts on published: an entry is usually ready when it is added, and
 the editor picks draft to hold it back. Both pages answer to the `tbtop-cms.pages`
 ability. A host config that published `admin.pages` before collections
 existed must add `collection_entries` and `collection_entry_edit`, or the
-menu items are left out.
+page and its menu item are left out.
 
 Embed an entries table in any admin page — a service editor listing its
 reviews, in place of a relation manager:
@@ -166,18 +166,16 @@ Always registered (override one by binding a subclass in the container):
 
 | Key | Class | Fields | Read by |
 |---|---|---|---|
-| `offices` | `Collection/BuiltIn/Offices.php` | `name`, `street`, `locality`, `region` (translatable), `postal_code`, `country`, `phones[{number}]`, `emails[{address}]`, `opening_hours[{days, opens, closes}]`, `latitude`, `longitude` | `SiteContacts::phones()/emails()/offices()`, the identity JSON-LD (seo.md) |
+| `phones` | `Collection/BuiltIn/Phones.php` | `number` | `SiteContacts::phones()`, identity `telephone` (the first) |
+| `emails` | `Collection/BuiltIn/Emails.php` | `address` | `SiteContacts::emails()`, identity `email` (the first) |
 | `socials` | `Collection/BuiltIn/Socials.php` | `name`, `label` (≤8), `href` | `SiteContacts::socials()`, identity `sameAs` |
 
-The first published office is the main one: its phones, emails, address,
-hours and coordinates are the site's. Their entries cannot be deleted
-(`deletable()` is false): an editor sets one to draft to take it off the
-site. Both sit under Settings in the menu;
-Site settings → Contacts links to them. They replaced the
-`site.contacts.*` settings and the SEO identity's address, hours and
-coordinates (migration `2026_10_28_000001_move_contacts_to_collections`). The
-shared `cms.settings` prop still carries `site.contacts.phones/emails/socials`
-in their old row shapes, built from the collections.
+Their tabs come first on the Collections page; Site settings → Contacts links
+to each. They replaced the `site.contacts.*` settings (migration
+`2026_10_28_000001_move_contacts_to_collections`); the identity's address,
+opening hours and coordinates stay in SEO settings (seo.md). The shared
+`cms.settings` prop still carries `site.contacts.phones/emails/socials` in
+their old row shapes, built from the collections.
 
 ## Seeding
 

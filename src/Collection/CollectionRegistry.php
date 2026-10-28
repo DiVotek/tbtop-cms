@@ -10,11 +10,12 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\StructureWalk;
 use Tbtop\Cms\Admin\Fields\CollectionField;
 use Tbtop\Cms\Admin\Fields\Pages;
-use Tbtop\Cms\Collection\BuiltIn\Offices;
+use Tbtop\Cms\Collection\BuiltIn\Emails;
+use Tbtop\Cms\Collection\BuiltIn\Phones;
 use Tbtop\Cms\Collection\BuiltIn\Socials;
 
 /**
- * The collections a site has: the built-in Offices and Socials, then
+ * The collections a site has: the built-in Phones, Emails and Socials, then
  * `config('tbtop-cms.collections')`, then extend(). Mirrors PageTypeRegistry.
  */
 class CollectionRegistry
@@ -82,7 +83,7 @@ class CollectionRegistry
         $this->booted = true;
 
         // Container-resolved, as the built-in page types: a host overrides one by binding a subclass.
-        foreach ([Offices::class, Socials::class] as $class) {
+        foreach ([Phones::class, Emails::class, Socials::class] as $class) {
             $this->register($class);
         }
 

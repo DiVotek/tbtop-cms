@@ -4,162 +4,87 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Settings\Settings;
 
 /**
- * The built-in Offices and Socials collections take over from settings:
- * Site settings → Contacts (phones, emails, socials) and the SEO identity's
- * address, opening hours and coordinates. The values become one published
- * office and one published entry per social row, then the settings keys go.
+ * The built-in Phones, Emails and Socials collections take over Site
+ * settings → Contacts: each row of `site.contacts.*` becomes one published
+ * entry, in the same order, then the settings key goes.
  *
  * Plain Settings reads and query-builder inserts (no model, no registry), so
  * a later change to the collections cannot break this step. A collection
- * that already has entries is left alone, its settings keys included (they
- * were not copied, so they stay recoverable); a rerun finds no keys.
+ * that already has entries is left alone, its settings key included (it was
+ * not copied, so it stays recoverable); a rerun finds no keys.
  */
 return new class extends Migration
 {
-    private const array OFFICE_KEYS = [
-        'site.contacts.phones',
-        'site.contacts.emails',
-        'seo.identity.address.street',
-        'seo.identity.address.locality',
-        'seo.identity.address.region',
-        'seo.identity.address.postal_code',
-        'seo.identity.address.country',
-        'seo.identity.geo.latitude',
-        'seo.identity.geo.longitude',
-        'seo.identity.opening_hours',
-    ];
-
     public function up(): void
     {
         $settings = app(Settings::class);
 
-        // One transaction per collection: a failed copy leaves it empty, so a rerun copies it again.
-        DB::transaction(static function () use ($settings): void {
-            if (self::hasEntries('offices')) {
-                return;
-            }
-            $office = self::office($settings);
-            if ($office !== null) {
-                self::insert('offices', 0, $office, self::officeName($settings));
-            }
-            self::forget($settings, self::OFFICE_KEYS);
-        });
-
-        DB::transaction(static function () use ($settings): void {
-            if (self::hasEntries('socials')) {
-                return;
-            }
-            foreach (self::socials($settings->get('site.contacts.socials')) as $i => $row) {
-                self::insert('socials', $i, $row, $row['name'] ?? $row['label']);
-            }
-            self::forget($settings, ['site.contacts.socials']);
-        });
+        self::move($settings, 'phones', 'site.contacts.phones', static fn (array $row): ?array => self::only($row, 'number'));
+        self::move($settings, 'emails', 'site.contacts.emails', static fn (array $row): ?array => self::only($row, 'address'));
+        self::move($settings, 'socials', 'site.contacts.socials', self::social(...));
     }
 
     /** The settings keys are gone for good: the collections are the source now. */
     public function down(): void {}
 
-    /** @param  list<string>  $keys */
-    private static function forget(Settings $settings, array $keys): void
+    /**
+     * One transaction per collection: a failed copy leaves it empty and its
+     * key in place, so a rerun copies it again. Settings::forget() bumps the
+     * content version, so the site sees the new entries at once.
+     *
+     * @param  Closure(array<mixed>): (array{0: array<string, string>, 1: string}|null)  $entry  a row's data and title, null to skip it
+     */
+    private static function move(Settings $settings, string $collection, string $key, Closure $entry): void
     {
-        foreach ($keys as $key) {
+        DB::transaction(static function () use ($settings, $collection, $key, $entry): void {
+            if (DB::table('tbtop_entries')->where('collection', $collection)->exists()) {
+                return;
+            }
+            $sort = 0;
+            foreach (self::rows($settings->get($key)) as $row) {
+                $found = $entry($row);
+                if ($found !== null) {
+                    self::insert($collection, $sort++, ...$found);
+                }
+            }
             $settings->forget($key);
-        }
-    }
-
-    /** @return array<string, mixed>|null null when settings hold nothing an office would show */
-    private static function office(Settings $settings): ?array
-    {
-        $data = array_filter([
-            'street' => self::localized($settings->get('seo.identity.address.street')),
-            'locality' => self::localized($settings->get('seo.identity.address.locality')),
-            'region' => self::localized($settings->get('seo.identity.address.region')),
-            'postal_code' => self::text($settings->get('seo.identity.address.postal_code')),
-            'country' => self::text($settings->get('seo.identity.address.country')),
-            'latitude' => self::number($settings->get('seo.identity.geo.latitude')),
-            'longitude' => self::number($settings->get('seo.identity.geo.longitude')),
-            'phones' => self::rows($settings->get('site.contacts.phones'), 'number'),
-            'emails' => self::rows($settings->get('site.contacts.emails'), 'address'),
-            'opening_hours' => self::hours($settings->get('seo.identity.opening_hours')),
-        ], static fn (mixed $value): bool => $value !== null && $value !== []);
-
-        if ($data === []) {
-            return null;
-        }
-
-        return ['name' => [app(Languages::class)->defaultLocale() => self::officeName($settings)], ...$data];
-    }
-
-    /** The office's name and its entry title: the site name, else "Office". */
-    private static function officeName(Settings $settings): string
-    {
-        return self::text($settings->get('site.name')) ?? 'Office';
-    }
-
-    /** @return list<array{label: string, name?: string, href: string}> */
-    private static function socials(mixed $rows): array
-    {
-        $out = [];
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $label = self::text($row['label'] ?? null);
-            $href = self::text($row['href'] ?? null);
-            if ($label !== null && $href !== null) {
-                $name = self::text($row['name'] ?? null);
-                $out[] = ['label' => $label, ...($name === null ? [] : ['name' => $name]), 'href' => $href];
-            }
-        }
-
-        return $out;
-    }
-
-    /** @return list<array<string, string>> */
-    private static function rows(mixed $rows, string $key): array
-    {
-        $out = [];
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            $value = is_array($row) ? self::text($row[$key] ?? null) : null;
-            if ($value !== null) {
-                $out[] = [$key => $value];
-            }
-        }
-
-        return $out;
-    }
-
-    /** @return list<array{days: list<string>, opens: string, closes: string}> */
-    private static function hours(mixed $rows): array
-    {
-        $out = [];
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            if (is_array($row) && is_array($row['days'] ?? null) && is_string($row['opens'] ?? null) && is_string($row['closes'] ?? null)) {
-                $out[] = ['days' => array_values(array_filter($row['days'], is_string(...))), 'opens' => $row['opens'], 'closes' => $row['closes']];
-            }
-        }
-
-        return $out;
+        });
     }
 
     /**
-     * A per-locale map stays one; a plain string (written by a script) is kept as is.
-     *
-     * @return array<string, string>|string|null
+     * @param  array<mixed>  $row
+     * @return array{0: array<string, string>, 1: string}|null
      */
-    private static function localized(mixed $value): array | string | null
+    private static function only(array $row, string $field): ?array
     {
-        if (is_array($value)) {
-            $map = array_filter($value, static fn (mixed $v): bool => is_string($v) && trim($v) !== '');
+        $value = self::text($row[$field] ?? null);
 
-            return $map === [] ? null : $map;
+        return $value === null ? null : [[$field => $value], $value];
+    }
+
+    /**
+     * @param  array<mixed>  $row
+     * @return array{0: array<string, string>, 1: string}|null
+     */
+    private static function social(array $row): ?array
+    {
+        $label = self::text($row['label'] ?? null);
+        $href = self::text($row['href'] ?? null);
+        if ($label === null || $href === null) {
+            return null;
         }
+        $name = self::text($row['name'] ?? null);
 
-        return self::text($value);
+        return [['label' => $label, ...($name === null ? [] : ['name' => $name]), 'href' => $href], $name ?? $label];
+    }
+
+    /** @return list<array<mixed>> */
+    private static function rows(mixed $value): array
+    {
+        return is_array($value) ? array_values(array_filter($value, is_array(...))) : [];
     }
 
     private static function text(mixed $value): ?string
@@ -167,17 +92,7 @@ return new class extends Migration
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
-    private static function number(mixed $value): int | float | null
-    {
-        return is_numeric($value) ? $value + 0 : null;
-    }
-
-    private static function hasEntries(string $collection): bool
-    {
-        return DB::table('tbtop_entries')->where('collection', $collection)->exists();
-    }
-
-    /** @param  array<string, mixed>  $data */
+    /** @param  array<string, string>  $data */
     private static function insert(string $collection, int $sort, array $data, string $title): void
     {
         DB::table('tbtop_entries')->insert([

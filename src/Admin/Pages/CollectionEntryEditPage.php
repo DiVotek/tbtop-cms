@@ -45,7 +45,7 @@ class CollectionEntryEditPage extends AdminPage
         $collection = $this->collection();
 
         return [
-            ['label' => __('tbtop-cms::nav.groups.' . $collection->navigationGroup())],
+            ['label' => __('tbtop-cms::collections.title'), 'url' => CollectionTable::listUrl($collection->key())],
             ['label' => $collection->label(), 'url' => CollectionTable::listUrl($collection->key())],
             ['label' => $this->name()],
         ];

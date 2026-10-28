@@ -65,8 +65,9 @@ return [
         ],
     ],
     // Collection classes (Tbtop\Cms\Collection\Collection): records that are
-    // not pages — reviews, team, vacancies. The built-in Offices and Socials
-    // are always registered. Read with an inline default. collections.md.
+    // not pages — reviews, team, vacancies. The built-in Phones, Emails and
+    // Socials are always registered. Read with an inline default.
+    // collections.md.
     'collections' => [],
     'blocks' => [
         // Block classes listed by hand. Keep for blocks outside the discovered

@@ -19,50 +19,43 @@ function contactsToCollectionsMigration(): Migration
     return require dirname(__DIR__, 2) . '/database/migrations/2026_10_28_000001_move_contacts_to_collections.php';
 }
 
-it('moves the contacts and the identity address into one published office and the socials into entries', function (): void {
+/** @return list<array<string, mixed>> */
+function migratedEntries(string $collection): array
+{
+    return Entry::query()->where('collection', $collection)->orderBy('sort_order')->get()
+        ->map(static fn (Entry $entry): array => ['title' => $entry->title, 'status' => $entry->status, 'data' => $entry->data])->all();
+}
+
+it('moves each contacts row into a published entry, in order, and drops the settings keys', function (): void {
     $settings = app(Settings::class);
-    $settings->set('site.name', 'Acme');
-    $settings->set('site.contacts.phones', [['number' => '+380 44 000 0001'], ['number' => ' ']]);
+    $settings->set('site.contacts.phones', [['number' => '+380 44 000 0001'], ['number' => ' '], ['number' => '+380 44 000 0002']]);
     $settings->set('site.contacts.emails', [['address' => 'hi@example.com']]);
-    $settings->set('site.contacts.socials', [['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme'], ['label' => 'X', 'href' => '']]);
-    $settings->set('seo.identity.address.street', ['en' => '1 Main St', 'uk' => 'вул. Головна, 1']);
-    $settings->set('seo.identity.address.locality', ['en' => 'Kyiv']);
-    $settings->set('seo.identity.address.country', 'UA');
-    $settings->set('seo.identity.geo.latitude', '50.45');
-    $settings->set('seo.identity.geo.longitude', 30.52);
-    $settings->set('seo.identity.opening_hours', [['days' => ['Monday'], 'opens' => '09:00', 'closes' => '18:00']]);
+    $settings->set('site.contacts.socials', [['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme'], ['label' => 'X', 'href' => ''], ['label' => 'FB', 'href' => 'https://facebook.com/acme']]);
+    $settings->set('seo.identity.address.street', ['en' => '1 Main St']);
 
     $migration = contactsToCollectionsMigration();
     $migration->up();
     $migration->up();
 
-    $office = Entry::query()->where('collection', 'offices')->sole();
-    expect($office->status)->toBe(Entry::PUBLISHED)
-        ->and($office->title)->toBe('Acme')
-        ->and($office->data)->toEqual([
-            'name' => ['en' => 'Acme'],
-            'street' => ['en' => '1 Main St', 'uk' => 'вул. Головна, 1'],
-            'locality' => ['en' => 'Kyiv'],
-            'country' => 'UA',
-            'latitude' => 50.45,
-            'longitude' => 30.52,
-            'phones' => [['number' => '+380 44 000 0001']],
-            'emails' => [['address' => 'hi@example.com']],
-            'opening_hours' => [['days' => ['Monday'], 'opens' => '09:00', 'closes' => '18:00']],
-        ]);
+    expect(migratedEntries('phones'))->toBe([
+        ['title' => '+380 44 000 0001', 'status' => Entry::PUBLISHED, 'data' => ['number' => '+380 44 000 0001']],
+        ['title' => '+380 44 000 0002', 'status' => Entry::PUBLISHED, 'data' => ['number' => '+380 44 000 0002']],
+    ])
+        ->and(migratedEntries('emails'))->toBe([['title' => 'hi@example.com', 'status' => Entry::PUBLISHED, 'data' => ['address' => 'hi@example.com']]])
+        ->and(array_column(migratedEntries('socials'), 'data'))->toBe([
+            ['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme'],
+            ['label' => 'FB', 'href' => 'https://facebook.com/acme'],
+        ])
+        ->and(array_column(migratedEntries('socials'), 'title'))->toBe(['Telegram', 'FB']);
 
-    $socials = Entry::query()->where('collection', 'socials')->get();
-    expect($socials)->toHaveCount(1)
-        ->and($socials[0]->data)->toEqual(['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme']);
-
-    foreach (['site.contacts.phones', 'site.contacts.socials', 'seo.identity.address.street', 'seo.identity.opening_hours', 'seo.identity.geo.latitude'] as $key) {
+    foreach (['site.contacts.phones', 'site.contacts.emails', 'site.contacts.socials'] as $key) {
         expect($settings->get($key))->toBeNull();
     }
+    // The identity's address stays in its own settings.
+    expect($settings->get('seo.identity.address.street'))->toBe(['en' => '1 Main St']);
 });
 
-it('creates no office when the settings hold nothing for one', function (): void {
-    app(Settings::class)->set('site.name', 'Acme');
-
+it('creates nothing when the settings hold no contacts', function (): void {
     contactsToCollectionsMigration()->up();
 
     expect(Entry::query()->count())->toBe(0);
@@ -72,22 +65,12 @@ it('keeps the settings of a collection that already has entries', function (): v
     $settings = app(Settings::class);
     $settings->set('site.contacts.phones', [['number' => '+380 44 000 0001']]);
     $settings->set('site.contacts.socials', [['label' => 'TG', 'href' => 'https://t.me/acme']]);
-    Entry::query()->create(['collection' => 'offices', 'data' => ['name' => ['en' => 'Seeded']], 'title' => 'Seeded']);
+    Entry::query()->create(['collection' => 'phones', 'data' => ['number' => '+380 44 999 9999'], 'title' => '+380 44 999 9999']);
 
     contactsToCollectionsMigration()->up();
 
-    expect(Entry::query()->where('collection', 'offices')->count())->toBe(1)
+    expect(Entry::query()->where('collection', 'phones')->count())->toBe(1)
         ->and($settings->get('site.contacts.phones'))->toBe([['number' => '+380 44 000 0001']])
         ->and(Entry::query()->where('collection', 'socials')->count())->toBe(1)
         ->and($settings->get('site.contacts.socials'))->toBeNull();
-});
-
-it('titles an office with no site name by its fallback name', function (): void {
-    app(Settings::class)->set('site.contacts.phones', [['number' => '+380 44 000 0001']]);
-
-    contactsToCollectionsMigration()->up();
-
-    $office = Entry::query()->where('collection', 'offices')->sole();
-    expect($office->title)->toBe('Office')
-        ->and($office->data['name'])->toBe(['en' => 'Office']);
 });

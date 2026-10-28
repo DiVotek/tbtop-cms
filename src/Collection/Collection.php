@@ -11,10 +11,11 @@ use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\Support\FormResolver;
 
 /**
- * A kind of record that is not a page: reviews, team members, vacancies,
- * offices. The schema is code, like a block's form; the records are rows in
- * `tbtop_entries`, edited under Content in the admin and read on the site
- * through a block's `collection` field or Cms::collection(). collections.md.
+ * A kind of record that is not a page: reviews, team members, vacancies.
+ * The schema is code, like a block's form; the records are rows in
+ * `tbtop_entries`, edited on the admin's Collections page (a tab each)
+ * and read on the site through a block's `collection` field or
+ * Cms::collection(). collections.md.
  *
  * Registered in `config('tbtop-cms.collections')` or with
  * CollectionRegistry::extend().
@@ -24,7 +25,7 @@ abstract class Collection
     /** Stored in each entry's `collection` column and used in admin URLs: `[a-z][a-z0-9_-]*`, at most 64 characters. */
     abstract public function key(): string;
 
-    /** The plural name, used for the admin menu item and the list page title. */
+    /** The plural name: the collection's tab on the admin's Collections page. */
     abstract public function label(): string;
 
     /**
@@ -62,34 +63,6 @@ abstract class Collection
         }
 
         return null;
-    }
-
-    /**
-     * Whether the admin may delete an entry. False drops the row's delete
-     * action, so the action endpoint refuses it too; an editor hides an
-     * entry from the site by setting it to draft. The built-in Offices and
-     * Socials say false.
-     */
-    public function deletable(): bool
-    {
-        return true;
-    }
-
-    /** A lucide icon name for the menu item. */
-    public function icon(): string
-    {
-        return 'list';
-    }
-
-    /** The admin menu group: `content`, `design` or `settings`. */
-    public function navigationGroup(): string
-    {
-        return 'content';
-    }
-
-    public function navigationOrder(): int
-    {
-        return 50;
     }
 
     /**

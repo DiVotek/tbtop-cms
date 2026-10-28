@@ -37,30 +37,6 @@ class Socials extends Collection
         return 'name';
     }
 
-    #[\Override]
-    public function deletable(): bool
-    {
-        return false;
-    }
-
-    #[\Override]
-    public function icon(): string
-    {
-        return 'share-2';
-    }
-
-    #[\Override]
-    public function navigationGroup(): string
-    {
-        return 'settings';
-    }
-
-    #[\Override]
-    public function navigationOrder(): int
-    {
-        return 22;
-    }
-
     public function fields(S $s): array
     {
         return [

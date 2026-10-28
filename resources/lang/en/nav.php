@@ -10,6 +10,7 @@ return [
     ],
     'items' => [
         'pages' => 'Pages',
+        'collections' => 'Collections',
         'shared_blocks' => 'Shared blocks',
         'redirects' => 'Redirects',
         'not_found' => '404 log',

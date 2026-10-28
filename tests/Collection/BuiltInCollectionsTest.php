@@ -22,9 +22,11 @@ function builtIn(string $collection, array $data, int $sort = 0, string $status 
     return Entry::query()->create(['collection' => $collection, 'status' => $status, 'sort_order' => $sort, 'data' => $data]);
 }
 
-it('reads phones and emails from the main office and socials from the social links', function (): void {
-    builtIn('offices', ['name' => ['en' => 'Kyiv'], 'phones' => [['number' => '+380 44 1'], ['number' => '+380 44 2']], 'emails' => [['address' => 'kyiv@example.com']]]);
-    builtIn('offices', ['name' => ['en' => 'Lviv'], 'phones' => [['number' => '+380 32 1']]], 1);
+it('reads the published phones, emails and social links in the editor order', function (): void {
+    builtIn('phones', ['number' => '+380 44 2'], 1);
+    builtIn('phones', ['number' => '+380 44 1']);
+    builtIn('phones', ['number' => '+380 44 3'], 2, Entry::DRAFT);
+    builtIn('emails', ['address' => 'kyiv@example.com']);
     builtIn('socials', ['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme']);
     builtIn('socials', ['label' => 'FB', 'href' => 'https://facebook.com/acme'], 1, Entry::DRAFT);
 
@@ -32,8 +34,7 @@ it('reads phones and emails from the main office and socials from the social lin
 
     expect($contacts->phones())->toBe(['+380 44 1', '+380 44 2'])
         ->and($contacts->emails())->toBe(['kyiv@example.com'])
-        ->and($contacts->socials())->toBe([['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme']])
-        ->and(array_column($contacts->offices(), 'name'))->toBe(['Kyiv', 'Lviv']);
+        ->and($contacts->socials())->toBe([['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme']]);
 });
 
 it('is empty with no entries', function (): void {
@@ -43,7 +44,8 @@ it('is empty with no entries', function (): void {
 });
 
 it('still shares the contacts under their old settings keys for templates', function (): void {
-    builtIn('offices', ['name' => ['en' => 'Kyiv'], 'phones' => [['number' => '+380 44 1']], 'emails' => [['address' => 'hi@example.com']]]);
+    builtIn('phones', ['number' => '+380 44 1']);
+    builtIn('emails', ['address' => 'hi@example.com']);
     builtIn('socials', ['label' => 'TG', 'href' => 'https://t.me/acme']);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
     app(Cms::class)->frontendRoutes();

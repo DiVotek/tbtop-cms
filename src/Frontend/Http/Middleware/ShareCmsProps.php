@@ -60,8 +60,9 @@ class ShareCmsProps
 
     /**
      * The contacts under the settings keys they were stored at before the
-     * Offices and Socials collections took over, in the same row shapes, so
-     * a template reading `cms.settings['site.contacts.phones']` keeps working.
+     * Phones, Emails and Socials collections took over, in the same row
+     * shapes, so a template reading `cms.settings['site.contacts.phones']`
+     * keeps working.
      *
      * @return array<string, list<array<string, string|null>>>
      */

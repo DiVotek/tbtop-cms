@@ -10,7 +10,8 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Admin\Collections\CollectionTable;
-use Tbtop\Cms\Collection\BuiltIn\Offices;
+use Tbtop\Cms\Collection\BuiltIn\Emails;
+use Tbtop\Cms\Collection\BuiltIn\Phones;
 use Tbtop\Cms\Collection\BuiltIn\Socials;
 use Tbtop\Cms\Collection\CollectionRegistry;
 
@@ -101,21 +102,23 @@ class SiteSettingsPage extends SettingsPageBase
     }
 
     /**
-     * Phones, emails, addresses and profile links are entries of the
-     * built-in Offices and Socials collections now; the tab points there.
+     * Phones, emails and profile links are entries of the built-in
+     * collections now; the tab points to each one's tab on the Collections page.
      *
      * @return list<Field|HtmlBlock|Node|TextBlock>
      */
     protected function contactsFields(S $s): array
     {
+        $registry = app(CollectionRegistry::class);
+        $links = [];
+        foreach ([Phones::KEY => 'phone', Emails::KEY => 'mail', Socials::KEY => 'share-2'] as $key => $icon) {
+            $links[] = $s->action('open' . ucfirst($key))->label($registry->get($key)->label())
+                ->icon($icon)->url(CollectionTable::listUrl($key));
+        }
+
         return [
             $s->displayText(__('tbtop-cms::settings.site.helpers.contacts'))->variant('muted'),
-            $s->flex([
-                $s->action('openOffices')->label(app(CollectionRegistry::class)->get(Offices::KEY)->label())
-                    ->icon('map-pin')->url(CollectionTable::listUrl(Offices::KEY)),
-                $s->action('openSocials')->label(app(CollectionRegistry::class)->get(Socials::KEY)->label())
-                    ->icon('share-2')->url(CollectionTable::listUrl(Socials::KEY)),
-            ], gap: 2),
+            $s->flex($links, gap: 2),
         ];
     }
 }

@@ -22,7 +22,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `pages.home.title` | `string` | falls back to `pages.home.name` | Title given to the seeded home page | wiring.md |
 | `pages.errors.4xx.name` / `.title` | `string` | `'Page not found'` | Name/title given to the seeded 4xx error page (`database/seeders/PageSeeder.php`) | pages.md |
 | `pages.errors.5xx.name` / `.title` | `string` | `'Something went wrong'` | Name/title given to the seeded 5xx error page | pages.md |
-| `collections` | `list<class-string<Collection>>` | `[]` | Host collection classes merged into `CollectionRegistry` (`Collection/CollectionRegistry.php`) after the built-in `offices` and `socials`; read with an inline default | collections.md |
+| `collections` | `list<class-string<Collection>>` | `[]` | Host collection classes merged into `CollectionRegistry` (`Collection/CollectionRegistry.php`) after the built-in `phones`, `emails` and `socials`; read with an inline default | collections.md |
 | `blocks.types` | `array<string,class-string<Block>>` | `[]` | Host block classes merged into `BlockRegistry` (`Block/BlockRegistry.php`) | blocks.md |
 | `blocks.strict` | `bool` | `false` | When true, `BlockContentResolver` throws on an unknown block kind instead of skipping it | blocks.md |
 | `blocks.discover` | `array<string,string>` | `[]` | Namespace → folder pairs scanned for concrete `Block` subclasses (`Block/BlockDiscovery.php`), registered after `blocks.types` in relative-path order | blocks.md |
@@ -144,7 +144,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | SiteHealthPage | `site-health` |
 | LayoutPage | `layout` |
 | LayoutEditPage | `layout/{slot}/edit` |
-| CollectionEntriesPage | `collections/{collection}` — one per collection; its menu items come from `CmsPanel` (collections.md) |
+| CollectionEntriesPage | `collections` — every collection as a tab (`?tab[collections]={key}`), one menu item under Content (collections.md) |
 | CollectionEntryEditPage | `collections/{collection}/{entry}/edit` |
 | SharedBlocksPage | `shared-blocks` |
 | SharedBlockEditPage | `shared-blocks/{sharedBlock}/edit` |
@@ -216,7 +216,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | Class/Contract | Path | Methods to implement | Purpose |
 |---|---|---|---|
 | `Block` (abstract) | `src/Block/Block.php` | Required: `kind(): string`, `form(S $s): list<Field>`. Overridable (have defaults): `label()`, `description()`, `category()`, `placements(): list<string>`, `resolve(array $input, ResolveContext $ctx): array`, `translatableFields()`, `toSchema(array $props, SchemaContext $ctx): ?array` (default `null`) | Base for a block type: schema/form, an optional server-side resolve step, and an optional schema.org node published into the page's `seo.jsonLd` |
-| `Collection` (abstract) | `src/Collection/Collection.php` | Required: `key()`, `label()`, `fields(S $s): list<Field>`. Overridable: `singularLabel()`, `titleField()`, `relatedField()`, `deletable()`, `icon()`, `navigationGroup()`, `navigationOrder()`, `resolve(array $input, ResolveContext $ctx): array` | A code-defined kind of record with no URL (collections.md) |
+| `Collection` (abstract) | `src/Collection/Collection.php` | Required: `key()`, `label()`, `fields(S $s): list<Field>`. Overridable: `singularLabel()`, `titleField()`, `relatedField()`, `resolve(array $input, ResolveContext $ctx): array` | A code-defined kind of record with no URL (collections.md) |
 | `Placement` | `src/Block/Placement.php` | Constants `LAYOUT`, `PAGES` | Values a `Block::placements()` entry may hold: a page-type key, `Placement::LAYOUT`, or the wildcard `Placement::PAGES` (every page type) |
 | `PageTypeInterface` | `src/Page/Contracts/PageTypeInterface.php` | `key()`, `label()`, `allowedChildren(): list<string>`, `requiresParent(): bool`, `maxDepth(): int`, `isSourceBacked(): bool`, `source(Page $page): ?object`, `template(Page $page): ?array`, `schemaTypes(): non-empty-list<string>`, `base(): string`, `fields(S $s): list<Field>`, `resolveFields(array $input, ResolveContext $ctx): array`, `childSubtype(): ?string` | Contract for a page type; `base() !== key()` makes it a subtype (pages.md, "Subtypes and type fields") |
 | `BasePageType` (abstract) | `src/Page/Types/BasePageType.php` | Implements `PageTypeInterface` with defaults (`label`=ucfirst(key), `allowedChildren`=[], `requiresParent`=false, `maxDepth`=1, `isSourceBacked`=false, `source`=null, `template`=null, `schemaTypes`=`['WebPage','AboutPage','ContactPage','ItemPage']`, `base`=own key, `childSubtype`=null, `fields`=[]); a subclass need only override `key()` plus whatever defaults don't fit | Convenience base for page types |
@@ -278,7 +278,7 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.name` | `SiteSettingsPage` | no | yes |
 | `site.logo` | `SiteSettingsPage` | no | yes (media URL) |
 | `site.favicon` | `SiteSettingsPage` | no | yes (media URL) |
-| `site.contacts.*` | none — removed: moved into the built-in Offices/Socials collections by `2026_10_28_000001_move_contacts_to_collections` (collections.md). `cms.settings` still carries `site.contacts.phones/emails/socials`, built by `ShareCmsProps` from the collections in the old row shapes | no | yes (built, not stored) |
+| `site.contacts.*` | none — removed: moved into the built-in Phones/Emails/Socials collections by `2026_10_28_000001_move_contacts_to_collections` (collections.md). `cms.settings` still carries `site.contacts.phones/emails/socials`, built by `ShareCmsProps` from the collections in the old row shapes | no | yes (built, not stored) |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
 | `seo.title_suffix` | none — legacy, still mapped by `SeoSettingsPage` with no field; a stored value keeps working | no | yes |
@@ -295,9 +295,16 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `seo.identity.name` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.name` | no | yes |
 | `seo.identity.logo` | none — legacy, still mapped by `SeoSettingsPage` with no field; falls back to `site.logo` | no | yes (media URL) |
 | `seo.identity.legal_name` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
-| `seo.identity.address.*`, `seo.identity.opening_hours`, `seo.identity.geo.*` | none — removed: moved into the main office of the built-in Offices collection by `2026_10_28_000001_move_contacts_to_collections` | no | no |
+| `seo.identity.address.street` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.locality` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.region` (translatable locale map) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.postal_code` | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.address.country` (ISO 3166-1 alpha-2) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.subtype` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.identity.subtype_custom` (`local_business` only, used when the subtype is `other`) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.opening_hours` (`local_business` only; list of `{days, opens, closes}`) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.geo.latitude` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
+| `seo.identity.geo.longitude` (`local_business` only) | `SeoSettingsPage` | no | yes — public business data, also published in the identity JSON-LD |
 | `seo.twitter_card` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.enabled` | `SeoSettingsPage` | no | yes |
 | `seo.not_found.retention_days` | `SeoSettingsPage` | no | yes |
@@ -378,7 +385,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `referencedBy(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<Page>` | Live pages whose page-type `pages` field `$field` picks `$page` (only type/subtype `$from` when given), by `sort_order` then name; `[]` for a null page (pages.md "Page references") |
 | | `referencedByLinks(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<{id, name, url}>` | `referencedBy()` as the `{id, name, url}` list a `pages` field resolves to |
 | | `collection(string $key, ?string $locale = null): EntryList` | The published entries of a collection resolved for the locale, editor's order, cached whole; `EntryList` filters in memory: `relatedTo()`, `latest()`, `take()`, `only()`, `where()`, `first()`, `all()` (collections.md) |
-| `Tbtop\Cms\Settings\SiteContacts` | `phones()`, `emails()`, `offices()`, `socials()` (each `?string $locale = null`) | The main office's phones/emails, the published offices (main first) and social links, from the built-in collections |
+| `Tbtop\Cms\Settings\SiteContacts` | `phones()`, `emails()`, `socials()` (each `?string $locale = null`) | The published entries of the built-in Phones, Emails and Socials collections, editor's order; the first phone and email and every social `href` feed the identity JSON-LD |
 | `Tbtop\Cms\Form\Forms` | `props(string $name, Page $page, ?string $locale = null): array` | `{action, honeypotField?}` for a template-rendered form posting from `$page`; also `all()`, `has()`, `get()`, `action()` |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |

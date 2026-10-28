@@ -561,50 +561,38 @@ key only to change the env-driven default. The package adds an auth guard
 `pages_api` check: a lang override of `tbtop-cms::health.checks.*` may add
 its keys.
 
-## Collections; Offices and Socials take over the contacts and the identity address
+## Collections; Phones, Emails and Socials take over the site contacts
 
 Records that are not pages — reviews, team, vacancies — are now
 **collections** (`docs/host/ai/collections.md`): a `Collection` class listed
 in `config('tbtop-cms.collections')`, entries in the new `tbtop_entries`
-table, a `collection` block field and `Cms::collection()`.
+table, a `collection` block field and `Cms::collection()`. The admin shows
+every collection on one Collections page, a tab each.
 
-Two collections are built in, and they replace settings:
-
-- **Offices** holds what Site settings → Contacts held for phones and emails,
-  plus the SEO identity's address, opening hours and coordinates. The first
-  published office is the main one.
-- **Social links** holds what Contacts held for socials.
+Three collections are built in, and they replace Site settings → Contacts:
+**Phones**, **Emails** and **Social links**, one entry per former row. The
+SEO identity's address, opening hours and coordinates stay in SEO settings.
 
 Run `php artisan migrate`. `2026_10_28_000000_create_entries_table` creates the
-table; `2026_10_28_000001_move_contacts_to_collections` turns the stored
-values into one published office (named after `site.name`) and one published
-entry per social row, then deletes `site.contacts.*`,
-`seo.identity.address.*`, `seo.identity.opening_hours` and
-`seo.identity.geo.*`. A collection that already has entries is left alone,
-its settings keys included: they are no longer read, so remove them by hand
-once the entries match.
+table; `2026_10_28_000001_move_contacts_to_collections` turns each row of
+`site.contacts.phones`, `site.contacts.emails` and `site.contacts.socials`
+into a published entry, in order, then deletes that key. A collection that
+already has entries is left alone, its settings key included: it is no longer
+read, so remove it by hand once the entries match.
 
 What changes for a host:
 
 1. **`SiteContacts` reads the collections.** `phones()`, `emails()` and
-   `socials()` keep their return shapes (and gain an optional `$locale`), and
-   `offices()` is new. Its constructor now takes `CollectionEntries`: resolve
-   it from the container rather than `new SiteContacts($settings)`.
+   `socials()` keep their return shapes (and gain an optional `$locale`).
+   Its constructor now takes `CollectionEntries`: resolve it from the
+   container rather than `new SiteContacts($settings)`.
 2. **`cms.settings` still carries `site.contacts.phones/emails/socials`**,
-   built from the collections in the old row shapes. It no longer carries
-   `seo.identity.address.*`, `seo.identity.opening_hours` or
-   `seo.identity.geo.*`; read an office from `SiteContacts::offices()` or a
-   `collection` block field instead.
-3. **The identity JSON-LD gains `department`** when more than one office is
-   published.
-4. **A local business no longer needs a street and city to save SEO
-   settings**: the address is an office now, and the form only asks for the
-   type, legal name and subtype.
-5. **A published `admin.pages` config needs two more slots**,
+   built from the collections in the old row shapes.
+3. **A published `admin.pages` config needs two more slots**,
    `collection_entries` => `CollectionEntriesPage::class` and
    `collection_entry_edit` => `CollectionEntryEditPage::class`. Without them
-   there is no collection admin and no menu items for it.
-6. **Import the admin blocks module** (`resources/js/cms/admin/blocks.ts`),
+   there is no Collections page and no menu item for it.
+4. **Import the admin blocks module** (`resources/js/cms/admin/blocks.ts`),
    as for the `link` field: it now also registers `collectionFieldClient`,
    the editor of the `collection` field.
 

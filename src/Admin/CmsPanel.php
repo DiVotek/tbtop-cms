@@ -14,8 +14,6 @@ use Tbtop\Cms\Admin\Http\Middleware\AuthorizeMediaApi;
 use Tbtop\Cms\Admin\Http\Middleware\EnsureCmsAdmin;
 use Tbtop\Cms\Admin\Http\Middleware\ShareAdminAuth;
 use Tbtop\Cms\Admin\Http\Middleware\SyncContentLocales;
-use Tbtop\Cms\Admin\Pages\CollectionEntriesPage;
-use Tbtop\Cms\Collection\CollectionRegistry;
 
 class CmsPanel extends Panel
 {
@@ -47,7 +45,6 @@ class CmsPanel extends Panel
             ->navigation('topbar-sidebar')
             ->userMenuItems($this->userMenuItems($prefix))
             ->navigationGroups($this->navigationGroups())
-            ->navigationItems($this->collectionItems($prefix))
             ->pages($this->pages());
     }
 
@@ -75,31 +72,6 @@ class CmsPanel extends Panel
             NavItem::make(static fn (): string => __('tbtop-cms::profile.title'))
                 ->url('/' . trim($prefix, '/') . '/profile')->icon('user'),
         ];
-    }
-
-    /**
-     * One menu item per collection: CollectionEntriesPage takes the
-     * collection from its URL, so it has no menu item of its own. None when
-     * a host config leaves the page out.
-     *
-     * @return list<NavItem>
-     */
-    private function collectionItems(string $prefix): array
-    {
-        if (! in_array(CollectionEntriesPage::class, $this->pages(), true)) {
-            return [];
-        }
-
-        $items = [];
-        foreach (app(CollectionRegistry::class)->all() as $collection) {
-            $items[] = NavItem::make(static fn (): string => $collection->label())
-                ->url('/' . trim($prefix, '/') . '/collections/' . $collection->key())
-                ->group($collection->navigationGroup())
-                ->sort($collection->navigationOrder())
-                ->icon($collection->icon());
-        }
-
-        return $items;
     }
 
     /** @return list<class-string<Page>> */

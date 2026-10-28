@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Settings;
 
-use Tbtop\Cms\Collection\BuiltIn\Offices;
+use Tbtop\Cms\Collection\BuiltIn\Emails;
+use Tbtop\Cms\Collection\BuiltIn\Phones;
 use Tbtop\Cms\Collection\BuiltIn\Socials;
 use Tbtop\Cms\Collection\CollectionEntries;
 
 /**
  * The site's contact details for blocks (header, footer, contact sections)
- * and the SEO identity node, from the built-in collections: phones and
- * emails are the main office's (the first published Offices entry), the
- * socials every published Socials entry. Each read is the cached collection.
+ * and the SEO identity node: every published entry of the built-in Phones,
+ * Emails and Socials collections, in the editor's order. Each read is the
+ * cached collection.
  */
 final class SiteContacts
 {
@@ -29,16 +30,16 @@ final class SiteContacts
 
     public function __construct(private readonly CollectionEntries $entries) {}
 
-    /** @return list<string> The main office's, in the order the editor arranged them. */
+    /** @return list<string> In the order the editor arranged them. */
     public function phones(?string $locale = null): array
     {
-        return self::column($this->offices($locale)[0]['phones'] ?? null, 'number');
+        return $this->column(Phones::KEY, 'number', $locale);
     }
 
-    /** @return list<string> The main office's. */
+    /** @return list<string> */
     public function emails(?string $locale = null): array
     {
-        return self::column($this->offices($locale)[0]['emails'] ?? null, 'address');
+        return $this->column(Emails::KEY, 'address', $locale);
     }
 
     /** @return list<array{label: string, name: string|null, href: string}> Entries missing a label or a link are skipped. */
@@ -56,26 +57,12 @@ final class SiteContacts
         return $socials;
     }
 
-    /**
-     * The published offices resolved for the locale, the main one first.
-     *
-     * @return list<array<string, mixed>>
-     */
-    public function offices(?string $locale = null): array
-    {
-        return $this->entries->of(Offices::KEY, $locale)->all();
-    }
-
-    /**
-     * One string column of repeater rows, blanks skipped.
-     *
-     * @return list<string>
-     */
-    public static function column(mixed $rows, string $field): array
+    /** @return list<string> One field of a collection's entries, blanks skipped. */
+    private function column(string $collection, string $field, ?string $locale): array
     {
         $values = [];
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            $value = is_array($row) ? self::str($row[$field] ?? null) : null;
+        foreach ($this->entries->of($collection, $locale) as $entry) {
+            $value = self::str($entry[$field] ?? null);
             if ($value !== null) {
                 $values[] = $value;
             }

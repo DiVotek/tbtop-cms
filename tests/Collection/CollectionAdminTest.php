@@ -32,27 +32,39 @@ function adminSocial(string $label, string $href = 'https://t.me/acme', string $
     return Entry::query()->create(['collection' => 'socials', 'status' => $status, 'sort_order' => $sort, 'data' => ['label' => $label, 'name' => $label . ' name', 'href' => $href]]);
 }
 
-it('lists each collection in the menu and shows its entries', function (): void {
+it('lists every collection as a tab of one page, with one menu item', function (): void {
     adminSocial('TG');
     adminSocial('FB', status: Entry::DRAFT, sort: 1);
 
-    $response = $this->get('/admin/collections/socials', ['X-Inertia' => 'true'])->assertOk();
+    $response = $this->get('/admin/collections', ['X-Inertia' => 'true'])->assertOk();
     $json = json_encode($response->json('props'), JSON_UNESCAPED_SLASHES);
 
-    expect($json)->toContain('/admin/collections/offices')->toContain('/admin/collections/socials')
-        ->and($response->json('props.title') ?? $json)->toContain('Social links');
+    expect($json)->toContain('"href":"/admin/collections"')
+        ->not->toContain('/admin/collections/socials"')
+        ->and(substr_count($json, '"label":"' . __('tbtop-cms::nav.items.collections') . '"'))->toBeGreaterThanOrEqual(1);
+    foreach (['entries_phones', 'entries_emails', 'entries_socials', 'entryCreate_socials'] as $name) {
+        expect($json)->toContain('"' . $name . '"');
+    }
 
-    $rows = $this->getJson('/admin/collections/socials/tables/entries_socials')->assertOk()->json('data.data');
+    $rows = $this->getJson('/admin/collections/tables/entries_socials')->assertOk()->json('data.data');
     expect(array_column($rows, 'title'))->toBe(['TG name', 'FB name'])
         ->and(array_column($rows, 'status'))->toBe([Entry::PUBLISHED, Entry::DRAFT]);
 });
 
-it('answers 404 for a collection that is not registered', function (): void {
-    $this->get('/admin/collections/ghost', ['X-Inertia' => 'true'])->assertNotFound();
+it('opens the tab named in the URL', function (): void {
+    $tabs = $this->get('/admin/collections?tab[collections]=socials', ['X-Inertia' => 'true'])->assertOk()->json('props.structure.options.tabs');
+
+    expect(array_column($tabs, 'name'))->toBe(['phones', 'emails', 'socials'])
+        ->and(array_column(array_filter($tabs, static fn (array $tab): bool => $tab['active'] ?? false), 'name'))->toBe(['socials'])
+        ->and(CollectionTable::listUrl('socials'))->toEndWith('/admin/collections?tab%5Bcollections%5D=socials');
+});
+
+it('answers 404 for an entry of a collection that is not registered', function (): void {
+    $this->get('/admin/collections/ghost/1/edit', ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('creates an entry from the modal and sends the editor to its edit page', function (): void {
-    $response = $this->postJson('/admin/collections/socials/actions/entryCreateSave', [
+    $response = $this->postJson('/admin/collections/actions/entryCreateSave_socials', [
         'payload' => ['form' => ['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme', 'status' => 'published']],
     ])->assertOk();
 
@@ -64,7 +76,7 @@ it('creates an entry from the modal and sends the editor to its edit page', func
 });
 
 it('rejects an entry the collection form does not accept', function (): void {
-    $this->postJson('/admin/collections/socials/actions/entryCreateSave', [
+    $this->postJson('/admin/collections/actions/entryCreateSave_socials', [
         'payload' => ['form' => ['label' => 'TG', 'href' => 'not a url', 'status' => 'published']],
     ])->assertUnprocessable();
 
@@ -90,7 +102,7 @@ it('edits an entry and refuses a save from a stale form', function (): void {
 it('does not open an entry under another collection', function (): void {
     $entry = adminSocial('TG');
 
-    $this->get("/admin/collections/offices/{$entry->id}/edit", ['X-Inertia' => 'true'])->assertNotFound();
+    $this->get("/admin/collections/phones/{$entry->id}/edit", ['X-Inertia' => 'true'])->assertNotFound();
 });
 
 it('deletes an entry from its row', function (): void {
@@ -98,19 +110,9 @@ it('deletes an entry from its row', function (): void {
     app()->instance(CollectionRegistry::class, new CollectionRegistry);
     $entry = Entry::query()->create(['collection' => 'review', 'data' => ['author' => 'A']]);
 
-    $this->postJson('/admin/collections/review/actions/entries_reviewDelete', ['payload' => ['row' => ['id' => $entry->id]]])->assertOk();
+    $this->postJson('/admin/collections/actions/entries_reviewDelete', ['payload' => ['row' => ['id' => $entry->id]]])->assertOk();
 
     expect(Entry::query()->count())->toBe(0);
-});
-
-it('offers no delete for a built-in collection and refuses one posted anyway', function (): void {
-    $entry = adminSocial('TG');
-
-    $props = json_encode($this->get('/admin/collections/socials', ['X-Inertia' => 'true'])->assertOk()->json('props'));
-    $this->postJson('/admin/collections/socials/actions/entries_socialsDelete', ['payload' => ['row' => ['id' => $entry->id]]])->assertNotFound();
-
-    expect($props)->not->toContain('entries_socialsDelete')
-        ->and(Entry::query()->whereKey($entry->id)->exists())->toBeTrue();
 });
 
 it('narrows an embedded table to the entries related to a page', function (): void {

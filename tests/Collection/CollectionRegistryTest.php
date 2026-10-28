@@ -42,8 +42,8 @@ function bootRegistryWith(array $classes): CollectionRegistry
     return $registry;
 }
 
-it('always has the built-in offices and socials, then the configured ones', function (): void {
-    expect(array_keys(bootRegistryWith([ReviewsCollection::class])->all()))->toBe(['offices', 'socials', 'review']);
+it('always has the built-in phones, emails and socials, then the configured ones', function (): void {
+    expect(array_keys(bootRegistryWith([ReviewsCollection::class])->all()))->toBe(['phones', 'emails', 'socials', 'review']);
 });
 
 it('takes collections from extend()', function (): void {

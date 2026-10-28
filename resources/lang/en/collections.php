@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'title' => 'Collections',
     'columns' => [
         'title' => 'Name',
         'status' => 'Status',
@@ -46,27 +47,18 @@ return [
         'add' => 'Add',
         'remove' => 'Remove',
     ],
-    'offices' => [
-        'label' => 'Offices',
-        'singular' => 'office',
-        'hint' => 'The first published office is the main one: its address, phones, emails, hours and coordinates are the site identity\'s; the others are published as its departments.',
+    'phones' => [
+        'label' => 'Phones',
+        'singular' => 'phone',
         'fields' => [
-            'name' => 'Name',
-            'street' => 'Street address',
-            'locality' => 'City',
-            'region' => 'Region',
-            'postal_code' => 'Postal code',
-            'country' => 'Country (ISO code, e.g. UA)',
-            'latitude' => 'Latitude',
-            'longitude' => 'Longitude',
-            'phones' => 'Phones',
             'number' => 'Number',
-            'emails' => 'Emails',
+        ],
+    ],
+    'emails' => [
+        'label' => 'Emails',
+        'singular' => 'email',
+        'fields' => [
             'address' => 'Address',
-            'opening_hours' => 'Opening hours',
-            'days' => 'Days',
-            'opens' => 'Opens',
-            'closes' => 'Closes',
         ],
     ],
     'socials' => [
