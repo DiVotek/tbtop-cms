@@ -98,7 +98,8 @@ interface PageTypeInterface
     /**
      * Whether the admin's Pages list shows this type's pages under "All".
      * False for a type with many small pages (tags): they stay on the
-     * type's own tab. A subtype inherits its base's answer unless it overrides it.
+     * type's own tab. Each registered type answers for itself: a subtype
+     * class extending its base's class inherits the answer.
      */
     public function listedInAll(): bool;
 

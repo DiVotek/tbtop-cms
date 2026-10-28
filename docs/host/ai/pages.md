@@ -630,8 +630,10 @@ public function resolveFields(array $input, ResolveContext $ctx): array
   (default true) set to false keeps the type's pages off the admin Pages
   "All" tab; they stay on their own tab (an unlisted subtype gets one too,
   and leaves its base's tab). Both
-  default in `BasePageType`; a subtype inherits its base's answer unless it
-  overrides it. Tags and categories end to end: recipes.md.
+  default in `BasePageType`. Each registered type answers for itself: a
+  subtype class that extends its base's class inherits its answers, one
+  extending `BasePageType` gets the defaults. Tags and categories end to end:
+  recipes.md.
 - **Index.** The lookup reads `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
   for a page on every save; a force delete cascades. Only a page type's
