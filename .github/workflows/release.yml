@@ -71,8 +71,12 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
         run: |
-          runs="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-            --jq '[.check_runs[] | select(.name != "Build the npm package" and .name != "Tag + publish both packages")]')"
+          page="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100")"
+          if [ "$(jq '.total_count > (.check_runs | length)' <<<"$page")" = "true" ]; then
+            echo "::error::more than 100 check runs on $SHA — this gate reads one page"
+            exit 1
+          fi
+          runs="$(jq '[.check_runs[] | select(.name != "Build the npm package" and .name != "Tag + publish both packages")]' <<<"$page")"
           if [ "$(jq length <<<"$runs")" -eq 0 ]; then
             echo "::error::no CI ran on $SHA — wait for ci.yml on main"
             exit 1
