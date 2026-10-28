@@ -74,6 +74,10 @@ describe("collections: registry", () => {
 		expect(() => cms.collections.get("nope")).toThrow("Collection [nope] is not registered.");
 	});
 
+	test("a collection field that picks from an unregistered collection fails at startup", async () => {
+		await expect(makeCms(null, { blocks: blocks(), collections: [team] })).rejects.toThrow("Block [Reviews]: the collection field [reviews] picks from [review], which is not a registered collection.");
+	});
+
 	test("a bad key, a duplicate, a reserved field name and a nested collection field are refused", () => {
 		const form = (s: S) => [s.text("name")];
 		expect(() => new Collections([{ key: "Bad Key", label: "x", form }])).toThrow("must match");

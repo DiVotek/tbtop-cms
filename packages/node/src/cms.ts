@@ -3,7 +3,7 @@ import type { CmsConfig } from "./config";
 import type { AuditEntry } from "./content/audit";
 import { rebuildPageRefs } from "./content/pageRefIndex";
 import { type PageTypeDef, PageTypes } from "./content/pageTypes";
-import { Collections } from "./content/collections";
+import { assertCollectionTargets, Collections } from "./content/collections";
 import { BUILT_IN_COLLECTIONS } from "./content/builtInCollections";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
@@ -117,6 +117,10 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 	warnUnknownPlacements(config, pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
 	const collections = new Collections([...BUILT_IN_COLLECTIONS, ...(config.collections ?? [])]);
+	assertCollectionTargets(collections, [
+		...config.blocks.all().map((block) => ({ owner: `Block [${block.kind}]`, form: block.form })),
+		...pageTypes.all().map((type) => ({ owner: `Page type [${type.key}]`, form: type.form })),
+	]);
 	const throttle = submitThrottle(config.forms);
 	const site = (request?: Request, options: { cached?: boolean } = {}): Site => {
 		const origin = (config.url ?? (request === undefined ? "http://localhost" : new URL(request.url).origin)).replace(/\/+$/, "");

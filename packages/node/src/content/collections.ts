@@ -124,5 +124,21 @@ export class Collections {
 	}
 }
 
+/**
+ * Every collection field in the block and page-type forms must name a
+ * registered collection: a typo would otherwise build, then throw on the
+ * first render of every page that uses it.
+ */
+export function assertCollectionTargets(collections: Collections, forms: { owner: string; form: (s: S) => unknown[] }[]): void {
+	for (const { owner, form } of forms) {
+		for (const field of walk.collectAll(form(new S()), isCollectionField) as CollectionField[]) {
+			const key = field.collectionKey();
+			if (!collections.has(key)) {
+				throw new Error(`${owner}: the collection field [${field.name}] picks from [${key}], which is not a registered collection.`);
+			}
+		}
+	}
+}
+
 /** Any depth: a collection field inside a repeater picks entries all the same. */
 const isCollectionField = (value: unknown): boolean => value instanceof CollectionField;
