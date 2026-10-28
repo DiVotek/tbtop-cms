@@ -12,7 +12,11 @@ const tag = definePageType({
 	listedInAll: false,
 	archiveOf: "tags",
 	form: () => [],
-	resolveFields: async (_input, ctx) => ({ articles: await ctx.referencedByPaged("tags", { from: "article", perPage: 2 }) }),
+	// Its sibling tags too: another page's listing, which must not decide this page's paging.
+	resolveFields: async (_input, ctx) => ({
+		articles: await ctx.referencedByPaged("tags", { from: "article", perPage: 2 }),
+		siblings: await ctx.site.childrenLinksPaged(ctx.page?.parentId == null ? null : await ctx.site.pages.find(ctx.page.parentId), { locale: ctx.locale, perPage: 10 }),
+	}),
 });
 const taggedPost = definePageType({ key: "tagged_post", base: "article", form: () => [pagesField("tags").of("category", "tag").creatable().max(10)] });
 
@@ -74,10 +78,10 @@ async function setup(options: { tags?: boolean } = {}) {
 
 const load = async (cms: Awaited<ReturnType<typeof setup>>["cms"], path: string) => cms.loadPage(new Request(`https://site.test${path}`));
 
-type Archive = { articles: { items: { name: string }[]; pagination: { page: number; pages: number; total: number; perPage: number } } };
+type Archive = { siblings: { items: { name: string }[] }; articles: { items: { name: string }[]; pagination: { page: number; pages: number; total: number; perPage: number } } };
 
 describe("tags as a category subtype (A-thin)", () => {
-	test("a tag lists its live articles newest first, a page at a time, each page its own canonical", async () => {
+	test("a tag lists its live articles newest first, a page at a time, each page its own canonical, whatever else it lists", async () => {
 		const { cms } = await setup();
 		const first = await load(cms, "/tags/japan");
 		const second = await load(cms, "/tags/japan?page=2");
@@ -86,6 +90,7 @@ describe("tags as a category subtype (A-thin)", () => {
 		const one = first.props.page.fields as Archive;
 		const two = second.props.page.fields as Archive;
 		expect(one.articles.items.map((ref) => ref.name)).toEqual(["Sushi", "Onsen"]);
+		expect(one.siblings.items.map((ref) => ref.name)).toContain("Japan");
 		expect(one.articles.pagination).toEqual({ page: 1, pages: 2, total: 3, perPage: 2 });
 		expect(first.props.seo.canonical).toBe("https://site.test/tags/japan");
 		expect(two.articles.items.map((ref) => ref.name)).toEqual(["Ramen"]);

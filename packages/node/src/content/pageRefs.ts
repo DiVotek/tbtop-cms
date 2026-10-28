@@ -166,7 +166,7 @@ export async function referencedByLinksPaged(site: Site, target: Page | null, fi
 	if (target === null) {
 		return emptyPage(options);
 	}
-	return linksOf(site, sourcesQuery(site, target, field, options.from), options);
+	return linksOf(site, target, sourcesQuery(site, target, field, options.from), options);
 }
 
 /** Cms::childrenLinksPaged: one page of a page's live children (a category's articles), the same way. */
@@ -176,11 +176,12 @@ export async function childrenLinksPaged(site: Site, parent: Page | null, option
 	}
 	const children = whereLive(site.pages.query()).where("tbtop_pages.parent_id", "=", parent.id);
 	const from = options.from;
-	return linksOf(site, from === undefined ? children : children.where((eb) => eb.or([eb("tbtop_pages.type", "=", from), eb("tbtop_pages.subtype", "=", from)])), options);
+	return linksOf(site, parent, from === undefined ? children : children.where((eb) => eb.or([eb("tbtop_pages.type", "=", from), eb("tbtop_pages.subtype", "=", from)])), options);
 }
 
-async function linksOf(site: Site, query: Parameters<typeof takePage>[1], options: PagedOptions): Promise<PagedRefs<PageRef>> {
+async function linksOf(site: Site, owner: Page, query: Parameters<typeof takePage>[1], options: PagedOptions): Promise<PagedRefs<PageRef>> {
 	const { pages, pagination } = await takePage(site.paging, query, {
+		owner: owner.id,
 		perPage: options.perPage ?? DEFAULT_PER_PAGE,
 		...(options.page === undefined ? {} : { page: options.page }),
 	});

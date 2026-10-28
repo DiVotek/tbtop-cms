@@ -155,7 +155,7 @@ export async function loadPage(
 		const props = await errorPageProps(site, 404, locale, path);
 		return { type: "notFound", status: 404, locale, path, cms: props.cms, props };
 	}
-	site.paging.read(url);
+	site.paging.read(url, page.id);
 	const props = await pageProps(site, page, locale, path);
 	const paged = site.paging.result;
 	if (paged !== null && paged.page > paged.pages) {
