@@ -31,6 +31,11 @@ export class Paging {
 		this.renderedId = renderedId;
 	}
 
+	/** `?page=` belongs to the rendered page's own archive; a sidebar listing another page starts at 1. */
+	requestedFor(ownerId: number): number {
+		return this.renderedId === null || ownerId === this.renderedId ? this.requested : 1;
+	}
+
 	record(ownerId: number, pagination: Pagination): void {
 		if (ownerId === this.renderedId) {
 			this.result = pagination;
@@ -55,7 +60,7 @@ export async function takePage(
 	if (!Number.isInteger(perPage) || perPage < 1) {
 		throw new Error("perPage needs at least 1.");
 	}
-	const page = Math.max(1, options.page ?? paging.requested);
+	const page = Math.max(1, options.page ?? paging.requestedFor(options.owner));
 	const counted = await query.select(sql<number>`count(*)`.as("count")).executeTakeFirst();
 	const total = Number(counted?.count ?? 0);
 	const pages = Math.max(1, Math.ceil(total / perPage));

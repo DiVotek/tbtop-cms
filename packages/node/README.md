@@ -412,7 +412,8 @@ const post = definePageType({
   `{ items, pagination: { page, pages, total, perPage } }`, newest first by
   `publishedAt`. The page number is the request's `?page=`. From page 2 on the
   canonical and `og:url` carry `?page=N`; a page past the last is a 404.
-  `?page=` is one number per URL, so a page lists one paged archive.
+  `?page=` is one number per URL and belongs to the page's own archive: a
+  listing of another page (sidebar siblings) starts at page 1.
   Outside a page render, `site.referencedByLinksPaged(page, field, options)`
   and `site.childrenLinksPaged(page, options)` take the same options plus
   `locale` and `page`.

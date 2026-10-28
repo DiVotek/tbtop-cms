@@ -92,6 +92,8 @@ describe("tags as a category subtype (A-thin)", () => {
 		const two = second.props.page.fields as Archive;
 		expect(one.articles.items.map((ref) => ref.name)).toEqual(["Sushi", "Onsen"]);
 		expect(one.siblings.items.map((ref) => ref.name)).toContain("Japan");
+		// Another page's listing ignores ?page=: the siblings still show on page 2.
+		expect(two.siblings.items.map((ref) => ref.name)).toContain("Japan");
 		expect(one.articles.pagination).toEqual({ page: 1, pages: 2, total: 3, perPage: 2 });
 		expect(first.props.seo.canonical).toBe("https://site.test/tags/japan");
 		expect(two.articles.items.map((ref) => ref.name)).toEqual(["Ramen"]);
