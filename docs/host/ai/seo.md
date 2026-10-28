@@ -552,7 +552,8 @@ The file, in order:
    (default 50, max 500). `- [title](url): description` from the page's own
    SEO title and description, without the site templates. Articles newest
    first by `published_at`; every other type home first, then by depth,
-   then `sort_order`. Built-in types use the plural names in
+   then `sort_order`, picked from that type's first 1000 pages by
+   `sort_order`. Built-in types use the plural names in
    `tbtop-cms::llms.sections.*`, other types their `label()`.
 6. Host sections from `config('tbtop-cms.seo.llms_txt.sections')`:
 

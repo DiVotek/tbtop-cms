@@ -28,7 +28,9 @@ final readonly class LlmsTxtPages
 {
     /**
      * Rows read per tree-ordered type before sorting: depth comes from the
-     * slug path, not a column, so the order cannot be taken from SQL.
+     * slug path, not a column, so the order cannot be taken from SQL. On a
+     * type with more pages, the ones past the first 1000 by sort order are
+     * not considered; a type that large is better listed by a host section.
      */
     private const int TREE_CANDIDATES = 1000;
 
@@ -117,15 +119,16 @@ final readonly class LlmsTxtPages
             ->get()
             ->all();
 
-        $key = static function (Page $page) use ($locale): array {
+        $keys = [];
+
+        foreach ($pages as $i => $page) {
             $path = trim((string) $page->pathFor($locale), '/');
+            $keys[$i] = [$path === '' ? 0 : 1, substr_count($path, '/'), $page->sort_order, $i];
+        }
 
-            return [$path === '' ? 0 : 1, substr_count($path, '/'), $page->sort_order];
-        };
+        asort($keys);
 
-        usort($pages, static fn (Page $a, Page $b): int => $key($a) <=> $key($b));
-
-        return $pages;
+        return array_map(static fn (int $i): Page => $pages[$i], array_keys($keys));
     }
 
     /** @return Builder<Page> */

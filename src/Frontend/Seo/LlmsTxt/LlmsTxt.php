@@ -104,7 +104,7 @@ final readonly class LlmsTxt
 
         foreach ($links as $link) {
             $notes = LlmsTxtMarkdown::inline((string) $link->notes);
-            $lines[] = '- [' . LlmsTxtMarkdown::linkText($link->name) . '](' . $link->url . ')' . ($notes !== '' ? ': ' . $notes : '');
+            $lines[] = '- [' . LlmsTxtMarkdown::linkText($link->name) . '](' . LlmsTxtMarkdown::url($link->url) . ')' . ($notes !== '' ? ': ' . $notes : '');
         }
 
         return implode("\n", $lines);

@@ -32,7 +32,7 @@ final readonly class LlmsTxtContacts
         $this->add($lines, 'hours', self::hours($properties['openingHoursSpecification'] ?? null, $locale), $locale);
 
         foreach ($this->contacts->socials($locale) as $social) {
-            $lines[] = '- ' . LlmsTxtMarkdown::inline($social['label']) . ': ' . $social['href'];
+            $lines[] = '- ' . LlmsTxtMarkdown::inline($social['label']) . ': ' . LlmsTxtMarkdown::url($social['href']);
         }
 
         return $lines;

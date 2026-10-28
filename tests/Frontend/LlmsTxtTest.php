@@ -60,6 +60,19 @@ final class LlmsTxtDocsSection implements LlmsTxtSection
     }
 }
 
+final class LlmsTxtRelativeSection implements LlmsTxtSection
+{
+    public function title(string $locale): string
+    {
+        return 'Files';
+    }
+
+    public function links(string $locale): array
+    {
+        return [new LlmsTxtLink('Price list', '/files/price list(v2).pdf')];
+    }
+}
+
 it('is not served until an editor turns it on', function (): void {
     app(Cms::class)->frontendRoutes();
     llmsPage(['name' => ['en' => 'About']]);
@@ -166,6 +179,24 @@ it('lists only the page types the editor ticked', function (): void {
     llmsArticle(['name' => ['en' => 'News']]);
 
     expect($this->get('/llms.txt')->getContent())->toContain('[News]')->not->toContain('## Pages');
+});
+
+it('strips underline headings from the editor notes', function (): void {
+    app(Settings::class)->set('seo.llms_txt.intro', ['en' => "Ordering\n---\nCall us.\n\nPrices\n===="]);
+    llmsTxtOn();
+
+    expect($this->get('/llms.txt')->getContent())
+        ->toContain("Ordering\n\nCall us.")
+        ->not->toContain('---')
+        ->not->toContain('====');
+});
+
+it('makes host links absolute and keeps them one link', function (): void {
+    config(['tbtop-cms.seo.llms_txt.sections' => [LlmsTxtRelativeSection::class]]);
+    llmsTxtOn();
+
+    expect($this->get('/llms.txt')->getContent())
+        ->toContain('- [Price list](' . url('/files/price%20list%28v2%29.pdf') . ')');
 });
 
 it('escapes brackets in link text', function (): void {
