@@ -1,4 +1,4 @@
-import { Field, S } from "@tbtop/admin";
+import { Field, S, walk } from "@tbtop/admin";
 import type { ResolveContext } from "../blocks/context";
 import { PagesField } from "../blocks/cmsFields";
 import { formFields } from "../blocks/fields";
@@ -80,13 +80,14 @@ export class Collections {
 		if (this.byKey.has(def.key)) {
 			throw new Error(`Collection [${def.key}] is registered twice.`);
 		}
-		const fields = formFields(def.form(new S()));
+		const form = def.form(new S());
+		const fields = formFields(form);
 		const names = fields.map((field) => field.name);
 		const reserved = names.filter((name) => RESERVED_FIELDS.includes(name));
 		if (reserved.length > 0) {
 			throw new Error(`Collection [${def.key}]: the field name(s) ${reserved.join(", ")} are reserved.`);
 		}
-		if (fields.some(isCollectionField)) {
+		if (walk.collectAll(form, isCollectionField).length > 0) {
 			throw new Error(`Collection [${def.key}]: an entry cannot pick entries (a collection field inside a collection).`);
 		}
 		const titleField = def.titleField ?? names[0];
@@ -110,4 +111,5 @@ export class Collections {
 }
 
 /** A `collection` field without importing the field class here (it imports this module). */
-const isCollectionField = (field: Field): boolean => field.toNode().kind === "collection";
+/** Any depth: a collection field inside a repeater picks entries all the same. */
+const isCollectionField = (value: unknown): boolean => value instanceof Field && value.toNode().kind === "collection";
