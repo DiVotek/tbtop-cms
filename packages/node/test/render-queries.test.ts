@@ -8,19 +8,21 @@ import { get } from "./support";
 
 // A page render on Workers pays a D1 round trip per query; what costs is the
 // longest chain of queries that wait on each other. A D1 binding with a fixed
-// latency turns that chain into wall time: concurrent queries overlap, a
-// chain adds up.
+// latency spaces that chain out: concurrent queries start together, a query
+// that waits on another starts a full latency later. Counting those waves, not
+// wall time, keeps a slow or cold runner from adding round trips.
 const LATENCY = 25;
 
 function slowD1() {
 	const inner = fakeD1();
-	const state = { on: false, queries: [] as string[] };
+	const state = { on: false, queries: [] as string[], starts: [] as number[] };
 	const wrap = (statement: D1PreparedStatement, sql: string): D1PreparedStatement => {
 		const delayed =
 			<A extends unknown[], R>(call: (...args: A) => Promise<R>) =>
 			async (...args: A): Promise<R> => {
 				if (state.on) {
 					state.queries.push(sql);
+					state.starts.push(performance.now());
 					await Bun.sleep(LATENCY);
 				}
 				return call(...args);
@@ -46,13 +48,26 @@ async function site() {
 	await seedFixtures(cms, demoFixture);
 	const render = async (path: string) => {
 		state.queries = [];
+		state.starts = [];
 		state.on = true;
-		const started = performance.now();
 		const result = await cms.loadPage(get(path));
 		state.on = false;
-		return { type: result.type, queries: [...state.queries], roundTrips: Math.round((performance.now() - started) / LATENCY) };
+		return { type: result.type, queries: [...state.queries], roundTrips: waves(state.starts) };
 	};
 	return { render };
+}
+
+/** Queries that start within most of a latency of a wave's first one share its round trip. */
+function waves(starts: number[]): number {
+	let count = 0;
+	let waveStart = Number.NEGATIVE_INFINITY;
+	for (const start of starts) {
+		if (start - waveStart >= LATENCY * 0.8) {
+			count++;
+			waveStart = start;
+		}
+	}
+	return count;
 }
 
 describe("a page render's database round trips", () => {
