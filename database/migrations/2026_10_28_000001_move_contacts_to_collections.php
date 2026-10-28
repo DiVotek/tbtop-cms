@@ -129,6 +129,7 @@ return new class extends Migration
     }
 
     /** A per-locale map stays one; a plain string (written by a script) is kept as is. @return array<string, string>|string|null */
+    /** @return array<string, string>|string|null */
     private static function localized(mixed $value): array | string | null
     {
         if (is_array($value)) {

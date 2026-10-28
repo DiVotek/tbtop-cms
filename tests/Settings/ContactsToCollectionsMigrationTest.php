@@ -39,7 +39,7 @@ it('moves the contacts and the identity address into one published office and th
     $office = Entry::query()->where('collection', 'offices')->sole();
     expect($office->status)->toBe(Entry::PUBLISHED)
         ->and($office->title)->toBe('Acme')
-        ->and($office->data)->toBe([
+        ->and($office->data)->toEqual([
             'name' => ['en' => 'Acme'],
             'street' => ['en' => '1 Main St', 'uk' => 'вул. Головна, 1'],
             'locality' => ['en' => 'Kyiv'],
@@ -53,7 +53,7 @@ it('moves the contacts and the identity address into one published office and th
 
     $socials = Entry::query()->where('collection', 'socials')->get();
     expect($socials)->toHaveCount(1)
-        ->and($socials[0]->data)->toBe(['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme']);
+        ->and($socials[0]->data)->toEqual(['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme']);
 
     foreach (['site.contacts.phones', 'site.contacts.socials', 'seo.identity.address.street', 'seo.identity.opening_hours', 'seo.identity.geo.latitude'] as $key) {
         expect($settings->get($key))->toBeNull();

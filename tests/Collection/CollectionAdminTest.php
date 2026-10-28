@@ -54,7 +54,7 @@ it('creates an entry from the modal and sends the editor to its edit page', func
 
     $entry = Entry::query()->sole();
     expect($entry->collection)->toBe('socials')
-        ->and($entry->data)->toBe(['name' => 'Telegram', 'label' => 'TG', 'href' => 'https://t.me/acme'])
+        ->and($entry->data)->toEqual(['name' => 'Telegram', 'label' => 'TG', 'href' => 'https://t.me/acme'])
         ->and($entry->isPublished())->toBeTrue()
         ->and(collect($response->json('effects'))->firstWhere('kind', 'redirect')['href'] ?? '')->toContain("/admin/collections/socials/{$entry->id}/edit");
 });
