@@ -389,7 +389,7 @@ import { definePageType, pagesField } from "@tbtop/cms";
 const tag = definePageType({
 	key: "tag",
 	base: "category",
-	listedInAll: false, // off the Pages "All" tab, on a "Tag" tab of its own
+	listedInAll: false, // off the Pages "All" and "Category" tabs, on a "Tag" tab of its own
 	archiveOf: "tags", // noindex and out of the sitemap while nothing live picks it
 	form: () => [],
 	resolveFields: async (_input, ctx) => ({ articles: await ctx.referencedByPaged("tags", { from: "article", perPage: 20 }) }),
@@ -411,6 +411,7 @@ const post = definePageType({
   `{ items, pagination: { page, pages, total, perPage } }`, newest first by
   `publishedAt`. The page number is the request's `?page=`. From page 2 on the
   canonical and `og:url` carry `?page=N`; a page past the last is a 404.
+  `?page=` is one number per URL, so a page lists one paged archive.
   Outside a page render, `site.referencedByLinksPaged(page, field, options)`
   and `site.childrenLinksPaged(page, options)` take the same options plus
   `locale` and `page`.

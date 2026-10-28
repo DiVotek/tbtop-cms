@@ -137,13 +137,15 @@ describe("tags as a category subtype (A-thin)", () => {
 		expect(await cms.site().pages.query().select("id").where("subtype", "=", "tag").execute()).toEqual([]);
 	});
 
-	test("tags stay off the Pages \"All\" tab and get a tab of their own", async () => {
+	test("tags stay off the Pages \"All\" and Category tabs and get a tab of their own", async () => {
 		const { ids, rows } = await setup();
 		const all = (await rows("pages", "/admin/pages", "all")).map((row) => Number(row.id));
 		const tags = (await rows("pages", "/admin/pages", "tag")).map((row) => Number(row.id));
 		expect(all).toContain(ids.ramen as number);
 		expect(all).not.toContain(ids.japan as number);
+		const categories = (await rows("pages", "/admin/pages", "category")).map((row) => Number(row.id));
 		expect(tags.sort()).toEqual([ids.japan as number, ids.empty as number].sort());
+		expect(categories.sort()).toEqual([ids.tags as number, ids.blog as number].sort());
 	});
 
 	test("a category's children page the same way", async () => {

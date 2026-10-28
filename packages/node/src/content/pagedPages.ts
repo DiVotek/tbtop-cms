@@ -13,7 +13,8 @@ export const PAGE_QUERY_KEY = "page";
 /**
  * The request's paged archive (CurrentPage): the `?page=` it asks for, and
  * the last listing a resolver took, so the page gets a `?page=N` canonical
- * and a page past the end is a 404.
+ * and a page past the end is a 404. `?page=` is one number for the whole
+ * URL, so a page lists one paged archive; a second one decides both.
  */
 export class Paging {
 	requested = 1;

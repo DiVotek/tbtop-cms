@@ -117,6 +117,9 @@ export function pagesIndex(cms: Cms) {
 					: live(qb)
 							.where("tbtop_pages.type", "not in", unlisted)
 							.where((eb) => eb.or([eb("tbtop_pages.subtype", "is", null), eb("tbtop_pages.subtype", "not in", unlisted)]));
+			// A base type's tab leaves its unlisted subtypes to their own tab, as "All" does.
+			const listedSubtypes = (qb: unknown) =>
+				unlisted.length === 0 ? live(qb) : live(qb).where((eb) => eb.or([eb("tbtop_pages.subtype", "is", null), eb("tbtop_pages.subtype", "not in", unlisted)]));
 			const presentSubtypes = (await site.pages.query().select("subtype").distinct().where("subtype", "is not", null).execute()).map((row) => row.subtype);
 			const subtypeTabs = unlisted.filter((key) => cms.pageTypes.get(key).base !== key && presentSubtypes.includes(key));
 			const now = sqlDate(new Date());
@@ -162,7 +165,7 @@ export function pagesIndex(cms: Cms) {
 					])
 					.tabs([
 						tab("all", "All").query(listed),
-						...tabTypes.map((type) => tab(type, typeLabel(cms, type)).query((qb) => live(qb).where("tbtop_pages.type", "=", type))),
+						...tabTypes.map((type) => tab(type, typeLabel(cms, type)).query((qb) => listedSubtypes(qb).where("tbtop_pages.type", "=", type))),
 						...subtypeTabs.map((key) => tab(key, typeLabel(cms, key)).query((qb) => live(qb).where("tbtop_pages.subtype", "=", key))),
 						Tab.make("deleted")
 							.label("Deleted")
