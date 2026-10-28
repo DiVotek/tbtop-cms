@@ -95,13 +95,21 @@ export class Collections {
 		if (titleField === undefined) {
 			throw new Error(`Collection [${def.key}] has no fields.`);
 		}
+		// A site file in plain JS has no types to catch a typo, and a wrong name leaves every entry untitled or unrelated.
+		if (!names.includes(titleField)) {
+			throw new Error(`Collection [${def.key}]: titleField [${titleField}] is not a field of its form.`);
+		}
+		const pages = fields.filter((field) => field instanceof PagesField).map((field) => field.name);
+		if (def.relatedField !== undefined && def.relatedField !== null && !pages.includes(def.relatedField)) {
+			throw new Error(`Collection [${def.key}]: relatedField [${def.relatedField}] is not a pages field of its form.`);
+		}
 		this.byKey.set(def.key, {
 			key: def.key,
 			label: def.label,
 			singularLabel: def.singularLabel ?? def.label,
 			form: def.form,
 			titleField,
-			relatedField: def.relatedField === undefined ? (fields.find((field) => field instanceof PagesField)?.name ?? null) : def.relatedField,
+			relatedField: def.relatedField === undefined ? (pages[0] ?? null) : def.relatedField,
 			icon: def.icon ?? "list",
 			navigationGroup: def.navigationGroup ?? "content",
 			navigationOrder: def.navigationOrder ?? 50,

@@ -81,6 +81,8 @@ describe("collections: registry", () => {
 		expect(() => new Collections([{ key: "x", label: "x", form: (s) => [s.text("status")] }])).toThrow("reserved");
 		expect(() => new Collections([{ key: "x", label: "x", form: () => [collectionField("more").of("team")] }])).toThrow("cannot pick entries");
 		expect(() => new Collections([{ key: "x", label: "x", form: (s) => [s.text("name"), s.repeater("rows").fields([collectionField("more").of("team")])] }])).toThrow("cannot pick entries");
+		expect(() => new Collections([{ key: "x", label: "x", titleField: "nmae", form: (s) => [s.text("name")] }])).toThrow("titleField [nmae] is not a field");
+		expect(() => new Collections([{ key: "x", label: "x", relatedField: "name", form: (s) => [s.text("name")] }])).toThrow("relatedField [name] is not a pages field");
 	});
 });
 
