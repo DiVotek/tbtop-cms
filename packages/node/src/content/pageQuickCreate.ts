@@ -10,7 +10,11 @@ import { draftPage, templateContent } from "./pageTemplate";
  * page. The first page of the type is made in Pages: until then the select
  * refuses, since only then is it known where the rest go.
  */
-export async function quickCreatePage(site: Site, pairs: string[], name: string, locale: string): Promise<{ value: string; label: string }> {
+export async function quickCreatePage(
+	site: Site,
+	pairs: string[],
+	input: { name: string; locale: string; by: string | number | null },
+): Promise<{ value: string; label: string }> {
 	if (pairs.length !== 1) {
 		throw new Error("pagesField().creatable() needs exactly one of() type to create.");
 	}
@@ -27,8 +31,8 @@ export async function quickCreatePage(site: Site, pairs: string[], name: string,
 			errors: { name: ["Create the first page of this type in Pages: new ones go under the same parent."] },
 		});
 	}
-	const label = name.trim();
-	const tree = { type, subtype, parentId: sibling.parent_id === null ? null : Number(sibling.parent_id), name: { [locale]: label } };
-	const page = await site.pages.create({ ...tree, status: "published", isIndexable: true, content: templateContent(site.pageTypes, draftPage(tree)) });
+	const label = input.name.trim();
+	const tree = { type, subtype, parentId: sibling.parent_id === null ? null : Number(sibling.parent_id), name: { [input.locale]: label } };
+	const page = await site.pages.create({ ...tree, status: "published", isIndexable: true, content: templateContent(site.pageTypes, draftPage(tree)) }, { by: input.by });
 	return { value: String(page.id), label };
 }

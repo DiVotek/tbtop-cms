@@ -124,7 +124,7 @@ describe("tags as a category subtype (A-thin)", () => {
 		const page = await cms.site().pages.find(Number(created.value));
 
 		expect(created.label).toBe("Street food");
-		expect([page?.type, page?.subtype, page?.parentId, page?.status]).toEqual(["category", "tag", ids.tags, "published"]);
+		expect([page?.type, page?.subtype, page?.parentId, page?.status, page?.createdBy]).toEqual(["category", "tag", ids.tags, "published", 1]);
 		expect((await load(cms, "/tags/street-food")).status).toBe(200);
 	});
 

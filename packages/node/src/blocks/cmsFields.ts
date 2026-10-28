@@ -141,7 +141,9 @@ export class PagesField<N extends string = string> extends Select<N, string[]> {
 			if (this.site === null) {
 				throw new Error(`"${this.name}": creatable() runs only on a form the CMS admin built.`);
 			}
-			return quickCreatePage(this.site, this.typePairs(), String(validated.name ?? ""), currentContext().locale);
+			const { locale, user } = currentContext();
+			const id = (user as { id?: unknown } | null)?.id;
+			return quickCreatePage(this.site, this.typePairs(), { name: String(validated.name ?? ""), locale, by: typeof id === "number" || typeof id === "string" ? id : null });
 		});
 	}
 
