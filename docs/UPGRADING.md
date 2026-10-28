@@ -580,7 +580,9 @@ table; `2026_10_28_000001_move_contacts_to_collections` turns the stored
 values into one published office (named after `site.name`) and one published
 entry per social row, then deletes `site.contacts.*`,
 `seo.identity.address.*`, `seo.identity.opening_hours` and
-`seo.identity.geo.*`. A collection that already has entries is left alone.
+`seo.identity.geo.*`. A collection that already has entries is left alone,
+its settings keys included: they are no longer read, so remove them by hand
+once the entries match.
 
 What changes for a host:
 

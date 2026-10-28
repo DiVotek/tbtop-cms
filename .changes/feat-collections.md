@@ -3,7 +3,7 @@
 touches: new table, admin nav, block field kinds, site contacts, identity JSON-LD, settings keys, migrations
 
 > ⚠️ **Migration** `2026_10_28_000000_create_entries_table.php` creates `tbtop_entries` (`collection`, json `data`, `title`, `status`, `sort_order`, `lock_version`); guarded no-op if the table exists.
-> ⚠️ **Data migration** `2026_10_28_000001_move_contacts_to_collections.php` moves `site.contacts.*` and `seo.identity.address/opening_hours/geo` into one published office and the social entries, then deletes those settings keys. No `down()`.
+> ⚠️ **Data migration** `2026_10_28_000001_move_contacts_to_collections.php` moves `site.contacts.*` and `seo.identity.address/opening_hours/geo` into one published office and the social entries, then deletes those settings keys; a collection that already has entries keeps its keys. No `down()`.
 > ⚠️ **Constructor change** `SiteContacts` takes `CollectionEntries` instead of `Settings`; resolve it from the container.
 > ⚠️ **Published config** a host `admin.pages` needs `collection_entries` and `collection_entry_edit`.
 
