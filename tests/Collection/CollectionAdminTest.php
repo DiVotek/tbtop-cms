@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
@@ -140,6 +141,18 @@ it('deletes from an embedded table only the entries it shows', function (): void
 
     expect(Entry::query()->pluck('id')->all())->toBe([$other->id]);
 });
+
+it('gates the embedded delete like the collection page when roles are on', function (bool $allowed): void {
+    config(['tbtop-cms.roles' => true, 'tbtop-cms.collections' => [ReviewsCollection::class]]);
+    app()->instance(CollectionRegistry::class, new CollectionRegistry);
+    Gate::define('tbtop-cms.pages', static fn (): bool => $allowed);
+
+    $table = CollectionTable::make(new S, 'review')->relatedTo(1)->build();
+    $delete = collect(StructureWalk::actionSearchDescendants($table->toNode()))->first(static fn (mixed $node): bool => $node instanceof ActionBuilder && str_ends_with($node->name, 'Delete'));
+
+    // A failing gate drops the action from the wire; the action endpoint re-runs the same check.
+    expect($delete !== null)->toBe($allowed);
+})->with(['allowed' => [true], 'denied' => [false]]);
 
 it('finds entries for the collection field picker, by title and by id', function (): void {
     $tg = adminSocial('TG');

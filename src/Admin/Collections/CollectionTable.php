@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\Color;
 use Tbtop\Admin\Dsl\Column;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TableBuilder;
+use Tbtop\Cms\Admin\Pages\CollectionEntriesPage;
 use Tbtop\Cms\Collection\CollectionRegistry;
 use Tbtop\Cms\Collection\Models\Entry;
 use Tbtop\Cms\Page\Models\Page;
@@ -104,10 +105,21 @@ final class CollectionTable
         return $query;
     }
 
-    /** @param  Closure(): Builder<Entry>  $query  the table's own scope, so a row it does not show cannot be deleted through it */
+    /**
+     * Gated like the collection's own page, so a host page that embeds the
+     * table under a looser gate cannot delete through it.
+     *
+     * @param  Closure(): Builder<Entry>  $query  the table's own scope, so a row it does not show cannot be deleted through it
+     */
     private static function deleteAction(S $s, string $table, Closure $query): ActionBuilder
     {
-        return $s->action($table . 'Delete')->label('')->icon('trash')->color('danger')
+        $action = $s->action($table . 'Delete');
+        $gate = CollectionEntriesPage::can();
+        if ($gate !== null) {
+            $action->authorize($gate);
+        }
+
+        return $action->label('')->icon('trash')->color('danger')
             ->tooltip(__('tbtop-cms::collections.actions.delete'))
             ->confirm(__('tbtop-cms::collections.actions.delete_title'), __('tbtop-cms::collections.actions.delete_confirm'))
             ->handle(static function (ActionCtx $ctx) use ($table, $query): Effects {
