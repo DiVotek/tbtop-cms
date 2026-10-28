@@ -146,3 +146,42 @@ it('rejects a related field that is not a pages field', function (): void {
 
     bootRegistryWith([$class]);
 })->throws(InvalidArgumentException::class, 'related field "name" is not a pages field of its form');
+
+it('rejects a key that differs from another only by - and _', function (): void {
+    $dash = new class extends Collection
+    {
+        public function key(): string
+        {
+            return 'team-a';
+        }
+
+        public function label(): string
+        {
+            return 'Team A';
+        }
+
+        public function fields(S $s): array
+        {
+            return [$s->text('name')];
+        }
+    };
+    $underscore = new class extends Collection
+    {
+        public function key(): string
+        {
+            return 'team_a';
+        }
+
+        public function label(): string
+        {
+            return 'Team A';
+        }
+
+        public function fields(S $s): array
+        {
+            return [$s->text('name')];
+        }
+    };
+
+    bootRegistryWith([$dash::class, $underscore::class]);
+})->throws(InvalidArgumentException::class, 'Collection [team_a] clashes with [team-a]');

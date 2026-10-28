@@ -118,6 +118,13 @@ class CollectionRegistry
             throw new InvalidArgumentException("Collection [{$key}] is already registered.");
         }
 
+        // The admin names a collection's table `entries_{key}` with - as _, so team-a and team_a would share it.
+        foreach (array_keys($this->collections) as $known) {
+            if (str_replace('-', '_', $known) === str_replace('-', '_', $key)) {
+                throw new InvalidArgumentException("Collection [{$key}] clashes with [{$known}]: keys may not differ only by - and _.");
+            }
+        }
+
         self::assertFields($collection);
         $this->collections[$key] = $collection;
     }
