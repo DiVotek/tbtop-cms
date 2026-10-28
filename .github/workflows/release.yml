@@ -13,7 +13,8 @@
 #   5. creates a GitHub Release from the CHANGELOG section
 #
 # npm goes BEFORE the tag on purpose: a npm failure then leaves no dangling
-# tag, so a re-run stays clean.
+# tag. Every step is safe to re-run: a version already on npm is skipped, a
+# tag already on this commit resumes, an existing GitHub Release is kept.
 #
 # IMPORTANT: this filename (release.yml) is registered as the npm trusted
 # publisher of @tbtop/cms on npmjs.com. Renaming it breaks publishing.
@@ -32,6 +33,7 @@ concurrency:
 
 permissions:
   contents: write # push the tag + create the GitHub Release
+  checks: read # require green CI on the released commit
   id-token: write # OIDC for npm trusted publishing + provenance
 
 jobs:
@@ -50,6 +52,27 @@ jobs:
         run: |
           if [ "$REF" != "refs/heads/main" ]; then
             echo "::error::Release must be run from main, not $REF"
+            exit 1
+          fi
+
+      # A release is permanent: every other check on this commit must have
+      # passed (or been skipped) before anything is published.
+      - name: Require green CI on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          runs="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+            --jq '[.check_runs[] | select(.name != "Tag + publish both packages")]')"
+          if [ "$(jq length <<<"$runs")" -eq 0 ]; then
+            echo "::error::no CI ran on $SHA — wait for ci.yml on main"
+            exit 1
+          fi
+          bad="$(jq -r '.[] | select(.status != "completed" or (.conclusion | IN("success", "skipped", "neutral") | not)) | "\(.name): \(.status) \(.conclusion // "")"' <<<"$runs")"
+          if [ -n "$bad" ]; then
+            echo "::error::CI on $SHA is not green:"
+            echo "$bad"
             exit 1
           fi
 
@@ -92,10 +115,14 @@ jobs:
           }
 
       # git ls-remote --exit-code returns 0 (ref matched), 2 (no match), or
-      # another code for a real failure. Only 2 means "tag is free".
+      # another code for a real failure. Only 2 means "tag is free". A tag that
+      # already points at this commit is a re-run after a failed GitHub Release
+      # step: resume, skipping the tag steps.
       - name: Fail if tag already exists
+        id: tag
         env:
           TAG: ${{ steps.ver.outputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>/dev/null; then
             status=0
@@ -103,6 +130,12 @@ jobs:
             status=$?
           fi
           if [ "$status" -eq 0 ]; then
+            tagged="$(git ls-remote origin "refs/tags/$TAG^{}" | cut -f1)"
+            if [ "$tagged" = "$SHA" ]; then
+              echo "$TAG already points at $SHA, resuming"
+              echo "resume=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "::error::$TAG already exists — bump the version in packages/node/package.json first"
             exit 1
           elif [ "$status" -ne 2 ]; then
@@ -136,6 +169,7 @@ jobs:
           fi
 
       - name: Fail if tag already exists (re-check)
+        if: steps.tag.outputs.resume != 'true'
         env:
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
@@ -154,6 +188,7 @@ jobs:
 
       # Pushing the tag lets Packagist publish the PHP package via its webhook.
       - name: Create and push tag
+        if: steps.tag.outputs.resume != 'true'
         env:
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
@@ -166,4 +201,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.ver.outputs.tag }}
-        run: gh release create "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists"
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
