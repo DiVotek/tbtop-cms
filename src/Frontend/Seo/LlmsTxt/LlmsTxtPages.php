@@ -72,17 +72,12 @@ final readonly class LlmsTxtPages
     private function links(string $type, string $locale): array
     {
         $limit = $this->settings->perType();
-        $pages = $type === 'article' ? $this->newestFirst($type, $limit) : $this->treeOrder($type, $locale);
+        $pages = $type === 'article' ? $this->newestFirst($type, $locale, $limit) : $this->treeOrder($type, $locale);
 
         $links = [];
 
         foreach ($pages as $page) {
-            $path = $page->pathFor($locale);
-
-            if ($path === null) {
-                continue;
-            }
-
+            $path = (string) $page->pathFor($locale);
             $seo = PageOwnSeo::blob($page);
             $links[] = new LlmsTxtLink(
                 PageOwnSeo::title($page, $seo, $locale),
@@ -99,20 +94,19 @@ final readonly class LlmsTxtPages
     }
 
     /** @return Collection<int, Page> */
-    private function newestFirst(string $type, int $limit): Collection
+    private function newestFirst(string $type, string $locale, int $limit): Collection
     {
-        // Twice the limit: a page with no slug in this locale is skipped.
-        return $this->query($type)
+        return $this->query($type, $locale)
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->limit($limit * 2)
+            ->limit($limit)
             ->get();
     }
 
     /** @return list<Page> */
     private function treeOrder(string $type, string $locale): array
     {
-        $pages = $this->query($type)
+        $pages = $this->query($type, $locale)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->limit(self::TREE_CANDIDATES)
@@ -131,14 +125,20 @@ final readonly class LlmsTxtPages
         return array_map(static fn (int $i): Page => $pages[$i], array_keys($keys));
     }
 
-    /** @return Builder<Page> */
-    private function query(string $type): Builder
+    /**
+     * Only pages with a slug in the locale: one without it has no URL to
+     * list and must not take a place under the limits.
+     *
+     * @return Builder<Page>
+     */
+    private function query(string $type, string $locale): Builder
     {
         return Page::query()
             ->live()
             ->where('type', $type)
             ->where('is_indexable', true)
             ->whereNull('error_class')
+            ->whereHas('slugs', static fn (Builder $slugs): Builder => $slugs->where('locale', $locale))
             ->with('slugs');
     }
 

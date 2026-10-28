@@ -199,6 +199,27 @@ it('makes host links absolute and keeps them one link', function (): void {
         ->toContain('- [Price list](' . url('/files/price%20list%28v2%29.pdf') . ')');
 });
 
+it('refreshes the cached file when a setting changes', function (): void {
+    llmsTxtOn();
+    $this->get('/llms.txt')->assertOk();
+
+    app(Settings::class)->set('seo.llms_txt.summary', ['en' => 'Now with a summary.']);
+
+    expect($this->get('/llms.txt')->getContent())->toContain('> Now with a summary.');
+});
+
+it('skips pages untranslated in the locale without spending the limit', function (): void {
+    app(Settings::class)->set('seo.llms_txt.per_type', 1);
+    llmsTxtOn();
+
+    llmsArticle(['name' => ['en' => 'Untranslated'], 'published_at' => now()->subDay()]);
+    $untranslated = Page::query()->where('type', 'article')->sole();
+    $untranslated->slugs()->delete();
+    llmsArticle(['name' => ['en' => 'Older'], 'published_at' => now()->subDays(2)]);
+
+    expect($this->get('/llms.txt')->getContent())->toContain('[Older]')->not->toContain('Untranslated');
+});
+
 it('escapes brackets in link text', function (): void {
     llmsTxtOn();
 

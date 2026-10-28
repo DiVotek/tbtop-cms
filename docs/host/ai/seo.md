@@ -536,7 +536,9 @@ locale, `text/plain; charset=utf-8`, following llmstxt.org. 404 until an
 editor turns on `seo.llms_txt.enabled` (SEO settings → *For AI*), and while
 indexing is off; `config('tbtop-cms.seo.llms_txt.enabled') === false`
 removes the route. Cached with `CmsCache::rememberLive` per origin and
-locale, so any content write refreshes it.
+locale, so any content or settings write refreshes it (a changed
+`seo.llms_txt.sections` config shows once the cache TTL runs out or the
+cache is cleared).
 
 The file, in order:
 

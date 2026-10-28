@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -267,6 +268,19 @@ it('saves the For AI tab under the keys llms.txt and robots.txt read', function 
         ->and($settings->get('seo.llms_txt.types'))->toBe(['article'])
         ->and((int) $settings->get('seo.llms_txt.per_type'))->toBe(20)
         ->and($settings->get('seo.content_signals.ai_train'))->toBeTrue();
+});
+
+it('turns a content signal off when the editor unticks it', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_content_signals_enabled' => true,
+        'seo_content_signals_search' => false,
+        'seo_content_signals_ai_input' => false,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect((string) test()->get('/robots.txt')->getContent())
+        ->toContain('Content-Signal: search=no, ai-input=no, ai-train=no');
 });
 
 it('rejects more pages per type than llms.txt lists', function (): void {
