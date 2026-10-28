@@ -128,7 +128,7 @@ export const f = {
 	pages: (type?: string) => field(z.array(pageRef), (_s, cms, name) => (type === undefined ? cms.pages(name) : cms.pages(name).of(type))),
 	/**
 	 * Entries of a collection (`collections` in defineSite, or a built-in by
-	 * key: `"offices"`, `"socials"`): the editor picks all, the latest N,
+	 * key: `"phones"`, `"socials"`): the editor picks all, the latest N,
 	 * those related to the page, or by hand. `{ id, ...fields }[]`, or one
 	 * entry or null with `{ single: true }`.
 	 */

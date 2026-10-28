@@ -29,7 +29,7 @@ export type Cms<T extends readonly PageTypeDef[] = any> = {
 	readonly config: CmsConfig<T>;
 	readonly pageTypes: PageTypes;
 	readonly schemaTypes: SchemaTypes;
-	/** The registered collections: the built-in offices and socials, then `config.collections`. */
+	/** The registered collections: the built-in phones, emails and socials, then `config.collections`. */
 	readonly collections: Collections;
 	/** A fresh per-request view of the stores; the origin comes from `url` or the request. */
 	site(request?: Request): Site;

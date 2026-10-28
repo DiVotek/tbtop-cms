@@ -38,7 +38,7 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	/**
 	 * Collections: records with no page of their own (reviews, team), edited
 	 * under their own menu item and picked by a block's `collection` field.
-	 * The built-in `offices` and `socials` are always there.
+	 * The built-in `phones`, `emails` and `socials` are always there.
 	 */
 	collections?: CollectionDef[];
 	/** Extra JSON-LD schema types next to the built-in WebPage family, Article family and CollectionPage. */

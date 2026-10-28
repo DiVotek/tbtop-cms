@@ -55,7 +55,7 @@ export class Site {
 	readonly notFound: NotFoundLog;
 	/** Collection entries, drafts included (the admin's store). */
 	readonly entries: Entries;
-	/** Phones, emails, offices and social links, from the built-in collections. */
+	/** Phones, emails and social links, from the built-in collections. */
 	readonly contacts: SiteContacts;
 	/** Published collections by `{key}:{locale}`, resolved once per request. */
 	private readonly collectionLists = new Map<string, Promise<EntryList>>();
