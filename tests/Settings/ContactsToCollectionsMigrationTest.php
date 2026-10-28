@@ -42,7 +42,8 @@ it('moves each contacts row into a published entry, in order, and drops the sett
         ['title' => '+380 44 000 0002', 'status' => Entry::PUBLISHED, 'data' => ['number' => '+380 44 000 0002']],
     ])
         ->and(migratedEntries('emails'))->toBe([['title' => 'hi@example.com', 'status' => Entry::PUBLISHED, 'data' => ['address' => 'hi@example.com']]])
-        ->and(array_column(migratedEntries('socials'), 'data'))->toBe([
+        // MySQL's json column stores object keys in its own order.
+        ->and(array_column(migratedEntries('socials'), 'data'))->toEqual([
             ['label' => 'TG', 'name' => 'Telegram', 'href' => 'https://t.me/acme'],
             ['label' => 'FB', 'href' => 'https://facebook.com/acme'],
         ])
