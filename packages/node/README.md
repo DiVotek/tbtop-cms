@@ -405,7 +405,7 @@ const post = definePageType({
   `creatable()` lets the editor type a new tag into the select: it is created
   published, next to the newest tag (`/tags/street-food`). Until a first tag
   exists the select refuses with a validation error, since only then is it
-  known where tags live. A name an existing tag already has (any case) picks
+  known where tags live. A name an existing tag already has in the editor's locale (any case) picks
   that tag instead of making a second one.
 - `ctx.referencedByPaged(field, { from, perPage })` and
   `ctx.childrenPaged({ from, perPage })` (a category's own articles) give
