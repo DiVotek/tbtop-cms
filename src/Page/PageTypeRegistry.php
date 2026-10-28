@@ -139,6 +139,43 @@ class PageTypeRegistry
         ));
     }
 
+    /**
+     * Types (base or subtype keys) whose pages the admin's "All" tab leaves
+     * out (listedInAll()).
+     *
+     * @return list<string>
+     */
+    public function unlistedInAllKeys(): array
+    {
+        $this->boot();
+
+        return array_values(array_map(
+            static fn (PageTypeInterface $type): string => $type->key(),
+            array_filter($this->types, static fn (PageTypeInterface $type): bool => ! $type->listedInAll()),
+        ));
+    }
+
+    /**
+     * Type (base or subtype key) => the `pages` field it is an archive of
+     * (archiveOf()).
+     *
+     * @return array<string, string>
+     */
+    public function archiveFields(): array
+    {
+        $this->boot();
+
+        $fields = [];
+        foreach ($this->types as $key => $type) {
+            $field = $type->archiveOf();
+            if ($field !== null && $field !== '') {
+                $fields[$key] = $field;
+            }
+        }
+
+        return $fields;
+    }
+
     private function boot(): void
     {
         if ($this->booted) {

@@ -69,16 +69,7 @@ final class PageRefIndex
      */
     public function sources(Page $target, string $field, ?string $from, string $locale): array
     {
-        $query = Page::query()->live()->with('slugs')
-            ->whereIn('id', DB::table(self::TABLE)->select('page_id')
-                ->where('target_id', $target->getKey())
-                ->where('field', $field));
-
-        if ($from !== null) {
-            $query->where(static fn (Builder $q): Builder => $q->where('type', $from)->orWhere('subtype', $from));
-        }
-
-        return $query->get()
+        return $this->sourcesQuery($target, $field, $from)->with('slugs')->get()
             ->sortBy([
                 static fn (Page $a, Page $b): int => $a->sort_order <=> $b->sort_order,
                 static fn (Page $a, Page $b): int => strnatcasecmp((string) PageRefList::nameOf($a, $locale), (string) PageRefList::nameOf($b, $locale)),
@@ -86,6 +77,36 @@ final class PageRefIndex
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * sources() as an unordered query, for a caller that pages or counts.
+     *
+     * @return Builder<Page>
+     */
+    public function sourcesQuery(Page $target, string $field, ?string $from): Builder
+    {
+        $query = Page::query()->live()
+            ->whereIn('id', DB::table(self::TABLE)->select('page_id')
+                ->where('target_id', $target->getKey())
+                ->where('field', $field));
+
+        return self::ofType($query, $from);
+    }
+
+    /**
+     * Only pages whose type or subtype is $from; any page for null.
+     *
+     * @param  Builder<Page>  $query
+     * @return Builder<Page>
+     */
+    public static function ofType(Builder $query, ?string $from): Builder
+    {
+        if ($from === null) {
+            return $query;
+        }
+
+        return $query->where(static fn (Builder $q): Builder => $q->where('type', $from)->orWhere('subtype', $from));
     }
 
     /** @return list<array{page_id: int, field: string, target_id: int, position: int}> */

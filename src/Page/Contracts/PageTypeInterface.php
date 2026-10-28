@@ -94,4 +94,20 @@ interface PageTypeInterface
      * base applies. Null: no default.
      */
     public function childSubtype(): ?string;
+
+    /**
+     * Whether the admin's Pages list shows this type's pages under "All".
+     * False for a type with many small pages (tags): they stay on the
+     * type's own tab. A subtype inherits its base's answer unless it overrides it.
+     */
+    public function listedInAll(): bool;
+
+    /**
+     * The `pages` field through which other pages pick pages of this type
+     * (`tags` for a tag type), or null. A page of a type that names one is
+     * an archive: while no live page picks it through that field it is
+     * noindex and left out of the sitemap. A tag is usually a category
+     * subtype under a "Tags" category: recipes.md.
+     */
+    public function archiveOf(): ?string;
 }
