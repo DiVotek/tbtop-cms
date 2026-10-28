@@ -27,8 +27,14 @@ export type DefaultAuth = {
 	};
 	/** createCms({ auth }) */
 	adapter: CmsAuth;
-	/** Better Auth's tables next to the CMS's. Idempotent. */
+	/** Better Auth's tables next to the CMS's, then `setup()`. Idempotent. */
 	migrate(): Promise<void>;
+	/**
+	 * The `firstAdmin` user, only while the site has no admin at all; nothing
+	 * without the option. `migrate()` runs it: call it yourself where the
+	 * tables come from elsewhere (D1 migration files). Idempotent.
+	 */
+	setup(): Promise<void>;
 	/**
 	 * Creates the user with this role, or leaves an existing email as it is
 	 * (its role unchanged); the user's id. It skips Better Auth's permission
@@ -55,18 +61,14 @@ export type DefaultAuthOptions = {
 	adapter?: Omit<CmsAuthOptions, "roles">;
 	/** Default `/api/auth`. */
 	basePath?: string;
+	/**
+	 * The admin `setup()` creates while the site has none, from the host's
+	 * secrets (`TBTOP_ADMIN_EMAIL` / `TBTOP_ADMIN_PASSWORD`). With another
+	 * admin, a deleted or demoted first admin stays so; with none left, the
+	 * next setup restores it.
+	 */
+	firstAdmin?: { email: string; password: string };
 };
-
-const firstAdmins = new WeakMap<DefaultAuth, (email: string, password: string) => Promise<string>>();
-
-/** The first admin from the host's secrets, on boot; not exported from the package. */
-export function ensureFirstAdmin(auth: DefaultAuth, email: string, password: string): Promise<string> {
-	const ensure = firstAdmins.get(auth);
-	if (ensure === undefined) {
-		throw new TypeError("tbtop/cms: not a defaultAuth() result.");
-	}
-	return ensure(email, password);
-}
 
 const env = (name: string): string | undefined => (typeof process === "undefined" ? undefined : process.env[name]);
 
@@ -92,7 +94,7 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		...(baseURL === undefined ? {} : { baseURL }),
 	} satisfies BetterAuthOptions;
 	const instance = betterAuth(config) as unknown as DefaultAuth["instance"];
-	const users = db as Kysely<{ tbtop_users: { id: string; email: string; role: string | null } }>;
+	const users = db as Users;
 	const ensureUser = async (email: string, role: string, { password, name }: { password: string; name?: string }): Promise<string> => {
 		const found = await users.selectFrom("tbtop_users").select("id").where("email", "=", email).executeTakeFirst();
 		if (found !== undefined) {
@@ -101,10 +103,19 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		// No headers: Better Auth's createUser checks the caller's role only when a request is given.
 		return (await instance.api.createUser({ body: { email, password, name: name ?? email.split("@")[0] ?? email, role } })).user.id;
 	};
+	const setup = async (): Promise<void> => {
+		if (options.firstAdmin !== undefined) {
+			await ensureFirstAdmin(users, options.firstAdmin, ensureUser);
+		}
+	};
 	const auth: DefaultAuth = {
 		instance,
 		adapter: cmsAuth(instance, { ...options.adapter, roles }),
-		migrate: async () => (await getMigrations(config)).runMigrations(),
+		migrate: async () => {
+			await (await getMigrations(config)).runMigrations();
+			await setup();
+		},
+		setup,
 		ensureUser: (email, role, opts) => {
 			if (role === "admin") {
 				return Promise.reject(new Error("tbtop/cms: ensureUser does not create admins; set TBTOP_ADMIN_EMAIL / TBTOP_ADMIN_PASSWORD."));
@@ -116,22 +127,29 @@ export function defaultAuth(db: Kysely<unknown>, options: DefaultAuthOptions = {
 		},
 		handle: async (request) => (new URL(request.url).pathname.startsWith(`${basePath}/`) ? instance.handler(request) : null),
 	};
-	// Only while the site has no admin at all: with another admin a deleted or demoted first admin stays so; with none left, the secrets restore one.
-	firstAdmins.set(auth, async (email, password) => {
-		const admin = await users
-			.selectFrom("tbtop_users")
-			.select("id")
-			.where((eb) => eb.or([eb("role", "=", "admin"), eb("role", "like", "admin,%"), eb("role", "like", "%,admin"), eb("role", "like", "%,admin,%")]))
-			.executeTakeFirst();
-		if (admin !== undefined) {
-			return admin.id;
-		}
-		if ((await users.selectFrom("tbtop_users").select("id").where("email", "=", email).executeTakeFirst()) !== undefined) {
-			throw new Error(`tbtop/cms: TBTOP_ADMIN_EMAIL ${email} belongs to an existing user who is not an admin; use another email or make that user an admin.`);
-		}
-		return ensureUser(email, "admin", { password });
-	});
 	return auth;
+}
+
+type Users = Kysely<{ tbtop_users: { id: string; email: string; role: string | null } }>;
+
+/** Only while the site has no admin at all: with another admin a deleted or demoted first admin stays so; with none left, the secrets restore one. */
+async function ensureFirstAdmin(
+	users: Users,
+	{ email, password }: { email: string; password: string },
+	ensureUser: (email: string, role: string, options: { password: string }) => Promise<string>,
+): Promise<void> {
+	const admin = await users
+		.selectFrom("tbtop_users")
+		.select("id")
+		.where((eb) => eb.or([eb("role", "=", "admin"), eb("role", "like", "admin,%"), eb("role", "like", "%,admin"), eb("role", "like", "%,admin,%")]))
+		.executeTakeFirst();
+	if (admin !== undefined) {
+		return;
+	}
+	if ((await users.selectFrom("tbtop_users").select("id").where("email", "=", email).executeTakeFirst()) !== undefined) {
+		throw new Error(`tbtop/cms: TBTOP_ADMIN_EMAIL ${email} belongs to an existing user who is not an admin; use another email or make that user an admin.`);
+	}
+	await ensureUser(email, "admin", { password });
 }
 
 /**

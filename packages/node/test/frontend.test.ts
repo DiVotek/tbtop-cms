@@ -42,7 +42,7 @@ describe("loadPage", () => {
 			layout: { header: [], footer: [] },
 			strings: { previewBanner: "Draft preview — this page is not published." },
 		});
-		expect(props.cms.settings["site.name"]).toBe("tbtop demo");
+		expect(props.cms.settings.name).toBe("tbtop demo");
 	});
 
 	test("a non-default locale prefix picks the locale; blank translations fall back", async () => {

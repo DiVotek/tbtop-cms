@@ -11,13 +11,13 @@ import { isWellFormed, linkLabel, parseLink, type ResolvedLink, telNumber } from
 import { firstText, type Page, pageFromRow, translationText } from "./content/page";
 import { Pages, whereLive } from "./content/pages";
 import { livePageRefs, type PageRef, referencedBy, referencedByLinks, resolvePageRefs } from "./content/pageRefs";
-import { hostMediaKeys } from "./content/hostSettings";
 import type { PageTypes } from "./content/pageTypes";
 import { Redirects } from "./content/redirects";
 import { PageRevisions } from "./content/revisions";
 import { richtextHtml } from "./content/richtext";
 import { Settings } from "./content/settings";
 import { SharedBlocks } from "./content/sharedBlocks";
+import { type CmsSettings, settingsObject } from "./content/siteSettings";
 import { namedFormProps } from "./forms/locate";
 import { Submissions } from "./forms/submissions";
 import { Notifications } from "./notifications";
@@ -48,6 +48,8 @@ export class Site {
 	readonly notFound: NotFoundLog;
 	/** Admin writes by a signed-in user (`activity_log`). */
 	readonly audit: AuditLog;
+	/** The settings object by locale, once per request. */
+	private readonly settingsByLocale = new Map<string, Promise<CmsSettings>>();
 	/** Link targets by locale and page id, on a frontend render (`cached`). */
 	private readonly targets: Map<string, Map<number, Promise<LinkTarget>>> | null;
 
@@ -68,8 +70,6 @@ export class Site {
 			cache,
 			secretKeys: config.secretSettings ?? [],
 			secretKey: config.settingsKey,
-			mediaUrl: (ref) => this.mediaUrl(ref),
-			mediaKeys: hostMediaKeys(config),
 		});
 		this.pages = new Pages(
 			db,
@@ -214,6 +214,17 @@ export class Site {
 		return targets;
 	}
 
+	/** The Site settings as one object in `locale` (`ctx.settings()`, `props.cms.settings`), once per request. */
+	settingsIn(locale: string): Promise<CmsSettings> {
+		let loading = this.settingsByLocale.get(locale);
+		if (loading === undefined) {
+			loading = settingsObject(this, locale);
+			this.settingsByLocale.set(locale, loading);
+			loading.catch(() => this.settingsByLocale.delete(locale));
+		}
+		return loading;
+	}
+
 	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}, targets?: LinkTargets, nested = false): Promise<ResolveContext> {
 		const fallback = await this.languages.defaultLocale();
 		return {
@@ -230,6 +241,7 @@ export class Site {
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
+			settings: () => this.settingsIn(locale),
 			site: this,
 		};
 	}

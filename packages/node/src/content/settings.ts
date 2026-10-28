@@ -4,14 +4,11 @@ import type { ContentCache } from "../support/cache";
 import { SecretBox } from "../support/secretBox";
 import { sqlDate } from "../support/values";
 
-/** Keys whose values are media references, turned into URLs for the frontend. */
-const MEDIA_KEYS = ["site.logo", "site.favicon", "seo.default_og_image", "seo.identity.logo"];
-const FRONTEND_PREFIXES = ["site.", "seo."];
-
 /**
  * Dotted-key settings (Settings.php): each value is JSON text. A secret key's
  * JSON is sealed with `settingsKey` (AES-GCM) and never reaches the frontend;
- * without a key a secret reads as the fallback and cannot be written.
+ * without a key a secret reads as the fallback and cannot be written. The
+ * frontend gets them as one object (`settingsObject`), never the rows.
  */
 export class Settings {
 	/** The rows as one promise: concurrent readers of a render share the query. */
@@ -23,9 +20,6 @@ export class Settings {
 		private readonly options: {
 			secretKeys: string[];
 			secretKey?: string;
-			mediaUrl: (ref: string) => string | null;
-			/** Host keys holding media refs besides the package's (host Site-settings uploads). */
-			mediaKeys?: string[];
 			/** Frontend reads go through `store` when `read`; every write bumps it. */
 			cache?: { store: ContentCache; read: boolean } | null;
 		},
@@ -87,23 +81,6 @@ export class Settings {
 		await this.changed(key);
 	}
 
-	/** Every `site.*` and `seo.*` key that is not secret, media keys as URLs (`cms.settings`). */
-	async forFrontend(): Promise<Record<string, unknown>> {
-		const out: Record<string, unknown> = {};
-		for (const [key, raw] of await this.rawAll()) {
-			if (!FRONTEND_PREFIXES.some((prefix) => key.startsWith(prefix)) || this.isSecret(key)) {
-				continue;
-			}
-			try {
-				const value = raw === null ? null : JSON.parse(raw);
-				out[key] = MEDIA_KEYS.includes(key) || (this.options.mediaKeys ?? []).includes(key) ? this.media(value) : value;
-			} catch {
-				console.warn("settings.decode_failed", { key });
-			}
-		}
-		return out;
-	}
-
 	private async seal(key: string, json: string): Promise<string> {
 		if (this.box === null) {
 			throw new Error(`Setting '${key}' is secret: set settingsKey in the CMS config to store it.`);
@@ -117,10 +94,6 @@ export class Settings {
 			console.warn("settings.secret_unreadable", { key });
 		}
 		return plain;
-	}
-
-	private media(value: unknown): string | null {
-		return typeof value === "string" || typeof value === "number" ? this.options.mediaUrl(String(value)) : null;
 	}
 
 	private rawAll(): Promise<Map<string, string | null>> {

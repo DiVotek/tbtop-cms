@@ -5,6 +5,7 @@ export {
 	type BlockProps,
 	block,
 	blockProps,
+	defineSettings,
 	defineSite,
 	type FormProps,
 	formBlock,
@@ -13,9 +14,12 @@ export {
 	pageType,
 	type SeoExtend,
 	type SeoHelpers,
+	type SettingsOf,
+	type SettingsTabs,
 	type Site,
 	type SiteCatalog,
 	type SiteDef,
 	type SitePageTypes,
+	type SiteSettings,
 } from "./define";
 export { type CmsFields, F, f, type Fields, formOf, type Output, zodOf } from "./fields";
