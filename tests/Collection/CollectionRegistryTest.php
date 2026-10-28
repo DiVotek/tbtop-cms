@@ -90,3 +90,59 @@ it('rejects a collection field nested in a repeater', function (): void {
 
     bootRegistryWith([$class]);
 })->throws(InvalidArgumentException::class, 'cannot hold another collection field');
+
+it('rejects a title field the form does not have', function (): void {
+    $class = get_class(collectionNamed('x'));
+    app()->bind($class, fn () => new class extends Collection
+    {
+        public function key(): string
+        {
+            return 'things';
+        }
+
+        public function label(): string
+        {
+            return 'Things';
+        }
+
+        public function fields(S $s): array
+        {
+            return [$s->text('name')];
+        }
+
+        public function titleField(): string
+        {
+            return 'nmae';
+        }
+    });
+
+    bootRegistryWith([$class]);
+})->throws(InvalidArgumentException::class, 'title field "nmae" is not a field of its form');
+
+it('rejects a related field that is not a pages field', function (): void {
+    $class = get_class(collectionNamed('x'));
+    app()->bind($class, fn () => new class extends Collection
+    {
+        public function key(): string
+        {
+            return 'things';
+        }
+
+        public function label(): string
+        {
+            return 'Things';
+        }
+
+        public function fields(S $s): array
+        {
+            return [$s->text('name')];
+        }
+
+        public function relatedField(): ?string
+        {
+            return 'name';
+        }
+    });
+
+    bootRegistryWith([$class]);
+})->throws(InvalidArgumentException::class, 'related field "name" is not a pages field of its form');

@@ -9,6 +9,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\StructureWalk;
 use Tbtop\Cms\Admin\Fields\CollectionField;
+use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Collection\BuiltIn\Offices;
 use Tbtop\Cms\Collection\BuiltIn\Socials;
 
@@ -129,6 +130,15 @@ class CollectionRegistry
                 throw new InvalidArgumentException("Collection [{$collection->key()}]: the field name \"{$field->name}\" is reserved.");
             }
         }
+        // A typo in an overridden titleField()/relatedField() would leave every entry untitled or unrelated, silently.
+        $names = $collection->fieldNames();
+        if ($names !== [] && ! in_array($collection->titleField(), $names, true)) {
+            throw new InvalidArgumentException("Collection [{$collection->key()}]: the title field \"{$collection->titleField()}\" is not a field of its form.");
+        }
+        $related = $collection->relatedField();
+        if ($related !== null && ! in_array($related, self::pagesFields($fields), true)) {
+            throw new InvalidArgumentException("Collection [{$collection->key()}]: the related field \"{$related}\" is not a pages field of its form.");
+        }
         // An entry is resolved once per locale and cached whole; an entry picking other entries, at any depth, would nest those caches.
         foreach ($fields as $root) {
             $nested = StructureWalk::find($root, static fn (mixed $node): bool => $node instanceof CollectionField);
@@ -136,5 +146,21 @@ class CollectionRegistry
                 throw new InvalidArgumentException("Collection [{$collection->key()}]: a collection field cannot hold another collection field (\"{$nested->name}\").");
             }
         }
+    }
+
+    /**
+     * @param  list<mixed>  $fields
+     * @return list<string>
+     */
+    private static function pagesFields(array $fields): array
+    {
+        $names = [];
+        foreach ($fields as $field) {
+            if ($field instanceof Pages) {
+                $names[] = $field->name;
+            }
+        }
+
+        return $names;
     }
 }
