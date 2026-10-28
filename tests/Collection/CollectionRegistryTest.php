@@ -80,3 +80,13 @@ it('rejects a collection field inside a collection', function (): void {
 
     bootRegistryWith([$class]);
 })->throws(InvalidArgumentException::class, 'cannot hold another collection field');
+
+it('rejects a collection field nested in a repeater', function (): void {
+    $class = get_class(collectionNamed('x'));
+    app()->bind($class, fn () => collectionNamed('things', [
+        (new S)->text('name'),
+        (new S)->repeater('rows')->fields([(new S)->collection('more')->of('review')]),
+    ]));
+
+    bootRegistryWith([$class]);
+})->throws(InvalidArgumentException::class, 'cannot hold another collection field');

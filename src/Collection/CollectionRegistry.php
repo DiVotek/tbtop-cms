@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Collection;
 use InvalidArgumentException;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Admin\Dsl\StructureWalk;
 use Tbtop\Cms\Admin\Fields\CollectionField;
 use Tbtop\Cms\Collection\BuiltIn\Offices;
 use Tbtop\Cms\Collection\BuiltIn\Socials;
@@ -122,16 +123,17 @@ class CollectionRegistry
 
     private static function assertFields(Collection $collection): void
     {
-        foreach (S::normalizeChildren($collection->fields(new S)) as $field) {
-            if (! $field instanceof Field) {
-                continue;
-            }
-            if (in_array($field->name, self::RESERVED_FIELDS, true)) {
+        $fields = S::normalizeChildren($collection->fields(new S));
+        foreach ($fields as $field) {
+            if ($field instanceof Field && in_array($field->name, self::RESERVED_FIELDS, true)) {
                 throw new InvalidArgumentException("Collection [{$collection->key()}]: the field name \"{$field->name}\" is reserved.");
             }
-            // An entry is resolved once per locale and cached whole; an entry picking other entries would nest those caches.
-            if ($field instanceof CollectionField) {
-                throw new InvalidArgumentException("Collection [{$collection->key()}]: a collection field cannot hold another collection field (\"{$field->name}\").");
+        }
+        // An entry is resolved once per locale and cached whole; an entry picking other entries, at any depth, would nest those caches.
+        foreach ($fields as $root) {
+            $nested = StructureWalk::find($root, static fn (mixed $node): bool => $node instanceof CollectionField);
+            if ($nested instanceof CollectionField) {
+                throw new InvalidArgumentException("Collection [{$collection->key()}]: a collection field cannot hold another collection field (\"{$nested->name}\").");
             }
         }
     }
