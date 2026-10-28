@@ -6,9 +6,7 @@ namespace Tbtop\Cms\Page\Refs;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
@@ -54,20 +52,13 @@ final readonly class EmptyArchives
         return $query;
     }
 
-    /** Index rows of live pages picking $targetId (any target when null) through $field. */
+    /** Index rows of live pages (Page::live(), the listings' own rule) picking $targetId (any target when null) through $field. */
     private function referrers(string $field, ?int $targetId, ?QueryBuilder $query = null): QueryBuilder
     {
-        $now = Carbon::now();
-        $pages = (new Page)->getTable();
-
         $query = ($query ?? DB::query())->select('r.page_id')
             ->from(PageRefIndex::TABLE, 'r')
-            ->join("{$pages} as s", 's.id', '=', 'r.page_id')
             ->where('r.field', $field)
-            ->whereNull('s.deleted_at')
-            ->where('s.status', PageStatus::Published->value)
-            ->where(static fn (QueryBuilder $q): QueryBuilder => $q->whereNull('s.published_at')->orWhere('s.published_at', '<=', $now))
-            ->where(static fn (QueryBuilder $q): QueryBuilder => $q->whereNull('s.unpublish_at')->orWhere('s.unpublish_at', '>', $now));
+            ->whereIn('r.page_id', Page::query()->live()->select('id')->toBase());
 
         return $targetId === null ? $query : $query->where('r.target_id', $targetId);
     }

@@ -83,6 +83,10 @@ final class Pages extends Select
             return parent::creatable($fields, $using);
         }
 
+        if ($fields !== []) {
+            throw new InvalidArgumentException('pages()->creatable($fields) needs a $using closure: without one the CMS creates the page from a name.');
+        }
+
         $this->opts[self::CREATES] = true;
 
         return parent::creatable(

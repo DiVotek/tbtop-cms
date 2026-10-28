@@ -59,7 +59,7 @@ final class PageQuickCreate
     private static function sameName(string $type, ?string $subtype, string $name, string $locale): ?array
     {
         $wanted = mb_strtolower($name);
-        $pages = Page::query()->where('type', $type)->where('subtype', $subtype)->latest('id')->get();
+        $pages = Page::query()->where('type', $type)->where('subtype', $subtype)->latest('id')->get(['id', 'name']);
 
         foreach ($pages as $page) {
             $own = $page->getTranslation('name', $locale, false);

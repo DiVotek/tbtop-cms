@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Tbtop\Admin\Dsl\Fields\Text;
+use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
@@ -164,4 +166,9 @@ it('pages the children of a category the same way', function (): void {
 
     expect(array_column($page['items'], 'name'))->toBe(['One'])
         ->and($page['pagination'])->toBe(['page' => 2, 'pages' => 2, 'total' => 3, 'perPage' => 2]);
+});
+
+it('refuses creatable() fields without a closure: the CMS makes the page from a name', function (): void {
+    expect(fn () => Pages::make('tags')->creatable([Text::make('code')]))
+        ->toThrow(InvalidArgumentException::class);
 });
