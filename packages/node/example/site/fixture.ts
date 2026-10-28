@@ -17,6 +17,7 @@ export const fixture: Fixture = {
 				{ kind: "Hero", data: { title: { uk: "Divotek", en: "Divotek" }, cta: { type: "external", value: "https://divotek.com.ua/audit", label: { uk: "Аудит", en: "Audit" } } } },
 				{ kind: "Promo", data: { title: { uk: "Замовити аудит", en: "Order an audit" }, cta: { type: "external", value: "https://divotek.com.ua/audit", label: { uk: "Так", en: "Yes" } } } },
 				{ kind: "Faq", data: { heading: { uk: "Питання", en: "FAQ" }, items: [{ question: { uk: "Скільки?", en: "How much?" }, answer: { uk: "Від 1200 грн", en: "From 1200 UAH" } }] } },
+				{ kind: "Contacts", data: { heading: { uk: "Контакти", en: "Contacts" } } },
 				{ kind: "Callback", data: { heading: { uk: "Передзвонимо", en: "We call back" }, button: { uk: "Чекаю", en: "Call me" } } },
 			],
 		},

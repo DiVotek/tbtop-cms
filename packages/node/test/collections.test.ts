@@ -312,11 +312,11 @@ describe("collections: the site file", () => {
 		const people = collection({ name: f.text().required(), photo: f.image() }, { label: "Team" });
 		const site = defineSite({
 			collections: { team: people },
-			blocks: { Team: block({ members: f.collection(people, { max: 8 }), lead: f.collection(people, { single: true }), offices: f.collection("offices") }) },
+			blocks: { Team: block({ members: f.collection(people, { max: 8 }), lead: f.collection(people, { single: true }), phones: f.collection("phones") }) },
 		});
 		const props = site.catalog.Team.props;
-		expect(props.safeParse({ members: [{ id: 1, name: "Ann", photo: null }], lead: null, offices: [{ id: 2, anything: true }] }).success).toBe(true);
-		expect(props.safeParse({ members: [{ name: "Ann", photo: null }], lead: null, offices: [] }).success).toBe(false);
+		expect(props.safeParse({ members: [{ id: 1, name: "Ann", photo: null }], lead: null, phones: [{ id: 2, anything: true }] }).success).toBe(true);
+		expect(props.safeParse({ members: [{ name: "Ann", photo: null }], lead: null, phones: [] }).success).toBe(false);
 
 		const cms = { link: () => null, pages: () => null, collection: collectionField } as never;
 		const [def] = collectionDefs(site.def, cms);

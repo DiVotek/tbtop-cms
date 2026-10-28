@@ -26,7 +26,7 @@ own database, `tbtop_test_*`, which is left behind: drop them for a clean
 server. On MySQL, `TIMESTAMP` columns end in 2038, as in the PHP package.
 
 The suites run on Bun (`bun:test`, `bun:sqlite`). The package itself runs on
-Node 20+ too: the workbench's E2E job serves it from Node (`vite preview`).
+Node 22+ too: the workbench's E2E job serves it from Node (`vite preview`).
 
 ## Workbench (TanStack Start)
 
@@ -99,6 +99,24 @@ export default cloudflare(site, { render, renderError });
 
 `page.fields.readingTime` is `number | null` in `render` without a hand-written
 type. A form block gets `action` and `honeypotField` props: post the form there.
+
+**Block props from `resolve`.** The fields are the editor's input; the props
+are what the component gets. Without `resolve` they are the same. With it, the
+props are what `resolve` returns, and their type comes from that return:
+
+```ts
+Contacts: block({ heading: f.text().translatable() }, {
+	// `fields` is the fields resolved and parsed: { heading: string | null }
+	resolve: async (fields, ctx) => ({ heading: fields.heading ?? "", phone: String(await ctx.site.settings.get("site.phone", "")) }),
+}),
+
+// the component, in the browser
+import type { BlockProps } from "@tbtop/cms/site";
+function Contacts(props: BlockProps<typeof site, "Contacts">) { /* { heading: string; phone: string } */ }
+```
+
+No zod schema follows from a function, so the catalog checks no shape for a
+block with `resolve` (any object passes): its return type is the check.
 
 **Fields (`f.*`).** `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
 `select(options)` (one value or null), `select(options, { multiple: true })`
@@ -841,7 +859,7 @@ in `tbtop_notification_templates`.
 
 ## Deploy
 
-On a VPS (Node 20+ or Bun), run `tbtop-cms migrate` on each release and
+On a VPS (Node 22+ or Bun), run `tbtop-cms migrate` on each release and
 `tbtop-cms scheduled` from cron every minute; both read the default export
 of `cms.config.{ts,mts,js,mjs}` (or `--config`). The build only needs
 `node:async_hooks` (from `@tbtop/admin`'s request context) outside the CLI.

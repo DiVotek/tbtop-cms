@@ -10,7 +10,7 @@ import { app } from "../example/site/node";
 import { site } from "../example/site/site";
 import worker from "../example/site/worker";
 import type { CloudflareEnv, ExecutionContext } from "../src/cloudflare";
-import { block, defineSite, f, pageType } from "../src/define";
+import { type BlockProps, block, defineSite, f, pageType } from "../src/define";
 import { pageTypeDefs } from "../src/define/define";
 import { writeD1Migrations } from "../src/cli/d1";
 import { D1_SCHEMA } from "../src/db/d1Migrations";
@@ -149,9 +149,11 @@ function checks(start: () => Promise<Host>): void {
 		expect(res.status).toBe(200);
 		expect(body).toContain("<h1>Головна</h1>");
 		expect(body).toContain('class="fields">Сайти, що продають<');
-		for (const kind of ["Hero", "Promo", "Faq"]) {
+		for (const kind of ["Hero", "Promo", "Faq", "Contacts"]) {
 			expect(body).toContain(`data-kind="${kind}"`);
 		}
+		// A block's resolve gets its fields resolved, and its return is the props.
+		expect(body).toContain(JSON.stringify({ heading: "Контакти", phone: "+380 44 000 00 00" }).replaceAll('"', "&#34;"));
 		expect(body).toContain("https://divotek.com.ua/audit");
 		expect(jsonLd(body).find((node) => node["@type"] === "FAQPage")?.mainEntity?.[0]?.name).toBe("Скільки?");
 	});
@@ -224,6 +226,16 @@ describe("defineSite", () => {
 		expect(props.safeParse({ title: "Hi", cta: null }).success).toBe(true);
 		expect(props.safeParse({ title: 1, cta: null }).success).toBe(false);
 		expect(site.catalog.Callback.props.safeParse({ heading: null, button: null, action: "/_cms/forms/x" }).success).toBe(true);
+	});
+
+	test("a block with resolve: the catalog takes any object, the props type is its return", () => {
+		expect(site.catalog.Contacts.props.safeParse({ heading: "Hi", phone: "1", extra: true }).success).toBe(true);
+		const props: BlockProps<typeof site, "Contacts"> = { heading: "Hi", phone: "1" };
+		// @ts-expect-error phone is a string, from resolve's return
+		const wrong: BlockProps<typeof site, "Contacts"> = { heading: "Hi", phone: 1 };
+		// @ts-expect-error a block without resolve keeps its fields' type
+		const promo: BlockProps<typeof site, "Promo"> = { title: 1, cta: null };
+		expect([props, wrong, promo]).toHaveLength(3);
 	});
 
 	test("a bare field record and pageType() both declare a page type, even with fields named `fields` and `options`", () => {
