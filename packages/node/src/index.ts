@@ -4,6 +4,11 @@ export type { PageRefWithFields, ResolveContext } from "./blocks/context";
 export type { PageColumns, PageView } from "./frontend/pageView";
 export { resolveForm } from "./blocks/fields";
 export { LinkField, linkField, PagesField, pagesField, type StoredLink } from "./blocks/cmsFields";
+export { CollectionField, collectionField, type CollectionValue, PICK_MODES, type PickMode } from "./blocks/collectionField";
+export { type Collection, type CollectionDef, Collections } from "./content/collections";
+export { BUILT_IN_COLLECTIONS, EMAILS, emailsCollection, PHONES, phonesCollection, SOCIALS, socialsCollection } from "./content/builtInCollections";
+export { ENTRY_DRAFT, ENTRY_PUBLISHED, type Entry, EntryConflictError, Entries, type EntryStatus } from "./content/entries";
+export { EntryList, type ResolvedEntry } from "./content/entryList";
 export {
 	type BlockImpl,
 	type BlockKind,
@@ -37,7 +42,7 @@ export type { LinkType, ResolvedLink } from "./content/link";
 export { definePageType, type PageType, type PageTypeDef } from "./content/pageTypes";
 export { RedirectError } from "./content/redirects";
 export { richtextHtml } from "./content/richtext";
-export { baselineMigration, cmsMigrations, type Dialect, type MigrationOptions, migrateCms } from "./db/migrations";
+export { baselineMigration, cmsMigrations, entriesMigration, type Dialect, type MigrationOptions, migrateCms } from "./db/migrations";
 export { type D1Migration, type D1MigrationOptions, d1Migrations } from "./db/d1Migrations";
 export type { CmsDatabase } from "./db/schema";
 export { demoFixture } from "./fixtures/demo";

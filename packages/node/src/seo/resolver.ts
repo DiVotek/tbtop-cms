@@ -336,7 +336,7 @@ async function jsonLd(
 }
 
 async function identityNode(site: Site, locale: string): Promise<Record<string, unknown> | null> {
-	const identity = new SiteIdentity(site.settings);
+	const identity = new SiteIdentity(site.settings, site.contacts);
 	const type = await identity.type();
 	const name = await identity.name();
 	if (type === "none" || name === "") {

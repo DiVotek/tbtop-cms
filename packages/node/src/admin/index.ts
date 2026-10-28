@@ -3,6 +3,7 @@ import type { Cms } from "../cms";
 import { allows, gated } from "./abilities";
 import { auditActivity, auditLog } from "./audit";
 import { blocksShowcase } from "./blocks";
+import { collectionHostRules, collectionPages } from "./collections";
 import { dashboard } from "./dashboard";
 import { layoutEdit, layoutIndex, redirectsIndex, sharedBlockEdit, sharedBlocksIndex } from "./design";
 import { submissionsIndex, submissionView } from "./forms";
@@ -36,15 +37,15 @@ export type CmsAdmin = {
 	panel: CmsPanelLook;
 	/** Request context for createAdmin({ context }): content locales from the admin-active languages. */
 	context: (request: Request) => Promise<Partial<AdminContext>>;
-	/** The host's `hostRules` plus the link and pages fields' (`link_shape`, `page_ref`): createAdmin({ hostRules: cms.admin.hostRules }); form submits use the same set. */
+	/** The host's `hostRules` plus the link, pages and collection fields' (`link_shape`, `page_ref`, `collection_value`): createAdmin({ hostRules: cms.admin.hostRules }); form submits use the same set. */
 	hostRules: Record<string, HostRule>;
 };
 
 export function adminPages(cms: Cms): CmsAdmin {
-	const own = cmsHostRules(cms);
+	const own = { ...cmsHostRules(cms), ...collectionHostRules(cms) };
 	for (const name of Object.keys(cms.config.hostRules ?? {})) {
 		if (Object.hasOwn(own, name)) {
-			throw new TypeError(`hostRules.${name} is the CMS's own rule (the link and pages fields'): give the host's rule another name.`);
+			throw new TypeError(`hostRules.${name} is the CMS's own rule (the link, pages and collection fields'): give the host's rule another name.`);
 		}
 	}
 	return {
@@ -64,6 +65,7 @@ export function adminPages(cms: Cms): CmsAdmin {
 			gated(cms, "tbtop-cms.design", sharedBlocksIndex(cms)),
 			gated(cms, "tbtop-cms.design", sharedBlockEdit(cms)),
 			gated(cms, "tbtop-cms.design", blocksShowcase(cms)),
+			...collectionPages(cms),
 			gated(cms, "tbtop-cms.languages", languagesIndex(cms)),
 			gated(cms, "tbtop-cms.languages", languageNew(cms)),
 			gated(cms, "tbtop-cms.languages", languageEdit(cms)),

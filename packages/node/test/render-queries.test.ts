@@ -59,13 +59,14 @@ describe("a page render's database round trips", () => {
 	test("the home page and a category with children wait on a few sequential queries, not one per lookup", async () => {
 		const { render } = await site();
 		// Before batching: `/` 10 queries in 11 round trips, `/blog` 13 in 13.
+		// One more each since collections: the published entries (the phones, emails and socials for `cms.settings`), next to the settings.
 		const home = await render("/");
 		expect(home.type).toBe("page");
-		expect(home.queries.length).toBeLessThanOrEqual(7);
+		expect(home.queries.length).toBeLessThanOrEqual(8);
 		expect(home.roundTrips).toBeLessThanOrEqual(6);
 		const blog = await render("/blog");
 		expect(blog.type).toBe("page");
-		expect(blog.queries.length).toBeLessThanOrEqual(9);
+		expect(blog.queries.length).toBeLessThanOrEqual(10);
 		expect(blog.roundTrips).toBeLessThanOrEqual(7);
 	});
 });

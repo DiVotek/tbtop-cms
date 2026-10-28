@@ -197,7 +197,8 @@ describe("admin section abilities (q02)", () => {
 			},
 			() => editor,
 		);
-		expect(navLabels((await page("/admin/pages")).props)).toEqual(["Pages"]);
+		// The Collections page answers to the pages ability, as in PHP.
+		expect(navLabels((await page("/admin/pages")).props)).toEqual(["Pages", "Collections"]);
 		for (const url of ["/admin/redirects", "/admin/layout", "/admin/blocks", "/admin/site-health", "/admin/audit", "/admin/layout/header", "/admin/shared-blocks", "/admin/languages", "/admin/settings/site", "/admin/settings/seo", "/admin/notification-settings"]) {
 			expect([url, (await visit(url)).status]).toEqual([url, 403]);
 		}

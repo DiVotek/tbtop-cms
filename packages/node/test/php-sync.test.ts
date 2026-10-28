@@ -238,8 +238,8 @@ describe("an upgraded database moves page titles into SEO (#326)", () => {
 		expect(await seo(3)).toBeNull();
 		expect(Object.keys((await db.selectFrom("tbtop_pages").selectAll().where("id", "=", 1).executeTakeFirst()) ?? {})).not.toContain("title");
 
-		// Rolling back brings the column back, filled from the meta titles.
-		expect((await migrator.migrateDown()).error).toBeUndefined();
+		// Rolling back to the baseline brings the column back, filled from the meta titles.
+		expect((await migrator.migrateTo("2026_10_22_000000_tbtop_cms_baseline")).error).toBeUndefined();
 		const back = (await (db as unknown as Kysely<{ tbtop_pages: { id: number; title: unknown } }>).selectFrom("tbtop_pages").select(["id", "title"]).orderBy("id").execute()).map((row) =>
 			typeof row.title === "string" ? JSON.parse(row.title) : row.title,
 		);

@@ -1,11 +1,13 @@
 import { definePage, Effects, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
+import { EMAILS, PHONES, SOCIALS } from "../content/builtInCollections";
 import { tabFields } from "../content/hostSettings";
 import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
+import { collectionListUrl } from "./linkFields";
 import { adminPrefix, editFooter, listHeader, NAV, siteOf } from "./support";
 
 /** A settings page (SettingsPageBase): form fields mapped to dotted settings keys. */
@@ -19,8 +21,6 @@ function settingsPage(
 		map: Record<string, string>;
 		fields: (s: S) => unknown[];
 		defaults?: Dict;
-		/** Repeater fields stored as trimmed rows of these keys, an empty list included (cleanRows). */
-		rows?: Record<string, string[]>;
 		/** A save-time check that may rewrite the form (normalizeForm + validateForm): an error message rejects the whole save. */
 		prepare?: (form: Dict, site: Site) => string | null | Promise<string | null>;
 	},
@@ -48,12 +48,6 @@ function settingsPage(
 				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
 					const form = { ...(ctx.form as Dict) };
-					const rows = options.rows ?? {};
-					for (const [field, keys] of Object.entries(rows)) {
-						if (field in form) {
-							form[field] = cleanRows(form[field], keys);
-						}
-					}
 					const rejected = (await options.prepare?.(form, site)) ?? null;
 					if (rejected !== null) {
 						return Effects.make().notify(rejected, "error");
@@ -62,7 +56,7 @@ function settingsPage(
 						if (!(field in form)) {
 							continue;
 						}
-						const value = field in rows ? form[field] : normalize(form[field]);
+						const value = normalize(form[field]);
 						if (value === null) {
 							await site.settings.forget(key);
 						} else {
@@ -90,40 +84,10 @@ function normalize(value: unknown): unknown {
 	return value ?? null;
 }
 
-/** SiteSettingsPage::cleanRows: each row keeps only its own trimmed, non-blank keys; empty rows go. */
-function cleanRows(value: unknown, keys: string[]): Dict[] {
-	const clean: Dict[] = [];
-	for (const row of Array.isArray(value) ? value : []) {
-		if (typeof row !== "object" || row === null) {
-			continue;
-		}
-		const values: Dict = {};
-		for (const key of keys) {
-			const cell = (row as Dict)[key];
-			if (typeof cell === "string" && cell.trim() !== "") {
-				values[key] = cell.trim();
-			}
-		}
-		if (Object.keys(values).length > 0) {
-			clean.push(values);
-		}
-	}
-	return clean;
-}
-
-/** The `requiredWith` pair on a social row: once any field is filled, the label and the link are required. */
-function socialsComplete(form: Dict): string | null {
-	const socials = Array.isArray(form.socials) ? (form.socials as Dict[]) : [];
-	return socials.every((row) => "label" in row && "href" in row) ? null : "Each social profile needs a short label and a link.";
-}
-
 const SITE_MAP: Record<string, string> = {
 	site_name: "site.name",
 	site_logo: "site.logo",
 	site_favicon: "site.favicon",
-	phones: "site.contacts.phones",
-	emails: "site.contacts.emails",
-	socials: "site.contacts.socials",
 };
 
 /** The host tabs' fields by name, each at `site.<name>`; a name the page already uses (or its key) throws. */
@@ -148,8 +112,6 @@ export function siteSettings(cms: Cms) {
 		subtitle: "General site identity: name, logo, and favicon.",
 		nav: { label: "Site settings", icon: "settings", order: 20 },
 		map: { ...SITE_MAP, ...hostSiteMap(cms) },
-		rows: { phones: ["number"], emails: ["address"], socials: ["label", "name", "href"] },
-		prepare: socialsComplete,
 		fields: (s) => [
 			s.tabs([
 				{
@@ -165,16 +127,17 @@ export function siteSettings(cms: Cms) {
 				{
 					label: "Contacts",
 					children: [
-						s.repeater("phones").label("Phones").fields([s.text("number").label("Number").placeholder("+380 44 000 00 00").rules("nullable|max:40")]),
-						s.repeater("emails").label("Emails").fields([s.text("address").label("Address").rules("nullable|email|max:190")]),
 						s
-							.repeater("socials")
-							.label("Social profiles")
-							.fields([
-								s.text("label").label("Short label").placeholder("TG").rules("nullable|max:8"),
-								s.text("name").label("Name").placeholder("Telegram").rules("nullable|max:40"),
-								s.text("href").label("Link").rules("nullable|url|max:255"),
-							]),
+							.displayText("Phones, emails and social profiles for the header, footer and contact blocks are kept on the Collections page. The first phone and email, and every social link, also feed the SEO identity markup.")
+							.variant("muted"),
+						s.flex(
+							[
+								s.action("openPhones").label("Phones").icon("phone").url(collectionListUrl(cms, PHONES)),
+								s.action("openEmails").label("Emails").icon("mail").url(collectionListUrl(cms, EMAILS)),
+								s.action("openSocials").label("Social links").icon("share-2").url(collectionListUrl(cms, SOCIALS)),
+							],
+							{ align: "center" },
+						),
 					],
 				},
 				...(cms.config.siteSettings?.tabs(s) ?? []),

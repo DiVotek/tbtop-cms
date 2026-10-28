@@ -14,7 +14,20 @@ const SEARCH_LIMIT = 50;
 /** The page search the link field's page picker posts `{search}` / `{value}` to (LinkPageSearchRoute). */
 export const linkSearchEndpoint = (cms: Cms): string => `${adminPrefix(cms)}/${SEARCH_PATH}/select-options/${SEARCH_FIELD}`;
 
-export const fieldBinding = (cms: Cms): CmsFieldBinding => ({ site: cms.site(), searchEndpoint: linkSearchEndpoint(cms) });
+/** A collection's entry list in the admin; its entry search sits under it. */
+/** One collection's own admin URLs (its entry editor, its entry search) start here. */
+export const collectionBaseUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections/${key}`;
+/** The Collections page with this collection's tab open. */
+export const collectionListUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections?${new URLSearchParams({ "tab[collections]": key })}`;
+export const ENTRY_SEARCH_FIELD = "entry";
+/** The picker of a `collection` field posts `{search}` / `{values}` here (EntrySearchRoute). */
+export const entrySearchEndpoint = (cms: Cms, key: string): string => `${collectionBaseUrl(cms, key)}/entry-search/select-options/${ENTRY_SEARCH_FIELD}`;
+
+export const fieldBinding = (cms: Cms): CmsFieldBinding => ({
+	site: cms.site(),
+	searchEndpoint: linkSearchEndpoint(cms),
+	entrySearchEndpoint: (collection) => entrySearchEndpoint(cms, collection),
+});
 
 /** EditorLocales::list: the default language first, then the admin-active ones. */
 async function editorLocales(site: Site): Promise<string[]> {
@@ -25,7 +38,8 @@ async function editorLocales(site: Site): Promise<string[]> {
 /**
  * The validation rules the link and pages fields declare, for
  * createAdmin({ hostRules }): `link_shape` (LinkShapeValidator) and
- * `page_ref` (PageRefRule) both look pages up in the CMS database.
+ * `page_ref` (PageRefRule) look pages up in the CMS database. The
+ * collection field's rule is collectionHostRules.
  */
 export function cmsHostRules(cms: Cms): Record<string, HostRule> {
 	return {

@@ -410,12 +410,41 @@ async function copyTitles(db: Kysely<unknown>): Promise<void> {
 	}
 }
 
+/** PHP 2026_10_28_000000: collection entries (Collection.php), one table for every collection. */
+export function entriesMigration(options: MigrationOptions): Migration {
+	const t = types(options.dialect);
+	return {
+		async up(db: Kysely<unknown>) {
+			await db.schema
+				.createTable("tbtop_entries")
+				.addColumn("id", t.id, (c) => {
+					const key = c.primaryKey();
+					return options.dialect === "postgres" ? key : key.autoIncrement();
+				})
+				.addColumn("collection", "varchar(64)", (c) => c.notNull())
+				.addColumn("data", t.json, (c) => c.notNull())
+				.addColumn("title", "varchar(255)", (c) => c.notNull().defaultTo(""))
+				.addColumn("status", "varchar(16)", (c) => c.notNull().defaultTo("draft"))
+				.addColumn("sort_order", "integer", (c) => c.notNull().defaultTo(0))
+				.addColumn("lock_version", "integer", (c) => c.notNull().defaultTo(0))
+				.addColumn("created_at", t.stamp)
+				.addColumn("updated_at", t.stamp)
+				.execute();
+			await db.schema.createIndex("tbtop_entries_collection_sort_order_index").on("tbtop_entries").columns(["collection", "sort_order"]).execute();
+		},
+		async down(db: Kysely<unknown>) {
+			await db.schema.dropTable("tbtop_entries").ifExists().execute();
+		},
+	};
+}
+
 /** A Kysely MigrationProvider: merge it into the host's own migrations, or run `migrateCms`. */
 export function cmsMigrations(options: MigrationOptions): MigrationProvider {
 	return {
 		getMigrations: async () => ({
 			"2026_10_22_000000_tbtop_cms_baseline": baselineMigration(options),
 			"2026_10_27_000000_tbtop_page_title_to_seo": pageTitleToSeoMigration(options),
+			"2026_10_28_000000_tbtop_entries": entriesMigration(options),
 		}),
 	};
 }

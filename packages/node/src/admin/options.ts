@@ -4,6 +4,31 @@ import type { Cms } from "../cms";
 import { adminLocale, adminLocales, profileLocaleHooks } from "./locales";
 import { adminPrefix } from "./support";
 
+type Driver = NonNullable<AdminConfig["driver"]>;
+
+/**
+ * A drag reorder writes `sort_order` through the driver, past the entries
+ * store (EntryBuilder::update): a write to `tbtop_entries` there also bumps
+ * the content cache, so the site sees the new order.
+ */
+function entriesAware(driver: Driver, changed: () => Promise<void>): Driver {
+	return {
+		...driver,
+		update: async (query, key, values) => {
+			await driver.update(query, key, values);
+			if (fromTable(query) === "tbtop_entries") {
+				await changed();
+			}
+		},
+	};
+}
+
+/** The driver gets the table's row query (a select), not an update builder: its table is the `from`. */
+function fromTable(query: unknown): string | null {
+	const node = (query as { toOperationNode?: () => { from?: { froms?: { table?: { identifier?: { name?: string } } }[] } } }).toOperationNode?.();
+	return node?.from?.froms?.[0]?.table?.identifier?.name ?? null;
+}
+
 /** The host's pages after the CMS's, or a function that gets the CMS's (auth pages included) and returns the panel's. */
 export type CmsAdminPages = PageDef[] | ((cmsPages: PageDef[]) => PageDef[]);
 
@@ -29,7 +54,7 @@ export function adminOptions(cms: Cms, options: CmsAdminOptions = {}): CmsAdminC
 		...admin.panel,
 		prefix: adminPrefix(cms),
 		pages,
-		driver: kyselyDriver(config.db),
+		driver: entriesAware(kyselyDriver(config.db), () => cms.site().entries.changed()),
 		hostRules: admin.hostRules,
 		context: admin.context,
 		locales: adminLocales(config),

@@ -98,6 +98,17 @@ export type SharedBlocksTable = Stamps & {
 	lock_version: Generated<number>;
 };
 
+export type EntriesTable = Stamps & {
+	id: Generated<number>;
+	collection: string;
+	data: Json;
+	/** The title field's text in the default locale, kept on every save: admin search and pickers. */
+	title: Generated<string>;
+	status: Generated<string>;
+	sort_order: Generated<number>;
+	lock_version: Generated<number>;
+};
+
 export type PageRefsTable = {
 	id: Generated<number>;
 	page_id: number;
@@ -220,6 +231,7 @@ export type CmsDatabase = {
 	tbtop_layouts: LayoutsTable;
 	tbtop_shared_blocks: SharedBlocksTable;
 	tbtop_page_refs: PageRefsTable;
+	tbtop_entries: EntriesTable;
 	tbtop_page_revisions: PageRevisionsTable;
 	tbtop_user_profiles: UserProfilesTable;
 	tbtop_form_submissions: FormSubmissionsTable;

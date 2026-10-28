@@ -3,6 +3,7 @@ import type { ResolvedLink } from "../content/link";
 import type { Page, TranslatableField } from "../content/page";
 import type { PageRef } from "../content/pageRefs";
 import type { PageColumns } from "../frontend/pageView";
+import type { EntryList } from "../content/entryList";
 import type { CmsSettings } from "../content/siteSettings";
 import type { Site } from "../site";
 
@@ -35,6 +36,8 @@ export type ResolveContext = {
 	pages(value: unknown, options: { fields: true }): Promise<PageRefWithFields[]>;
 	/** The live pages whose page-type pages field `field` picks this page (Cms::referencedByLinks), only of type or subtype `from` when given. */
 	referencedBy(field: string, from?: string): Promise<PageRef[]>;
+	/** A collection's published entries in this locale (Cms::collection), filtered in memory. */
+	collection(key: string): Promise<EntryList>;
 	/** A translatable page column as text, locale then fallback. */
 	pageText(field: TranslatableField): string | null;
 	/** A package string (`forms.contact.heading`) in this locale. */

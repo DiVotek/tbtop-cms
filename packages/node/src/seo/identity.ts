@@ -1,4 +1,5 @@
 import type { Settings } from "../content/settings";
+import type { SiteContacts } from "../content/siteContacts";
 import { localizedWithFallback } from "./localized";
 
 export const ORGANISATION_TYPES = ["organization", "online_store", "local_business"];
@@ -26,9 +27,12 @@ const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The site's schema.org identity from `seo.identity.*` (SiteIdentity.php). */
+/** The site's schema.org identity from `seo.identity.*`; telephone, email and sameAs from the contact collections (SiteIdentity.php). */
 export class SiteIdentity {
-	constructor(private readonly settings: Settings) {}
+	constructor(
+		private readonly settings: Settings,
+		private readonly contacts: SiteContacts,
+	) {}
 
 	async type(): Promise<string> {
 		return this.settings.string("seo.identity.type", "none");
@@ -64,8 +68,8 @@ export class SiteIdentity {
 		}
 		const out: Record<string, unknown> = {};
 		const legalName = await this.text("seo.identity.legal_name");
-		const telephone = (await this.column("site.contacts.phones", "number"))[0] ?? "";
-		const email = (await this.column("site.contacts.emails", "address"))[0] ?? "";
+		const telephone = (await this.contacts.phones(locale))[0] ?? "";
+		const email = (await this.contacts.emails(locale))[0] ?? "";
 		for (const [key, value] of Object.entries({ legalName, telephone, email })) {
 			if (value !== "") {
 				out[key] = value;
@@ -89,18 +93,9 @@ export class SiteIdentity {
 		return out;
 	}
 
-	/** Profile links from `site.contacts.socials` that are absolute http(s) URLs. */
+	/** Profile links of the Socials collection that are absolute http(s) URLs. */
 	async sameAs(): Promise<string[]> {
-		const rows = await this.settings.get("site.contacts.socials");
-		const out: string[] = [];
-		for (const row of Array.isArray(rows) ? rows : []) {
-			const label = isRecord(row) && typeof row.label === "string" ? row.label.trim() : "";
-			const href = isRecord(row) && typeof row.href === "string" ? row.href.trim() : "";
-			if (label !== "" && href !== "" && /^https?:\/\//i.test(href) && URL.canParse(href)) {
-				out.push(href);
-			}
-		}
-		return out;
+		return (await this.contacts.socials()).map((social) => social.href).filter((href) => /^https?:\/\//i.test(href) && URL.canParse(href));
 	}
 
 	async name(): Promise<string> {
@@ -166,13 +161,6 @@ export class SiteIdentity {
 			});
 		}
 		return out;
-	}
-
-	private async column(key: string, field: string): Promise<string[]> {
-		const rows = await this.settings.get(key);
-		return (Array.isArray(rows) ? rows : [])
-			.map((row) => (isRecord(row) && typeof row[field] === "string" ? (row[field] as string).trim() : ""))
-			.filter((value) => value !== "");
 	}
 
 	private async text(key: string): Promise<string> {

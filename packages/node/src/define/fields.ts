@@ -1,6 +1,8 @@
 import type { S } from "@tbtop/admin";
 import { z } from "zod";
+import type { PickMode } from "../blocks/collectionField";
 import type { LinkType } from "../content/link";
+import { type CollectionType, collectionKeyOf, type EntryOf } from "./collections";
 
 /**
  * The CMS's own admin fields, handed to a form next to `s` when the server
@@ -9,7 +11,13 @@ import type { LinkType } from "../content/link";
 export type CmsFields = {
 	link(name: string): { types(types: LinkType[]): unknown };
 	pages(name: string): { of(type: string, subtype?: string): unknown };
+	collection(name: string): { of(key: string): CollectionFieldLike };
 };
+
+type CollectionFieldLike = { single(): CollectionFieldLike; max(count: number): CollectionFieldLike; modes(modes: PickMode[]): CollectionFieldLike };
+
+/** `f.collection()`'s options: one entry or null, a cap, the modes the editor may choose (the first is the default). */
+type PickOptions = { max?: number; modes?: PickMode[] };
 
 type FieldLike = { label(label: string): FieldLike; translatable(): FieldLike; required(): FieldLike; helperText(text: string): FieldLike };
 
@@ -65,6 +73,30 @@ const link = z.object({ href: z.string(), type: z.string(), label: z.string() })
 const pageRef = z.object({ id: z.string(), name: z.string(), url: z.string() });
 const text = () => z.string().nullable();
 
+/** A built-in (or any) collection named by key: its entries' fields are untyped. */
+type AnyEntry = { id: number } & Record<string, unknown>;
+
+const entry = z.looseObject({ id: z.number() });
+
+function pick<R extends Fields>(target: CollectionType<R>, opts: PickOptions & { single: true }): F<EntryOf<R> | null>;
+function pick<R extends Fields>(target: CollectionType<R>, opts?: PickOptions & { single?: false }): F<EntryOf<R>[]>;
+function pick(target: string, opts: PickOptions & { single: true }): F<AnyEntry | null>;
+function pick(target: string, opts?: PickOptions & { single?: false }): F<AnyEntry[]>;
+// biome-ignore lint/suspicious/noExplicitAny: the implementation takes any collection.
+function pick(target: CollectionType<any> | string, opts: PickOptions & { single?: boolean } = {}): F<unknown> {
+	const one: z.ZodType = typeof target === "string" ? entry : entry.extend(zodOf(target.fields).shape);
+	return field<unknown>(opts.single === true ? one.nullable() : z.array(one), (_s, cms, name) => {
+		let built = cms.collection(name).of(collectionKeyOf(target));
+		if (opts.single === true) {
+			built = built.single();
+		}
+		if (opts.max !== undefined) {
+			built = built.max(opts.max);
+		}
+		return opts.modes === undefined ? built : built.modes(opts.modes);
+	});
+}
+
 const choices = (options: Record<string, string>) => Object.entries(options).map(([value, label]) => ({ value, label }));
 
 function select<const V extends string>(options: Record<V, string>, opts?: { multiple?: false }): F<V | null>;
@@ -94,6 +126,13 @@ export const f = {
 	link: (types?: LinkType[]) => field(link.nullable(), (_s, cms, name) => (types === undefined ? cms.link(name) : cms.link(name).types(types))),
 	/** Live pages, as `{ id, name, url }[]`; `type` limits them to one page type. */
 	pages: (type?: string) => field(z.array(pageRef), (_s, cms, name) => (type === undefined ? cms.pages(name) : cms.pages(name).of(type))),
+	/**
+	 * Entries of a collection (`collections` in defineSite, or a built-in by
+	 * key: `"phones"`, `"socials"`): the editor picks all, the latest N,
+	 * those related to the page, or by hand. `{ id, ...fields }[]`, or one
+	 * entry or null with `{ single: true }`.
+	 */
+	collection: pick,
 	/**
 	 * Any other admin field: `f.custom((s, name) => s.colorpicker(name), z.string().nullable())`.
 	 * `zod` is the value FormResolver gives that kind (a trimmed string or null for most).

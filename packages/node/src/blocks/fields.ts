@@ -1,6 +1,7 @@
 import { Field, Repeater } from "@tbtop/admin";
 import { isBlank, isDict } from "../support/values";
 import { PagesField } from "./cmsFields";
+import { CollectionField, pickEntries } from "./collectionField";
 import type { ResolveContext } from "./context";
 
 type Resolve = (value: unknown, ctx: ResolveContext) => unknown;
@@ -32,7 +33,8 @@ export function formFields(nodes: unknown[]): Field[] {
 /**
  * FormResolver: stored input to frontend props, by field kind. Richtext
  * becomes HTML, media a URL, link `{href, type, label}`, a pages field its
- * live pages as `{id, name, url}[]`, numbers numbers,
+ * live pages as `{id, name, url}[]`, a collection field its picked entries,
+ * numbers numbers,
  * booleans booleans, repeaters rows without blank ones; everything else a
  * trimmed string or null.
  */
@@ -54,6 +56,9 @@ function ruleFor(field: Field): Resolve {
 	}
 	if (field.childFields().length > 0) {
 		return (value) => value;
+	}
+	if (field instanceof CollectionField) {
+		return (value, ctx) => pickEntries(field, value, ctx);
 	}
 	// Before the multiple-select rule: on the wire a pages field is a select.
 	if (field instanceof PagesField) {
