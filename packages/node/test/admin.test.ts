@@ -65,9 +65,9 @@ describe("admin pages", () => {
 		const items = (JSON.parse(nav) as { tbtop: { nav: { key: string; items: { label: string }[] }[] } }).tbtop.nav.map((group) => [group.key, group.items.map((item) => item.label)]);
 		// CmsPanel's items, minus the media library (Node has none); the inbox is a header link, not a nav item.
 		expect(items).toEqual([
-			["content", ["Pages", "Redirects", "404 log", "SEO report"]],
+			["content", ["Pages", "Collections", "Redirects", "404 log", "SEO report"]],
 			["design", ["Layouts", "Blocks", "Shared blocks"]],
-			["settings", ["Languages", "Site settings", "Offices", "Social links", "SEO settings", "Notifications", "Audit log", "Site health"]],
+			["settings", ["Languages", "Site settings", "SEO settings", "Notifications", "Audit log", "Site health"]],
 		]);
 	});
 

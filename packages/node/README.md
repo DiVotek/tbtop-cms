@@ -545,17 +545,17 @@ const cards = await site.pageViews(posts, locale); // [{ id, name, summary, url,
 ## Collections
 
 A collection is a kind of record with no page of its own: reviews, team
-members, offices. Its fields are code; its entries are `tbtop_entries` rows,
-edited under their own menu item and read on the site through a block's
-`collection` field or `site.collection(key)`. A record with its own URL, SEO
-and blocks is a page type instead.
+members, phone numbers. Its fields are code; its entries are `tbtop_entries`
+rows, edited on the admin's Collections page and read on the site through a
+block's `collection` field or `site.collection(key)`. A record with its own
+URL, SEO and blocks is a page type instead.
 
 ```ts
 import { block, collection, defineSite, f } from "@tbtop/cms/site";
 
 const reviews = collection(
 	{ author: f.text().required(), text: f.textarea().translatable(), services: f.pages("service") },
-	{ label: "Reviews", singularLabel: "review" }, // titleField, relatedField, icon, navigationGroup, navigationOrder, deletable, resolve
+	{ label: "Reviews", singularLabel: "review" }, // titleField, relatedField, resolve
 );
 
 export const site = defineSite({
@@ -564,7 +564,7 @@ export const site = defineSite({
 		Reviews: block({
 			reviews: f.collection(reviews), // { id, author, text, services }[]
 			featured: f.collection(reviews, { single: true, modes: ["manual", "latest"] }), // one or null
-			offices: f.collection("offices", { max: 3 }), // a built-in, by key (untyped fields)
+			phones: f.collection("phones", { max: 3 }), // a built-in, by key (untyped fields)
 		}),
 	},
 });
@@ -589,23 +589,21 @@ tens of thousands: there is no SQL filtering on entry fields.
 The low level is `createCms({ collections: [{ key, label, form: (s) => [...] }] })`
 and `collectionField("reviews").of("review")` in a block's `form()`.
 
-Admin: `{prefix}/collections/{key}` lists the entries (search, drag reorder,
-delete, an "Add" modal), `{prefix}/collections/{key}/{id}/edit` edits one
-(draft or published, optimistic lock), both behind `tbtop-cms.pages`. The
+Admin: `{prefix}/collections` (one menu item under Content) shows every
+collection as a tab, the built-ins first: its entries (search, drag reorder,
+delete) and an "Add" modal; `?tab[collections]={key}` opens a tab.
+`{prefix}/collections/{key}/{id}/edit` edits one entry (draft or published,
+optimistic lock); both answer to `tbtop-cms.pages`. The
 field's client is the `collection` kind of `@tbtop/cms/admin-client`; its
 picker posts to `{prefix}/collections/{key}/entry-search/select-options/entry`.
 
-**Built-ins.** `offices` (name, street, city, region, postal code, country,
-phones, emails, opening hours, coordinates) and `socials` (name, short label,
-link) are always there, under Settings. Their entries cannot be deleted
-(`deletable: false`); set one to draft to take it off the site. The first
-published office is the main one: its phones, emails, address, hours and coordinates are the site's
-and its identity's; the other offices are published as the identity's
-`department`s, and `sameAs` lists the social links. They replace the
-`site.contacts.*` settings and the SEO identity's address, hours and
-coordinates: re-enter those values as entries (there is no data migration).
-`site.contacts` reads them (`phones()`, `emails()`, `socials()`,
-`offices()`), and the shared `cms.settings` prop still carries
+**Built-ins.** `phones` (number), `emails` (address) and `socials` (name,
+short label, link) are always there, their tabs first. The first published
+phone and email are the identity's `telephone` and `email`, and `sameAs`
+lists the social links; the identity's address, hours and coordinates stay
+in SEO settings. They replace the `site.contacts.*` settings: re-enter those
+values as entries (there is no data migration). `site.contacts` reads them
+(`phones()`, `emails()`, `socials()`), and the shared `cms.settings` prop still carries
 `site.contacts.phones/emails/socials` in their old row shapes, built from the
 collections.
 
@@ -888,7 +886,7 @@ export default {
   `seo.title` (PHP #326), then `tbtop_entries` (collections).
 - Collections: code-defined records in `tbtop_entries`, the `collection`
   block field (all / latest / related / manual), `site.collection()`, their
-  admin pages, and the built-in offices and socials behind the site's
+  admin page, and the built-in phones, emails and socials behind the site's
   contacts and identity (see "Collections").
 - Languages, settings (`site.*`/`seo.*` dotted keys), pages with per-locale
   slugs and paths (collision suffixes, cascade to children), optimistic

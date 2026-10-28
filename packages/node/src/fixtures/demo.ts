@@ -15,18 +15,12 @@ export const demoFixture: Fixture = {
 		"seo.title_template": { en: "{title} {sep} {site_name}", uk: "{title} {sep} {site_name}" },
 		"seo.default_description": { en: "A demo site on tbtop CMS.", uk: "Демо-сайт на tbtop CMS." },
 		"seo.identity.type": "organization",
+		"seo.identity.address.locality": { en: "Kyiv", uk: "Київ" },
+		"seo.identity.address.country": "UA",
 	},
 	entries: [
-		{
-			collection: "offices",
-			data: {
-				name: { en: "Main office", uk: "Головний офіс" },
-				locality: { en: "Kyiv", uk: "Київ" },
-				country: "UA",
-				phones: [{ number: "+380 44 000 00 00" }],
-				emails: [{ address: "hello@example.test" }],
-			},
-		},
+		{ collection: "phones", data: { number: "+380 44 000 00 00" } },
+		{ collection: "emails", data: { address: "hello@example.test" } },
 		{ collection: "socials", data: { label: "GH", name: "GitHub", href: "https://github.com/DiVotek" } },
 	],
 	sharedBlocks: [

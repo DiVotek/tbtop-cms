@@ -1,6 +1,5 @@
 import type { Site } from "../site";
-import { OFFICES, SOCIALS } from "./builtInCollections";
-import type { ResolvedEntry } from "./entryList";
+import { EMAILS, PHONES, SOCIALS } from "./builtInCollections";
 import { safeHref } from "./safeHref";
 
 /** One social link as blocks and the identity read it. */
@@ -8,38 +7,21 @@ export type SocialLink = { label: string; name: string | null; href: string };
 
 const text = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
 
-/** One string column of repeater rows, blanks skipped (SiteContacts::column). */
-export function column(rows: unknown, field: string): string[] {
-	const out: string[] = [];
-	for (const row of Array.isArray(rows) ? rows : []) {
-		const value = typeof row === "object" && row !== null ? text((row as Record<string, unknown>)[field]) : null;
-		if (value !== null) {
-			out.push(value);
-		}
-	}
-	return out;
-}
-
 /**
  * The site's contact details for blocks and the SEO identity, from the
- * built-in collections (SiteContacts.php): phones and emails are the main
- * office's (the first published Offices entry), the socials every
- * published Socials entry. Each read is the cached collection.
+ * built-in collections (SiteContacts.php): every published Phones, Emails
+ * and Socials entry, in the editor's order. Each read is the cached
+ * collection.
  */
 export class SiteContacts {
 	constructor(private readonly site: Site) {}
 
-	/** The published offices resolved for the locale, the main one first. */
-	async offices(locale?: string): Promise<ResolvedEntry[]> {
-		return (await this.site.collection(OFFICES, locale)).all();
-	}
-
 	async phones(locale?: string): Promise<string[]> {
-		return column((await this.offices(locale))[0]?.phones, "number");
+		return this.column(PHONES, "number", locale);
 	}
 
 	async emails(locale?: string): Promise<string[]> {
-		return column((await this.offices(locale))[0]?.emails, "address");
+		return this.column(EMAILS, "address", locale);
 	}
 
 	/** Entries missing a label or a link, or with a script link stored past the form, are skipped. */
@@ -65,5 +47,17 @@ export class SiteContacts {
 			"site.contacts.emails": (await this.emails(locale)).map((address) => ({ address })),
 			"site.contacts.socials": await this.socials(locale),
 		};
+	}
+
+	/** One field of a collection's published entries, blanks skipped. */
+	private async column(collection: string, field: string, locale?: string): Promise<string[]> {
+		const out: string[] = [];
+		for (const entry of await this.site.collection(collection, locale)) {
+			const value = text(entry[field]);
+			if (value !== null) {
+				out.push(value);
+			}
+		}
+		return out;
 	}
 }

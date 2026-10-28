@@ -15,10 +15,13 @@ const SEARCH_LIMIT = 50;
 export const linkSearchEndpoint = (cms: Cms): string => `${adminPrefix(cms)}/${SEARCH_PATH}/select-options/${SEARCH_FIELD}`;
 
 /** A collection's entry list in the admin; its entry search sits under it. */
-export const collectionListUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections/${key}`;
+/** One collection's own admin URLs (its entry editor, its entry search) start here. */
+export const collectionBaseUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections/${key}`;
+/** The Collections page with this collection's tab open. */
+export const collectionListUrl = (cms: Cms, key: string): string => `${adminPrefix(cms)}/collections?${new URLSearchParams({ "tab[collections]": key })}`;
 export const ENTRY_SEARCH_FIELD = "entry";
 /** The picker of a `collection` field posts `{search}` / `{values}` here (EntrySearchRoute). */
-export const entrySearchEndpoint = (cms: Cms, key: string): string => `${collectionListUrl(cms, key)}/entry-search/select-options/${ENTRY_SEARCH_FIELD}`;
+export const entrySearchEndpoint = (cms: Cms, key: string): string => `${collectionBaseUrl(cms, key)}/entry-search/select-options/${ENTRY_SEARCH_FIELD}`;
 
 export const fieldBinding = (cms: Cms): CmsFieldBinding => ({
 	site: cms.site(),

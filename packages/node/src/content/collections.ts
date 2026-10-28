@@ -5,15 +5,15 @@ import { CollectionField } from "../blocks/collectionField";
 import { formFields } from "../blocks/fields";
 
 /**
- * A kind of record with no page of its own: reviews, team members, offices
- * (Collection.php). Its form is code; its entries are `tbtop_entries` rows
+ * A kind of record with no page of its own: reviews, team members, phone
+ * numbers (Collection.php). Its form is code; its entries are `tbtop_entries` rows
  * edited in the admin and read on the site through a `collection` field or
  * `site.collection(key)`.
  */
 export type CollectionDef = {
 	/** `[a-z][a-z0-9_-]*`, at most 64 characters: stored in `tbtop_entries.collection` and used in admin URLs. */
 	key: string;
-	/** Plural name: the menu item and the list title. */
+	/** Plural name: the collection's tab on the Collections page. */
 	label: string;
 	/** The "Add …" button; default `label`. */
 	singularLabel?: string;
@@ -23,18 +23,6 @@ export type CollectionDef = {
 	titleField?: string;
 	/** The `pages` field the "related" mode filters on; default the first one, none without one. */
 	relatedField?: string | null;
-	icon?: string;
-	/** Default `content`. */
-	navigationGroup?: string;
-	/** Default 50. */
-	navigationOrder?: number;
-	/**
-	 * Whether the admin may delete an entry; default true. False drops the
-	 * row's delete action, so the action endpoint refuses it too; an editor
-	 * hides an entry from the site by setting it to draft. The built-in
-	 * offices and socials say false.
-	 */
-	deletable?: boolean;
 	/**
 	 * One entry as the site gets it, from values flattened to the locale;
 	 * default FormResolver over `form`. `ctx.page` is null: an entry is
@@ -122,10 +110,6 @@ export class Collections {
 			form: def.form,
 			titleField,
 			relatedField: def.relatedField === undefined ? (pages[0] ?? null) : def.relatedField,
-			icon: def.icon ?? "list",
-			navigationGroup: def.navigationGroup ?? "content",
-			navigationOrder: def.navigationOrder ?? 50,
-			deletable: def.deletable ?? true,
 			resolve: def.resolve ?? null,
 			fieldNames: names,
 		});

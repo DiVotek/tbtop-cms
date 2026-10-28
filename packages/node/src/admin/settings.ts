@@ -1,8 +1,8 @@
 import { definePage, Effects, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
-import { OFFICES, SOCIALS } from "../content/builtInCollections";
+import { EMAILS, PHONES, SOCIALS } from "../content/builtInCollections";
 import { tabFields } from "../content/hostSettings";
-import { BUSINESS_SUBTYPES } from "../seo/identity";
+import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
@@ -128,13 +128,12 @@ export function siteSettings(cms: Cms) {
 					label: "Contacts",
 					children: [
 						s
-							.displayText(
-								"Phones, emails, the address and opening hours belong to an office; the first published office is the main one. Social links are their own list.",
-							)
+							.displayText("Phones, emails and social profiles for the header, footer and contact blocks are kept on the Collections page. The first phone and email, and every social link, also feed the SEO identity markup.")
 							.variant("muted"),
 						s.flex(
 							[
-								s.action("openOffices").label("Offices").icon("map-pin").url(collectionListUrl(cms, OFFICES)),
+								s.action("openPhones").label("Phones").icon("phone").url(collectionListUrl(cms, PHONES)),
+								s.action("openEmails").label("Emails").icon("mail").url(collectionListUrl(cms, EMAILS)),
 								s.action("openSocials").label("Social links").icon("share-2").url(collectionListUrl(cms, SOCIALS)),
 							],
 							{ align: "center" },
@@ -161,6 +160,7 @@ const IDENTITY = [
 	{ value: "local_business", label: "Local business" },
 ];
 
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 /** Per-type template fields, keyed as the resolver reads them (SeoSettingsPage::typeTemplateMap). */
 function typeTemplateMap(cms: Cms): Record<string, string> {
@@ -204,14 +204,54 @@ function verificationToken(form: Dict, field: string, metaName: string): string 
 	return null;
 }
 
-/** SeoSettingsPage::normalizeForm: refuses owned robots lines and bad verification tokens. */
-async function prepareSeo(form: Dict): Promise<string | null> {
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** The identity rules of organisationFields/localBusinessFields that apply to the chosen type. */
+async function identityError(form: Dict, site: Site): Promise<string | null> {
+	const type = typeof form.seo_identity_type === "string" ? form.seo_identity_type : "none";
+	if (!ORGANISATION_TYPES.includes(type)) {
+		return null;
+	}
+	const country = form.seo_identity_country;
+	if (typeof country === "string" && country !== "" && !/^[A-Za-z]{2}$/.test(country)) {
+		return "The country must be a two-letter ISO code.";
+	}
+	if (type !== "local_business") {
+		return null;
+	}
+	const locale = await site.languages.defaultLocale();
+	for (const [field, label] of [["seo_identity_street", "street"], ["seo_identity_locality", "city"]]) {
+		const value = form[field as string];
+		const text = typeof value === "object" && value !== null ? (value as Dict)[locale] : value;
+		if (typeof text !== "string" || text.trim() === "") {
+			return `A local business needs its ${label}.`;
+		}
+	}
+	const rows = Array.isArray(form.seo_identity_opening_hours) ? (form.seo_identity_opening_hours as Dict[]) : [];
+	for (const row of rows) {
+		const days = Array.isArray(row.days) ? row.days : [];
+		if (days.length === 0 || !days.every((day) => DAYS.includes(String(day)))) {
+			return "Each opening hours row needs its days.";
+		}
+		if (!TIME.test(String(row.opens ?? "")) || !TIME.test(String(row.closes ?? ""))) {
+			return "Each opening hours row needs an opening and a closing time (HH:MM).";
+		}
+	}
+	return null;
+}
+
+/** SeoSettingsPage::normalizeForm plus the identity rules: refuses owned robots lines and bad tokens, upper-cases the country. */
+async function prepareSeo(form: Dict, site: Site): Promise<string | null> {
 	const rejected =
 		robotsExtraError(form.seo_robots_extra) ??
 		verificationToken(form, "seo_verification_google", "google-site-verification") ??
-		verificationToken(form, "seo_verification_bing", "msvalidate.01");
+		verificationToken(form, "seo_verification_bing", "msvalidate.01") ??
+		(await identityError(form, site));
 	if (rejected !== null) {
 		return rejected;
+	}
+	if (typeof form.seo_identity_country === "string") {
+		form.seo_identity_country = form.seo_identity_country.toUpperCase();
 	}
 	// Stored as the bare id, so the reopened page shows it instead of the pasted snippet.
 	if (typeof form.seo_gtm_container_id === "string") {
@@ -244,6 +284,14 @@ export function seoSettings(cms: Cms) {
 			seo_identity_logo: "seo.identity.logo",
 			seo_identity_subtype: "seo.identity.subtype",
 			seo_identity_subtype_custom: "seo.identity.subtype_custom",
+			seo_identity_street: "seo.identity.address.street",
+			seo_identity_locality: "seo.identity.address.locality",
+			seo_identity_region: "seo.identity.address.region",
+			seo_identity_postal_code: "seo.identity.address.postal_code",
+			seo_identity_country: "seo.identity.address.country",
+			seo_identity_latitude: "seo.identity.geo.latitude",
+			seo_identity_longitude: "seo.identity.geo.longitude",
+			seo_identity_opening_hours: "seo.identity.opening_hours",
 			seo_verification_google: "seo.verification.google",
 			seo_verification_bing: "seo.verification.bing",
 			seo_gtm_container_id: "seo.gtm_container_id",
@@ -307,9 +355,25 @@ export function seoSettings(cms: Cms) {
 							.label("Business type")
 							.options([...BUSINESS_SUBTYPES.map((value) => ({ value, label: value })), { value: "other", label: "Other" }]),
 						s.text("seo_identity_subtype_custom").label("Other business type").regex("/^[A-Z][A-Za-z]+$/"),
+						s.text("seo_identity_street").label("Street").translatable(),
+						s.text("seo_identity_locality").label("City").translatable(),
+						s.text("seo_identity_region").label("Region").translatable(),
+						s.text("seo_identity_postal_code").label("Postal code"),
+						s.text("seo_identity_country").label("Country (ISO code)").placeholder("UA"),
+						s.number("seo_identity_latitude").label("Latitude").rules("nullable|numeric|between:-90,90"),
+						s.number("seo_identity_longitude").label("Longitude").rules("nullable|numeric|between:-180,180"),
 						s
-							.displayText("The address, phones, emails, opening hours and coordinates come from the main office (Settings → Offices); the other offices are published as its departments.")
-							.variant("muted"),
+							.repeater("seo_identity_opening_hours")
+							.label("Opening hours")
+							.fields([
+								s
+									.select("days")
+									.label("Days")
+									.multiple()
+									.options(DAYS.map((day) => ({ value: day, label: day }))),
+								s.time("opens").label("Opens"),
+								s.time("closes").label("Closes"),
+							]),
 					],
 				},
 				{

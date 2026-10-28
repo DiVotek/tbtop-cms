@@ -202,6 +202,21 @@ describe("SEO settings (R2-content-11)", () => {
 		expect(await save(made, { seo_verification_bing: '<meta name="google-site-verification" content="abc" />' })).toContain("does not look like a verification token");
 		expect(await made.cms.site().settings.get("seo.verification.bing")).toBeNull();
 	});
+
+	test("identity: the country is upper-cased and checked; a local business needs street, city and valid hours", async () => {
+		const made = await panel();
+		const settings = () => made.cms.site().settings;
+		await save(made, { seo_identity_type: "organization", seo_identity_country: "de" });
+		expect(await settings().get("seo.identity.address.country")).toBe("DE");
+		expect(await save(made, { seo_identity_type: "organization", seo_identity_country: "D1" })).toContain("two-letter ISO code");
+		const business = { seo_identity_type: "local_business", seo_identity_street: { en: "1 Main St" }, seo_identity_locality: { en: "Kyiv" } };
+		expect(await save(made, { ...business, seo_identity_street: { en: " ", uk: "вул. 1" } })).toContain("needs its street");
+		expect(await save(made, { ...business, seo_identity_opening_hours: [{ days: ["Funday"], opens: "09:00", closes: "18:00" }] })).toContain("needs its days");
+		expect(await save(made, { ...business, seo_identity_opening_hours: [{ days: ["Monday"], opens: "9am", closes: "18:00" }] })).toContain("opening and a closing time");
+		expect(await settings().get("seo.identity.type")).toBe("organization");
+		await save(made, { ...business, seo_identity_opening_hours: [{ days: ["Monday"], opens: "09:00", closes: "18:00" }] });
+		expect(await settings().get("seo.identity.type")).toBe("local_business");
+	});
 });
 
 describe("R4-fixes-3: fixtures write redirects like a PHP seeder", () => {

@@ -6,8 +6,8 @@ import type { Collection } from "../content/collections";
 import { ENTRY_DRAFT, ENTRY_PUBLISHED, type Entry, EntryConflictError, type EntryStatus } from "../content/entries";
 import { type Dict, isDict } from "../support/values";
 import { gated } from "./abilities";
-import { collectionListUrl, ENTRY_SEARCH_FIELD, fieldBinding } from "./linkFields";
-import { editFooter, editorValues, siteOf } from "./support";
+import { collectionBaseUrl, collectionListUrl, ENTRY_SEARCH_FIELD, fieldBinding } from "./linkFields";
+import { editFooter, editorValues, listHeader, NAV, recordCrumbs, siteOf } from "./support";
 
 const SEARCH_LIMIT = 20;
 
@@ -16,20 +16,24 @@ const STATUS_OPTIONS = [
 	{ value: ENTRY_DRAFT, label: "Draft" },
 ];
 
-const GROUP_LABELS: Record<string, string> = { content: "Content", design: "Design", settings: "Settings" };
+export const entryEditUrl = (cms: Cms, key: string, id: number | string): string => `${collectionBaseUrl(cms, key)}/${String(id)}/edit`;
 
-export const entryEditUrl = (cms: Cms, key: string, id: number | string): string => `${collectionListUrl(cms, key)}/${String(id)}/edit`;
+/** The `name` of the Collections page's tabs block: the open tab is `?tab[collections]={key}`. */
+export const COLLECTION_TABS = "collections";
 
 /**
- * Each collection's admin pages, behind the pages ability: its list (menu
- * item), the entry editor and the entry search its `collection` fields use.
+ * The admin pages of the collections, behind the pages ability: one
+ * Collections page (a tab each, one menu item), and per collection the entry
+ * editor and the entry search its `collection` fields use.
  */
 export function collectionPages(cms: Cms): PageDef[] {
-	return cms.collections.all().flatMap((collection) => [
-		gated(cms, "tbtop-cms.pages", entriesIndex(cms, collection)),
-		gated(cms, "tbtop-cms.pages", entryEdit(cms, collection)),
-		gated(cms, "tbtop-cms.pages", entrySearch(cms, collection)),
-	]) as PageDef[];
+	return [
+		gated(cms, "tbtop-cms.pages", collectionsIndex(cms)),
+		...cms.collections.all().flatMap((collection) => [
+			gated(cms, "tbtop-cms.pages", entryEdit(cms, collection)),
+			gated(cms, "tbtop-cms.pages", entrySearch(cms, collection)),
+		]),
+	] as PageDef[];
 }
 
 /** The entry form: the collection's fields, bound to the CMS lookups, then the status. */
@@ -49,7 +53,7 @@ function dataOf(collection: Collection, form: Dict): Dict {
 
 const statusOf = (value: unknown): EntryStatus => (value === ENTRY_PUBLISHED ? ENTRY_PUBLISHED : ENTRY_DRAFT);
 
-/** The row's delete; a collection with `deletable: false` gets none. */
+/** The row's delete, scoped to the collection. */
 function deleteAction(s: S, cms: Cms, key: string, table: string) {
 	return s
 		.action(`${table}Delete`)
@@ -65,53 +69,74 @@ function deleteAction(s: S, cms: Cms, key: string, table: string) {
 		}, ["row"]);
 }
 
-/** CollectionEntriesPage: the entries table (search, drag reorder, delete unless `deletable: false`) and the "Add" modal. */
-function entriesIndex(cms: Cms, collection: Collection) {
-	const { key, label } = collection;
-	const table = `entries_${key.replaceAll("-", "_")}`;
+/**
+ * CollectionEntriesPage: every collection as a tab, the built-ins first; each
+ * tab has its entries table (search, drag reorder, delete) and an "Add" modal.
+ */
+function collectionsIndex(cms: Cms) {
 	return definePage({
-		path: `collections/${key}`,
-		title: label,
-		breadcrumbs: [{ label: GROUP_LABELS[collection.navigationGroup] ?? collection.navigationGroup }, { label }],
-		nav: { group: collection.navigationGroup, label, icon: collection.icon, order: collection.navigationOrder },
-		view: (s, { request }) =>
-			s.stack([
-				s.row([
-					s
-						.action("entryCreate")
-						.label(`Add ${collection.singularLabel}`)
-						.icon("plus")
-						.color("primary")
-						.modal(
-							`Add ${collection.singularLabel}`,
-							s
-								.form("entryCreate", [...entryFields(s, cms, collection), s.actionsRow([s.action("entryCreateSave").label("Create").color("primary").submit()])])
-								.record({ status: ENTRY_PUBLISHED })
-								.onSubmit(async (ctx) => {
-									const form = ctx.form as Dict;
-									const id = await siteOf(cms, ctx).entries.create({ collection: key, data: dataOf(collection, form), status: statusOf(form.status) });
-									return entryEditUrl(cms, key, id);
-								}),
-						),
-				]),
-				s
-					.table(table)
-					.columns([
-						Column.make("title")
-							.label("Name")
-							.emphasized()
-							.searchable()
-							.formatUsing((value, row) => (typeof value === "string" && value !== "" ? value : `#${String(row.id)}`)),
-						Column.make("status").label("Status").badge({ published: { color: "success", label: "Published" }, draft: { color: "gray", label: "Draft" } }),
-						Column.make("updated_at").label("Updated").datetime(),
-					])
-					.reorderable("sort_order")
-					.recordUrl((row) => entryEditUrl(cms, key, String(row.id)))
-					.emptyState("No entries yet", "Add the first one; blocks show the published entries.")
-					.rowActions(collection.deletable ? [deleteAction(s, cms, key, table)] : [])
-					.query(() => cms.site(request).config.db.selectFrom("tbtop_entries").where("collection", "=", key)),
-			]),
+		path: "collections",
+		...listHeader("content", "Collections"),
+		nav: { group: NAV.content, label: "Collections", icon: "library", order: 15 },
+		view: (s, { request }) => {
+			const open = new URL(request.url).searchParams.get(`tab[${COLLECTION_TABS}]`);
+			const tabs = cms.collections.all().map((collection) => ({
+				name: collection.key,
+				label: collection.label,
+				active: collection.key === open,
+				children: entriesTab(s, cms, collection, request),
+			}));
+			return s.tabs(tabs, { name: COLLECTION_TABS });
+		},
 	});
+}
+
+/** One collection's tab: its "Add" modal and its entries table. */
+function entriesTab(s: S, cms: Cms, collection: Collection, request: Request): unknown[] {
+	const { key } = collection;
+	const suffix = `_${key.replaceAll("-", "_")}`;
+	const table = `entries${suffix}`;
+	const title = `Add ${collection.singularLabel}`;
+	return [
+		s.flex(
+			[
+				s.spacer(),
+				s
+					.action(`entryCreate${suffix}`)
+					.label(title)
+					.icon("plus")
+					.color("primary")
+					.modal(
+						title,
+						s
+							.form(`entryCreate${suffix}`, [...entryFields(s, cms, collection), s.actionsRow([s.action(`entryCreateSave${suffix}`).label("Create").color("primary").submit()])])
+							.record({ status: ENTRY_PUBLISHED })
+							.onSubmit(async (ctx) => {
+								const form = ctx.form as Dict;
+								const id = await siteOf(cms, ctx).entries.create({ collection: key, data: dataOf(collection, form), status: statusOf(form.status) });
+								return entryEditUrl(cms, key, id);
+							}),
+					),
+			],
+			{ justify: "end" },
+		),
+		s
+			.table(table)
+			.columns([
+				Column.make("title")
+					.label("Name")
+					.emphasized()
+					.searchable()
+					.formatUsing((value, row) => (typeof value === "string" && value !== "" ? value : `#${String(row.id)}`)),
+				Column.make("status").label("Status").badge({ published: { color: "success", label: "Published" }, draft: { color: "gray", label: "Draft" } }),
+				Column.make("updated_at").label("Updated").datetime(),
+			])
+			.reorderable("sort_order")
+			.recordUrl((row) => entryEditUrl(cms, key, String(row.id)))
+			.emptyState("No entries yet", "Add the first one; blocks show the published entries.")
+			.rowActions([deleteAction(s, cms, key, table)])
+			.query(() => cms.site(request).config.db.selectFrom("tbtop_entries").where("collection", "=", key)),
+	];
 }
 
 /** CollectionEntryEditPage: the entry's fields and status under the optimistic lock. */
@@ -128,7 +153,7 @@ function entryEdit(cms: Cms, collection: Collection) {
 	return definePage({
 		path: `collections/${key}/$entry/edit`,
 		title: label,
-		breadcrumbs: [{ label: GROUP_LABELS[collection.navigationGroup] ?? collection.navigationGroup }, { label, url: listUrl }, { label: "Edit" }],
+		breadcrumbs: [...recordCrumbs("content", { label: "Collections", url: listUrl }, label), { label: "Edit" }],
 		view: async (s, { params, request }) => {
 			const entry = await find(cms.site(request), params.entry ?? "");
 			return s

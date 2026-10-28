@@ -66,10 +66,10 @@ async function reviewsProps(cms: ReviewsCms, page: number, data: Record<string, 
 }
 
 describe("collections: registry", () => {
-	test("the built-in offices and socials are always there, the host's after them", async () => {
+	test("the built-in phones, emails and socials are always there, the host's after them", async () => {
 		const { cms } = await makeCms(null, { collections: [reviews] });
-		expect(cms.collections.all().map((c) => c.key)).toEqual(["offices", "socials", "review"]);
-		expect(cms.collections.get("review")).toMatchObject({ titleField: "author", relatedField: "services", singularLabel: "review", navigationGroup: "content" });
+		expect(cms.collections.all().map((c) => c.key)).toEqual(["phones", "emails", "socials", "review"]);
+		expect(cms.collections.get("review")).toMatchObject({ titleField: "author", relatedField: "services", singularLabel: "review" });
 		expect(cms.collections.get("socials").titleField).toBe("name");
 		expect(() => cms.collections.get("nope")).toThrow("Collection [nope] is not registered.");
 	});
@@ -187,18 +187,23 @@ async function admin(config: Partial<CmsConfig> = {}) {
 }
 
 describe("collections: admin", () => {
+	const index = "/admin/collections";
 	const url = "/admin/collections/review";
 
-	test("each collection is a menu item with a list; create, edit and delete go through the store", async () => {
+	test("every collection is a tab of one page with one menu item; create, edit and delete go through the store", async () => {
 		const { cms, page, post, visit, anna } = await admin();
-		const nav = JSON.stringify((await page(url)).props);
-		expect(nav).toContain('"label":"Reviews","href":"/admin/collections/review"');
-		expect(nav).toContain('"label":"Offices","href":"/admin/collections/offices"');
+		const props = (await page(`${index}?tab[collections]=review`)).props;
+		const nav = JSON.stringify(props);
+		expect(nav).toContain('"label":"Collections","href":"/admin/collections"');
+		expect(nav).not.toContain('"href":"/admin/collections/review"');
+		const tabs = (props.structure as { options: { tabs: { name: string; active?: boolean }[] } }).options.tabs;
+		expect(tabs.map((tab) => tab.name)).toEqual(["phones", "emails", "socials", "review", "team"]);
+		expect(tabs.filter((tab) => tab.active).map((tab) => tab.name)).toEqual(["review"]);
 
-		const rows = async () => (((await (await visit(`${url}/tables/entries_review`, { inertia: false })).json()) as { data: { data: { title: string }[] } }).data.data).map((row) => row.title);
+		const rows = async () => (((await (await visit(`${index}/tables/entries_review`, { inertia: false })).json()) as { data: { data: { title: string }[] } }).data.data).map((row) => row.title);
 		expect(await rows()).toEqual(["Anna", "Bob", "Draft"]);
 
-		const created = await post(`${url}/forms/entryCreate`, { author: "Cleo", text: { en: "Nice" }, status: "published" });
+		const created = await post(`${index}/forms/entryCreate_review`, { author: "Cleo", text: { en: "Nice" }, status: "published" });
 		expect(created.status).toBe(303);
 		const id = Number(/\/review\/(\d+)\/edit/.exec(created.headers.get("location") ?? "")?.[1]);
 		expect((await cms.site().entries.find(id))?.sortOrder).toBe(3);
@@ -212,18 +217,9 @@ describe("collections: admin", () => {
 		await post(`${edit}/forms/entryEditor`, { ...record, author: "Stale" });
 		expect((await cms.site().entries.find(anna))?.title).toBe("Anna K.");
 
-		await post(`${url}/actions/entries_reviewDelete`, { payload: { row: { id: anna } } });
+		await post(`${index}/actions/entries_reviewDelete`, { payload: { row: { id: anna } } });
 		expect(await cms.site().entries.find(anna)).toBeNull();
 		expect((await visit("/admin/collections/review/99999/edit")).status).toBe(404);
-	});
-
-	test("a built-in collection offers no delete and refuses one posted anyway", async () => {
-		const { cms, page, post } = await admin();
-		const social = await cms.site().entries.create({ collection: "socials", data: { label: "TG", href: "https://t.me/acme" } });
-		expect(JSON.stringify((await page(url)).props.structure)).toContain("entries_reviewDelete");
-		expect(JSON.stringify((await page("/admin/collections/socials")).props.structure)).not.toContain("entries_socialsDelete");
-		expect((await post("/admin/collections/socials/actions/entries_socialsDelete", { payload: { row: { id: social } } })).status).toBeGreaterThanOrEqual(400);
-		expect(await cms.site().entries.find(social)).not.toBeNull();
 	});
 
 	test("a drag reorder writes through the driver and bumps the cached collection", async () => {
@@ -231,7 +227,7 @@ describe("collections: admin", () => {
 		await cms.site().pages.update(ids.home as number, { content: [{ id: "r1", kind: "Reviews", data: {} }] });
 		const order = async () => ((await renderedProps(cms, "/")).reviews as { id: number }[]).map((e) => e.id);
 		expect(await order()).toEqual([anna, bob]);
-		const res = await post(`${url}/tables/entries_review/reorder`, { ids: [bob, draft, anna] });
+		const res = await post(`${index}/tables/entries_review/reorder`, { ids: [bob, draft, anna] });
 		expect(res.status).toBeLessThan(400);
 		expect(await order()).toEqual([bob, anna]);
 	});
@@ -256,18 +252,15 @@ describe("collections: admin", () => {
 	});
 });
 
-describe("collections: offices and socials", () => {
-	test("the main office feeds the identity, the others become departments; sameAs and cms.settings come from the collections", async () => {
+describe("collections: phones, emails and socials", () => {
+	test("the first phone and email feed the identity, every social link its sameAs; cms.settings comes from the collections", async () => {
 		const { cms } = await makeCms({ languages: [{ locale: "en", name: "English", default: true }], pages: [{ key: "home", system: true, name: { en: "Home" } }] });
 		const site = cms.site();
-		await site.settings.setMany({ "site.name": "Autofocus", "seo.identity.type": "local_business", "seo.identity.subtype": "AutoRepair" });
-		await site.entries.create({
-			collection: "offices",
-			status: "published",
-			data: { name: { en: "Main" }, street: { en: "1 Main St" }, locality: { en: "Kyiv" }, phones: [{ number: "+380 44 000 0001" }], opening_hours: [{ days: ["Monday"], opens: "09:00", closes: "18:00" }] },
-		});
-		await site.entries.create({ collection: "offices", status: "published", data: { name: { en: "Lviv" }, locality: { en: "Lviv" }, phones: [{ number: "+380 32 000 0002" }], latitude: 49.84, longitude: 24.03 } });
-		await site.entries.create({ collection: "offices", data: { name: { en: "Soon" } } });
+		await site.settings.setMany({ "site.name": "Autofocus", "seo.identity.type": "local_business", "seo.identity.subtype": "AutoRepair", "seo.identity.address.locality": { en: "Kyiv" } });
+		await site.entries.create({ collection: "phones", status: "published", data: { number: "+380 44 000 0001" } });
+		await site.entries.create({ collection: "phones", status: "published", data: { number: "+380 44 000 0002" } });
+		await site.entries.create({ collection: "phones", data: { number: "+380 44 000 0003" } });
+		await site.entries.create({ collection: "emails", status: "published", data: { address: "hi@example.com" } });
 		await site.entries.create({ collection: "socials", status: "published", data: { label: "FB", name: "Facebook", href: "https://facebook.com/acme" } });
 
 		const result = await cms.loadPage(get("/"));
@@ -278,34 +271,25 @@ describe("collections: offices and socials", () => {
 		expect(identity).toMatchObject({
 			"@type": "AutoRepair",
 			telephone: "+380 44 000 0001",
-			address: { "@type": "PostalAddress", streetAddress: "1 Main St", addressLocality: "Kyiv" },
-			openingHoursSpecification: [{ dayOfWeek: ["https://schema.org/Monday"], opens: "09:00", closes: "18:00" }],
+			email: "hi@example.com",
+			address: { "@type": "PostalAddress", addressLocality: "Kyiv" },
 			sameAs: ["https://facebook.com/acme"],
-			department: [
-				{
-					"@type": "AutoRepair",
-					name: "Lviv",
-					telephone: "+380 32 000 0002",
-					address: { "@type": "PostalAddress", addressLocality: "Lviv" },
-					geo: { "@type": "GeoCoordinates", latitude: 49.84, longitude: 24.03 },
-				},
-			],
 		});
 		expect(result.props.cms.settings).toMatchObject({
-			"site.contacts.phones": [{ number: "+380 44 000 0001" }],
-			"site.contacts.emails": [],
+			"site.contacts.phones": [{ number: "+380 44 000 0001" }, { number: "+380 44 000 0002" }],
+			"site.contacts.emails": [{ address: "hi@example.com" }],
 			"site.contacts.socials": [{ label: "FB", name: "Facebook", href: "https://facebook.com/acme" }],
 		});
-		expect(await site.contacts.phones()).toEqual(["+380 44 000 0001"]);
+		expect(await site.contacts.phones()).toEqual(["+380 44 000 0001", "+380 44 000 0002"]);
 	});
 
-	test("an office needs its name; a social link its label and an http(s) link", () => {
-		const offices = new Collections(BUILT_IN_COLLECTIONS).get("offices");
-		const socials = new Collections(BUILT_IN_COLLECTIONS).get("socials");
+	test("a phone needs its number, an email a valid address, a social link its label and an http(s) link", () => {
+		const built = new Collections(BUILT_IN_COLLECTIONS);
 		const rules = (fields: unknown[], name: string) => (fields.find((field) => (field as { name: string }).name === name) as { ruleEntries(): string[] }).ruleEntries();
-		expect(rules(offices.form(new S()), "name")).toContain("required");
-		expect(rules(socials.form(new S()), "label")).toEqual(expect.arrayContaining(["required", "max:8"]));
-		expect(rules(socials.form(new S()), "href")).toEqual(expect.arrayContaining(["required", "url"]));
+		expect(rules(built.get("phones").form(new S()), "number")).toContain("required");
+		expect(rules(built.get("emails").form(new S()), "address")).toEqual(expect.arrayContaining(["required", "email"]));
+		expect(rules(built.get("socials").form(new S()), "label")).toEqual(expect.arrayContaining(["required", "max:8"]));
+		expect(rules(built.get("socials").form(new S()), "href")).toEqual(expect.arrayContaining(["required", "url"]));
 	});
 	test("a social link with a script scheme is refused by the form and never reaches the site", async () => {
 		const socials = new Collections(BUILT_IN_COLLECTIONS).get("socials");
