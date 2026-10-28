@@ -73,7 +73,9 @@ entries (name, status, last change) with search, drag-to-reorder, click to
 edit and per-row delete, and an "Add" modal with the collection's form. The
 entry editor is `{admin.prefix}/collections/{key}/{entry}/edit`
 (`CollectionEntryEditPage`), with a draft/published status and the same
-optimistic lock as shared blocks. Both pages answer to the `tbtop-cms.pages`
+optimistic lock as shared blocks. The "Add" modal has the status switch too
+and starts on published: an entry is usually ready when it is added, and
+the editor picks draft to hold it back. Both pages answer to the `tbtop-cms.pages`
 ability. A host config that published `admin.pages` before collections
 existed must add `collection_entries` and `collection_entry_edit`, or the
 menu items are left out.

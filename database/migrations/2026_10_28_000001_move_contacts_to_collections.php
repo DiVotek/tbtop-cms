@@ -37,20 +37,27 @@ return new class extends Migration
     {
         $settings = app(Settings::class);
 
-        if (! self::hasEntries('offices')) {
+        // One transaction per collection: a failed copy leaves it empty, so a rerun copies it again.
+        DB::transaction(static function () use ($settings): void {
+            if (self::hasEntries('offices')) {
+                return;
+            }
             $office = self::office($settings);
             if ($office !== null) {
                 self::insert('offices', 0, $office, self::text($settings->get('site.name')) ?? '');
             }
             self::forget($settings, self::OFFICE_KEYS);
-        }
+        });
 
-        if (! self::hasEntries('socials')) {
+        DB::transaction(static function () use ($settings): void {
+            if (self::hasEntries('socials')) {
+                return;
+            }
             foreach (self::socials($settings->get('site.contacts.socials')) as $i => $row) {
                 self::insert('socials', $i, $row, $row['name'] ?? $row['label']);
             }
             self::forget($settings, ['site.contacts.socials']);
-        }
+        });
     }
 
     /** The settings keys are gone for good: the collections are the source now. */
