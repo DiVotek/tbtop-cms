@@ -44,7 +44,7 @@ return new class extends Migration
             }
             $office = self::office($settings);
             if ($office !== null) {
-                self::insert('offices', 0, $office, self::text($settings->get('site.name')) ?? '');
+                self::insert('offices', 0, $office, self::officeName($settings));
             }
             self::forget($settings, self::OFFICE_KEYS);
         });
@@ -91,9 +91,13 @@ return new class extends Migration
             return null;
         }
 
-        $name = self::text($settings->get('site.name')) ?? 'Office';
+        return ['name' => [app(Languages::class)->defaultLocale() => self::officeName($settings)], ...$data];
+    }
 
-        return ['name' => [app(Languages::class)->defaultLocale() => $name], ...$data];
+    /** The office's name and its entry title: the site name, else "Office". */
+    private static function officeName(Settings $settings): string
+    {
+        return self::text($settings->get('site.name')) ?? 'Office';
     }
 
     /** @return list<array{label: string, name?: string, href: string}> */

@@ -81,3 +81,13 @@ it('keeps the settings of a collection that already has entries', function (): v
         ->and(Entry::query()->where('collection', 'socials')->count())->toBe(1)
         ->and($settings->get('site.contacts.socials'))->toBeNull();
 });
+
+it('titles an office with no site name by its fallback name', function (): void {
+    app(Settings::class)->set('site.contacts.phones', [['number' => '+380 44 000 0001']]);
+
+    contactsToCollectionsMigration()->up();
+
+    $office = Entry::query()->where('collection', 'offices')->sole();
+    expect($office->title)->toBe('Office')
+        ->and($office->data['name'])->toBe(['en' => 'Office']);
+});
