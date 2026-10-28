@@ -131,6 +131,9 @@ describe("tags as a category subtype (A-thin)", () => {
 		expect(created.label).toBe("Street food");
 		expect([page?.type, page?.subtype, page?.parentId, page?.status, page?.createdBy]).toEqual(["category", "tag", ids.tags, "published", 1]);
 		expect((await load(cms, "/tags/street-food")).status).toBe(200);
+
+		const again = await send(`${url}/select-create/field_tagged_post__tags`, { name: " japan " }, url);
+		expect(await again.json()).toEqual({ value: String(ids.japan), label: "Japan" });
 	});
 
 	test("the select refuses the first tag: the first one shows where tags live", async () => {
