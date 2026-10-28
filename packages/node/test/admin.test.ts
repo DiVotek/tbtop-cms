@@ -205,5 +205,7 @@ describe("host tabs on Site settings (siteSettings)", () => {
 	test("a field name the page already uses is refused", async () => {
 		const clash = { tabs: (s: S) => [{ label: "Mine", children: [s.text("site_name")] }] };
 		await expect(hostPanel(undefined, { siteSettings: clash })).rejects.toThrow('"site_name" is already on the Site settings page');
+		const phones = { tabs: (s: S) => [{ label: "Mine", children: [s.text("phones")] }] };
+		await expect(hostPanel(undefined, { siteSettings: phones })).rejects.toThrow('"phones" is already on the Site settings page');
 	});
 });

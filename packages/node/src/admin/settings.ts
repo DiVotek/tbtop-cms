@@ -90,10 +90,13 @@ const SITE_MAP: Record<string, string> = {
 	site_favicon: "site.favicon",
 };
 
-/** The host tabs' fields by name, each at `site.<name>`; a name the page already uses (or its key) throws. */
+/** The settings object's keys filled from the built-in collections (settingsObject): no host field may take them. */
+const COLLECTION_KEYS = [PHONES, EMAILS, SOCIALS];
+
+/** The host tabs' fields by name, each at `site.<name>`; a name the page or the settings object already uses throws. */
 function hostSiteMap(cms: Cms): Record<string, string> {
 	const tabs = cms.config.siteSettings?.tabs(new S()) ?? [];
-	const taken = new Set([...Object.keys(SITE_MAP), ...Object.values(SITE_MAP)]);
+	const taken = new Set([...Object.keys(SITE_MAP), ...Object.values(SITE_MAP), ...COLLECTION_KEYS]);
 	const map: Record<string, string> = {};
 	for (const field of tabFields(tabs.flatMap((tab) => tab.children))) {
 		const key = `site.${field.name}`;
