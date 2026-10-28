@@ -66,20 +66,14 @@ export function CollectionForm({ id, value, onChange, disabled, invalid, describ
 			{current.mode === "latest" && cap !== 1 ? (
 				<label className="flex items-center gap-2 text-sm">
 					<span>{options?.limitLabel ?? "How many"}</span>
-					<Input
+					<LimitInput
 						id={id}
-						type="number"
-						min={1}
-						max={cap ?? undefined}
-						value={current.limit ?? options?.defaultLimit ?? 3}
-						onChange={(e) => {
-							const limit = Number.parseInt(e.target.value, 10);
-							onChange({ mode: "latest", limit: Number.isNaN(limit) ? 1 : Math.max(1, cap === null ? limit : Math.min(cap, limit)) });
-						}}
+						limit={current.limit ?? options?.defaultLimit ?? 3}
+						cap={cap}
+						onChange={(limit) => onChange({ mode: "latest", limit })}
 						disabled={disabled}
-						aria-invalid={invalid}
-						aria-describedby={describedBy}
-						className="w-24"
+						invalid={invalid}
+						describedBy={describedBy}
 					/>
 				</label>
 			) : null}
@@ -97,6 +91,49 @@ export function CollectionForm({ id, value, onChange, disabled, invalid, describ
 				/>
 			) : null}
 		</div>
+	);
+}
+
+/** A typed count, clamped to 1…cap; null while the text is no number yet (cleared to retype), so nothing is saved. */
+export function limitFrom(text: string, cap: number | null): number | null {
+	const typed = Number.parseInt(text, 10);
+	return Number.isNaN(typed) ? null : Math.max(1, cap === null ? typed : Math.min(cap, typed));
+}
+
+interface LimitInputProps {
+	id?: string;
+	limit: number;
+	cap: number | null;
+	onChange: (limit: number) => void;
+	disabled?: boolean;
+	invalid?: boolean;
+	describedBy?: string;
+}
+
+/** The latest-N count: the typed text stays as typed (so it can be cleared), a number is clamped and saved, blur shows the saved one. */
+function LimitInput({ id, limit, cap, onChange, disabled, invalid, describedBy }: LimitInputProps) {
+	const [draft, setDraft] = useState<string | null>(null);
+
+	return (
+		<Input
+			id={id}
+			type="number"
+			min={1}
+			max={cap ?? undefined}
+			value={draft ?? String(limit)}
+			onChange={(e) => {
+				setDraft(e.target.value);
+				const next = limitFrom(e.target.value, cap);
+				if (next !== null) {
+					onChange(next);
+				}
+			}}
+			onBlur={() => setDraft(null)}
+			disabled={disabled}
+			aria-invalid={invalid}
+			aria-describedby={describedBy}
+			className="w-24"
+		/>
 	);
 }
 

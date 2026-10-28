@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { type AdminClient, ClientProvider } from "@tbtop/inertia-admin";
-import { CollectionCell, CollectionForm } from "./collectionField";
+import { CollectionCell, CollectionForm, limitFrom } from "./collectionField";
 import type { CollectionOptions, CollectionValue } from "./types";
 import { parseCollectionValue } from "./types";
 
@@ -63,6 +63,15 @@ describe("CollectionForm modes", () => {
 			</ClientProvider>,
 		);
 		expect(queryByText("All")).toBeNull();
+	});
+});
+
+describe("limitFrom", () => {
+	it("saves nothing while the count is cleared, and clamps a typed one to 1…cap", () => {
+		expect(limitFrom("", 10)).toBeNull();
+		expect(limitFrom("12", 10)).toBe(10);
+		expect(limitFrom("0", null)).toBe(1);
+		expect(limitFrom("5", null)).toBe(5);
 	});
 });
 
