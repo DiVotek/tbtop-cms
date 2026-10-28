@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Admin\Collections;
 
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Tbtop\Admin\Actions\ActionCtx;
 use Tbtop\Admin\Actions\Effects;
@@ -70,7 +71,7 @@ final class CollectionTable
             ->searchable(['title'])
             ->reorderable('sort_order')
             ->recordUrl(static fn (object $row): string => self::editUrl($key, (int) ($row->id ?? 0)))
-            ->rowActions([self::deleteAction($s, $name, $key)])
+            ->rowActions([self::deleteAction($s, $name, fn (): Builder => $this->query())])
             ->emptyState(__('tbtop-cms::collections.empty.title'), __('tbtop-cms::collections.empty.description'));
 
         return $this->pageId === null ? $table : $table->embedded();
@@ -102,13 +103,14 @@ final class CollectionTable
         return $query;
     }
 
-    private static function deleteAction(S $s, string $table, string $key): ActionBuilder
+    /** @param  Closure(): Builder<Entry>  $query  the table's own scope, so a row it does not show cannot be deleted through it */
+    private static function deleteAction(S $s, string $table, Closure $query): ActionBuilder
     {
         return $s->action($table . 'Delete')->label('')->icon('trash')->color('danger')
             ->tooltip(__('tbtop-cms::collections.actions.delete'))
             ->confirm(__('tbtop-cms::collections.actions.delete_title'), __('tbtop-cms::collections.actions.delete_confirm'))
-            ->handle(static function (ActionCtx $ctx) use ($table, $key): Effects {
-                $entry = Entry::query()->of($key)->find($ctx->key());
+            ->handle(static function (ActionCtx $ctx) use ($table, $query): Effects {
+                $entry = $query()->find($ctx->key());
                 $entry?->delete();
 
                 return Effects::make()->notify(__('tbtop-cms::collections.actions.deleted'))->refreshTable($table);

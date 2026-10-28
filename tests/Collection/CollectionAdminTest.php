@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tbtop\Admin\Actions\ActionCtx;
+use Tbtop\Admin\Dsl\ActionBuilder;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Admin\Dsl\StructureWalk;
 use Tbtop\Cms\Admin\Collections\CollectionTable;
 use Tbtop\Cms\Collection\CollectionRegistry;
 use Tbtop\Cms\Collection\Models\Entry;
@@ -108,6 +111,22 @@ it('narrows an embedded table to the entries related to a page', function (): vo
     $rows = ($table->queryClosure())()->get();
 
     expect($rows->pluck('title')->all())->toBe(['A']);
+});
+
+it('deletes from an embedded table only the entries it shows', function (): void {
+    config(['tbtop-cms.collections' => [ReviewsCollection::class]]);
+    app()->instance(CollectionRegistry::class, new CollectionRegistry);
+    $service = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Audit']]);
+    $related = Entry::query()->create(['collection' => 'review', 'data' => ['author' => 'A', 'services' => [(string) $service->id]]]);
+    $other = Entry::query()->create(['collection' => 'review', 'data' => ['author' => 'B', 'services' => ['999']]]);
+
+    $table = CollectionTable::make(new S, 'review')->relatedTo($service)->build();
+    $delete = collect(StructureWalk::actionSearchDescendants($table->toNode()))->first(static fn (mixed $node): bool => $node instanceof ActionBuilder && str_ends_with($node->name, 'Delete'));
+    $handle = $delete->handler();
+    $handle(new ActionCtx(request(), null, row: ['id' => $other->id]));
+    $handle(new ActionCtx(request(), null, row: ['id' => $related->id]));
+
+    expect(Entry::query()->pluck('id')->all())->toBe([$other->id]);
 });
 
 it('finds entries for the collection field picker, by title and by id', function (): void {
