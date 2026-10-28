@@ -41,11 +41,13 @@ class TagPageType extends CategoryType
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array{items: list<array{id: string, name: string, url: string}>, pagination: array{page: int, pages: int, total: int, perPage: int}}
+     * @return array<string, mixed>
      */
     #[\Override]
     public function resolveFields(array $input, ResolveContext $ctx): array
     {
-        return Cms::referencedByLinksPaged($ctx->page, 'tags', from: 'article', perPage: 2);
+        $articles = Cms::referencedByLinksPaged($ctx->page, 'tags', from: 'article', perPage: 2);
+
+        return [...$articles, 'siblings' => Cms::childrenLinksPaged($ctx->page?->parent, perPage: 10)];
     }
 }

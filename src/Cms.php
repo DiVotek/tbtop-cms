@@ -147,7 +147,7 @@ class Cms
             return $this->emptyPage($perPage);
         }
 
-        return $this->paged->take($this->refs->sourcesQuery($page, $field, $from), $perPage, $pageNumber);
+        return $this->paged->take($this->refs->sourcesQuery($page, $field, $from), $page, $perPage, $pageNumber);
     }
 
     /**
@@ -176,7 +176,7 @@ class Cms
 
         $query = PageRefIndex::ofType(Page::query()->live()->where('parent_id', $page->getKey()), $from);
 
-        return $this->paged->take($query, $perPage, $pageNumber);
+        return $this->paged->take($query, $page, $perPage, $pageNumber);
     }
 
     /**

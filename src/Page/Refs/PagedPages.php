@@ -12,9 +12,10 @@ use Tbtop\Cms\Page\Models\Page;
 /**
  * One page of a live-pages list for an archive (a tag's articles, a
  * category's children): newest first by published_at, then id. The page
- * number comes from the request's `?page=` unless given. The listing is
- * recorded on CurrentPage, so the page being rendered gets a `?page=N`
- * canonical and a page past the end is a 404 (PageController).
+ * number comes from the request's `?page=` unless given. A listing of the
+ * page being rendered, by the request's number, is recorded on CurrentPage,
+ * so that page gets a `?page=N` canonical and a page past the end is a 404
+ * (PageController); a sidebar listing another page's archive is not.
  */
 final readonly class PagedPages
 {
@@ -24,9 +25,10 @@ final readonly class PagedPages
 
     /**
      * @param  Builder<Page>  $query  Live pages, unordered.
+     * @param  Page  $owner  The page whose archive this is (the tag, the category).
      * @return array{pages: list<Page>, pagination: array{page: int, pages: int, total: int, perPage: int}}
      */
-    public function take(Builder $query, int $perPage, ?int $pageNumber = null): array
+    public function take(Builder $query, Page $owner, int $perPage, ?int $pageNumber = null): array
     {
         if ($perPage < 1) {
             throw new InvalidArgumentException('perPage needs at least 1.');
@@ -44,7 +46,10 @@ final readonly class PagedPages
             ->forPage($page, $perPage)
             ->get();
 
-        $this->current->paginate($page, $pages);
+        $rendered = $this->current->get();
+        if ($pageNumber === null && $rendered !== null && $rendered->is($owner)) {
+            $this->current->paginate($page, $pages);
+        }
 
         return [
             'pages' => array_values($rows->all()),

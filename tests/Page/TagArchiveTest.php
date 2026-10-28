@@ -65,7 +65,7 @@ function tagProps(Page $tag, string $query = ''): array
     return test()->get('/' . $tag->refresh()->pathFor('en') . $query, ['X-Inertia' => 'true'])->assertOk()->json('props');
 }
 
-it('lists the live articles of a tag newest first, a page at a time, each page its own canonical', function (): void {
+it('lists the live articles of a tag newest first, a page at a time, each page its own canonical, whatever else the page lists', function (): void {
     $japan = tag('Japan');
     taggedPost('Ramen', [$japan], ['published_at' => Carbon::parse('2026-10-01')]);
     taggedPost('Sushi', [$japan], ['published_at' => Carbon::parse('2026-10-03')]);
@@ -78,6 +78,7 @@ it('lists the live articles of a tag newest first, a page at a time, each page i
 
     expect(array_column($first['page']['fields']['items'], 'name'))->toBe(['Sushi', 'Onsen'])
         ->and($first['page']['fields']['pagination'])->toBe(['page' => 1, 'pages' => 2, 'total' => 3, 'perPage' => 2])
+        ->and(array_column($first['page']['fields']['siblings']['items'], 'name'))->toContain('Japan')
         ->and($first['seo']['canonical'])->toBe(url('/tags/japan'))
         ->and(array_column($second['page']['fields']['items'], 'name'))->toBe(['Ramen'])
         ->and($second['page']['fields']['pagination']['page'])->toBe(2)

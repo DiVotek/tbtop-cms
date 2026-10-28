@@ -607,7 +607,9 @@ public function resolveFields(array $input, ResolveContext $ctx): array
   ?int $pageNumber = null)` and `Cms::childrenLinksPaged()` do the same for
   the live children of a page (a category's articles). The page number is
   the request's `?page=` (a positive integer, else 1) unless given. Once a
-  paged call ran for the page being rendered, page 2 and on get `?page=N` on
+  paged call listed the page being rendered (its own tag or category, by the
+  request's number; a sidebar listing another page, or a given
+  `$pageNumber`, does not count), page 2 and on get `?page=N` on
   `seo.canonical` and `seo.ogUrl`, and a page number past the last answers
   404; a `?page=` on a page that listed nothing paged keeps the plain
   canonical. The title is not suffixed: render "page N" from `pagination`.
