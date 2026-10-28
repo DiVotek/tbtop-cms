@@ -328,10 +328,14 @@ class PagesPage extends AdminPage
     private function allTab(string $pages): Tab
     {
         $tab = $this->tab('all', __('tbtop-cms::pages.tabs.all'));
-        $unlisted = app(PageTypeRegistry::class)->unlistedInAllKeys();
+        $registry = app(PageTypeRegistry::class);
+        $unlisted = $registry->unlistedInAllKeys();
+        // A row's own type decides: its subtype when registered, else its base (a listed subtype of an unlisted base stays).
+        $listed = array_values(array_diff($registry->keys(), $unlisted));
 
-        return $unlisted === [] ? $tab : $tab->query(static fn (Builder $q): Builder => $q->whereNotIn("{$pages}.type", $unlisted)
-            ->where(static fn (Builder $sub): Builder => $sub->whereNull("{$pages}.subtype")->orWhereNotIn("{$pages}.subtype", $unlisted)));
+        return $unlisted === [] ? $tab : $tab->query(static fn (Builder $q): Builder => $q
+            ->where(static fn (Builder $sub): Builder => $sub->whereNull("{$pages}.subtype")->orWhereNotIn("{$pages}.subtype", $unlisted))
+            ->where(static fn (Builder $sub): Builder => $sub->whereNotIn("{$pages}.type", $unlisted)->orWhereIn("{$pages}.subtype", $listed)));
     }
 
     /**

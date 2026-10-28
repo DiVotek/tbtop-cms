@@ -84,7 +84,9 @@ it('lists the live articles of a tag newest first, a page at a time, each page i
         ->and($first['seo']['canonical'])->toBe(url('/tags/japan'))
         ->and(array_column($second['page']['fields']['items'], 'name'))->toBe(['Ramen'])
         ->and($second['page']['fields']['pagination']['page'])->toBe(2)
-        ->and($second['seo']['canonical'])->toBe(url('/tags/japan') . '?page=2');
+        ->and($second['seo']['canonical'])->toBe(url('/tags/japan') . '?page=2')
+        // Another page's listing ignores ?page=: the siblings still show on page 2.
+        ->and(array_column($second['page']['fields']['siblings']['items'], 'name'))->toContain('Japan');
 });
 
 it('answers 404 past the last page and ignores a malformed page number', function (): void {

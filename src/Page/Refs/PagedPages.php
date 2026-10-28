@@ -34,7 +34,10 @@ final readonly class PagedPages
             throw new InvalidArgumentException('perPage needs at least 1.');
         }
 
-        $page = max(1, $pageNumber ?? self::requested());
+        $rendered = $this->current->get();
+        // ?page= belongs to the rendered page's own archive; a sidebar listing another page starts at 1.
+        $own = $rendered === null || $rendered->is($owner);
+        $page = max(1, $pageNumber ?? ($own ? self::requested() : 1));
         $total = (clone $query)->count();
         $pages = max(1, (int) ceil($total / $perPage));
 
@@ -46,8 +49,7 @@ final readonly class PagedPages
             ->forPage($page, $perPage)
             ->get();
 
-        $rendered = $this->current->get();
-        if ($pageNumber === null && $rendered !== null && $rendered->is($owner)) {
+        if ($pageNumber === null && $rendered !== null && $own) {
             $this->current->paginate($page, $pages);
         }
 

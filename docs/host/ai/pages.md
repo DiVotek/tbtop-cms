@@ -609,7 +609,8 @@ public function resolveFields(array $input, ResolveContext $ctx): array
   the request's `?page=` (a positive integer, else 1) unless given. Once a
   paged call listed the page being rendered (its own tag or category, by the
   request's number; a sidebar listing another page, or a given
-  `$pageNumber`, does not count), page 2 and on get `?page=N` on
+  `$pageNumber`, does not count; such a listing also starts at page 1
+  instead of following `?page=`), page 2 and on get `?page=N` on
   `seo.canonical` and `seo.ogUrl`, and a page number past the last answers
   404; a `?page=` on a page that listed nothing paged keeps the plain
   canonical. The title is not suffixed: render "page N" from `pagination`.
