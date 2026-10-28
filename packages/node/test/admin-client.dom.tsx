@@ -9,6 +9,7 @@ GlobalRegistrator.register();
 const { act, cleanup, fireEvent, render, waitFor } = await import("@testing-library/react");
 const { ClientProvider, getBlockDescriptor } = await import("@tbtop/inertia-admin");
 const { CollectionCell, CollectionForm, LinkCell, LinkForm, linkFieldClient } = await import("../src/admin-client");
+const { limitFrom } = await import("../src/admin-client/collection/collectionField");
 
 afterEach(() => cleanup());
 afterAll(async () => {
@@ -185,6 +186,13 @@ function renderCollection(props: { options?: CollectionOptions; value?: Collecti
 }
 
 describe("collection field client", () => {
+	test("the latest count saves nothing while cleared, and clamps a typed one to 1…cap", () => {
+		expect(limitFrom("", 10)).toBeNull();
+		expect(limitFrom("12", 10)).toBe(10);
+		expect(limitFrom("0", null)).toBe(1);
+		expect(limitFrom("5", null)).toBe(5);
+	});
+
 	test("a mode switch starts from that mode's defaults; one allowed mode hides the switch", () => {
 		const onChange = mock(NOOP);
 		const { getByText, unmount } = renderCollection({ value: { mode: "manual", ids: ["4"] }, onChange });
