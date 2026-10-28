@@ -144,7 +144,7 @@ async function canonical(site: Site, page: Page, locale: string): Promise<string
 export const identityId = (site: Site): string => `${site.absolute("/")}#identity`;
 
 async function identityAuthor(site: Site): Promise<Record<string, unknown> | null> {
-	const identity = new SiteIdentity(site.settings);
+	const identity = new SiteIdentity(site.settings, site.contacts);
 	const schemaType = await identity.schemaType();
 	const name = await identity.name();
 	if (name === "" || schemaType === null || !((await identity.type()) === "person" || (await identity.isOrganisation()))) {
@@ -154,7 +154,7 @@ async function identityAuthor(site: Site): Promise<Record<string, unknown> | nul
 }
 
 async function identityPublisher(site: Site): Promise<Record<string, unknown> | null> {
-	const identity = new SiteIdentity(site.settings);
+	const identity = new SiteIdentity(site.settings, site.contacts);
 	const schemaType = await identity.schemaType();
 	const name = await identity.name();
 	if (!(await identity.isOrganisation()) || schemaType === null || name === "") {

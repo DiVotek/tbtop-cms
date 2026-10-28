@@ -5,6 +5,7 @@ import { type CmsAdminOverrides, createCmsAdmin } from "../admin/create";
 import { type DefaultAuth, type DefaultAuthOptions, defaultAuth, ensureFirstAdmin } from "../betterAuth/defaultAuth";
 import type { Catalog } from "../blocks/catalog";
 import { linkField, pagesField } from "../blocks/cmsFields";
+import { collectionField } from "../blocks/collectionField";
 import { type BlockImpl, implementBlocks } from "../blocks/registry";
 import { type Cms, createCms } from "../cms";
 import type { CmsConfig } from "../config";
@@ -13,13 +14,13 @@ import { ensureErrorPages } from "../frontend/errorPage";
 import type { PageProps } from "../frontend/load";
 import { type Fixture, seedFixtures } from "../fixtures/seed";
 import { baseNode, identityId, type SchemaContext } from "../seo/schemaContext";
-import { pageTypeDefs, type SeoHelpers, type Site, type SiteDef, type SitePageTypes } from "../define/define";
+import { collectionDefs, pageTypeDefs, type SeoHelpers, type Site, type SiteDef, type SitePageTypes } from "../define/define";
 import { type CmsFields, formOf } from "../define/fields";
 import type { CmsCacheStore } from "../support/cache";
 import { cmsRoutes, migrateAll, type PageRenderers, renderPage } from "./routes";
 
 /** The CMS config a site file does not hold: url, preview, forms, notifications, timezone and the rest. */
-export type SiteConfig = Omit<CmsConfig, "db" | "blocks" | "pageTypes" | "schemaTypes" | "seo" | "siteSettings" | "cache">;
+export type SiteConfig = Omit<CmsConfig, "db" | "blocks" | "pageTypes" | "collections" | "schemaTypes" | "seo" | "siteSettings" | "cache">;
 
 /** What `serve` and `cloudflare` take besides the site and what it runs on. */
 export type SiteOptions<D extends SiteDef> = Partial<PageRenderers<PageProps<SitePageTypes<D>>>> & {
@@ -56,7 +57,7 @@ export type Runtime = {
 	firstAdmin?: { email: string; password: string };
 };
 
-const cmsFields = { link: linkField, pages: pagesField } as unknown as CmsFields;
+const cmsFields = { link: linkField, pages: pagesField, collection: collectionField } as unknown as CmsFields;
 
 const helpers = (ctx: SchemaContext): SeoHelpers => ({ baseNode: (type) => baseNode(ctx, type), identityId: identityId(ctx.site) });
 
@@ -96,6 +97,7 @@ export function siteApp<const D extends SiteDef>(site: Site<D>, runtime: Runtime
 		db: db as Kysely<CmsDatabase>,
 		blocks: implementBlocks(site.catalog as Catalog, impls),
 		pageTypes: pageTypeDefs(def, cmsFields),
+		collections: collectionDefs(def, cmsFields),
 		schemaTypes: Object.entries(def.jsonLd ?? {}).map(([key, build]) => ({ key, build: (ctx: SchemaContext) => build(ctx, helpers(ctx)) })),
 		...(extend === undefined ? {} : { seo: { extend: (nodes, ctx) => extend(nodes, ctx, helpers(ctx)) } }),
 		...(settings === undefined

@@ -23,6 +23,13 @@ import { Submissions } from "./forms/submissions";
 import { Notifications } from "./notifications";
 import type { SchemaTypes } from "./seo/schemaTypes";
 import { ContentCache } from "./support/cache";
+import type { Collections } from "./content/collections";
+import { Entries, type Entry } from "./content/entries";
+import { SiteContacts } from "./content/siteContacts";
+import { EntryList, type ResolvedEntry } from "./content/entryList";
+import { flattenLocales, translatablePaths } from "./blocks/locale";
+import { resolveForm } from "./blocks/fields";
+import { S } from "@tbtop/admin";
 import { translate } from "./support/strings";
 
 /**
@@ -46,6 +53,15 @@ export class Site {
 	readonly submissions: Submissions;
 	readonly notifications: Notifications;
 	readonly notFound: NotFoundLog;
+	/** Collection entries, drafts included (the admin's store). */
+	readonly entries: Entries;
+	/** Phones, emails, offices and social links, from the built-in collections. */
+	readonly contacts: SiteContacts;
+	/** Published collections by `{key}:{locale}`, resolved once per request. */
+	private readonly collectionLists = new Map<string, Promise<EntryList>>();
+	/** Every published entry by collection, in one query for all the collections a request reads. */
+	private publishedEntries: Promise<Map<string, Entry[]>> | null = null;
+	private readonly cache: { store: ContentCache; read: boolean } | null;
 	/** Admin writes by a signed-in user (`activity_log`). */
 	readonly audit: AuditLog;
 	/** Link targets by locale and page id, on a frontend render (`cached`). */
@@ -55,6 +71,7 @@ export class Site {
 		readonly config: CmsConfig,
 		readonly pageTypes: PageTypes,
 		readonly schemaTypes: SchemaTypes,
+		readonly collections: Collections,
 		/** The site origin without a trailing slash: `https://example.com`. */
 		readonly origin: string,
 		/** Read settings and languages through `config.cache` (frontend requests); writes bump it either way. */
@@ -63,6 +80,7 @@ export class Site {
 		const db = config.db;
 		this.audit = new AuditLog(db);
 		const cache = config.cache === undefined ? null : { store: new ContentCache(config.cache.store, config.cache.ttl ?? 3600), read: options.cached === true };
+		this.cache = cache;
 		this.languages = new Languages(db, cache, this.audit);
 		this.settings = new Settings(db, {
 			cache,
@@ -86,6 +104,8 @@ export class Site {
 		this.submissions = new Submissions(db);
 		this.notFound = new NotFoundLog(db, this.settings, config.notFound?.ignore);
 		this.notifications = new Notifications(this);
+		this.contacts = new SiteContacts(this);
+		this.entries = new Entries(db, collections, () => this.languages.defaultLocale(), () => this.collectionsChanged(), this.audit);
 		// A frontend render reads; each page, slug and link target is loaded once for all its blocks and layouts.
 		this.targets = options.cached === true ? new Map() : null;
 		if (options.cached === true) {
@@ -228,6 +248,7 @@ export class Site {
 			pages: ((value: unknown, options?: { fields?: boolean }) =>
 				options?.fields === true ? this.pagesWithFields(value, locale, nested) : resolvePageRefs(this, value, locale)) as ResolveContext["pages"],
 			referencedBy: (field, from) => referencedByLinks(this, page, field, { locale, ...(from === undefined ? {} : { from }) }),
+			collection: (key) => this.collection(key, locale),
 			pageText: (field) => (page === null ? null : translationText(page, field, locale, fallback)),
 			t: (key) => translate(key, locale, fallback, this.config.strings),
 			site: this,
@@ -271,6 +292,70 @@ export class Site {
 
 	private async withLocale<R>(options: { locale?: string }, run: (locale: string) => Promise<R>): Promise<R> {
 		return run(options.locale ?? (await this.languages.defaultLocale()));
+	}
+
+	/**
+	 * Cms::collection: a collection's published entries resolved for the
+	 * locale (default language unless given), in the editor's order. The
+	 * whole collection is resolved once and kept under the content cache on
+	 * a frontend request; filter the list in memory.
+	 */
+	collection(key: string, locale?: string): Promise<EntryList> {
+		return this.withLocale(locale === undefined ? {} : { locale }, (resolved) => {
+			const memo = `${key}:${resolved}`;
+			let list = this.collectionLists.get(memo);
+			if (list === undefined) {
+				const collection = this.collections.get(key);
+				const compute = () => this.resolveEntries(key, resolved);
+				list = (this.cache?.read === true ? this.cache.store.remember(`collection:${memo}`, compute) : compute()).then((entries) => new EntryList(entries, collection.relatedField));
+				this.collectionLists.set(memo, list);
+				list.catch(() => this.collectionLists.delete(memo));
+			}
+			return list;
+		});
+	}
+
+	/** Each published entry flattened to the locale and resolved by the collection; one that throws is skipped with a warning. */
+	private async resolveEntries(key: string, locale: string): Promise<ResolvedEntry[]> {
+		const collection = this.collections.get(key);
+		const locales = (await this.languages.all()).map((row) => row.locale);
+		const ctx = await this.resolveContext(locale, null);
+		const form = collection.form(new S());
+		const paths = translatablePaths(form);
+		const out: ResolvedEntry[] = [];
+		for (const entry of (await this.published()).get(key) ?? []) {
+			try {
+				const input = flattenLocales(entry.data, locale, ctx.fallbackLocale, locales, paths);
+				const fields = collection.resolve === null ? await resolveForm(form, input, ctx) : await collection.resolve(input, ctx);
+				out.push({ ...fields, id: entry.id });
+			} catch (error) {
+				if (this.config.strictBlocks === true) {
+					throw error;
+				}
+				console.warn("collection.entry_resolve_failed", { collection: key, entry: entry.id, error: String(error) });
+			}
+		}
+		return out;
+	}
+
+	private published(): Promise<Map<string, Entry[]>> {
+		if (this.publishedEntries === null) {
+			const loading = this.entries.published();
+			this.publishedEntries = loading;
+			loading.catch(() => {
+				if (this.publishedEntries === loading) {
+					this.publishedEntries = null;
+				}
+			});
+		}
+		return this.publishedEntries;
+	}
+
+	/** An entry write: this request's lists and every cached one are stale. */
+	private async collectionsChanged(): Promise<void> {
+		this.collectionLists.clear();
+		this.publishedEntries = null;
+		await this.cache?.store.bump();
 	}
 
 	/** Forms::props: `action` (and `honeypotField`) for a named form (`formName`) posted from `page`; the default locale unless given. */

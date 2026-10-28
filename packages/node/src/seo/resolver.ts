@@ -336,7 +336,7 @@ async function jsonLd(
 }
 
 async function identityNode(site: Site, locale: string): Promise<Record<string, unknown> | null> {
-	const identity = new SiteIdentity(site.settings);
+	const identity = new SiteIdentity(site.settings, site.contacts);
 	const type = await identity.type();
 	const name = await identity.name();
 	if (type === "none" || name === "") {
@@ -353,7 +353,7 @@ async function identityNode(site: Site, locale: string): Promise<Record<string, 
 	if ((await identity.isOrganisation()) && logo !== null) {
 		node.logo = logo;
 	}
-	Object.assign(node, await identity.properties(locale, await site.languages.defaultLocale()));
+	Object.assign(node, await identity.properties(locale));
 	const sameAs = await identity.sameAs();
 	if (sameAs.length > 0) {
 		node.sameAs = sameAs;

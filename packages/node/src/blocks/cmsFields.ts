@@ -2,6 +2,7 @@ import { currentContext, defaultLocale, Field, Select, walk, type WithValue } fr
 import { LINK_TYPES, type LinkType } from "../content/link";
 import { acceptsType, pageId, pageNameOf, searchPages } from "../content/pageRefs";
 import type { Site } from "../site";
+import { CollectionField } from "./collectionField";
 
 /** The stored value of a link field: a target, never a resolved href, so a page link survives a slug change. */
 export type StoredLink = {
@@ -12,8 +13,8 @@ export type StoredLink = {
 	label?: Record<string, string | null> | string | null;
 };
 
-/** What the CMS editors hand a link or pages field: its page lookups and the admin's page-search URL. */
-export type CmsFieldBinding = { site: Site; searchEndpoint: string };
+/** What the CMS editors hand a link, pages or collection field: its lookups and the admin's search URLs. */
+export type CmsFieldBinding = { site: Site; searchEndpoint: string; entrySearchEndpoint?: (collection: string) => string };
 
 export const LINK_SHAPE_RULE = "link_shape";
 export const PAGE_REF_RULE = "page_ref";
@@ -178,10 +179,17 @@ export function pagesField<const N extends string>(name: N): PagesField<N> {
 	return new PagesField(name);
 }
 
-/** Hands every link and pages field in a form (repeaters included) the CMS lookups. */
+/** Hands every link, pages and collection field in a form (repeaters included) the CMS lookups. */
 export function bindCmsFields<T extends unknown[]>(fields: T, binding: CmsFieldBinding): T {
 	for (const field of walk.collectAll(fields, (value) => value instanceof LinkField || value instanceof PagesField)) {
 		(field as LinkField | PagesField).bindCms(binding);
+	}
+	const { site, entrySearchEndpoint } = binding;
+	for (const field of walk.collectAll(fields, (value) => value instanceof CollectionField)) {
+		(field as CollectionField).bindCms({
+			collection: (key) => (site.collections.has(key) ? site.collections.get(key) : null),
+			searchEndpoint: (key) => entrySearchEndpoint?.(key) ?? "",
+		});
 	}
 	return fields;
 }

@@ -228,7 +228,7 @@ describe("defineSite", () => {
 
 	test("a bare field record and pageType() both declare a page type, even with fields named `fields` and `options`", () => {
 		const s = defineSite({ pages: { page: { fields: f.text(), options: f.number() }, b: pageType({ a: f.text() }, { label: "B", jsonLd: "Service" }) }, blocks: { X: block({}) } });
-		const [page, b] = pageTypeDefs(s.def, { link: () => ({ types: () => null }), pages: () => ({ of: () => null }) });
+		const [page, b] = pageTypeDefs(s.def, { link: () => ({ types: () => null }), pages: () => ({ of: () => null }), collection: () => ({ of: () => null as never }) });
 		expect(Object.keys(page?.schema?.shape ?? {})).toEqual(["fields", "options"]);
 		expect(b).toMatchObject({ key: "b", label: "B", schemaTypes: ["Service"] });
 		expect(Object.keys(b?.schema?.shape ?? {})).toEqual(["a"]);
@@ -237,7 +237,7 @@ describe("defineSite", () => {
 	test("pageType() keeps a subtype's template, so its new pages start from the starter blocks", () => {
 		const starter = [{ kind: "Promo", data: { title: { en: "Hi" } } }];
 		const s = defineSite({ pages: { solution: pageType({}, { base: "page", template: () => starter }) }, blocks: { Promo: block({}) } });
-		const [solution] = pageTypeDefs(s.def, { link: () => ({ types: () => null }), pages: () => ({ of: () => null }) });
+		const [solution] = pageTypeDefs(s.def, { link: () => ({ types: () => null }), pages: () => ({ of: () => null }), collection: () => ({ of: () => null as never }) });
 		expect(solution?.template?.({} as never)).toEqual(starter);
 	});
 });

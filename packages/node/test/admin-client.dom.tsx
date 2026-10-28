@@ -1,14 +1,14 @@
 import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import type { AdminClient } from "@tbtop/inertia-admin";
-import type { LinkOptions, LinkValue } from "../src/admin-client";
+import type { CollectionOptions, CollectionValue, LinkOptions, LinkValue } from "../src/admin-client";
 
 // A DOM for this file only, in its own `bun test` process (`test:dom`): in CI a second happy-dom register in one process left this suite hanging.
 const realFetch = globalThis.fetch;
 GlobalRegistrator.register();
 const { act, cleanup, fireEvent, render, waitFor } = await import("@testing-library/react");
 const { ClientProvider, getBlockDescriptor } = await import("@tbtop/inertia-admin");
-const { LinkCell, LinkForm, linkFieldClient } = await import("../src/admin-client");
+const { CollectionCell, CollectionForm, LinkCell, LinkForm, linkFieldClient } = await import("../src/admin-client");
 
 afterEach(() => cleanup());
 afterAll(async () => {
@@ -165,5 +165,61 @@ describe("@tbtop/cms/admin-client", () => {
 			expect(container.textContent).toBe(expected);
 			unmount();
 		}
+	});
+});
+
+const COLLECTION: CollectionOptions = {
+	searchEndpoint: "/admin/collections/review/entry-search/select-options/entry",
+	allowedModes: ["all", "latest", "related", "manual"],
+	cap: null,
+	defaultLimit: 3,
+	collectionLabel: "Reviews",
+};
+
+function renderCollection(props: { options?: CollectionOptions; value?: CollectionValue | null; onChange?: (next: CollectionValue | null) => void; client?: AdminClient }) {
+	return render(
+		<ClientProvider client={props.client ?? stubClient(async () => ({ options: [] }))}>
+			<CollectionForm name="reviews" id="reviews" value={props.value ?? null} onChange={props.onChange ?? NOOP} options={(props.options ?? COLLECTION) as Record<string, unknown>} />
+		</ClientProvider>,
+	);
+}
+
+describe("collection field client", () => {
+	test("a mode switch starts from that mode's defaults; one allowed mode hides the switch", () => {
+		const onChange = mock(NOOP);
+		const { getByText, unmount } = renderCollection({ value: { mode: "manual", ids: ["4"] }, onChange });
+		fireEvent.click(getByText("Latest"));
+		expect(onChange).toHaveBeenCalledWith({ mode: "latest", limit: 3 });
+		unmount();
+		const { queryByText } = renderCollection({ options: { ...COLLECTION, allowedModes: ["manual"] } });
+		expect(queryByText("All")).toBeNull();
+	});
+
+	test("stored ids are named from one {values} lookup; a searched entry is added at the end", async () => {
+		const post = mock(async (_url: string, body?: unknown) => {
+			const payload = body as { values?: string[]; search?: string };
+			return payload.values !== undefined ? { options: [{ value: "4", label: "Anna" }] } : { options: [{ value: "7", label: "Boris (draft)" }] };
+		});
+		const onChange = mock(NOOP);
+		const { getByText, findByText } = renderCollection({ value: { mode: "manual", ids: ["4"] }, onChange, client: stubClient(post) });
+		expect(await findByText("Anna")).toBeTruthy();
+		fireEvent.click(getByText("Add · Reviews"));
+		fireEvent.click(await findByText("Boris (draft)"));
+		await waitFor(() => expect(onChange).toHaveBeenCalledWith({ mode: "manual", ids: ["4", "7"] }));
+		expect(post.mock.calls[0]).toEqual(["/admin/collections/review/entry-search/select-options/entry", { values: ["4"] }]);
+		// The popover's close and focus return run on timers: let them finish while the DOM is still here.
+		await settle();
+	});
+
+	test("picks move and go; the cell summarises the mode", async () => {
+		const onChange = mock(NOOP);
+		const { getAllByLabelText } = renderCollection({ value: { mode: "manual", ids: ["1", "2"] }, onChange });
+		fireEvent.click(getAllByLabelText("Down")[0] as HTMLElement);
+		expect(onChange).toHaveBeenCalledWith({ mode: "manual", ids: ["2", "1"] });
+		fireEvent.click(getAllByLabelText("Remove")[1] as HTMLElement);
+		expect(onChange).toHaveBeenCalledWith({ mode: "manual", ids: ["1"] });
+		const { container } = render(<CollectionCell value={{ mode: "latest", limit: 4 }} options={COLLECTION as Record<string, unknown>} />);
+		expect(container.textContent).toBe("Latest: 4");
+		await settle();
 	});
 });

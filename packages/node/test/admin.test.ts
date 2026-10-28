@@ -67,7 +67,7 @@ describe("admin pages", () => {
 		expect(items).toEqual([
 			["content", ["Pages", "Redirects", "404 log", "SEO report"]],
 			["design", ["Layouts", "Blocks", "Shared blocks"]],
-			["settings", ["Languages", "Site settings", "SEO settings", "Notifications", "Audit log", "Site health"]],
+			["settings", ["Languages", "Site settings", "Offices", "Social links", "SEO settings", "Notifications", "Audit log", "Site health"]],
 		]);
 	});
 
@@ -114,11 +114,10 @@ describe("admin pages", () => {
 
 	test("site settings save to their dotted keys", async () => {
 		const { cms, post } = await panel();
-		const res = await post("/admin/settings/site/forms/settings_site", { site_name: "Renamed", phones: [{ number: "+1 555 0100" }] }, "/admin/settings/site");
+		const res = await post("/admin/settings/site/forms/settings_site", { site_name: "Renamed" }, "/admin/settings/site");
 		expect(res.status).toBe(303);
 		const settings = cms.site().settings;
 		expect(await settings.get("site.name")).toBe("Renamed");
-		expect(await settings.get("site.contacts.phones")).toEqual([{ number: "+1 555 0100" }]);
 	});
 
 	test("retrying a delivered or deleted submission says so", async () => {

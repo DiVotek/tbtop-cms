@@ -3,6 +3,8 @@ import type { CmsConfig } from "./config";
 import type { AuditEntry } from "./content/audit";
 import { rebuildPageRefs } from "./content/pageRefIndex";
 import { type PageTypeDef, PageTypes } from "./content/pageTypes";
+import { Collections } from "./content/collections";
+import { BUILT_IN_COLLECTIONS } from "./content/builtInCollections";
 import { notifySubmission, retrySubmission } from "./forms/notifier";
 import { submitForm } from "./forms/submit";
 import { submitThrottle } from "./forms/throttle";
@@ -27,6 +29,8 @@ export type Cms<T extends readonly PageTypeDef[] = any> = {
 	readonly config: CmsConfig<T>;
 	readonly pageTypes: PageTypes;
 	readonly schemaTypes: SchemaTypes;
+	/** The registered collections: the built-in offices and socials, then `config.collections`. */
+	readonly collections: Collections;
 	/** A fresh per-request view of the stores; the origin comes from `url` or the request. */
 	site(request?: Request): Site;
 	/**
@@ -112,15 +116,17 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 	const pageTypes = new PageTypes(config.pageTypes);
 	warnUnknownPlacements(config, pageTypes);
 	const schemaTypes = new SchemaTypes(config.schemaTypes);
+	const collections = new Collections([...BUILT_IN_COLLECTIONS, ...(config.collections ?? [])]);
 	const throttle = submitThrottle(config.forms);
 	const site = (request?: Request, options: { cached?: boolean } = {}): Site => {
 		const origin = (config.url ?? (request === undefined ? "http://localhost" : new URL(request.url).origin)).replace(/\/+$/, "");
-		return new Site(config, pageTypes, schemaTypes, origin, options);
+		return new Site(config, pageTypes, schemaTypes, collections, origin, options);
 	};
 	const cms: Cms<T> = {
 		config,
 		pageTypes,
 		schemaTypes,
+		collections,
 		site: (request) => site(request),
 		// The props match T only as far as the page types' schemas checked them: resolved fields that fail one are dropped.
 		loadPage: async (request, { waitUntil } = {}) => {

@@ -1,3 +1,4 @@
+import { ENTRY_PUBLISHED, type EntryStatus } from "../content/entries";
 import type { Cms } from "../cms";
 import type { Translations } from "../content/page";
 import { ensureDefaultLanguage } from "../content/languages";
@@ -54,6 +55,8 @@ export type Fixture = {
 		frontend?: boolean;
 	}[];
 	settings?: Record<string, unknown>;
+	/** Collection entries in order, published unless `status` says otherwise. */
+	entries?: { collection: string; data: Record<string, unknown>; status?: EntryStatus }[];
 	sharedBlocks?: { key: string; name: string; kind: string; data: Record<string, unknown> }[];
 	pages?: FixturePage[];
 	layout?: { header?: FixtureBlock[]; footer?: FixtureBlock[] };
@@ -123,6 +126,9 @@ export async function seedFixtures(cms: Cms, fixture: Fixture): Promise<Record<s
 		site.languages.forget();
 	}
 	await site.settings.setMany(fixture.settings ?? {});
+	for (const entry of fixture.entries ?? []) {
+		await site.entries.create({ ...entry, status: entry.status ?? ENTRY_PUBLISHED });
+	}
 
 	const shared = new Map<string, number>();
 	for (const block of fixture.sharedBlocks ?? []) {

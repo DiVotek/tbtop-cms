@@ -1,12 +1,14 @@
 import { definePage, Effects, S } from "@tbtop/admin";
 import type { Cms } from "../cms";
 import { tabFields } from "../content/hostSettings";
-import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
+import { BUSINESS_SUBTYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
 import { adminPrefix, editFooter, listHeader, NAV, siteOf } from "./support";
+import { collectionListUrl } from "./collections";
+import { OFFICES, SOCIALS } from "../content/builtInCollections";
 
 /** A settings page (SettingsPageBase): form fields mapped to dotted settings keys. */
 function settingsPage(
@@ -19,8 +21,6 @@ function settingsPage(
 		map: Record<string, string>;
 		fields: (s: S) => unknown[];
 		defaults?: Dict;
-		/** Repeater fields stored as trimmed rows of these keys, an empty list included (cleanRows). */
-		rows?: Record<string, string[]>;
 		/** A save-time check that may rewrite the form (normalizeForm + validateForm): an error message rejects the whole save. */
 		prepare?: (form: Dict, site: Site) => string | null | Promise<string | null>;
 	},
@@ -48,12 +48,6 @@ function settingsPage(
 				.onSubmit(async (ctx) => {
 					const site = siteOf(cms, ctx);
 					const form = { ...(ctx.form as Dict) };
-					const rows = options.rows ?? {};
-					for (const [field, keys] of Object.entries(rows)) {
-						if (field in form) {
-							form[field] = cleanRows(form[field], keys);
-						}
-					}
 					const rejected = (await options.prepare?.(form, site)) ?? null;
 					if (rejected !== null) {
 						return Effects.make().notify(rejected, "error");
@@ -62,7 +56,7 @@ function settingsPage(
 						if (!(field in form)) {
 							continue;
 						}
-						const value = field in rows ? form[field] : normalize(form[field]);
+						const value = normalize(form[field]);
 						if (value === null) {
 							await site.settings.forget(key);
 						} else {
@@ -90,40 +84,10 @@ function normalize(value: unknown): unknown {
 	return value ?? null;
 }
 
-/** SiteSettingsPage::cleanRows: each row keeps only its own trimmed, non-blank keys; empty rows go. */
-function cleanRows(value: unknown, keys: string[]): Dict[] {
-	const clean: Dict[] = [];
-	for (const row of Array.isArray(value) ? value : []) {
-		if (typeof row !== "object" || row === null) {
-			continue;
-		}
-		const values: Dict = {};
-		for (const key of keys) {
-			const cell = (row as Dict)[key];
-			if (typeof cell === "string" && cell.trim() !== "") {
-				values[key] = cell.trim();
-			}
-		}
-		if (Object.keys(values).length > 0) {
-			clean.push(values);
-		}
-	}
-	return clean;
-}
-
-/** The `requiredWith` pair on a social row: once any field is filled, the label and the link are required. */
-function socialsComplete(form: Dict): string | null {
-	const socials = Array.isArray(form.socials) ? (form.socials as Dict[]) : [];
-	return socials.every((row) => "label" in row && "href" in row) ? null : "Each social profile needs a short label and a link.";
-}
-
 const SITE_MAP: Record<string, string> = {
 	site_name: "site.name",
 	site_logo: "site.logo",
 	site_favicon: "site.favicon",
-	phones: "site.contacts.phones",
-	emails: "site.contacts.emails",
-	socials: "site.contacts.socials",
 };
 
 /** The host tabs' fields by name, each at `site.<name>`; a name the page already uses (or its key) throws. */
@@ -148,8 +112,6 @@ export function siteSettings(cms: Cms) {
 		subtitle: "General site identity: name, logo, and favicon.",
 		nav: { label: "Site settings", icon: "settings", order: 20 },
 		map: { ...SITE_MAP, ...hostSiteMap(cms) },
-		rows: { phones: ["number"], emails: ["address"], socials: ["label", "name", "href"] },
-		prepare: socialsComplete,
 		fields: (s) => [
 			s.tabs([
 				{
@@ -165,16 +127,18 @@ export function siteSettings(cms: Cms) {
 				{
 					label: "Contacts",
 					children: [
-						s.repeater("phones").label("Phones").fields([s.text("number").label("Number").placeholder("+380 44 000 00 00").rules("nullable|max:40")]),
-						s.repeater("emails").label("Emails").fields([s.text("address").label("Address").rules("nullable|email|max:190")]),
 						s
-							.repeater("socials")
-							.label("Social profiles")
-							.fields([
-								s.text("label").label("Short label").placeholder("TG").rules("nullable|max:8"),
-								s.text("name").label("Name").placeholder("Telegram").rules("nullable|max:40"),
-								s.text("href").label("Link").rules("nullable|url|max:255"),
-							]),
+							.displayText(
+								"Phones, emails, the address and opening hours belong to an office; the first published office is the main one. Social links are their own list.",
+							)
+							.variant("muted"),
+						s.flex(
+							[
+								s.action("openOffices").label("Offices").icon("map-pin").url(collectionListUrl(cms, OFFICES)),
+								s.action("openSocials").label("Social links").icon("share-2").url(collectionListUrl(cms, SOCIALS)),
+							],
+							{ align: "center" },
+						),
 					],
 				},
 				...(cms.config.siteSettings?.tabs(s) ?? []),
@@ -197,7 +161,6 @@ const IDENTITY = [
 	{ value: "local_business", label: "Local business" },
 ];
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 /** Per-type template fields, keyed as the resolver reads them (SeoSettingsPage::typeTemplateMap). */
 function typeTemplateMap(cms: Cms): Record<string, string> {
@@ -241,54 +204,14 @@ function verificationToken(form: Dict, field: string, metaName: string): string 
 	return null;
 }
 
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-/** The identity rules of organisationFields/localBusinessFields that apply to the chosen type. */
-async function identityError(form: Dict, site: Site): Promise<string | null> {
-	const type = typeof form.seo_identity_type === "string" ? form.seo_identity_type : "none";
-	if (!ORGANISATION_TYPES.includes(type)) {
-		return null;
-	}
-	const country = form.seo_identity_country;
-	if (typeof country === "string" && country !== "" && !/^[A-Za-z]{2}$/.test(country)) {
-		return "The country must be a two-letter ISO code.";
-	}
-	if (type !== "local_business") {
-		return null;
-	}
-	const locale = await site.languages.defaultLocale();
-	for (const [field, label] of [["seo_identity_street", "street"], ["seo_identity_locality", "city"]]) {
-		const value = form[field as string];
-		const text = typeof value === "object" && value !== null ? (value as Dict)[locale] : value;
-		if (typeof text !== "string" || text.trim() === "") {
-			return `A local business needs its ${label}.`;
-		}
-	}
-	const rows = Array.isArray(form.seo_identity_opening_hours) ? (form.seo_identity_opening_hours as Dict[]) : [];
-	for (const row of rows) {
-		const days = Array.isArray(row.days) ? row.days : [];
-		if (days.length === 0 || !days.every((day) => DAYS.includes(String(day)))) {
-			return "Each opening hours row needs its days.";
-		}
-		if (!TIME.test(String(row.opens ?? "")) || !TIME.test(String(row.closes ?? ""))) {
-			return "Each opening hours row needs an opening and a closing time (HH:MM).";
-		}
-	}
-	return null;
-}
-
-/** SeoSettingsPage::normalizeForm plus the identity rules: refuses owned robots lines and bad tokens, upper-cases the country. */
-async function prepareSeo(form: Dict, site: Site): Promise<string | null> {
+/** SeoSettingsPage::normalizeForm: refuses owned robots lines and bad verification tokens. */
+async function prepareSeo(form: Dict): Promise<string | null> {
 	const rejected =
 		robotsExtraError(form.seo_robots_extra) ??
 		verificationToken(form, "seo_verification_google", "google-site-verification") ??
-		verificationToken(form, "seo_verification_bing", "msvalidate.01") ??
-		(await identityError(form, site));
+		verificationToken(form, "seo_verification_bing", "msvalidate.01");
 	if (rejected !== null) {
 		return rejected;
-	}
-	if (typeof form.seo_identity_country === "string") {
-		form.seo_identity_country = form.seo_identity_country.toUpperCase();
 	}
 	// Stored as the bare id, so the reopened page shows it instead of the pasted snippet.
 	if (typeof form.seo_gtm_container_id === "string") {
@@ -321,14 +244,6 @@ export function seoSettings(cms: Cms) {
 			seo_identity_logo: "seo.identity.logo",
 			seo_identity_subtype: "seo.identity.subtype",
 			seo_identity_subtype_custom: "seo.identity.subtype_custom",
-			seo_identity_street: "seo.identity.address.street",
-			seo_identity_locality: "seo.identity.address.locality",
-			seo_identity_region: "seo.identity.address.region",
-			seo_identity_postal_code: "seo.identity.address.postal_code",
-			seo_identity_country: "seo.identity.address.country",
-			seo_identity_latitude: "seo.identity.geo.latitude",
-			seo_identity_longitude: "seo.identity.geo.longitude",
-			seo_identity_opening_hours: "seo.identity.opening_hours",
 			seo_verification_google: "seo.verification.google",
 			seo_verification_bing: "seo.verification.bing",
 			seo_gtm_container_id: "seo.gtm_container_id",
@@ -392,25 +307,9 @@ export function seoSettings(cms: Cms) {
 							.label("Business type")
 							.options([...BUSINESS_SUBTYPES.map((value) => ({ value, label: value })), { value: "other", label: "Other" }]),
 						s.text("seo_identity_subtype_custom").label("Other business type").regex("/^[A-Z][A-Za-z]+$/"),
-						s.text("seo_identity_street").label("Street").translatable(),
-						s.text("seo_identity_locality").label("City").translatable(),
-						s.text("seo_identity_region").label("Region").translatable(),
-						s.text("seo_identity_postal_code").label("Postal code"),
-						s.text("seo_identity_country").label("Country (ISO code)").placeholder("UA"),
-						s.number("seo_identity_latitude").label("Latitude").rules("nullable|numeric|between:-90,90"),
-						s.number("seo_identity_longitude").label("Longitude").rules("nullable|numeric|between:-180,180"),
 						s
-							.repeater("seo_identity_opening_hours")
-							.label("Opening hours")
-							.fields([
-								s
-									.select("days")
-									.label("Days")
-									.multiple()
-									.options(DAYS.map((day) => ({ value: day, label: day }))),
-								s.time("opens").label("Opens"),
-								s.time("closes").label("Closes"),
-							]),
+							.displayText("The address, phones, emails, opening hours and coordinates come from the main office (Settings → Offices); the other offices are published as its departments.")
+							.variant("muted"),
 					],
 				},
 				{

@@ -1,6 +1,7 @@
 import type { HostRule, NavLink, NotificationStore, PageDef, S, SessionResolver } from "@tbtop/admin";
 import type { Kysely } from "kysely";
 import type { CmsAbility } from "./admin/abilities";
+import type { CollectionDef } from "./content/collections";
 import type { BlockRegistry } from "./blocks/registry";
 import type { Cms } from "./cms";
 import type { CmsDatabase } from "./db/schema";
@@ -34,6 +35,12 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	blocks: BlockRegistry;
 	/** Extra page types next to the built-in page, category and article. */
 	pageTypes?: T;
+	/**
+	 * Collections: records with no page of their own (reviews, team), edited
+	 * under their own menu item and picked by a block's `collection` field.
+	 * The built-in `offices` and `socials` are always there.
+	 */
+	collections?: CollectionDef[];
 	/** Extra JSON-LD schema types next to the built-in WebPage family, Article family and CollectionPage. */
 	schemaTypes?: SchemaTypeDef[];
 	/**

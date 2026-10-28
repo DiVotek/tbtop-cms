@@ -1,9 +1,11 @@
 import { z } from "zod";
 import type { Placement } from "../blocks/catalog";
 import type { BlockImpl } from "../blocks/registry";
+import type { CollectionDef } from "../content/collections";
 import type { PageTypeDef } from "../content/pageTypes";
 import type { SchemaContext } from "../seo/schemaContext";
 import { type CmsFields, F, f, type Fields, formOf, type Output, zodOf } from "./fields";
+import { type CollectionType, nameCollections } from "./collections";
 
 /** What every JSON-LD callback gets besides the context: the page's base node and the site's identity @id. */
 export type SeoHelpers = {
@@ -68,6 +70,9 @@ export type SiteDef = {
 	jsonLd?: Record<string, (ctx: SchemaContext, h: SeoHelpers) => Record<string, unknown>[]>;
 	/** Every page's JSON-LD, last. */
 	seo?: SeoExtend;
+	/** Collections by key: records with no page of their own, picked in blocks with `f.collection()`. */
+	// biome-ignore lint/suspicious/noExplicitAny: each collection keeps its own fields type.
+	collections?: Record<string, CollectionType<any>>;
 	/** Site settings tabs by label; a field's value is at `site.<name>` in the settings. */
 	settings?: Record<string, Fields>;
 };
@@ -97,6 +102,11 @@ export type Site<D extends SiteDef = SiteDef> = {
 	readonly pageTypes: SitePageTypes<D>;
 };
 
+/** A site's collections as createCms takes them: fields to `form`. */
+export function collectionDefs(def: SiteDef, cms: CmsFields): CollectionDef[] {
+	return Object.entries(def.collections ?? {}).map(([key, { fields, options }]) => ({ ...options, key, form: (s) => formOf(fields)(s, cms) }));
+}
+
 /** A site's page types as createCms takes them: fields to `form` and `schema`, `jsonLd` to `schemaTypes`. */
 export function pageTypeDefs(def: SiteDef, cms: CmsFields): PageTypeDef[] {
 	return Object.entries(def.pages ?? {}).map(([key, value]) => {
@@ -118,6 +128,7 @@ export function pageTypeDefs(def: SiteDef, cms: CmsFields): PageTypeDef[] {
  * `cloudflare(site)` run it.
  */
 export function defineSite<const D extends SiteDef>(def: D): Site<D> {
+	nameCollections(def.collections ?? {});
 	const catalog = Object.fromEntries(
 		Object.entries(def.blocks ?? {}).map(([kind, b]) => {
 			const { label, description, category, placements } = b.options;

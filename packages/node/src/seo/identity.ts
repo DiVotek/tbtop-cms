@@ -1,5 +1,6 @@
+import { DAYS } from "../content/builtInCollections";
 import type { Settings } from "../content/settings";
-import { localizedWithFallback } from "./localized";
+import { column, type SiteContacts } from "../content/siteContacts";
 
 export const ORGANISATION_TYPES = ["organization", "online_store", "local_business"];
 export const IDENTITY_TYPES = ["none", "person", ...ORGANISATION_TYPES];
@@ -20,15 +21,17 @@ export const BUSINESS_SUBTYPES = [
 	"LodgingBusiness",
 	"SportsActivityLocation",
 ];
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The site's schema.org identity from `seo.identity.*` (SiteIdentity.php). */
+/** The site's schema.org identity from `seo.identity.*` and the Offices and Socials collections (SiteIdentity.php). */
 export class SiteIdentity {
-	constructor(private readonly settings: Settings) {}
+	constructor(
+		private readonly settings: Settings,
+		private readonly contacts: SiteContacts,
+	) {}
 
 	async type(): Promise<string> {
 		return this.settings.string("seo.identity.type", "none");
@@ -58,49 +61,32 @@ export class SiteIdentity {
 		return type === "local_business" ? this.subtype() : SiteIdentity.schemaTypeFor(type);
 	}
 
-	async properties(locale: string, fallback: string): Promise<Record<string, unknown>> {
+	/**
+	 * legalName, then the main office's telephone, email, address and (for a
+	 * local business) geo and opening hours; the other offices as `department`.
+	 */
+	async properties(locale: string): Promise<Record<string, unknown>> {
 		if (!(await this.isOrganisation())) {
 			return {};
 		}
-		const out: Record<string, unknown> = {};
+		const [main, ...others] = await this.contacts.offices(locale);
 		const legalName = await this.text("seo.identity.legal_name");
-		const telephone = (await this.column("site.contacts.phones", "number"))[0] ?? "";
-		const email = (await this.column("site.contacts.emails", "address"))[0] ?? "";
-		for (const [key, value] of Object.entries({ legalName, telephone, email })) {
-			if (value !== "") {
-				out[key] = value;
-			}
+		const out: Record<string, unknown> = { ...(legalName === "" ? {} : { legalName }), ...(main === undefined ? {} : await this.office(main)) };
+		const departmentType = (await this.schemaType()) ?? "Organization";
+		const departments: Record<string, unknown>[] = [];
+		for (const office of others) {
+			const name = typeof office.name === "string" ? office.name.trim() : "";
+			departments.push({ "@type": departmentType, ...(name === "" ? {} : { name }), ...(await this.office(office)) });
 		}
-		const address = await this.address(locale, fallback);
-		if (address !== null) {
-			out.address = address;
-		}
-		if ((await this.type()) !== "local_business") {
-			return out;
-		}
-		const geo = await this.geo();
-		if (geo !== null) {
-			out.geo = geo;
-		}
-		const hours = await this.openingHours();
-		if (hours.length > 0) {
-			out.openingHoursSpecification = hours;
+		if (departments.length > 0) {
+			out.department = departments;
 		}
 		return out;
 	}
 
-	/** Profile links from `site.contacts.socials` that are absolute http(s) URLs. */
+	/** Profile links of the Socials collection that are absolute http(s) URLs. */
 	async sameAs(): Promise<string[]> {
-		const rows = await this.settings.get("site.contacts.socials");
-		const out: string[] = [];
-		for (const row of Array.isArray(rows) ? rows : []) {
-			const label = isRecord(row) && typeof row.label === "string" ? row.label.trim() : "";
-			const href = isRecord(row) && typeof row.href === "string" ? row.href.trim() : "";
-			if (label !== "" && href !== "" && /^https?:\/\//i.test(href) && URL.canParse(href)) {
-				out.push(href);
-			}
-		}
-		return out;
+		return (await this.contacts.socials()).map((social) => social.href).filter((href) => /^https?:\/\//i.test(href) && URL.canParse(href));
 	}
 
 	async name(): Promise<string> {
@@ -116,36 +102,54 @@ export class SiteIdentity {
 		return BUSINESS_SUBTYPES.includes(subtype) || /^[A-Z][A-Za-z]+$/.test(subtype) ? subtype : "LocalBusiness";
 	}
 
-	private async address(locale: string, fallback: string): Promise<Record<string, unknown> | null> {
-		const translated = async (key: string) => localizedWithFallback(await this.settings.get(key), locale, fallback);
-		const street = await translated("seo.identity.address.street");
-		const locality = await translated("seo.identity.address.locality");
-		if (street === "" && locality === "") {
+	private async office(office: Record<string, unknown>): Promise<Record<string, unknown>> {
+		const telephone = column(office.phones, "number")[0] ?? "";
+		const email = column(office.emails, "address")[0] ?? "";
+		const out: Record<string, unknown> = { ...(telephone === "" ? {} : { telephone }), ...(email === "" ? {} : { email }) };
+		const address = SiteIdentity.address(office);
+		if (address !== null) {
+			out.address = address;
+		}
+		if ((await this.type()) !== "local_business") {
+			return out;
+		}
+		const geo = SiteIdentity.geo(office.latitude, office.longitude);
+		if (geo !== null) {
+			out.geo = geo;
+		}
+		const hours = SiteIdentity.openingHours(office.opening_hours);
+		if (hours.length > 0) {
+			out.openingHoursSpecification = hours;
+		}
+		return out;
+	}
+
+	/** An office's PostalAddress; null without a street and a city. */
+	static address(office: Record<string, unknown>): Record<string, unknown> | null {
+		const text = (key: string) => (typeof office[key] === "string" ? (office[key] as string).trim() : "");
+		if (text("street") === "" && text("locality") === "") {
 			return null;
 		}
-		const country = (await this.text("seo.identity.address.country")).toUpperCase();
+		const country = text("country").toUpperCase();
 		const fields: Record<string, string> = {
-			streetAddress: street,
-			addressLocality: locality,
-			addressRegion: await translated("seo.identity.address.region"),
-			postalCode: await this.text("seo.identity.address.postal_code"),
+			streetAddress: text("street"),
+			addressLocality: text("locality"),
+			addressRegion: text("region"),
+			postalCode: text("postal_code"),
 			addressCountry: /^[A-Z]{2}$/.test(country) ? country : "",
 		};
 		return { "@type": "PostalAddress", ...Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== "")) };
 	}
 
-	private async geo(): Promise<Record<string, unknown> | null> {
-		const [lat, lng] = [await this.settings.get("seo.identity.geo.latitude"), await this.settings.get("seo.identity.geo.longitude")].map(
-			(value) => (typeof value === "number" || (typeof value === "string" && value.trim() !== "") ? Number(value) : Number.NaN),
-		) as [number, number];
+	static geo(latitude: unknown, longitude: unknown): Record<string, unknown> | null {
+		const [lat, lng] = [latitude, longitude].map((value) => (typeof value === "number" || (typeof value === "string" && value.trim() !== "") ? Number(value) : Number.NaN)) as [number, number];
 		if (Number.isNaN(lat) || Number.isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
 			return null;
 		}
 		return { "@type": "GeoCoordinates", latitude: lat, longitude: lng };
 	}
 
-	private async openingHours(): Promise<Record<string, unknown>[]> {
-		const rows = await this.settings.get("seo.identity.opening_hours", []);
+	static openingHours(rows: unknown): Record<string, unknown>[] {
 		const out: Record<string, unknown>[] = [];
 		for (const row of Array.isArray(rows) ? rows : []) {
 			if (!isRecord(row)) {
@@ -158,21 +162,9 @@ export class SiteIdentity {
 			if (days.length === 0 || !TIME.test(opens) || !TIME.test(closes)) {
 				continue;
 			}
-			out.push({
-				"@type": "OpeningHoursSpecification",
-				dayOfWeek: days.map((day) => `https://schema.org/${day}`),
-				opens,
-				closes,
-			});
+			out.push({ "@type": "OpeningHoursSpecification", dayOfWeek: days.map((day) => `https://schema.org/${day}`), opens, closes });
 		}
 		return out;
-	}
-
-	private async column(key: string, field: string): Promise<string[]> {
-		const rows = await this.settings.get(key);
-		return (Array.isArray(rows) ? rows : [])
-			.map((row) => (isRecord(row) && typeof row[field] === "string" ? (row[field] as string).trim() : ""))
-			.filter((value) => value !== "");
 	}
 
 	private async text(key: string): Promise<string> {

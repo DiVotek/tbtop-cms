@@ -8,6 +8,7 @@ const TYPES: Record<string, string> = {
 	redirect: "Redirect",
 	language: "Language",
 	layout: "Layout",
+	entry: "Collection entry",
 	shared_block: "Shared block",
 	setting: "Setting",
 	submission: "Form submission",

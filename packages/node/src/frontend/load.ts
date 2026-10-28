@@ -192,15 +192,16 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 }
 
 export async function sharedProps(site: Site, locale: string, page: Page | null): Promise<SharedShape> {
-	const [languages, settings, defaultLocale, slots, previewBanner] = await Promise.all([
+	const [languages, settings, contacts, defaultLocale, slots, previewBanner] = await Promise.all([
 		site.languages.frontendActive(),
 		site.settings.forFrontend(),
+		site.contacts.legacySettings(locale),
 		site.languages.defaultLocale(),
 		(async () => layout(site, locale, page ?? (await site.pages.home())))(),
 		site.t("pages.preview.banner", locale),
 	]);
 	return {
-		settings,
+		settings: { ...settings, ...contacts },
 		locale,
 		defaultLocale,
 		languages: languages.map((row) => ({ locale: row.locale, name: row.name, is_default: row.is_default })),

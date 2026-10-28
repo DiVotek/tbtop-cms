@@ -85,6 +85,7 @@ export const site = defineSite({
 	jsonLd: { /* schema types: (ctx, { baseNode, identityId }) => nodes */ },
 	seo: async (nodes, ctx, h) => nodes, // every page's JSON-LD, last
 	settings: { Company: { phone: f.text() } }, // Site settings tabs
+	collections: { review: reviews }, // records with no page: see "Collections"
 });
 
 // server.ts (Node / Bun)
@@ -101,7 +102,8 @@ type. A form block gets `action` and `honeypotField` props: post the form there.
 
 **Fields (`f.*`).** `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
 `select(options)` (one value or null), `select(options, { multiple: true })`
-(an array), `tags`, `image`, `link(types?)`, `pages(type?)`, `repeater(fields)`.
+(an array), `tags`, `image`, `link(types?)`, `pages(type?)`,
+`collection(target, { single?, max?, modes? })`, `repeater(fields)`.
 Each takes `.label()`, `.helperText()`, `.translatable()`, `.required()`.
 Anything else of the admin: `f.custom((s, name) => s.colorpicker(name), z.string().nullable())`.
 
@@ -540,6 +542,72 @@ const cards = await site.pageViews(posts, locale); // [{ id, name, summary, url,
 // pages: Math.ceil(Number(total) / perPage)
 ```
 
+## Collections
+
+A collection is a kind of record with no page of its own: reviews, team
+members, offices. Its fields are code; its entries are `tbtop_entries` rows,
+edited under their own menu item and read on the site through a block's
+`collection` field or `site.collection(key)`. A record with its own URL, SEO
+and blocks is a page type instead.
+
+```ts
+import { block, collection, defineSite, f } from "@tbtop/cms/site";
+
+const reviews = collection(
+	{ author: f.text().required(), text: f.textarea().translatable(), services: f.pages("service") },
+	{ label: "Reviews", singularLabel: "review" }, // titleField, relatedField, icon, navigationGroup, navigationOrder, resolve
+);
+
+export const site = defineSite({
+	collections: { review: reviews },
+	blocks: {
+		Reviews: block({
+			reviews: f.collection(reviews), // { id, author, text, services }[]
+			featured: f.collection(reviews, { single: true, modes: ["manual", "latest"] }), // one or null
+			offices: f.collection("offices", { max: 3 }), // a built-in, by key (untyped fields)
+		}),
+	},
+});
+```
+
+The editor picks the mode per block: `all` (every published entry, the
+editor's order), `latest` (the newest N, default 3), `related` (the entries
+whose `pages` field, `relatedField`, picks the page rendered; offered only
+when there is one) or `manual` (picked by hand, in that order). `max` caps
+every mode; `modes` limits the choice, the first being the default. The value
+is stored as `{ mode, limit?, ids? }` and checked by the `collection_value`
+host rule (`cms.admin.options()` passes it).
+
+`site.collection("review", locale?)` (and `ctx.collection(key)` in a
+resolver) gives an `EntryList`: `all()`, `first()`, `take(n)`, `latest(n)`,
+`relatedTo(page)`, `only(ids)`, `where(field, value)`, all in memory. A
+published collection is resolved once per locale and request, and through the
+content cache on the frontend; every entry write through the CMS (and a drag
+reorder in the admin) bumps it. Collections are for hundreds of entries, not
+tens of thousands: there is no SQL filtering on entry fields.
+
+The low level is `createCms({ collections: [{ key, label, form: (s) => [...] }] })`
+and `collectionField("reviews").of("review")` in a block's `form()`.
+
+Admin: `{prefix}/collections/{key}` lists the entries (search, drag reorder,
+delete, an "Add" modal), `{prefix}/collections/{key}/{id}/edit` edits one
+(draft or published, optimistic lock), both behind `tbtop-cms.pages`. The
+field's client is the `collection` kind of `@tbtop/cms/admin-client`; its
+picker posts to `{prefix}/collections/{key}/entry-search/select-options/entry`.
+
+**Built-ins.** `offices` (name, street, city, region, postal code, country,
+phones, emails, opening hours, coordinates) and `socials` (name, short label,
+link) are always there, under Settings. The first published office is the
+main one: its phones, emails, address, hours and coordinates are the site's
+and its identity's; the other offices are published as the identity's
+`department`s, and `sameAs` lists the social links. They replace the
+`site.contacts.*` settings and the SEO identity's address, hours and
+coordinates: re-enter those values as entries (there is no data migration).
+`site.contacts` reads them (`phones()`, `emails()`, `socials()`,
+`offices()`), and the shared `cms.settings` prop still carries
+`site.contacts.phones/emails/socials` in their old row shapes, built from the
+collections.
+
 ## Link and pages fields
 
 `linkField` and `pagesField` go into a host block's `form()` (or a page
@@ -610,8 +678,8 @@ Pricing: {
 
 ```tsx
 // The admin bundle's entry. Peers: react 19 and @tbtop/inertia-admin (optional for the other entries).
-import { linkFieldClient } from "@tbtop/cms/admin-client"; // defineFieldClient("link", …): the import registers it
-void linkFieldClient;
+import { collectionFieldClient, linkFieldClient } from "@tbtop/cms/admin-client"; // defineFieldClient(…): the import registers them
+void [linkFieldClient, collectionFieldClient];
 ```
 
 The CMS admin pages (the login screen among them) carry Tailwind classes the
@@ -816,7 +884,11 @@ export default {
 
 - Schema and a baseline migration equal to the PHP migrations (SQLite,
   Postgres and MySQL column types), then the page title moved into
-  `seo.title` (PHP #326).
+  `seo.title` (PHP #326), then `tbtop_entries` (collections).
+- Collections: code-defined records in `tbtop_entries`, the `collection`
+  block field (all / latest / related / manual), `site.collection()`, their
+  admin pages, and the built-in offices and socials behind the site's
+  contacts and identity (see "Collections").
 - Languages, settings (`site.*`/`seo.*` dotted keys), pages with per-locale
   slugs and paths (collision suffixes, cascade to children), optimistic
   locking, layouts (header/footer), shared blocks, redirects (chains, cycles,
@@ -842,7 +914,7 @@ export default {
   through a content-versioned cache (`ttl` default 3600 s). Admin reads stay
   live and every write through the CMS bumps the version; a write made
   around the CMS shows once the entry expires.
-- Audit log: a write to a page, redirect, language, shared block or layout
+- Audit log: a write to a page, redirect, language, shared block, layout or collection entry
   made by a signed-in admin records the event (created, updated, deleted,
   restored, revision_restored), the user and the changed fields with old
   and new values in `activity_log`; large fields (body, content, fields,

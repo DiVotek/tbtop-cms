@@ -4,6 +4,7 @@ export {
 	type Block,
 	block,
 	blockProps,
+	collectionDefs,
 	defineSite,
 	type FormProps,
 	formBlock,
@@ -17,4 +18,5 @@ export {
 	type SiteDef,
 	type SitePageTypes,
 } from "./define";
+export { collection, type CollectionOptions, type CollectionType, type EntryOf } from "./collections";
 export { type CmsFields, F, f, type Fields, formOf, type Output, zodOf } from "./fields";

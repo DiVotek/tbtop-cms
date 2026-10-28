@@ -7,8 +7,8 @@ const LOG_NAME = "tbtop-cms";
 
 /** What a store's rows are audited as (LogsCmsActivity's auditFields/auditLabel/markers/blocks). */
 export type AuditSubject = {
-	type: "page" | "redirect" | "language" | "shared_block" | "layout";
-	table: "tbtop_pages" | "tbtop_redirects" | "tbtop_languages" | "tbtop_shared_blocks" | "tbtop_layouts";
+	type: "page" | "redirect" | "language" | "shared_block" | "layout" | "entry";
+	table: "tbtop_pages" | "tbtop_redirects" | "tbtop_languages" | "tbtop_shared_blocks" | "tbtop_layouts" | "tbtop_entries";
 	fields: readonly string[];
 	label: (row: Dict) => string;
 	/** Changed, but too large or private to copy: the name is kept, the values are not. */
@@ -44,6 +44,7 @@ export const AUDIT_SUBJECTS = {
 		label: (row) => String(row.name || row.locale),
 	},
 	sharedBlock: { type: "shared_block", table: "tbtop_shared_blocks", fields: ["name", "kind", "data"], label: (row) => String(row.name) },
+	entry: { type: "entry", table: "tbtop_entries", fields: ["data", "status"], label: (row) => (typeof row.title === "string" && row.title !== "" ? row.title : `Entry #${String(row.id)}`) },
 	layout: { type: "layout", table: "tbtop_layouts", fields: ["slot", "content"], blocks: ["content"], label: (row) => String(row.slot) },
 } as const satisfies Record<string, AuditSubject>;
 
