@@ -17,7 +17,7 @@ return [
             'contacts' => 'Contacts',
         ],
         'helpers' => [
-            'contacts' => 'Phones, emails and social profiles for the header, footer and contact blocks. The first phone and email, and every social link, also feed the SEO identity markup.',
+            'contacts' => 'Phones, emails and social profiles for the header, footer and contact blocks are kept on the Collections page. The first phone and email, and every social link, also feed the SEO identity markup.',
         ],
         'fields' => [
             'site_name' => 'Site name',
@@ -109,7 +109,7 @@ return [
             'verification_google' => 'Paste the verification token or the full <meta name="google-site-verification" …> tag from Google Search Console — either works. Can be left empty if the site is verified another way (DNS record, Google Tag Manager, Analytics).',
             'verification_bing' => 'Paste the verification token or the full <meta name="msvalidate.01" …> tag from Bing Webmaster Tools — either works. Can be left empty if the site is verified another way (DNS record, Google Tag Manager, Analytics).',
             'identity_type' => 'Adds an Organization, online store, local business or Person structured-data object to every page — search engines may use it for the knowledge panel and local results.',
-            'identity_contacts' => 'Telephone, email and profile links come from Site settings → Contacts: the first phone and email, and every social link.',
+            'identity_contacts' => 'Telephone, email and profile links come from the Collections page: the first phone and email, and every social link.',
             'identity_address' => 'Address. Required for a local business; for other types it is published only when a street or city is set. A language with no translation uses the default language\'s address.',
             'identity_country' => 'Two-letter ISO 3166-1 code, e.g. UA or US.',
             'identity_subtype' => 'The schema.org type that describes the business best. Choose "Other" to enter one that is not listed.',

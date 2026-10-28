@@ -115,7 +115,7 @@ Field-by-field:
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type and subtype; a page reads its subtype's pair first, then its type's |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
-| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`; telephone, email and profile links only from `site.contacts.*`) | SEO settings → *Identity* tab exposes type and, for the organisation types, legal name, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win); telephone, email and sameAs are edited on Site settings → *Contacts* only |
+| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`; telephone, email and profile links only from the built-in Phones/Emails/Socials collections) | SEO settings → *Identity* tab exposes type and, for the organisation types, legal name, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win); telephone, email and sameAs are edited on the admin's Collections page only |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
 | Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
@@ -357,11 +357,12 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    nothing when `seo.identity.type` is `none`. Name and logo fall back to
    the site's own `site.name`/`site.logo` when no
    `seo.identity.name`/`seo.identity.logo` is set. `telephone`, `email`
-   and `sameAs` come only from the Site settings contacts
-   (`site.contacts.phones/emails/socials`, see `SiteContacts`): the first
-   phone, the first email and every social `href`. There are no
+   and `sameAs` come only from the built-in Phones, Emails and Socials
+   collections (see `SiteContacts`, collections.md): the first published
+   phone, the first published email and every social `href`. There are no
    `seo.identity.telephone/email/same_as` keys any more — the
-   `2026_10_07_000001` migration moved them into the contacts.
+   `2026_10_07_000001` migration moved them into the contacts, and
+   `2026_10_28_000001` moved those into the collections.
 
    | `seo.identity.type` | `@type` | Extra properties |
    |---|---|---|

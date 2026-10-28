@@ -46,6 +46,22 @@ final class PageNameSearch
     }
 
     /**
+     * The same case-insensitive match on one plain string column, e.g. an
+     * entry's `title`.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     */
+    public static function applyToColumn(Builder $query, string $column, string $term): void
+    {
+        $lower = self::lowerFunction($query->getModel()->getConnection());
+        $wrapped = $query->getQuery()->getGrammar()->wrap($column);
+
+        $query->whereRaw("{$lower}({$wrapped}) like ? escape '!'", ['%' . self::escapeLike(mb_strtolower($term)) . '%']);
+    }
+
+    /**
      * `%` and `_` typed into the search match themselves, not any text. `!` is
      * the escape character because a backslash would need driver-specific
      * quoting inside the SQL literal (MySQL reads it as an escape there).

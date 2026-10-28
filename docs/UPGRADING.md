@@ -561,6 +561,41 @@ key only to change the env-driven default. The package adds an auth guard
 `pages_api` check: a lang override of `tbtop-cms::health.checks.*` may add
 its keys.
 
+## Collections; Phones, Emails and Socials take over the site contacts
+
+Records that are not pages — reviews, team, vacancies — are now
+**collections** (`docs/host/ai/collections.md`): a `Collection` class listed
+in `config('tbtop-cms.collections')`, entries in the new `tbtop_entries`
+table, a `collection` block field and `Cms::collection()`. The admin shows
+every collection on one Collections page, a tab each.
+
+Three collections are built in, and they replace Site settings → Contacts:
+**Phones**, **Emails** and **Social links**, one entry per former row. The
+SEO identity's address, opening hours and coordinates stay in SEO settings.
+
+Run `php artisan migrate`. `2026_10_28_000000_create_entries_table` creates the
+table; `2026_10_28_000001_move_contacts_to_collections` turns each row of
+`site.contacts.phones`, `site.contacts.emails` and `site.contacts.socials`
+into a published entry, in order, then deletes that key. A collection that
+already has entries is left alone, its settings key included: it is no longer
+read, so remove it by hand once the entries match.
+
+What changes for a host:
+
+1. **`SiteContacts` reads the collections.** `phones()`, `emails()` and
+   `socials()` keep their return shapes (and gain an optional `$locale`).
+   Its constructor now takes `CollectionEntries`: resolve it from the
+   container rather than `new SiteContacts($settings)`.
+2. **`cms.settings` still carries `site.contacts.phones/emails/socials`**,
+   built from the collections in the old row shapes.
+3. **A published `admin.pages` config needs two more slots**,
+   `collection_entries` => `CollectionEntriesPage::class` and
+   `collection_entry_edit` => `CollectionEntryEditPage::class`. Without them
+   there is no Collections page and no menu item for it.
+4. **Import the admin blocks module** (`resources/js/cms/admin/blocks.ts`),
+   as for the `link` field: it now also registers `collectionFieldClient`,
+   the editor of the `collection` field.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by

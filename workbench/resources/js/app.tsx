@@ -2,6 +2,7 @@ import "@tbtop/inertia-admin/styles.css";
 
 import { createInertiaApp, type ResolvedComponent } from "@inertiajs/react";
 import { AdminPage } from "@tbtop/inertia-admin";
+import "@cms/admin/blocks";
 import { createRoot } from "react-dom/client";
 
 createInertiaApp({

@@ -22,6 +22,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `pages.home.title` | `string` | falls back to `pages.home.name` | Title given to the seeded home page | wiring.md |
 | `pages.errors.4xx.name` / `.title` | `string` | `'Page not found'` | Name/title given to the seeded 4xx error page (`database/seeders/PageSeeder.php`) | pages.md |
 | `pages.errors.5xx.name` / `.title` | `string` | `'Something went wrong'` | Name/title given to the seeded 5xx error page | pages.md |
+| `collections` | `list<class-string<Collection>>` | `[]` | Host collection classes merged into `CollectionRegistry` (`Collection/CollectionRegistry.php`) after the built-in `phones`, `emails` and `socials`; read with an inline default | collections.md |
 | `blocks.types` | `array<string,class-string<Block>>` | `[]` | Host block classes merged into `BlockRegistry` (`Block/BlockRegistry.php`) | blocks.md |
 | `blocks.strict` | `bool` | `false` | When true, `BlockContentResolver` throws on an unknown block kind instead of skipping it | blocks.md |
 | `blocks.discover` | `array<string,string>` | `[]` | Namespace → folder pairs scanned for concrete `Block` subclasses (`Block/BlockDiscovery.php`), registered after `blocks.types` in relative-path order | blocks.md |
@@ -61,7 +62,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `admin.prefix` | `string` | `'admin'` | URL prefix the admin panel and its routes mount under | §3 below |
 | `admin.guard` | `string` | `'web'` | Auth guard the admin panel, login, and `EnsureCmsAdmin` use | wiring.md |
 | `admin.model` | `class-string` | `'App\\Models\\User'` | Host user model class; read wherever the package needs the host's user type (`UserKeyColumn`, `AdminUsers`, `AuthorNames`, profiles) | wiring.md |
-| `admin.pages.*` | `array<string,class-string>` | 24 slots, one per built-in admin page (dashboard, profile, login, languages, pages, page_edit, redirects, not_found, seo_report, media_library, site_settings, seo_settings, notification_settings, site_health, layout, layout_edit, shared_blocks, shared_block_edit, blocks, form_submissions, form_submission, users, audit_log, audit_activity) | Maps a logical admin page slot to the class that implements it; swap a value to override the built-in page | wiring.md |
+| `admin.pages.*` | `array<string,class-string>` | 26 slots, one per built-in admin page (dashboard, profile, login, languages, pages, page_edit, collection_entries, collection_entry_edit, redirects, not_found, seo_report, media_library, site_settings, seo_settings, notification_settings, site_health, layout, layout_edit, shared_blocks, shared_block_edit, blocks, form_submissions, form_submission, users, audit_log, audit_activity) | Maps a logical admin page slot to the class that implements it; swap a value to override the built-in page | wiring.md |
 
 ## 2. Artisan commands
 
@@ -108,6 +109,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|---|---|
 | `login` | GET (redirect) | `login` -> `{admin.prefix}/login` | `AdminWiring::wireAdminLoginRedirect()` — only registered if no route named `login` already exists |
 | `tbtop.cms.logout` | POST | `{admin.prefix}/logout` | `LogoutController`, middleware `['web','auth:{admin.guard}']` |
+| `tbtop.cms.entry-search` | POST | `{admin.prefix}/entry-search` | `EntrySearchController` — the `collection` field's picker; `{collection, search}` → `{options:[{value,label,draft}]}` (20, editor's order, by the `title` column), `{collection, ids}` → the same for those ids in that order. Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; drafts included |
 | `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
 
 **Pages API** (`Api/ApiWiring.php`, only when `tbtop-cms.api.enabled` and Sanctum is installed) — prefix `api/cms/v1`, middleware `[AcceptsJson, SubstituteBindings, 'auth:cms-api', ActAsPanelUser, 'throttle:' . api.throttle]` plus `CheckAbilities:pages:read` or `:pages:write` per route; shapes in api.md:
@@ -143,6 +145,8 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | SiteHealthPage | `site-health` |
 | LayoutPage | `layout` |
 | LayoutEditPage | `layout/{slot}/edit` |
+| CollectionEntriesPage | `collections` — every collection as a tab (`?tab[collections]={key}`), one menu item under Content (collections.md) |
+| CollectionEntryEditPage | `collections/{collection}/{entry}/edit` |
 | SharedBlocksPage | `shared-blocks` |
 | SharedBlockEditPage | `shared-blocks/{sharedBlock}/edit` |
 | BlocksPage | `blocks` |
@@ -213,6 +217,7 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | Class/Contract | Path | Methods to implement | Purpose |
 |---|---|---|---|
 | `Block` (abstract) | `src/Block/Block.php` | Required: `kind(): string`, `form(S $s): list<Field>`. Overridable (have defaults): `label()`, `description()`, `category()`, `placements(): list<string>`, `resolve(array $input, ResolveContext $ctx): array`, `translatableFields()`, `toSchema(array $props, SchemaContext $ctx): ?array` (default `null`) | Base for a block type: schema/form, an optional server-side resolve step, and an optional schema.org node published into the page's `seo.jsonLd` |
+| `Collection` (abstract) | `src/Collection/Collection.php` | Required: `key()`, `label()`, `fields(S $s): list<Field>`. Overridable: `singularLabel()`, `titleField()`, `relatedField()`, `resolve(array $input, ResolveContext $ctx): array` | A code-defined kind of record with no URL (collections.md) |
 | `Placement` | `src/Block/Placement.php` | Constants `LAYOUT`, `PAGES` | Values a `Block::placements()` entry may hold: a page-type key, `Placement::LAYOUT`, or the wildcard `Placement::PAGES` (every page type) |
 | `PageTypeInterface` | `src/Page/Contracts/PageTypeInterface.php` | `key()`, `label()`, `allowedChildren(): list<string>`, `requiresParent(): bool`, `maxDepth(): int`, `isSourceBacked(): bool`, `source(Page $page): ?object`, `template(Page $page): ?array`, `schemaTypes(): non-empty-list<string>`, `base(): string`, `fields(S $s): list<Field>`, `resolveFields(array $input, ResolveContext $ctx): array`, `childSubtype(): ?string` | Contract for a page type; `base() !== key()` makes it a subtype (pages.md, "Subtypes and type fields") |
 | `BasePageType` (abstract) | `src/Page/Types/BasePageType.php` | Implements `PageTypeInterface` with defaults (`label`=ucfirst(key), `allowedChildren`=[], `requiresParent`=false, `maxDepth`=1, `isSourceBacked`=false, `source`=null, `template`=null, `schemaTypes`=`['WebPage','AboutPage','ContactPage','ItemPage']`, `base`=own key, `childSubtype`=null, `fields`=[]); a subclass need only override `key()` plus whatever defaults don't fit | Convenience base for page types |
@@ -251,6 +256,9 @@ Source of truth: the contract/base-class files themselves under `src/`.
 | `LayoutSaved` | `src/Layout/Events/LayoutSaved.php` | `LayoutForm::save()` after `Layout::updateOrCreate` | `Layout $layout` |
 | `SharedBlockSaved` | `src/SharedBlock/Events/SharedBlockSaved.php` | `SharedBlockForm::create()` after the write; `update()` via `DB::afterCommit`, after the save transaction commits | `SharedBlock $block` |
 | `SharedBlockDeleted` | `src/SharedBlock/Events/SharedBlockDeleted.php` | `SharedBlocksPage` delete action, after `delete()` (offered only while nothing places the block, re-checked server-side) | `SharedBlock $block` |
+| `EntrySaved` | `src/Collection/Events/EntrySaved.php` | `Entry` model `saved`, via `DB::afterCommit` — every model write of a collection entry | `Entry $entry` |
+| `EntryDeleted` | `src/Collection/Events/EntryDeleted.php` | `Entry` model `deleted`, via `DB::afterCommit` | `Entry $entry` |
+| `EntriesUpdated` | `src/Collection/Events/EntriesUpdated.php` | `EntryBuilder::update()` — a query update of entries (the admin table's drag reorder), which fires no model event | none |
 | `LanguagesChanged` | `src/Language/Events/LanguagesChanged.php` | `LanguageObserver`, on any create/update/soft-delete/restore/force-delete of a `Language` | none |
 | `SettingsSaved` | `src/Settings/Events/SettingsSaved.php` | `SettingsForm::apply()`, once per form submission that wrote at least one key | `array $keys` (dotted store keys written) |
 | `SubmissionReceived` | `src/Form/Events/SubmissionReceived.php` | `FormSubmitController::__invoke()`, after validation and storage, before `handleSubmit()` | `?FormSubmission $submission`, `array $payload`, `Page $page`, `string $blockId`, `string $locale` |
@@ -271,9 +279,7 @@ Source of truth: `src/Settings/Settings.php` (store + `forFrontend()` rules) and
 | `site.name` | `SiteSettingsPage` | no | yes |
 | `site.logo` | `SiteSettingsPage` | no | yes (media URL) |
 | `site.favicon` | `SiteSettingsPage` | no | yes (media URL) |
-| `site.contacts.phones` (`[{number}]`) | `SiteSettingsPage` | no | yes — public contact data; read via `Tbtop\Cms\Settings\SiteContacts`, first entry is the identity JSON-LD `telephone` (the only source) |
-| `site.contacts.emails` (`[{address}]`) | `SiteSettingsPage` | no | yes — same, the first entry is the identity `email` (the only source) |
-| `site.contacts.socials` (`[{label, name, href}]`) | `SiteSettingsPage` | no | yes — same, the `href`s are the identity `sameAs` (the only source) |
+| `site.contacts.*` | none — removed: moved into the built-in Phones/Emails/Socials collections by `2026_10_28_000001_move_contacts_to_collections` (collections.md). `cms.settings` still carries `site.contacts.phones/emails/socials`, built by `ShareCmsProps` from the collections in the old row shapes | no | yes (built, not stored) |
 | `seo.title_template` | `SeoSettingsPage` | no | yes |
 | `seo.title_separator` | `SeoSettingsPage` | no | yes |
 | `seo.title_suffix` | none — legacy, still mapped by `SeoSettingsPage` with no field; a stored value keeps working | no | yes |
@@ -354,6 +360,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_form_submissions` | `src/Form/Models/FormSubmission.php` | Yes | gained `lead_status` in a later migration |
 | `tbtop_layouts` | `src/Layout/Models/Layout.php` | Yes | |
 | `tbtop_shared_blocks` | `src/SharedBlock/Models/SharedBlock.php` | Yes | `name`, `kind`, json `data` (same shape as a page content row's `data`), `lock_version` (bumped in SQL on every update; an edit form save claims it atomically, so a stale or concurrent save is rejected); page content rows point at it via a top-level `shared` key |
+| `tbtop_entries` | `src/Collection/Models/Entry.php` | Yes | Migration `2026_10_28_000000_create_entries_table.php`; `collection` (key), json `data` (field values, translatable ones as locale maps), `title` (title field, default locale, kept by the model), `status` (`draft`/`published`), `sort_order`, `lock_version` (same optimistic lock as shared blocks); index `(collection, sort_order)` |
 | `tbtop_page_revisions` | `src/Page/Models/PageRevision.php` | Yes | `user_id` via `UserKeyColumn::define` (nullable) |
 | `tbtop_page_refs` | `src/Page/Refs/PageRefIndex.php` (no model) | Yes | Migration `2026_10_07_000002_create_page_refs_table.php`; `page_id` (FK, cascade on delete), `field`, `target_id` (no FK), `position`; indexes `(target_id, field)` and `page_id`. Derived: rewritten per page on save, `cms:page-refs:rebuild` recomputes it |
 | `tbtop_form_submission_comments` | `src/Form/Models/FormSubmissionComment.php` | Yes | `user_id` via `UserKeyColumn::define` |
@@ -378,6 +385,8 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | | `forms(): Forms` | The `HasForm` forms by name (blocks.md "Forms reachable from any page") |
 | | `referencedBy(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<Page>` | Live pages whose page-type `pages` field `$field` picks `$page` (only type/subtype `$from` when given), by `sort_order` then name; `[]` for a null page (pages.md "Page references") |
 | | `referencedByLinks(?Page $page, string $field, ?string $from = null, ?string $locale = null): list<{id, name, url}>` | `referencedBy()` as the `{id, name, url}` list a `pages` field resolves to |
+| | `collection(string $key, ?string $locale = null): EntryList` | The published entries of a collection resolved for the locale, editor's order, cached whole; `EntryList` filters in memory: `relatedTo()`, `latest()`, `take()`, `only()`, `where()`, `first()`, `all()` (collections.md) |
+| `Tbtop\Cms\Settings\SiteContacts` | `phones()`, `emails()`, `socials()` (each `?string $locale = null`) | The published entries of the built-in Phones, Emails and Socials collections, editor's order; the first phone and email and every social `href` feed the identity JSON-LD |
 | `Tbtop\Cms\Form\Forms` | `props(string $name, Page $page, ?string $locale = null): array` | `{action, honeypotField?}` for a template-rendered form posting from `$page`; also `all()`, `has()`, `get()`, `action()` |
 | `Tbtop\Cms\Settings\Settings` | `get(string $key, mixed $default = null): mixed` | Reads one decoded settings value (decrypts if the key is secret) |
 | | `set(string $key, mixed $value): void` | Writes/upserts one setting, bumps the content cache |

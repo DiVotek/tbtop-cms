@@ -4,6 +4,8 @@ declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\AuditActivityPage;
 use Tbtop\Cms\Admin\Pages\AuditLogPage;
 use Tbtop\Cms\Admin\Pages\BlocksPage;
+use Tbtop\Cms\Admin\Pages\CollectionEntriesPage;
+use Tbtop\Cms\Admin\Pages\CollectionEntryEditPage;
 use Tbtop\Cms\Admin\Pages\DashboardPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionsPage;
@@ -62,6 +64,11 @@ return [
             ],
         ],
     ],
+    // Collection classes (Tbtop\Cms\Collection\Collection): records that are
+    // not pages — reviews, team, vacancies. The built-in Phones, Emails and
+    // Socials are always registered. Read with an inline default.
+    // collections.md.
+    'collections' => [],
     'blocks' => [
         // Block classes listed by hand. Keep for blocks outside the discovered
         // folders; everything else goes through 'discover'.
@@ -223,6 +230,8 @@ return [
             'languages' => LanguagesPage::class,
             'pages' => PagesPage::class,
             'page_edit' => PageEditPage::class,
+            'collection_entries' => CollectionEntriesPage::class,
+            'collection_entry_edit' => CollectionEntryEditPage::class,
             'redirects' => RedirectsPage::class,
             'not_found' => NotFoundLogPage::class,
             'seo_report' => SeoReportPage::class,

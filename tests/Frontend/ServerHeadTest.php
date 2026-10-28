@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Cms;
+use Tbtop\Cms\Collection\Models\Entry;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -253,18 +254,16 @@ it('filters non-URL entries out of the emitted sameAs structured data', function
     app(Cms::class)->frontendRoutes();
     app(Settings::class)->set('site.name', 'Acme Co');
     app(Settings::class)->set('seo.identity.type', 'organization');
-    // Written directly to the store (bypassing the Contacts form's url
+    // Written directly to the table (bypassing the entry form's url
     // rule) — emit-time filtering must hold on its own.
-    app(Settings::class)->set('site.contacts.socials', [
-        ['label' => 'GH', 'href' => 'https://github.com/acme'],
-        ['label' => 'X', 'href' => 'not a url'],
-        ['label' => 'JS', 'href' => 'javascript:alert(1)'],
-    ]);
+    foreach ([['GH', 'https://github.com/acme'], ['X', 'not a url'], ['JS', 'javascript:alert(1)']] as $i => [$label, $href]) {
+        Entry::query()->create(['collection' => 'socials', 'status' => Entry::PUBLISHED, 'sort_order' => $i, 'data' => ['label' => $label, 'href' => $href]]);
+    }
     $page = Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $html = $this->get($page->pathFor('en'))->assertOk()->getContent();
 
-    // Scoped to the ld+json payloads: the raw public SEO setting also rides
+    // Scoped to the ld+json payloads: the raw social links also ride
     // along in the serialized cms.settings prop, where it is inert JSON —
     // only the structured data must be clean.
     preg_match_all('#<script[^>]*application/ld\+json[^>]*>(.*?)</script>#s', $html, $matches);
