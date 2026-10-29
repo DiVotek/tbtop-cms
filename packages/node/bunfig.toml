@@ -1,0 +1,3 @@
+[test]
+# `bun test` runs the package suites; the workbench has its own (Playwright).
+root = "./test"

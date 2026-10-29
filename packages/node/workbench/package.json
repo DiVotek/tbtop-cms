@@ -1,0 +1,41 @@
+{
+	"name": "tbtop-cms-workbench",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"setup": "../scripts/pack-workbench.sh && bun update @tbtop/cms @tbtop/admin",
+		"dev": "vite build --config vite.admin.config.ts && vite dev",
+		"build": "vite build --config vite.admin.config.ts && vite build",
+		"start": "vite preview",
+		"typecheck": "tsc --noEmit",
+		"e2e": "playwright test"
+	},
+	"dependencies": {
+		"@inertiajs/react": "^3.9.1",
+		"@json-render/core": "^0.19.0",
+		"@json-render/react": "^0.19.0",
+		"@tanstack/react-router": "^1.170.45",
+		"@tanstack/react-start": "1.169.3",
+		"@tbtop/admin": "file:.packs/tbtop-admin.tgz",
+		"@tbtop/cms": "file:.packs/tbtop-cms.tgz",
+		"@tbtop/inertia-admin": "0.7.1",
+		"better-auth": "^1.7.12",
+		"better-sqlite3": "^13.0.3",
+		"kysely": "^0.28.2",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.64.1",
+		"@tailwindcss/vite": "^4.3.3",
+		"@types/better-sqlite3": "^9.6.0",
+		"@types/node": "^26.6.5",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^6.1.2",
+		"tailwindcss": "^4.3.3",
+		"typescript": "^5.9.0",
+		"vite": "^8.3.5"
+	}
+}

@@ -1,5 +1,8 @@
 {
     "preset": "laravel",
+    "exclude": [
+        "packages"
+    ],
     "rules": {
         "blank_line_before_statement": true,
         "concat_space": {

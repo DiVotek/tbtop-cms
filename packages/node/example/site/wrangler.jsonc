@@ -1,0 +1,15 @@
+// The bindings `cloudflare(site)` reads, by name. Secrets: `wrangler secret put
+// BETTER_AUTH_SECRET`, TBTOP_ADMIN_EMAIL, TBTOP_ADMIN_PASSWORD.
+{
+	"name": "tbtop-site",
+	"main": "worker.ts",
+	"compatibility_date": "2026-10-01",
+	// nodejs_compat: node:crypto for Better Auth, which cloudflare(site) installs by default, and node:async_hooks.
+	"compatibility_flags": ["nodejs_compat"],
+	// migrations_dir: what `tbtop-cms d1:migrations --entry worker.ts` writes, `wrangler d1 migrations apply DB` runs.
+	"d1_databases": [{ "binding": "DB", "database_name": "tbtop-site", "database_id": "<wrangler d1 create tbtop-site>", "migrations_dir": "migrations" }],
+	"kv_namespaces": [{ "binding": "CACHE", "id": "<wrangler kv namespace create CACHE>" }],
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tbtop-site-media" }],
+	"vars": { "MEDIA_URL": "https://media.example.com" },
+	"triggers": { "crons": ["* * * * *"] }
+}

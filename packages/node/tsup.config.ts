@@ -1,0 +1,27 @@
+import { defineConfig } from "tsup";
+
+// One entry per public export; splitting keeps shared classes in one chunk.
+export default defineConfig({
+	entry: {
+		index: "src/index.ts",
+		catalog: "src/blocks/catalog.ts",
+		react: "src/react/index.ts",
+		"admin-client": "src/admin-client/index.ts",
+		"better-auth": "src/betterAuth/index.ts",
+		site: "src/define/index.ts",
+		serve: "src/serve/index.ts",
+		cloudflare: "src/cloudflare/index.ts",
+		cli: "src/cli/bin.ts",
+	},
+	format: ["esm"],
+	target: "es2022",
+	platform: "neutral",
+	dts: true,
+	splitting: true,
+	sourcemap: true,
+	clean: true,
+	treeshake: true,
+	// Runtime deps and peers stay external.
+	external: ["zod", "kysely", "@tbtop/admin", "@tbtop/inertia-admin", /^@tbtop\/admin\//, "better-auth", /^better-auth\//, /^node:/, "react", /^react\//, "react-dom", /^@json-render\//],
+	removeNodeProtocol: false,
+});

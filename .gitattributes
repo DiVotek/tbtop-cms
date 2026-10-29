@@ -14,3 +14,12 @@
 /rector.php             export-ignore
 /tests                  export-ignore
 /workbench              export-ignore
+/.changes               export-ignore
+/CONTEXT.md             export-ignore
+/bin                    export-ignore
+/bun.lock               export-ignore
+/bunfig.toml            export-ignore
+/docs/adr               export-ignore
+/packages               export-ignore
+/test-setup.ts          export-ignore
+/tsconfig.json          export-ignore

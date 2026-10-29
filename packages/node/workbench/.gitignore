@@ -1,0 +1,12 @@
+node_modules
+.packs
+.output
+dist
+public/admin-build
+*.sqlite
+test-results
+playwright-report
+/storage
+mailbox.jsonl
+e2e-mailbox.jsonl
+e2e/.auth
