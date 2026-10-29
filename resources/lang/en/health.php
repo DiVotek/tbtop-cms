@@ -94,6 +94,14 @@ return [
                 'present' => 'Delete public/robots.txt — Laravel serves static files under public/ before any route runs, so it silently disables the SEO settings indexing toggle and sitemap reference.',
             ],
         ],
+        'llms_txt' => [
+            'label' => 'Static llms.txt',
+            'ok' => 'No static public/llms.txt is shadowing the dynamic route.',
+            'present' => 'public/llms.txt exists and shadows the dynamic /llms.txt route.',
+            'hints' => [
+                'present' => 'Delete public/llms.txt to let the «For AI» tab of the SEO settings build the file, or keep it if it is maintained by hand on purpose.',
+            ],
+        ],
         'media_disk_writable' => [
             'label' => 'Media disk writable',
             'ok' => 'The ":disk" disk accepted a write+delete probe file.',

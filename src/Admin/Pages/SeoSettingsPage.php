@@ -11,7 +11,9 @@ use Tbtop\Admin\Dsl\Node;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
+use Tbtop\Cms\Frontend\Seo\ContentSignals;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
+use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
 use Tbtop\Cms\Frontend\Seo\RobotsTxt;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
 use Tbtop\Cms\Frontend\Seo\SiteIdentity;
@@ -106,14 +108,30 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_twitter_card' => 'seo.twitter_card',
             'seo_not_found_enabled' => 'seo.not_found.enabled',
             'seo_not_found_retention_days' => 'seo.not_found.retention_days',
+            'seo_llms_txt_enabled' => LlmsTxtSettings::ENABLED,
+            'seo_llms_txt_summary' => LlmsTxtSettings::SUMMARY,
+            'seo_llms_txt_intro' => LlmsTxtSettings::INTRO,
+            'seo_llms_txt_types' => LlmsTxtSettings::TYPES,
+            'seo_llms_txt_per_type' => LlmsTxtSettings::PER_TYPE,
+            'seo_content_signals_enabled' => ContentSignals::ENABLED,
+            'seo_content_signals_search' => ContentSignals::SIGNALS['search'][0],
+            'seo_content_signals_ai_input' => ContentSignals::SIGNALS['ai-input'][0],
+            'seo_content_signals_ai_train' => ContentSignals::SIGNALS['ai-train'][0],
         ];
     }
 
-    /** Mirrors SeoResolver's fallbacks for the two selects. */
+    /** Mirrors SeoResolver's fallbacks for the selects and ContentSignals' per-signal defaults. */
     #[\Override]
     protected function defaults(): array
     {
-        return ['seo_twitter_card' => 'auto', 'seo_identity_type' => 'none', 'seo_identity_subtype' => SiteIdentity::SUBTYPES[0]];
+        return [
+            'seo_twitter_card' => 'auto',
+            'seo_identity_type' => 'none',
+            'seo_identity_subtype' => SiteIdentity::SUBTYPES[0],
+            'seo_content_signals_search' => ContentSignals::SIGNALS['search'][1],
+            'seo_content_signals_ai_input' => ContentSignals::SIGNALS['ai-input'][1],
+            'seo_content_signals_ai_train' => ContentSignals::SIGNALS['ai-train'][1],
+        ];
     }
 
     /**
@@ -206,6 +224,7 @@ class SeoSettingsPage extends SettingsPageBase
                 ['label' => __('tbtop-cms::settings.seo.tabs.identity'), 'children' => $this->identityFields($s)],
                 ['label' => __('tbtop-cms::settings.seo.tabs.integrations'), 'children' => $this->integrationsFields($s)],
                 ['label' => __('tbtop-cms::settings.seo.tabs.not_found'), 'children' => $this->notFoundFields($s)],
+                ['label' => __('tbtop-cms::settings.seo.tabs.ai'), 'children' => $this->aiFields($s)],
             ]),
         ];
     }
@@ -450,6 +469,54 @@ class SeoSettingsPage extends SettingsPageBase
             $s->number('seo_not_found_retention_days')->label(__('tbtop-cms::settings.seo.fields.not_found_retention_days'))
                 ->helperText(__('tbtop-cms::settings.seo.helpers.not_found_retention_days'))
                 ->rules('nullable|integer|min:1'),
+        ];
+    }
+
+    /**
+     * llms.txt and the robots.txt Content-Signal line. Both are off until
+     * switched on here: each states something on the owner's behalf.
+     *
+     * @return list<Field|Node|TextBlock>
+     */
+    private function aiFields(S $s): array
+    {
+        $types = [];
+
+        foreach (app(PageTypeRegistry::class)->all() as $type) {
+            if ($type->base() === $type->key()) {
+                $types[] = ['value' => $type->key(), 'label' => PageFormOptions::typeLabelFor($type->key(), $type->label())];
+            }
+        }
+
+        $signal = fn (string $field): Field => $s->boolean($field)
+            ->label(__('tbtop-cms::settings.seo.fields.' . substr($field, 4)))
+            ->hiddenIf(Cond::not(Cond::truthy('seo_content_signals_enabled')));
+
+        return [
+            $s->boolean('seo_llms_txt_enabled')->label(__('tbtop-cms::settings.seo.fields.llms_txt_enabled'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_enabled')),
+            $s->section(['hiddenIf' => Cond::not(Cond::truthy('seo_llms_txt_enabled'))], [
+                $s->textarea('seo_llms_txt_summary')->label(__('tbtop-cms::settings.seo.fields.llms_txt_summary'))
+                    ->translatable()
+                    ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_summary'))
+                    ->rules('nullable|max:500'),
+                $s->textarea('seo_llms_txt_intro')->label(__('tbtop-cms::settings.seo.fields.llms_txt_intro'))
+                    ->translatable()
+                    ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_intro'))
+                    ->rules('nullable|max:5000'),
+                $s->checkboxlist('seo_llms_txt_types')->label(__('tbtop-cms::settings.seo.fields.llms_txt_types'))
+                    ->options($types)
+                    ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_types'))
+                    ->rules('nullable|array'),
+                $s->number('seo_llms_txt_per_type')->label(__('tbtop-cms::settings.seo.fields.llms_txt_per_type'))
+                    ->placeholder((string) LlmsTxtSettings::DEFAULT_PER_TYPE)
+                    ->rules('nullable|integer|min:1|max:' . LlmsTxtSettings::MAX_PER_TYPE),
+            ]),
+            $s->boolean('seo_content_signals_enabled')->label(__('tbtop-cms::settings.seo.fields.content_signals_enabled'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.content_signals_enabled')),
+            $signal('seo_content_signals_search'),
+            $signal('seo_content_signals_ai_input'),
+            $signal('seo_content_signals_ai_train'),
         ];
     }
 

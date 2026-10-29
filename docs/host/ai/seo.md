@@ -118,7 +118,9 @@ Field-by-field:
 | Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`; telephone, email and profile links only from the built-in Phones/Emails/Socials collections) | SEO settings → *Identity* tab exposes type and, for the organisation types, legal name, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win); telephone, email and sameAs are edited on the admin's Collections page only |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
-| Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
+| Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`/`content-signal`) are rejected at save time |
+| llms.txt (on/off, summary, notes, page types, pages per type) | `Settings` (`seo.llms_txt.*`) | SEO settings → *For AI* tab; see llms.txt below |
+| Content signals for AI use | `Settings` (`seo.content_signals.*`) | SEO settings → *For AI* tab; see robots.txt below |
 | GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Integrations* tab (accepts bare id or the full install snippet) |
 | Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Integrations* tab (accepts bare token or the pasted `<meta>` tag) |
 | 404 log toggle / retention | `Settings` (`seo.not_found.enabled`, `seo.not_found.retention_days`) | SEO settings → *Not found* tab |
@@ -479,10 +481,19 @@ on), then the editor's `seo.robots_extra` lines spliced
 line would end the group and orphan everything after it in a real
 robots.txt parse), then a trailing `Sitemap:` line (only when indexing is on
 *and* the sitemap route is enabled). Lines claiming an owned directive
-(`user-agent`/`allow`/`disallow`/`sitemap`, case-insensitive) are rejected
+(`user-agent`/`allow`/`disallow`/`sitemap`/`content-signal`, case-insensitive) are rejected
 at save time in `SeoSettingsPage::guardRobotsExtra()`, not silently
 stripped — an editor who wrote a conflicting line gets a validation error
 naming it.
+
+### Content signals
+
+With `seo.content_signals.enabled` on, the owned group carries one
+`Content-Signal:` line after the owned `Disallow:` paths
+(contentsignals.org), e.g. `Content-Signal: search=yes, ai-input=yes,
+ai-train=no`. Each signal reads its own key (`seo.content_signals.search`,
+`.ai_input`, `.ai_train`); an unset one takes that default. Off by default,
+and absent while indexing is off. Reader: `ContentSignals`.
 
 ### Disallowed paths
 
@@ -517,6 +528,56 @@ preview URL out of an index.
 
 **Install trap**: a static `public/robots.txt` shadows this route — see
 wiring.md, "`public/robots.txt` must not exist".
+
+## llms.txt
+
+`GET /llms.txt` (`LlmsTxtController` → `LlmsTxt::render()`), in the default
+locale, `text/plain; charset=utf-8`, following llmstxt.org. 404 until an
+editor turns on `seo.llms_txt.enabled` (SEO settings → *For AI*), and while
+indexing is off; `config('tbtop-cms.seo.llms_txt.enabled') === false`
+removes the route. Cached with `CmsCache::rememberLive` per origin and
+locale, so any content or settings write refreshes it (a changed
+`seo.llms_txt.sections` config shows once the cache TTL runs out or the
+cache is cleared).
+
+The file, in order:
+
+1. `# {site.name}` (the app URL's host when unset).
+2. `> {summary}`: `seo.llms_txt.summary`, else `seo.default_description`.
+3. The editor's notes (`seo.llms_txt.intro`), headings stripped: H1 and H2
+   belong to the format.
+4. Contacts: phones and emails (built-in collections), address and opening
+   hours (identity settings), social links. The same sources as the
+   identity JSON-LD node.
+5. One `## {type}` list per base page type (`seo.llms_txt.types`, empty =
+   all): live, indexable, non-error pages, up to `seo.llms_txt.per_type`
+   (default 50, max 500). `- [title](url): description` from the page's own
+   SEO title and description, without the site templates. Articles newest
+   first by `published_at`; every other type home first, then by depth,
+   then `sort_order`, picked from that type's first 1000 pages by
+   `sort_order`. Built-in types use the plural names in
+   `tbtop-cms::llms.sections.*`, other types their `label()`.
+6. Host sections from `config('tbtop-cms.seo.llms_txt.sections')`:
+
+```php
+final class DocsSection implements LlmsTxtSection
+{
+    public function title(string $locale): string
+    {
+        return 'Docs';
+    }
+
+    public function links(string $locale): array
+    {
+        return [new LlmsTxtLink('API', 'https://docs.example.com/api', 'REST reference')];
+    }
+}
+```
+
+7. `## Optional` with the sitemap, when the sitemap route is on.
+
+**Install trap**: a static `public/llms.txt` shadows the route; the
+`llms_txt` health check warns about it.
 
 ## Verification tokens and GTM
 

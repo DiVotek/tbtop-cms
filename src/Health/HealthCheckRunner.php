@@ -12,6 +12,7 @@ use Tbtop\Cms\Health\Checks\BrokenSharedReferencesCheck;
 use Tbtop\Cms\Health\Checks\DefaultOwnerAndLanguageCheck;
 use Tbtop\Cms\Health\Checks\InertiaRootViewCheck;
 use Tbtop\Cms\Health\Checks\JsWiringCheck;
+use Tbtop\Cms\Health\Checks\LlmsTxtCheck;
 use Tbtop\Cms\Health\Checks\MediaDiskWritableCheck;
 use Tbtop\Cms\Health\Checks\NotificationsConfiguredCheck;
 use Tbtop\Cms\Health\Checks\PackageVersionsMatchCheck;
@@ -46,6 +47,7 @@ final class HealthCheckRunner
             JsWiringCheck::class,
             PackageVersionsMatchCheck::class,
             RobotsTxtCheck::class,
+            LlmsTxtCheck::class,
             MediaDiskWritableCheck::class,
             NotificationsConfiguredCheck::class,
             SchedulerHeartbeatCheck::class,

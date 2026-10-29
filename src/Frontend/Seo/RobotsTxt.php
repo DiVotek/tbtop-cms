@@ -31,14 +31,16 @@ final readonly class RobotsTxt
      * starting with one would re-scope every owned rule above it: robots.txt
      * groups rules by the agent line that precedes them, so an editor writing
      * `User-agent: Googlebot` would quietly turn the site-wide `Allow: /` into
-     * a Googlebot-only rule.
+     * a Googlebot-only rule. `Content-Signal` is owned by the «For AI» tab
+     * of the SEO settings page.
      */
-    public const array OWNED_DIRECTIVES = ['user-agent', 'allow', 'disallow', 'sitemap'];
+    public const array OWNED_DIRECTIVES = ['user-agent', 'allow', 'disallow', 'sitemap', 'content-signal'];
 
     public function __construct(
         private Settings $settings,
         private IndexingSetting $indexing,
         private RobotsRegistry $disallow,
+        private ContentSignals $signals,
     ) {}
 
     /**
@@ -56,7 +58,7 @@ final readonly class RobotsTxt
     public function render(): string
     {
         $group = $this->indexing->enabled()
-            ? ['User-agent: *', 'Allow: /', ...$this->ownedDisallows()]
+            ? ['User-agent: *', 'Allow: /', ...$this->ownedDisallows(), ...$this->signalLines()]
             : ['User-agent: *', 'Disallow: /'];
 
         $custom = self::customLines((string) $this->settings->get('seo.robots_extra', ''));
@@ -117,6 +119,19 @@ final readonly class RobotsTxt
     private function ownedDisallows(): array
     {
         return array_map(fn (string $path): string => 'Disallow: ' . $path, $this->disallow->all());
+    }
+
+    /**
+     * Inside the `User-agent: *` group, as contentsignals.org places it.
+     * Only under `Allow: /`: a closed site grants no use of its content.
+     *
+     * @return list<string>
+     */
+    private function signalLines(): array
+    {
+        $line = $this->signals->line();
+
+        return $line === null ? [] : [$line];
     }
 
     /**

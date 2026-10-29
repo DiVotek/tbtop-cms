@@ -475,6 +475,9 @@ and sitemap reference then silently do nothing.
 rm public/robots.txt
 ```
 
+The same holds for `public/llms.txt` and the `tbtop-cms.llms-txt` route: the
+`llms_txt` health check warns when the file exists.
+
 ## Admin access and roles
 
 Access is binary, owned by this package: a user has it if a
