@@ -624,6 +624,25 @@ render and refused on the next save. A site that already had such a line in
 robots.txt loses it. `RobotsTxt` takes a `ContentSignals` in
 its constructor: resolve it from the container rather than with `new`.
 
+## Markdown versions of pages for AI agents
+
+While the editor has it on (SEO settings → *For AI*, off by default), every
+live, indexable page also answers as markdown at its path plus `.md`
+(`/about.md`, `/index.md` for the home page) and to a request whose `Accept`
+ranks `text/markdown` above `text/html`. HTML answers gain `Vary: Accept` and a
+`Link` header to the markdown version; llms.txt links the `.md` versions while
+markdown is on. A host that never wants it sets
+`tbtop-cms.seo.markdown.enabled` to `false`; a published `seo` config section
+without the key gets the inline default.
+
+`PageTypeInterface` gains `toMarkdown(Page $page, MarkdownContext $ctx):
+?string`, appended after the page's blocks. `BasePageType` implements it (a
+type that allows children lists its live children), so a type extending it
+needs nothing. **A type that implements the interface directly must add it, or
+it fails at load.** `Block::toMarkdown()` is optional: the default renders the
+block's translatable fields, and `''` leaves a block out. Details are in
+`docs/host/ai/seo.md`.
+
 ## The pages API is rate limited
 
 Every `/api/cms/v1` route now runs Laravel's `throttle` with
@@ -747,6 +766,8 @@ hand, in order.
     *For AI*: robots.txt now drops it from the extra lines.
 17. **A host copy of `CmsPage.tsx`** renders `page.heading` when `page.id` is
     `null` (fallback error pages).
+18. **Page types that implement `PageTypeInterface` directly** add
+    `toMarkdown()` (see "Markdown versions of pages for AI agents").
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts, the admin
