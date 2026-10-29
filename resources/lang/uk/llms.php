@@ -17,6 +17,7 @@ return [
     'optional' => [
         'sitemap' => 'Карта сайту',
         'sitemap_notes' => 'Усі індексовані URL сайту',
+        'language_notes' => 'Цей файл іншою мовою',
     ],
     'markdown' => [
         'children' => 'У цьому розділі',

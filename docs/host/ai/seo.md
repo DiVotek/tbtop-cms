@@ -533,7 +533,11 @@ wiring.md, "`public/robots.txt` must not exist".
 ## llms.txt
 
 `GET /llms.txt` (`LlmsTxtController` → `LlmsTxt::render()`), in the default
-locale, `text/plain; charset=utf-8`, following llmstxt.org. 404 until an
+locale, `text/plain; charset=utf-8`, following llmstxt.org. Every other
+frontend-active locale has its own at `/{locale}/llms.txt` (`/uk/llms.txt`):
+the page route hands that path to `LlmsTxtController::forLocale()` once
+`SetLanguage` has picked the locale, so `/en/llms.txt` for the default locale
+301s to `/llms.txt` and a locale that is not on the frontend 404s. 404 until an
 editor turns on `seo.llms_txt.enabled` (SEO settings → *For AI*), and while
 indexing is off; `config('tbtop-cms.seo.llms_txt.enabled') === false`
 removes the route. Cached with `CmsCache::rememberLive` per origin and
@@ -576,7 +580,9 @@ final class DocsSection implements LlmsTxtSection
 }
 ```
 
-7. `## Optional` with the sitemap, when the sitemap route is on.
+7. `## Optional`: the sitemap (when the sitemap route is on) and this file in
+   every other frontend language, `- [{language name}]({locale llms.txt})`;
+   left out when both are empty.
 
 **Install trap**: a static `public/llms.txt` shadows the route; the
 `llms_txt` health check warns about it.
@@ -600,8 +606,10 @@ Headers: `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`,
 `Link: <canonical>; rel="canonical"`, `X-Robots-Tag: noindex` for a noindex
 page, `Content-Signal: …` while content signals are on. While markdown is on,
 the HTML answer carries `Vary: Accept` and `Link: </about.md>;
-rel="alternate"; type="text/markdown"` (plus `</llms.txt>; rel="describedby"`
-while llms.txt is on), except for a preview.
+rel="alternate"; type="text/markdown"`; while llms.txt is on it carries
+`Link: </llms.txt>; rel="describedby"; type="text/plain"` for its locale's
+file (`/uk/llms.txt` on a `/uk/…` page), with or without markdown. Neither
+for a preview.
 
 The document, in order:
 

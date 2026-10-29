@@ -25,6 +25,7 @@ use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
 use Tbtop\Cms\Frontend\Seo\ContentSignals;
 use Tbtop\Cms\Frontend\Seo\IndexingSetting;
 use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
+use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtUrl;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -61,6 +62,7 @@ class PageController
         private readonly LlmsTxtSettings $llms,
         private readonly IndexingSetting $indexing,
         private readonly ContentSignals $signals,
+        private readonly LlmsTxtUrl $llmsTxtUrl,
         private readonly EmptyArchives $emptyArchives,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
@@ -69,6 +71,14 @@ class PageController
     {
         $locale = (string) app()->getLocale();
         $path = (string) $request->attributes->get('cms_path', '');
+
+        // `/uk/llms.txt`: the llms.txt route only matches the bare path, so
+        // another locale's file arrives here once SetLanguage has stripped
+        // the prefix (the default locale's prefix already 301'd to /llms.txt).
+        if ($path === 'llms.txt' && $locale !== $this->languages->defaultLocale() && config('tbtop-cms.seo.llms_txt.enabled', true)) {
+            return app(LlmsTxtController::class)->forLocale($locale);
+        }
+
         $markdownOn = $this->llms->markdownEnabled() && $this->indexing->enabled();
         $suffixPath = $markdownOn ? MarkdownRequest::suffixPath($path) : null;
         $wantsMarkdown = $suffixPath !== null || ($markdownOn && MarkdownRequest::accepts($request));
@@ -114,9 +124,7 @@ class PageController
             $response->headers->set('X-Robots-Tag', 'noindex');
         }
 
-        if ($markdownOn) {
-            $this->advertiseMarkdown($response, $path, $locale, $props['isPreview'] === true);
-        }
+        $this->advertise($response, $path, $locale, $markdownOn, $props['isPreview'] === true);
 
         return $response;
     }
@@ -147,25 +155,33 @@ class PageController
     }
 
     /**
-     * The HTML answer names its markdown twin and llms.txt in `Link`
-     * headers, and varies on Accept so a cache never hands one to a client
-     * that asked for the other.
+     * The HTML answer names its markdown twin and its locale's llms.txt in
+     * `Link` headers; with markdown on it varies on Accept, so a cache never
+     * hands one to a client that asked for the other. No `Link` for a preview.
      */
-    private function advertiseMarkdown(Response $response, string $path, string $locale, bool $isPreview): void
+    private function advertise(Response $response, string $path, string $locale, bool $markdownOn, bool $isPreview): void
     {
-        $response->setVary('Accept', false);
+        if ($markdownOn) {
+            $response->setVary('Accept', false);
+        }
 
         if ($isPreview) {
             return;
         }
 
-        $links = ['<' . $this->markdownPages->markdownUrl($path, $locale) . '>; rel="alternate"; type="text/markdown"'];
+        $links = [];
 
-        if ($this->llms->enabled()) {
-            $links[] = '<' . url('llms.txt') . '>; rel="describedby"; type="text/plain"';
+        if ($markdownOn) {
+            $links[] = '<' . $this->markdownPages->markdownUrl($path, $locale) . '>; rel="alternate"; type="text/markdown"';
         }
 
-        $response->headers->set('Link', implode(', ', $links), false);
+        if ($this->llms->enabled() && $this->indexing->enabled() && config('tbtop-cms.seo.llms_txt.enabled', true)) {
+            $links[] = '<' . $this->llmsTxtUrl->for($locale) . '>; rel="describedby"; type="text/plain"';
+        }
+
+        if ($links !== []) {
+            $response->headers->set('Link', implode(', ', $links), false);
+        }
     }
 
     /**
