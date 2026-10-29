@@ -6,17 +6,18 @@ namespace Tbtop\Cms\Frontend\Seo\LlmsTxt;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\URL;
+use Tbtop\Cms\Frontend\Markdown\MarkdownPages;
 use Tbtop\Cms\Frontend\Seo\PageOwnSeo;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
-use Tbtop\Cms\Page\PageUrl;
 
 /**
  * One llms.txt section per base page type: the live, indexable pages of
  * that type, by the rules the sitemap uses (live scope, `is_indexable`, no
  * error pages).
+ *
+ * Links point at the page's `.md` while markdown versions are on.
  *
  * Articles are newest first, every other type follows the tree: the home
  * page, then shallower before deeper, then the editor's sort order. Link
@@ -36,7 +37,7 @@ final readonly class LlmsTxtPages
 
     public function __construct(
         private PageTypeRegistry $types,
-        private PageUrl $url,
+        private MarkdownPages $pages,
         private LlmsTxtSettings $settings,
     ) {}
 
@@ -77,11 +78,10 @@ final readonly class LlmsTxtPages
         $links = [];
 
         foreach ($pages as $page) {
-            $path = (string) $page->pathFor($locale);
             $seo = PageOwnSeo::blob($page);
             $links[] = new LlmsTxtLink(
                 PageOwnSeo::title($page, $seo, $locale),
-                URL::to($this->url->build($path, $locale)),
+                (string) $this->pages->linkFor($page, $locale),
                 PageOwnSeo::description($page, $seo, $locale),
             );
 

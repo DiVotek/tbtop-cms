@@ -8,8 +8,8 @@ use Tbtop\Cms\Frontend\Seo\LocalizedSeo;
 use Tbtop\Cms\Settings\Settings;
 
 /**
- * The single reader of the `seo.llms_txt.*` keys the SEO settings page
- * writes on its «For AI» tab.
+ * The single reader of the `seo.llms_txt.*` and `seo.markdown.*` keys the
+ * SEO settings page writes on its «For AI» tab.
  */
 final readonly class LlmsTxtSettings
 {
@@ -23,6 +23,8 @@ final readonly class LlmsTxtSettings
 
     public const string PER_TYPE = 'seo.llms_txt.per_type';
 
+    public const string MARKDOWN = 'seo.markdown.enabled';
+
     public const int DEFAULT_PER_TYPE = 50;
 
     public const int MAX_PER_TYPE = 500;
@@ -34,6 +36,17 @@ final readonly class LlmsTxtSettings
     {
         return (bool) config('tbtop-cms.seo.llms_txt.enabled', true)
             && (bool) $this->settings->get(self::ENABLED);
+    }
+
+    /**
+     * Markdown versions of pages (`/about.md`, `Accept: text/markdown`).
+     * Off until an editor turns it on; the host config can turn it off for
+     * good.
+     */
+    public function markdownEnabled(): bool
+    {
+        return (bool) config('tbtop-cms.seo.markdown.enabled', true)
+            && (bool) $this->settings->get(self::MARKDOWN);
     }
 
     /** The blockquote under the site name: the AI description, else the fallback meta description. */

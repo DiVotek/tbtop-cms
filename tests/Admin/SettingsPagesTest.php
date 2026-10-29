@@ -141,6 +141,7 @@ it('keeps every settings field reachable after the regrouping', function (): voi
         'seo_llms_txt_intro',
         'seo_llms_txt_types',
         'seo_llms_txt_per_type',
+        'seo_markdown_enabled',
         'seo_content_signals_enabled',
         'seo_content_signals_search',
         'seo_content_signals_ai_input',
@@ -258,6 +259,7 @@ it('saves the For AI tab under the keys llms.txt and robots.txt read', function 
         'seo_llms_txt_enabled' => true,
         'seo_llms_txt_types' => ['article'],
         'seo_llms_txt_per_type' => 20,
+        'seo_markdown_enabled' => true,
         'seo_content_signals_enabled' => true,
         'seo_content_signals_ai_train' => true,
     ])->assertRedirect()->assertSessionHasNoErrors();
@@ -267,6 +269,7 @@ it('saves the For AI tab under the keys llms.txt and robots.txt read', function 
     expect($settings->get('seo.llms_txt.enabled'))->toBeTrue()
         ->and($settings->get('seo.llms_txt.types'))->toBe(['article'])
         ->and((int) $settings->get('seo.llms_txt.per_type'))->toBe(20)
+        ->and($settings->get('seo.markdown.enabled'))->toBeTrue()
         ->and($settings->get('seo.content_signals.ai_train'))->toBeTrue();
 });
 

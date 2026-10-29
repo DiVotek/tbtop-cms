@@ -11,6 +11,7 @@ use Tbtop\Cms\Block\HandlesFormSubmission;
 use Tbtop\Cms\Block\HasFieldLabels;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 
 /**
  * Reference form block: an anonymous contact form. Notifying the team about
@@ -83,6 +84,18 @@ class ContactForm extends Block implements HandlesFormSubmission, HasFieldLabels
                 'required' => $field['required'],
             ], self::FIELDS),
         ];
+    }
+
+    /**
+     * The heading and one line saying there is a form: an agent cannot fill
+     * it in, but can tell a reader where to.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    #[\Override]
+    public function toMarkdown(array $props, MarkdownContext $ctx): string
+    {
+        return trim($ctx->heading((string) ($props['heading'] ?? '')) . "\n\n" . $ctx->text(__('tbtop-cms::llms.markdown.form', [], $ctx->locale)));
     }
 
     /** The editor's copy, or the default in the page locale when it is blank. */

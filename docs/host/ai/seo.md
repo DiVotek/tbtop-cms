@@ -120,6 +120,7 @@ Field-by-field:
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
 | Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`/`content-signal`) are rejected at save time |
 | llms.txt (on/off, summary, notes, page types, pages per type) | `Settings` (`seo.llms_txt.*`) | SEO settings → *For AI* tab; see llms.txt below |
+| Markdown versions of pages (on/off) | `Settings` (`seo.markdown.enabled`) | SEO settings → *For AI* tab; see Markdown for agents below |
 | Content signals for AI use | `Settings` (`seo.content_signals.*`) | SEO settings → *For AI* tab; see robots.txt below |
 | GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Integrations* tab (accepts bare id or the full install snippet) |
 | Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Integrations* tab (accepts bare token or the pasted `<meta>` tag) |
@@ -552,7 +553,8 @@ The file, in order:
 5. One `## {type}` list per base page type (`seo.llms_txt.types`, empty =
    all): live, indexable, non-error pages, up to `seo.llms_txt.per_type`
    (default 50, max 500). `- [title](url): description` from the page's own
-   SEO title and description, without the site templates. Articles newest
+   SEO title and description, without the site templates; the URL is the
+   page's `.md` while markdown versions are on. Articles newest
    first by `published_at`; every other type home first, then by depth,
    then `sort_order`, picked from that type's first 1000 pages by
    `sort_order`. Built-in types use the plural names in
@@ -578,6 +580,67 @@ final class DocsSection implements LlmsTxtSection
 
 **Install trap**: a static `public/llms.txt` shadows the route; the
 `llms_txt` health check warns about it.
+
+## Markdown for agents
+
+The page route answers in markdown (`PageController` → `PageMarkdown`) when
+the path ends in `.md` (`/about.md`, `/uk/about.md`; `/index.md` is the home
+page) or the `Accept` header ranks `text/markdown` above `text/html`
+(`MarkdownRequest::accepts()`: a tie goes to the type listed first, `*/*`
+counts for HTML only, an Inertia visit is never markdown). Off until an
+editor turns on `seo.markdown.enabled` (SEO settings → *For AI*), and while
+indexing is off; `config('tbtop-cms.seo.markdown.enabled') === false` turns
+it off for good. Without it, `/about.md` is an ordinary unknown path.
+
+Only live pages: a draft or scheduled page 404s, even for an admin, and
+redirects and 404s work as for the HTML path without `.md`. Not cached: it
+costs one page render, like the HTML answer.
+
+Headers: `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`,
+`Link: <canonical>; rel="canonical"`, `X-Robots-Tag: noindex` for a noindex
+page, `Content-Signal: …` while content signals are on. While markdown is on,
+the HTML answer carries `Vary: Accept` and `Link: </about.md>;
+rel="alternate"; type="text/markdown"` (plus `</llms.txt>; rel="describedby"`
+while llms.txt is on), except for a preview.
+
+The document, in order:
+
+1. YAML frontmatter: `title`, `description` (the rendered head values),
+   `url` (canonical), `lang`, `image` (og:image), `alternates` (hreflang
+   locale → URL, the current locale left out).
+2. `# {heading}` (the page's title cascade when empty), the summary, the body
+   (richtext → markdown, `RichtextMarkdownRenderer`: headings start at H2,
+   links keep only the URLs the HTML renderer allows).
+3. Every active block in order, by `Block::toMarkdown()` (blocks.md).
+4. `PageTypeInterface::toMarkdown()`: by default, for a type that allows
+   children, `## In this section` with the live, indexable children (own
+   title and description, `.md` links), up to `seo.llms_txt.per_type`.
+5. `## About {site}`: the notes for AI (`seo.llms_txt.intro`) and the same
+   contact lines as llms.txt; left out when both are empty.
+6. The page's whole JSON-LD graph, the nodes the HTML head carries, as one
+   `json` code block.
+
+A type adds its own text by overriding `toMarkdown()`; call the parent to
+keep the children list:
+
+```php
+final class ProductType extends BasePageType
+{
+    public function toMarkdown(Page $page, MarkdownContext $ctx): ?string
+    {
+        $product = $ctx->source;
+
+        return $ctx->heading('Price') . "\n\n" . $ctx->text($product->price . ' UAH');
+    }
+}
+```
+
+`MarkdownContext` (`src/Frontend/Markdown/MarkdownContext.php`) carries
+`page`, `locale`, `defaultLocale`, `url` (canonical), `source`, `fields`
+(resolved type fields; `field($name)`), and helpers that escape stored text:
+`text()`, `escape()`, `heading($text, $level = 2)`, `link()`, `list()`,
+`richtext()`, `pageItem(Page)` (`[title](url.md): description`) and
+`children($limit)`.
 
 ## Verification tokens and GTM
 

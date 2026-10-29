@@ -11,6 +11,7 @@ use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 use Tbtop\Cms\Tests\Fixtures\PageEditHelpers;
 use Tbtop\Cms\Tests\Fixtures\TaggedPostPageType;
@@ -112,6 +113,10 @@ it('keeps a tag nothing live is tagged with out of the index and the sitemap', f
         ->and($sitemap)->toContain(url('/blog/ramen'));
 
     test()->get('/tags/empty', ['X-Inertia' => 'true'])->assertHeader('X-Robots-Tag', 'noindex');
+
+    app(Settings::class)->set('seo.markdown.enabled', true);
+    test()->get('/tags/empty.md')->assertOk()->assertHeader('X-Robots-Tag', 'noindex');
+    test()->get('/tags/japan.md')->assertOk()->assertHeaderMissing('X-Robots-Tag');
 });
 
 it('creates a published tag from the select, next to the other tags', function (): void {

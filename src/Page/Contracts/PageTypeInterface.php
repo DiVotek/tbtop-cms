@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Page\Contracts;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 use Tbtop\Cms\Page\Models\Page;
 
 interface PageTypeInterface
@@ -111,4 +112,13 @@ interface PageTypeInterface
      * subtype under a "Tags" category: recipes.md.
      */
     public function archiveOf(): ?string;
+
+    /**
+     * Markdown appended to the page's `.md` version after its blocks, or
+     * null for nothing. BasePageType lists the live, indexable children of
+     * a type that allows children (a blog category lists its articles); a
+     * source-backed type can add what its source() knows (price, stock).
+     * The page subtype's implementation wins over the base type's.
+     */
+    public function toMarkdown(Page $page, MarkdownContext $ctx): ?string;
 }
