@@ -119,7 +119,7 @@ describe("llms.txt per locale", () => {
 		expect(body).toContain("](https://site.test/llms.txt): Цей файл іншою мовою");
 	});
 
-	test("the default locale prefix redirects; an unknown prefix and a disabled file are the host's", async () => {
+	test("the default locale prefix redirects; an unknown prefix is the host's; a disabled file 404s", async () => {
 		const { cms } = await on();
 		const res = await cms.handle(get("/en/llms.txt"));
 		expect(res?.status).toBe(301);
