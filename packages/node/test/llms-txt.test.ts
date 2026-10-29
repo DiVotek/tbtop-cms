@@ -56,6 +56,7 @@ describe("llms.txt", () => {
 				"",
 				"## Optional",
 				"- [Sitemap](https://site.test/sitemap.xml): Every indexable URL of the site",
+				"- [Українська](https://site.test/uk/llms.txt): This file in another language",
 				"",
 			].join("\n"),
 		);
@@ -104,6 +105,36 @@ describe("llms.txt", () => {
 		const body = (await llms(cms)) ?? "";
 		expect(body).toContain("## Files\n- [Price \\[2026\\]](https://site.test/files/price%20list%28v2%29.pdf): PDF\n\n## Optional");
 		expect(body).not.toContain("## Empty");
+	});
+});
+
+describe("llms.txt per locale", () => {
+	test("another frontend locale under its prefix, linking back to the default one", async () => {
+		const { cms } = await on();
+		const res = await cms.handle(get("/uk/llms.txt"));
+		expect(res?.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
+		const body = (await res?.text()) ?? "";
+		expect(body).toContain("> Демо-сайт на tbtop CMS.");
+		expect(body).toContain("](https://site.test/uk/");
+		expect(body).toContain("](https://site.test/llms.txt): Цей файл іншою мовою");
+	});
+
+	test("the default locale prefix redirects; an unknown prefix is the host's; a disabled file 404s", async () => {
+		const { cms } = await on();
+		const res = await cms.handle(get("/en/llms.txt"));
+		expect(res?.status).toBe(301);
+		expect(res?.headers.get("location")).toBe("/llms.txt");
+		expect(await cms.handle(get("/de/llms.txt"))).toBeNull();
+		expect(await cms.handle(get("/blog/llms.txt"))).toBeNull();
+		expect((await (await makeCms()).cms.handle(get("/uk/llms.txt")))?.status).toBe(404);
+	});
+
+	test("the HTML answer names its locale's llms.txt, markdown on or off", async () => {
+		const { cms } = await on();
+		const uk = await cms.loadPage(get("/uk"));
+		expect(uk.type === "page" ? uk.headers : null).toEqual({ Link: '<https://site.test/uk/llms.txt>; rel="describedby"; type="text/plain"' });
+		const en = await cms.loadPage(get("/"));
+		expect(en.type === "page" ? en.headers : null).toEqual({ Link: '<https://site.test/llms.txt>; rel="describedby"; type="text/plain"' });
 	});
 });
 

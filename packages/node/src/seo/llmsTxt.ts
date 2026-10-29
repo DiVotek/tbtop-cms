@@ -34,6 +34,7 @@ const STRINGS: Record<string, Record<string, string>> = {
 		"contacts.hours": "Opening hours",
 		"optional.sitemap": "Sitemap",
 		"optional.sitemap_notes": "Every indexable URL of the site",
+		"optional.language_notes": "This file in another language",
 		"days.monday": "Monday",
 		"days.tuesday": "Tuesday",
 		"days.wednesday": "Wednesday",
@@ -52,6 +53,7 @@ const STRINGS: Record<string, Record<string, string>> = {
 		"contacts.hours": "Графік роботи",
 		"optional.sitemap": "Карта сайту",
 		"optional.sitemap_notes": "Усі індексовані URL сайту",
+		"optional.language_notes": "Цей файл іншою мовою",
 		"days.monday": "Понеділок",
 		"days.tuesday": "Вівторок",
 		"days.wednesday": "Середа",
@@ -228,8 +230,14 @@ export async function llmsTxt(site: Site, locale: string): Promise<string> {
 			sections.push({ title: section.title(locale), links });
 		}
 	}
-	if (site.config.sitemap !== false) {
-		sections.push({ title: "Optional", links: [{ name: t("optional.sitemap", locale), url: "/sitemap.xml", notes: t("optional.sitemap_notes", locale) }] });
+	const optional: LlmsTxtLink[] = site.config.sitemap === false ? [] : [{ name: t("optional.sitemap", locale), url: "/sitemap.xml", notes: t("optional.sitemap_notes", locale) }];
+	for (const language of await site.languages.frontendActive()) {
+		if (language.locale !== locale) {
+			optional.push({ name: language.name, url: await llmsTxtPath(site, language.locale), notes: t("optional.language_notes", locale) });
+		}
+	}
+	if (optional.length > 0) {
+		sections.push({ title: "Optional", links: optional });
 	}
 	for (const section of sections) {
 		const lines = section.links.map((link) => {
@@ -241,11 +249,14 @@ export async function llmsTxt(site: Site, locale: string): Promise<string> {
 	return `${blocks.join("\n\n")}\n`;
 }
 
-/** LlmsTxtController: 404 until turned on and while indexing is off, in the default locale. */
-export async function llmsTxtResponse(site: Site): Promise<Response> {
+/** LlmsTxtUrl: `/llms.txt` for the default locale, `/uk/llms.txt` for another. */
+export const llmsTxtPath = (site: Site, locale: string): Promise<string> => site.url("llms.txt", locale);
+
+/** LlmsTxtController: 404 until turned on and while indexing is off; the default locale unless another is given. */
+export async function llmsTxtResponse(site: Site, locale?: string): Promise<Response> {
 	if (!(await llmsTxtEnabled(site)) || !(await indexingEnabled(site))) {
 		return new Response(null, { status: 404 });
 	}
-	const body = await llmsTxt(site, await site.languages.defaultLocale());
+	const body = await llmsTxt(site, locale ?? (await site.languages.defaultLocale()));
 	return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }

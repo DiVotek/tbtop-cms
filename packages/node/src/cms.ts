@@ -13,7 +13,7 @@ import { type LoadResult, loadPage, type PageProps } from "./frontend/load";
 import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { type HealthResult, runHealthChecks, SCHEDULER_HEARTBEAT } from "./health";
 import { runSeoAudit, writeSeoSnapshot } from "./seo/audit";
-import { llmsTxtResponse } from "./seo/llmsTxt";
+import { localeLlmsTxt } from "./seo/llmsTxtRoute";
 import { markdownResponse } from "./seo/markdown/page";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
@@ -170,8 +170,11 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			if (pathname === "/robots.txt") {
 				return new Response(await robotsTxt(scope), { headers: { "Content-Type": "text/plain" } });
 			}
-			if (pathname === "/llms.txt" && config.llmsTxt?.enabled !== false) {
-				return llmsTxtResponse(scope);
+			if (pathname.endsWith("/llms.txt") && config.llmsTxt?.enabled !== false) {
+				const llms = await localeLlmsTxt(scope, request);
+				if (llms !== null) {
+					return llms;
+				}
 			}
 			if (config.sitemap === false || (pathname !== "/sitemap.xml" && !SITEMAP_CHUNK.test(pathname))) {
 				return null;
