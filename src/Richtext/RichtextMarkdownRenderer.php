@@ -68,7 +68,8 @@ class RichtextMarkdownRenderer
             'quote' => Markdown::quote($this->inline($node, $depth)),
             'list' => $this->list($node, $depth, 0),
             'code' => $this->code($node, $depth),
-            default => $this->inline($node, $depth),
+            // A text or link node straight under the root.
+            default => $this->node($node, $depth),
         };
     }
 

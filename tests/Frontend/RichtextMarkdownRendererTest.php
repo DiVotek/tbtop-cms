@@ -40,3 +40,9 @@ it('reads a Lexical state and plain text as well as HTML', function (): void {
         ->and(richtextMarkdown('Plain text'))->toBe('Plain text')
         ->and(richtextMarkdown(null))->toBe('');
 });
+
+it('keeps text that sits straight under the root', function (): void {
+    $state = ['root' => ['children' => [['type' => 'text', 'text' => 'Loose', 'format' => 1]]]];
+
+    expect(richtextMarkdown($state))->toBe('**Loose**');
+});
