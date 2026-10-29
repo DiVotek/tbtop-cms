@@ -596,6 +596,47 @@ What changes for a host:
    as for the `link` field: it now also registers `collectionFieldClient`,
    the editor of the `collection` field.
 
+## Page types: `listedInAll()` and `archiveOf()` (tags and category archives)
+
+`PageTypeInterface` gains two methods, `listedInAll(): bool` and
+`archiveOf(): ?string`. `BasePageType` answers `true` and `null`, so a type
+extending it needs nothing. **A type that implements the interface directly
+must add both, or it fails at load.** `listedInAll()` false keeps the type off
+the Pages "All" tab; `archiveOf()` names the `pages` field the type is an
+archive of, and such a page stays noindex and out of the sitemap while no live
+page picks it. Tags as pages and the paged archive helpers
+(`Cms::referencedByPaged()`, `childrenPaged()`, …) are in
+`docs/host/ai/recipes.md`, "Tags and category archives".
+
+## `llms.txt` and the robots.txt `Content-Signal`
+
+`GET /llms.txt` is a new route, off until the editor turns it on in SEO
+settings → *For AI* (404 until then, and while indexing is off). A host that
+serves its own `/llms.txt` sets `tbtop-cms.seo.llms_txt.enabled` to `false`;
+a static `public/llms.txt` shadows the route, and the `llms_txt` health check
+warns about it. A published `seo` config section without `llms_txt` keys gets
+the inline defaults.
+
+`Content-Signal` is now a robots.txt directive the site writes itself (off by
+default, same tab): a `seo.robots_extra` line starting with it is dropped on
+render and refused on the next save. `RobotsTxt` takes a `ContentSignals` in
+its constructor: resolve it from the container rather than with `new`.
+
+## The pages API is rate limited
+
+Every `/api/cms/v1` route now runs Laravel's `throttle` with
+`tbtop-cms.api.throttle` (default `'60,1'`, 60 requests a minute per token
+user; `''` turns it off). An integration that calls more often raises the
+limit there. A published `config/tbtop-cms.php` without the key gets the
+default.
+
+## The fallback error page shows its heading
+
+With no published 404/500 page in the database, the response carries an empty
+block spec and only `page.heading`. The package's `CmsPage.tsx` now renders
+that heading as an `<h1>` when `page.id` is `null`; a host with its own copy of
+`CmsPage.tsx` adds the same branch, or its fallback error pages stay blank.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
@@ -687,6 +728,19 @@ hand, in order.
 11. **Run `php artisan tbtop:media-regenerate` once** after updating
     tbtop/admin, so media uploaded earlier gets the `sm`/`md`/`lg` variants
     `mediaImage()` lists in its `srcset`.
+12. **Page types that implement `PageTypeInterface` directly** add
+    `listedInAll()` and `archiveOf()` (see their section above).
+13. **Run `php artisan migrate`** for the collections:
+    `2026_10_28_000000_create_entries_table`, then
+    `2026_10_28_000001_move_contacts_to_collections` (no `down()`). A
+    published `admin.pages` config adds `collection_entries` and
+    `collection_entry_edit`; the host's admin JS imports
+    `resources/js/cms/admin/blocks.ts`.
+14. **Code that builds `SiteContacts` or `RobotsTxt` with `new`** passes the
+    new dependency (`CollectionEntries`, `ContentSignals`) or resolves it from
+    the container.
+15. **A host copy of `CmsPage.tsx`** renders `page.heading` when `page.id` is
+    `null` (fallback error pages).
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts, the admin
