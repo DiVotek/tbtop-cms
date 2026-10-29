@@ -273,6 +273,19 @@ it('falls back to the text of a block without its own markdown', function (): vo
         ->not->toContain('Broken');
 });
 
+it('reads a richtext field stored as Lexical state, JSON text or decoded', function (): void {
+    mdBlocks([MdNotesBlock::class]);
+    markdownOn();
+    $state = ['root' => ['children' => [['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => 'Bold move', 'format' => 1]]]]]];
+    mdPage(['name' => ['en' => 'About'], 'content' => [
+        mdBlock('MdNotes', ['body' => ['en' => json_encode($state)]], 'j'),
+        mdBlock('MdNotes', ['body' => ['en' => ['root' => ['children' => [['type' => 'paragraph', 'children' => [['type' => 'text', 'text' => 'As array', 'format' => 2]]]]]]]], 'a'),
+    ]]);
+
+    expect($this->get('/about.md')->assertOk()->getContent())->toContain("**Bold move**\n\n_As array_")
+        ->not->toContain('"root"');
+});
+
 it('lists the live indexable children of a category', function (): void {
     markdownOn();
     $blog = Page::factory()->category()->create(['status' => PageStatus::Published, 'name' => ['en' => 'Blog'], 'title' => ['en' => 'Blog']]);
