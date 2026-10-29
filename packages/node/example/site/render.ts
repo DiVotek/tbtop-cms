@@ -16,7 +16,7 @@ const json = (value: unknown) => JSON.stringify(value).replace(/[<>&\u2028\u2029
 function fieldsLine(page: Props["page"]): string {
 	switch (page.type) {
 		case "service":
-			return `${page.fields.price ?? "?"} UAH · ${page.fields.duration ?? ""}${page.fields.level === "pro" ? " · Pro" : ""}${page.fields.channels.map((channel) => ` · ${channel}`).join("")}`;
+			return `${page.fields.price ?? "?"} UAH · ${page.fields.duration ?? ""}${page.fields.level === "pro" ? " · Pro" : ""}${(page.fields.channels ?? []).map((channel) => ` · ${channel}`).join("")}`;
 		case "page":
 			return page.fields.tagline ?? "";
 		default:
