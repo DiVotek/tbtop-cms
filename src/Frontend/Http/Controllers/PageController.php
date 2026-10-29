@@ -124,9 +124,7 @@ class PageController
             $response->headers->set('X-Robots-Tag', 'noindex');
         }
 
-        if ($props['isPreview'] !== true) {
-            $this->advertise($response, $path, $locale, $markdownOn);
-        }
+        $this->advertise($response, $path, $locale, $markdownOn, $props['isPreview'] === true);
 
         return $response;
     }
@@ -159,14 +157,21 @@ class PageController
     /**
      * The HTML answer names its markdown twin and its locale's llms.txt in
      * `Link` headers; with markdown on it varies on Accept, so a cache never
-     * hands one to a client that asked for the other. Not for a preview.
+     * hands one to a client that asked for the other. No `Link` for a preview.
      */
-    private function advertise(Response $response, string $path, string $locale, bool $markdownOn): void
+    private function advertise(Response $response, string $path, string $locale, bool $markdownOn, bool $isPreview): void
     {
+        if ($markdownOn) {
+            $response->setVary('Accept', false);
+        }
+
+        if ($isPreview) {
+            return;
+        }
+
         $links = [];
 
         if ($markdownOn) {
-            $response->setVary('Accept', false);
             $links[] = '<' . $this->markdownPages->markdownUrl($path, $locale) . '>; rel="alternate"; type="text/markdown"';
         }
 
