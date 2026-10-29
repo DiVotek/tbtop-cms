@@ -617,6 +617,11 @@ a static `public/llms.txt` shadows the route, and the `llms_txt` health check
 warns about it. A published `seo` config section without `llms_txt` keys gets
 the inline defaults.
 
+Every frontend locale other than the default also gets its own file at
+`/{locale}/llms.txt` (`/uk/llms.txt`), and `/en/llms.txt` for the default locale
+301s to `/llms.txt`. The same switches turn them off. While llms.txt is on, HTML
+pages send `Link: <…/llms.txt>; rel="describedby"` for their locale's file.
+
 `Content-Signal` is now a robots.txt directive the site writes itself (off by
 default, same tab): a `seo.robots_extra` line starting with it is dropped on
 render and refused on the next save. A site that already had such a line in
