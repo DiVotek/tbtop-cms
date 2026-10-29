@@ -110,16 +110,18 @@ jobs:
             exit 1
           }
 
-      # A wildcard or local spec in what consumers install cannot be fixed
-      # after publish. devDependencies are not installed by consumers.
+      # A wildcard, tag, open or local range in what consumers install cannot
+      # be fixed after publish: only exact, caret and tilde versions (joined
+      # by ||) pass. devDependencies are not installed by consumers.
       - name: Refuse unpinned dependency ranges
         run: |
           node -e '
             const pkg = require("./package.json");
+            const pinned = /^[~^]?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
             const bad = [];
             for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
               for (const [name, range] of Object.entries(pkg[field] ?? {})) {
-                if (range === "*" || /^(file|link|workspace):/.test(range)) bad.push(`${field}.${name}: ${range}`);
+                if (!range.split("||").every((part) => pinned.test(part.trim()))) bad.push(`${field}.${name}: ${range}`);
               }
             }
             if (bad.length) {

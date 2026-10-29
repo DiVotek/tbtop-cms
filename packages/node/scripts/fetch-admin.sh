@@ -12,6 +12,11 @@ if [ "$(git -C .tbtop rev-parse HEAD 2>/dev/null || true)" != "$sha" ]; then
 	git -C .tbtop fetch -q --depth 1 "$repo" "$sha"
 	git -C .tbtop checkout -q FETCH_HEAD
 fi
+# Whatever TBTOP_REPO points at, only the pinned commit is built.
+if [ "$(git -C .tbtop rev-parse HEAD)" != "$sha" ]; then
+	echo "fetch-admin: .tbtop is not at ADMIN_SHA $sha" >&2
+	exit 1
+fi
 cd .tbtop/packages/node
 bun install --frozen-lockfile
 bun run build
