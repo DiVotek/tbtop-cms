@@ -619,7 +619,9 @@ the inline defaults.
 
 `Content-Signal` is now a robots.txt directive the site writes itself (off by
 default, same tab): a `seo.robots_extra` line starting with it is dropped on
-render and refused on the next save. `RobotsTxt` takes a `ContentSignals` in
+render and refused on the next save. A site that already had such a line in
+`seo.robots_extra` moves it to SEO settings → *For AI* before upgrading, or
+robots.txt loses it. `RobotsTxt` takes a `ContentSignals` in
 its constructor: resolve it from the container rather than with `new`.
 
 ## The pages API is rate limited
@@ -739,7 +741,11 @@ hand, in order.
 14. **Code that builds `SiteContacts` or `RobotsTxt` with `new`** passes the
     new dependency (`CollectionEntries`, `ContentSignals`) or resolves it from
     the container.
-15. **A host copy of `CmsPage.tsx`** renders `page.heading` when `page.id` is
+15. **Pages API integrations calling more than 60 times a minute per token
+    user** raise `tbtop-cms.api.throttle` (or set it to `''` for no limit).
+16. **A `Content-Signal` line in `seo.robots_extra`** moves to SEO settings →
+    *For AI*: robots.txt now drops it from the extra lines.
+17. **A host copy of `CmsPage.tsx`** renders `page.heading` when `page.id` is
     `null` (fallback error pages).
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
