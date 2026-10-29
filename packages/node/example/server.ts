@@ -12,7 +12,7 @@ import { BunSqliteDialect } from "kysely-bun-sqlite";
 import { type CmsDatabase, cmsBlockImpls, cmsBlocks, createCms, demoFixture, implementBlocks, migrateCms, type PageProps, seedFixtures } from "../src";
 
 // Everyone is an admin here (see `user` below): run only on an explicit opt-in.
-if (process.env.TBTOP_DEMO !== "1") throw new Error("example/server.ts is a demo: every visitor is signed in. Run it with TBTOP_DEMO=1, or start a host from example/site.");
+if (process.env.TBTOP_DEMO !== "1" || process.env.NODE_ENV === "production") throw new Error("example/server.ts is a demo: every visitor is signed in. Run it with TBTOP_DEMO=1 outside production, or start a host from example/site.");
 
 const db = new Kysely<CmsDatabase>({ dialect: new BunSqliteDialect({ database: new Database(process.env.DB ?? "example/site.sqlite") }) });
 await migrateCms(db as Kysely<unknown>, { dialect: "sqlite" });
