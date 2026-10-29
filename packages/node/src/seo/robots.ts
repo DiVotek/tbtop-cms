@@ -13,6 +13,12 @@ const SIGNALS: [string, string, boolean][] = [
 
 /** ContentSignals::line: `Content-Signal: search=yes, ai-input=yes, ai-train=no`, or null until an editor opts in. */
 export async function contentSignalLine(site: Site): Promise<string | null> {
+	const value = await contentSignalValue(site);
+	return value === null ? null : `Content-Signal: ${value}`;
+}
+
+/** `search=yes, ai-input=yes, ai-train=no`, the value a markdown answer's header carries; null when off. */
+export async function contentSignalValue(site: Site): Promise<string | null> {
 	if (!Boolean(await site.settings.get("seo.content_signals.enabled", false))) {
 		return null;
 	}
@@ -21,7 +27,7 @@ export async function contentSignalLine(site: Site): Promise<string | null> {
 		const value = await site.settings.get(key);
 		parts.push(`${name}=${(value === null || value === undefined ? fallback : Boolean(value)) ? "yes" : "no"}`);
 	}
-	return `Content-Signal: ${parts.join(", ")}`;
+	return parts.join(", ");
 }
 
 const normalize = (path: string): string => {

@@ -2,6 +2,7 @@ import { S } from "@tbtop/admin";
 import type { z } from "zod";
 import type { ResolveContext } from "../blocks/context";
 import { formFields, resolveForm } from "../blocks/fields";
+import type { MarkdownContext } from "../seo/markdown/context";
 import type { Page } from "./page";
 
 /** The zod object a page type's resolved custom fields match. */
@@ -44,10 +45,18 @@ export type PageTypeDef = {
 	 * of the sitemap. A subtype inherits its base's.
 	 */
 	archiveOf?: string;
+	/**
+	 * Markdown after the blocks in the page's `.md` version, or null for
+	 * nothing. Default: a type that allows children lists its live, indexable
+	 * ones (`## In this section`). A subtype inherits its base's.
+	 */
+	toMarkdown?: (page: Page, ctx: MarkdownContext) => string | null | Promise<string | null>;
 };
 
-export type PageType = Required<Omit<PageTypeDef, "template" | "resolveFields" | "schema" | "archiveOf">> & {
+export type PageType = Required<Omit<PageTypeDef, "template" | "resolveFields" | "schema" | "archiveOf" | "toMarkdown">> & {
 	archiveOf: string | null;
+	/** Null: the default (the children list for a type that allows children). */
+	toMarkdown: NonNullable<PageTypeDef["toMarkdown"]> | null;
 	schema: FieldsSchema | null;
 	template: (page: Page) => unknown[] | null;
 	resolveFields: (input: Record<string, unknown>, ctx: ResolveContext) => Promise<Record<string, unknown>>;
@@ -141,6 +150,7 @@ function normalize(def: PageTypeDef, baseDef: PageTypeDef | undefined): PageType
 		template: def.template ?? (() => null),
 		listedInAll: def.listedInAll ?? baseDef?.listedInAll ?? true,
 		archiveOf: def.archiveOf ?? baseDef?.archiveOf ?? null,
+		toMarkdown: def.toMarkdown ?? baseDef?.toMarkdown ?? null,
 		resolveFields: async (input, ctx) => {
 			const resolved = await resolve(input, ctx);
 			if (schema === null) {

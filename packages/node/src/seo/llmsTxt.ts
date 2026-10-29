@@ -6,6 +6,7 @@ import { translate } from "../support/strings";
 import { indexingEnabled } from "./resolver";
 import { SiteIdentity } from "./identity";
 import { localizedWithFallback } from "./localized";
+import { markdownEnabled, markdownPath } from "./markdown/context";
 import { ownDescription, ownTitle } from "./schemaContext";
 
 /** One `- [name](url): notes` line of an llms.txt file list; a relative URL is made absolute on render. */
@@ -69,7 +70,7 @@ const inline = (text: string): string => text.replace(/\s+/gu, " ").trim();
 const linkText = (text: string): string => inline(text).replaceAll("\\", "\\\\").replaceAll("[", "\\[").replaceAll("]", "\\]");
 
 /** LlmsTxtMarkdown::block: free text minus ATX headings, setext underlines and runs of blank lines. */
-const block = (text: string): string =>
+export const notesBlock = (text: string): string =>
 	text
 		.replaceAll("\r\n", "\n")
 		.replace(/^[ \t]*#{1,6}[ \t]+/gmu, "")
@@ -88,7 +89,7 @@ export async function llmsTxtEnabled(site: Site): Promise<boolean> {
 	return site.config.llmsTxt?.enabled !== false && Boolean(await site.settings.get("seo.llms_txt.enabled", false));
 }
 
-async function perType(site: Site): Promise<number> {
+export async function perType(site: Site): Promise<number> {
 	const stored = Number(await site.settings.get("seo.llms_txt.per_type"));
 	return Number.isInteger(stored) && stored >= 1 ? Math.min(stored, MAX_PER_TYPE) : DEFAULT_PER_TYPE;
 }
@@ -143,11 +144,14 @@ async function pagesOf(site: Site, type: string, locale: string, limit: number):
 
 async function pageSections(site: Site, locale: string): Promise<{ title: string; links: LlmsTxtLink[] }[]> {
 	const limit = await perType(site);
+	const markdown = await markdownEnabled(site);
 	const sections: { title: string; links: LlmsTxtLink[] }[] = [];
 	for (const key of await listedTypes(site)) {
 		const links: LlmsTxtLink[] = [];
 		for (const { page, path } of await pagesOf(site, key, locale, limit)) {
-			links.push({ name: await ownTitle(site, page, locale), url: await site.url(path, locale), notes: await ownDescription(site, page, locale) });
+			// Links point at the page's `.md` while markdown versions are on.
+			const url = markdown ? await markdownPath(site, path, locale) : await site.url(path, locale);
+			links.push({ name: await ownTitle(site, page, locale), url, notes: await ownDescription(site, page, locale) });
 		}
 		if (links.length > 0) {
 			const builtIn = STRINGS.en?.[`sections.${key}`] !== undefined;
@@ -158,7 +162,7 @@ async function pageSections(site: Site, locale: string): Promise<{ title: string
 }
 
 /** LlmsTxtContacts: phones, emails, address and opening hours, then the social links. */
-async function contactLines(site: Site, locale: string, fallback: string): Promise<string[]> {
+export async function contactLines(site: Site, locale: string, fallback: string): Promise<string[]> {
 	const lines: string[] = [];
 	const add = (label: string, value: string) => {
 		if (value !== "") {
@@ -192,11 +196,16 @@ async function contactLines(site: Site, locale: string, fallback: string): Promi
 	return lines;
 }
 
+/** The H1: the site name, else the origin's host. */
+export async function siteName(site: Site): Promise<string> {
+	const name = inline(await site.settings.string("site.name"));
+	return name !== "" ? name : new URL(site.origin).host;
+}
+
 /** LlmsTxt::render: the site name, summary, notes, contacts, page-type sections, host sections, `## Optional`. */
 export async function llmsTxt(site: Site, locale: string): Promise<string> {
 	const fallback = await site.languages.defaultLocale();
-	const name = inline(await site.settings.string("site.name"));
-	const blocks = [`# ${name !== "" ? name : new URL(site.origin).host}`];
+	const blocks = [`# ${await siteName(site)}`];
 	const summary = inline(
 		localizedWithFallback(await site.settings.get("seo.llms_txt.summary"), locale, fallback) ||
 			localizedWithFallback(await site.settings.get("seo.default_description"), locale, fallback),
@@ -204,7 +213,7 @@ export async function llmsTxt(site: Site, locale: string): Promise<string> {
 	if (summary !== "") {
 		blocks.push(`> ${summary}`);
 	}
-	const intro = block(localizedWithFallback(await site.settings.get("seo.llms_txt.intro"), locale, fallback));
+	const intro = notesBlock(localizedWithFallback(await site.settings.get("seo.llms_txt.intro"), locale, fallback));
 	if (intro !== "") {
 		blocks.push(intro);
 	}

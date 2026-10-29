@@ -5,6 +5,7 @@ import type { PageTypeDef, PageTypeUnion } from "../content/pageTypes";
 import { isEmptyArchive } from "../content/emptyArchives";
 import { PAGE_QUERY_KEY } from "../content/pagedPages";
 import { isExternal } from "../content/redirects";
+import { markdownAdvertHeaders } from "../seo/markdown/advert";
 import { resolveSeo, type Seo } from "../seo/resolver";
 import { schemaContext } from "../seo/schemaContext";
 import type { Site } from "../site";
@@ -74,7 +75,7 @@ function decodePath(path: string): string {
  * a URL, so everything outside printable ASCII is percent-encoded, as are `\`
  * (folded into `/` by browsers). Escapes already present are kept.
  */
-function headerSafe(location: string): string {
+export function headerSafe(location: string): string {
 	return location.replace(/[^\x21-\x7e]|\\/gu, (char) => {
 		try {
 			return encodeURIComponent(char);
@@ -85,7 +86,7 @@ function headerSafe(location: string): string {
 }
 
 /** An external target: non-ASCII hosts go to punycode and the rest is percent-encoded. */
-function externalLocation(target: string, origin: string): string {
+export function externalLocation(target: string, origin: string): string {
 	if (/^[\x21-\x7e]*$/.test(target)) {
 		return target;
 	}
@@ -162,7 +163,8 @@ export async function loadPage(
 		const notFound = await errorPageProps(site, 404, locale, path);
 		return { type: "notFound", status: 404, locale, path, cms: notFound.cms, props: notFound };
 	}
-	return { type: "page", status: 200, headers: props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}, props: asJson(props) };
+	const headers = { ...(props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}), ...(await markdownAdvertHeaders(site, path, locale, props.isPreview)) };
+	return { type: "page", status: 200, headers, props: asJson(props) };
 }
 
 /** PageResolver: the page at a path in a locale, live only unless previewing. */
