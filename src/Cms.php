@@ -24,6 +24,7 @@ use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageUrl;
+use Tbtop\Cms\Page\Refs\PagedPages;
 use Tbtop\Cms\Page\Refs\PageRefIndex;
 use Tbtop\Cms\Page\Refs\PageRefList;
 
@@ -38,6 +39,7 @@ class Cms
         private readonly PageRefIndex $refs,
         private readonly PageRefList $refList,
         private readonly CollectionEntries $collections,
+        private readonly PagedPages $paged,
     ) {}
 
     /**
@@ -134,6 +136,79 @@ class Cms
         $locale ??= (string) app()->getLocale();
 
         return $this->refList->items($this->referencedBy($page, $field, $from, $locale), $locale);
+    }
+
+    /**
+     * One page of referencedBy() for an archive (a tag page's articles):
+     * newest first by published_at, `$perPage` per page, the page number
+     * from `?page=` unless given. The page being rendered gets a `?page=N`
+     * canonical, and a page number past the last is a 404. pages.md.
+     *
+     * @return array{pages: list<Page>, pagination: array{page: int, pages: int, total: int, perPage: int}}
+     */
+    public function referencedByPaged(?Page $page, string $field, ?string $from = null, int $perPage = 20, ?int $pageNumber = null): array
+    {
+        if ($page === null) {
+            return $this->emptyPage($perPage);
+        }
+
+        return $this->paged->take($this->refs->sourcesQuery($page, $field, $from), $page, $perPage, $pageNumber);
+    }
+
+    /**
+     * referencedByPaged() with `items` as the `{id, name, url}` list a
+     * `pages` field resolves to: ready for `page.fields`.
+     *
+     * @return array{items: list<array{id: string, name: string, url: string}>, pagination: array{page: int, pages: int, total: int, perPage: int}}
+     */
+    public function referencedByLinksPaged(?Page $page, string $field, ?string $from = null, int $perPage = 20, ?int $pageNumber = null, ?string $locale = null): array
+    {
+        return $this->linksOf($this->referencedByPaged($page, $field, $from, $perPage, $pageNumber), $locale);
+    }
+
+    /**
+     * One page of the live children of `$page` (a category's articles),
+     * optionally only those whose type or subtype is `$from`; same order,
+     * `?page=` and canonical rules as referencedByPaged().
+     *
+     * @return array{pages: list<Page>, pagination: array{page: int, pages: int, total: int, perPage: int}}
+     */
+    public function childrenPaged(?Page $page, ?string $from = null, int $perPage = 20, ?int $pageNumber = null): array
+    {
+        if ($page === null) {
+            return $this->emptyPage($perPage);
+        }
+
+        $query = PageRefIndex::ofType(Page::query()->live()->where('parent_id', $page->getKey()), $from);
+
+        return $this->paged->take($query, $page, $perPage, $pageNumber);
+    }
+
+    /**
+     * childrenPaged() with `items` as `{id, name, url}` links.
+     *
+     * @return array{items: list<array{id: string, name: string, url: string}>, pagination: array{page: int, pages: int, total: int, perPage: int}}
+     */
+    public function childrenLinksPaged(?Page $page, ?string $from = null, int $perPage = 20, ?int $pageNumber = null, ?string $locale = null): array
+    {
+        return $this->linksOf($this->childrenPaged($page, $from, $perPage, $pageNumber), $locale);
+    }
+
+    /**
+     * @param  array{pages: list<Page>, pagination: array{page: int, pages: int, total: int, perPage: int}}  $paged
+     * @return array{items: list<array{id: string, name: string, url: string}>, pagination: array{page: int, pages: int, total: int, perPage: int}}
+     */
+    private function linksOf(array $paged, ?string $locale): array
+    {
+        $locale ??= (string) app()->getLocale();
+
+        return ['items' => $this->refList->items($paged['pages'], $locale), 'pagination' => $paged['pagination']];
+    }
+
+    /** @return array{pages: list<Page>, pagination: array{page: int, pages: int, total: int, perPage: int}} */
+    private function emptyPage(int $perPage): array
+    {
+        return ['pages' => [], 'pagination' => ['page' => 1, 'pages' => 1, 'total' => 0, 'perPage' => $perPage]];
     }
 
     /**

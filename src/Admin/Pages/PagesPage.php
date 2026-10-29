@@ -179,7 +179,7 @@ class PagesPage extends AdminPage
     private function tabs(string $pages): array
     {
         return [
-            $this->tab('all', __('tbtop-cms::pages.tabs.all')),
+            $this->allTab($pages),
             ...$this->typeTabs($pages),
             Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))->count()
                 ->description(__('tbtop-cms::pages.tabs_deleted_description'))
@@ -324,6 +324,20 @@ class PagesPage extends AdminPage
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
     }
 
+    /** Every page but those of a type kept to its own tab (PageTypeInterface::listedInAll()). */
+    private function allTab(string $pages): Tab
+    {
+        $tab = $this->tab('all', __('tbtop-cms::pages.tabs.all'));
+        $registry = app(PageTypeRegistry::class);
+        $unlisted = $registry->unlistedInAllKeys();
+        // A row's own type decides: its subtype when registered, else its base (a listed subtype of an unlisted base stays).
+        $listed = array_values(array_diff($registry->keys(), $unlisted));
+
+        return $unlisted === [] ? $tab : $tab->query(static fn (Builder $q): Builder => $q
+            ->where(static fn (Builder $sub): Builder => $sub->whereNull("{$pages}.subtype")->orWhereNotIn("{$pages}.subtype", $unlisted))
+            ->where(static fn (Builder $sub): Builder => $sub->whereNotIn("{$pages}.type", $unlisted)->orWhereIn("{$pages}.subtype", $listed)));
+    }
+
     /**
      * One tab per type a live page has, registered types in registry order
      * and then any type that outlived its registration, labelled by its key.
@@ -336,12 +350,40 @@ class PagesPage extends AdminPage
         $present = Page::query()->distinct()->pluck('type')->all();
         $unregistered = array_diff($present, $registry->keys());
         sort($unregistered);
+        // A base type's tab leaves its unlisted subtypes to their own tab, as "All" does.
+        $unlisted = $registry->unlistedInAllKeys();
 
-        return array_map(
-            fn (string $type): Tab => $this->tab($type, PageFormOptions::typeLabelFor($type, $registry->has($type) ? $registry->get($type)->label() : $type))
-                ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", $type)),
-            [...array_intersect($registry->keys(), $present), ...$unregistered],
+        return [
+            ...array_map(
+                fn (string $type): Tab => $this->tab($type, PageFormOptions::typeLabelFor($type, $registry->has($type) ? $registry->get($type)->label() : $type))
+                    ->query(static fn (Builder $q): Builder => $unlisted === [] ? $q->where("{$pages}.type", $type) : $q->where("{$pages}.type", $type)
+                        ->where(static fn (Builder $sub): Builder => $sub->whereNull("{$pages}.subtype")->orWhereNotIn("{$pages}.subtype", $unlisted))),
+                [...array_intersect($registry->keys(), $present), ...$unregistered],
+            ),
+            ...$this->unlistedSubtypeTabs($pages),
+        ];
+    }
+
+    /**
+     * A subtype left out of "All" (a tag under a "Tags" category) still
+     * needs a tab of its own: its base's tab mixes it with the rest.
+     *
+     * @return list<Tab>
+     */
+    private function unlistedSubtypeTabs(string $pages): array
+    {
+        $registry = app(PageTypeRegistry::class);
+        $subtypes = array_filter(
+            $registry->unlistedInAllKeys(),
+            static fn (string $key): bool => $registry->get($key)->base() !== $key,
         );
+        $present = Page::query()->distinct()->whereIn('subtype', $subtypes)->pluck('subtype')->all();
+
+        return array_values(array_map(
+            fn (string $subtype): Tab => $this->tab($subtype, PageFormOptions::typeLabelFor($subtype, $registry->get($subtype)->label()))
+                ->query(static fn (Builder $q): Builder => $q->where("{$pages}.subtype", $subtype)),
+            array_intersect($subtypes, $present),
+        ));
     }
 
     /** Same label as the type's tab: the translation, then the type's own label(), then the raw key. */

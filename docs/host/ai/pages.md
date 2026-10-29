@@ -501,7 +501,8 @@ final class ConcertType extends BasePageType
   (`?tab=section`) and labelled by `pages.types.{key}` when that translation
   exists, else the type's `label()`, else the raw key. A host base type
   (`section`, `event`) gets its own tab; subtypes share their base's tab and
-  use the Subtype filter.
+  use the Subtype filter, except one with `listedInAll()` false, which has a
+  tab of its own instead.
 - **`childSubtype()`.** A category type (or subtype) may return the key of a
   subtype of `article`; an article that arrives under that category without
   a subtype of its own — created there, or a page that just became an
@@ -595,6 +596,45 @@ public function resolveFields(array $input, ResolveContext $ctx): array
   `Page` models from `referencedBy()`. Type the key in the override's
   `@return array{...}` (see Page prop types) — the base's keys stay typed
   from its form.
+- **Paged archive.** `Cms::referencedByPaged(?Page $page, string $field,
+  ?string $from = null, int $perPage = 20, ?int $pageNumber = null)` returns
+  `{pages: list<Page>, pagination: {page, pages, total, perPage}}`: the same
+  pages as `referencedBy()`, but newest first (`published_at`, a missing one
+  last, then id) and one page at a time. `Cms::referencedByLinksPaged()`
+  (plus `?string $locale`) returns `{items, pagination}` with `items` as
+  `{id, name, url}` links, ready to return from `resolveFields()`.
+  `Cms::childrenPaged(?Page $page, ?string $from = null, int $perPage = 20,
+  ?int $pageNumber = null)` and `Cms::childrenLinksPaged()` do the same for
+  the live children of a page (a category's articles). The page number is
+  the request's `?page=` (a positive integer, else 1) unless given. Once a
+  paged call listed the page being rendered (its own tag or category, by the
+  request's number; a sidebar listing another page, or a given
+  `$pageNumber`, does not count; such a listing also starts at page 1
+  instead of following `?page=`), page 2 and on get `?page=N` on
+  `seo.canonical` and `seo.ogUrl`, and a page number past the last answers
+  404; a `?page=` on a page that listed nothing paged keeps the plain
+  canonical. The title is not suffixed: render "page N" from `pagination`.
+- **Creating from the select.** `->creatable()` adds "+ Create" to the
+  select: the typed name becomes a **published** page of the field's one
+  `of()` type (more or fewer pairs throws), under the parent of the newest
+  page of that type, slugs derived from the name in every locale like any
+  new page; the name is stored in the admin's locale. The first page of the
+  type is made in Pages: until one exists the select answers a validation
+  error. A name a page of that type already has in the locale (any case)
+  picks that page instead of making a second one.
+  `creatable($fields, $using)` with your own closure is tbtop/admin's
+  `Select::creatable()` unchanged.
+- **Archive types.** A type whose `archiveOf(): ?string` names the field
+  that picks its pages (`'tags'`) is an archive: while no live page picks a
+  page of it through that field, the page is noindex (meta and
+  `X-Robots-Tag`) and left out of the sitemap. `listedInAll(): bool`
+  (default true) set to false keeps the type's pages off the admin Pages
+  "All" tab; they stay on their own tab (an unlisted subtype gets one too,
+  and leaves its base's tab). Both
+  default in `BasePageType`. Each registered type answers for itself: a
+  subtype class that extends its base's class inherits its answers, one
+  extending `BasePageType` gets the defaults. Tags and categories end to end:
+  recipes.md.
 - **Index.** The lookup reads `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
   for a page on every save; a force delete cascades. Only a page type's
