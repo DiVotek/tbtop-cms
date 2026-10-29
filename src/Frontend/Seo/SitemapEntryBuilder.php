@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\Refs\EmptyArchives;
 use Tbtop\Cms\Settings\Settings;
 
 /**
@@ -20,6 +21,7 @@ class SitemapEntryBuilder
         private readonly Languages $languages,
         private readonly SeoResolver $seo,
         private readonly Settings $settings,
+        private readonly EmptyArchives $emptyArchives,
     ) {}
 
     /**
@@ -131,11 +133,11 @@ class SitemapEntryBuilder
     /** @return Builder<Page> */
     private function query(): Builder
     {
-        return Page::query()
+        return $this->emptyArchives->exclude(Page::query()
             ->live()
             ->where('is_indexable', true)
             ->whereNull('error_class')
-            ->with('slugs');
+            ->with('slugs'));
     }
 
     /**

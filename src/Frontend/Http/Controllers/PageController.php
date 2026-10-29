@@ -34,6 +34,8 @@ use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Refs\EmptyArchives;
+use Tbtop\Cms\Page\Refs\PagedPages;
 use Tbtop\Cms\Page\Support\PageTranslation;
 use Tbtop\Cms\Redirect\RedirectResolver;
 use Tbtop\Cms\Richtext\RichtextHtmlRenderer;
@@ -59,6 +61,7 @@ class PageController
         private readonly LlmsTxtSettings $llms,
         private readonly IndexingSetting $indexing,
         private readonly ContentSignals $signals,
+        private readonly EmptyArchives $emptyArchives,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -165,6 +168,37 @@ class PageController
         $response->headers->set('Link', implode(', ', $links), false);
     }
 
+    /**
+     * A page that listed a paged archive (PagedPages) past its last page is
+     * a 404; page 2 and on are their own canonical, `?page=N`, as search
+     * engines expect of a paginated series. Any other `?page=` keeps the
+     * plain canonical.
+     *
+     * @param  array<string, mixed>  $seo
+     * @return array<string, mixed>
+     */
+    private function pagedSeo(array $seo): array
+    {
+        $pagination = $this->currentPage->pagination();
+
+        if ($pagination === null || $pagination['page'] === 1) {
+            return $seo;
+        }
+
+        if ($pagination['page'] > $pagination['pages']) {
+            throw new NotFoundHttpException;
+        }
+
+        $query = '?' . PagedPages::QUERY_KEY . '=' . $pagination['page'];
+        foreach (['canonical', 'ogUrl'] as $key) {
+            if (is_string($seo[$key] ?? null) && ! str_contains($seo[$key], '?')) {
+                $seo[$key] .= $query;
+            }
+        }
+
+        return $seo;
+    }
+
     private function notFound(string $path, string $locale, Request $request): RedirectResponse
     {
         $redirect = $this->redirects->resolve($path, $locale, $request);
@@ -234,7 +268,8 @@ class PageController
 
     /**
      * The page's blocks (forms bound), type fields and SEO, shared by the
-     * HTML and markdown answers so both carry the same JSON-LD.
+     * HTML and markdown answers so both carry the same JSON-LD, noindex
+     * verdict and paged canonical.
      *
      * @return array{blocks: list<ResolvedBlock>, fields: array<string, mixed>, seo: array<string, mixed>}
      */
@@ -244,7 +279,11 @@ class PageController
         ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($content, $page, $source);
         $resolved = $this->forms->bind($blocks, $page);
         $ctx = $this->schemaContextFactory->make($page, $locale, $source);
-        $seo = $this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $this->blockSchemaNodes($resolved, $ctx));
+        $seo = $this->pagedSeo($this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $this->blockSchemaNodes($resolved, $ctx)));
+
+        if ($this->emptyArchives->isEmpty($page)) {
+            $seo['noindex'] = true;
+        }
 
         return ['blocks' => $resolved, 'fields' => $fields, 'seo' => $seo];
     }

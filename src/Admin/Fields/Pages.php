@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Admin\Fields;
 
 use InvalidArgumentException;
+use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Fields\Select;
+use Tbtop\Admin\Dsl\Fields\Text;
 use Tbtop\Admin\I18n\LocaleService;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Refs\PageIds;
@@ -13,6 +15,7 @@ use Tbtop\Cms\Page\Refs\PageRefList;
 use Tbtop\Cms\Page\Refs\PageRefRule;
 use Tbtop\Cms\Page\Refs\PageTypeFilter;
 use Tbtop\Cms\Page\Support\PageNameSearch;
+use Tbtop\Cms\Page\Support\PageQuickCreate;
 
 /**
  * `$s->pages('services')->of('article', 'legal_service')` — a searchable
@@ -29,6 +32,8 @@ use Tbtop\Cms\Page\Support\PageNameSearch;
 final class Pages extends Select
 {
     private const string TYPES = 'pageTypes';
+
+    private const string CREATES = 'createsPages';
 
     private const int SEARCH_LIMIT = 20;
 
@@ -61,6 +66,44 @@ final class Pages extends Select
         }
 
         return $this->rules('max:' . $count);
+    }
+
+    /**
+     * "+ Create" in the select: the typed name becomes a published page of
+     * the one of() type, under the parent of the newest page of that type
+     * (PageQuickCreate). With $fields and $using it is Select::creatable()
+     * unchanged.
+     *
+     * @param  list<Field>  $fields
+     */
+    #[\Override]
+    public function creatable(array $fields = [], ?callable $using = null): static
+    {
+        if ($using !== null) {
+            return parent::creatable($fields, $using);
+        }
+
+        if ($fields !== []) {
+            throw new InvalidArgumentException('pages()->creatable($fields) needs a $using closure: without one the CMS creates the page from a name.');
+        }
+
+        $this->opts[self::CREATES] = true;
+
+        return parent::creatable(
+            [Text::make('name')->label(__('tbtop-cms::pages.fields.name'))->required()->rules('max:255')],
+            fn (array $validated): array => PageQuickCreate::create($this->typeFilter(), (string) $validated['name'], LocaleService::currentLocale()),
+        );
+    }
+
+    /** PrefixedField::rename() replays options; the create closure is rebuilt from the flag, it is not one. */
+    #[\Override]
+    public function set(string $key, mixed $value): static
+    {
+        if ($key === self::CREATES && $value === true) {
+            return $this->creatable();
+        }
+
+        return parent::set($key, $value);
     }
 
     /** Leaves the page being edited out of the search and rejects it on save — a page does not reference itself. Server-only. */

@@ -69,6 +69,16 @@ abstract class BasePageType implements PageTypeInterface
         return null;
     }
 
+    public function listedInAll(): bool
+    {
+        return true;
+    }
+
+    public function archiveOf(): ?string
+    {
+        return null;
+    }
+
     /** @return list<Field> */
     public function fields(S $s): array
     {
