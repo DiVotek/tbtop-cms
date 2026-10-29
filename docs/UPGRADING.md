@@ -619,8 +619,10 @@ the inline defaults.
 
 Every frontend locale other than the default also gets its own file at
 `/{locale}/llms.txt` (`/uk/llms.txt`). The default locale's prefixed path
-(`/en/llms.txt` when `en` is the default) 301s to `/llms.txt`, like its pages. The same switches turn them off. While llms.txt is on, HTML
-pages send `Link: <…/llms.txt>; rel="describedby"` for their locale's file.
+(`/en/llms.txt` when `en` is the default) 301s to `/llms.txt`, like its pages.
+The *For AI* switch, indexing and `tbtop-cms.seo.llms_txt.enabled` turn these
+files off together with `/llms.txt`. While llms.txt is on, HTML pages send
+`Link: <…/llms.txt>; rel="describedby"` for their locale's file.
 
 `Content-Signal` is now a robots.txt directive the site writes itself (off by
 default, same tab): a `seo.robots_extra` line starting with it is dropped on
