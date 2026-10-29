@@ -1,6 +1,5 @@
 import type { Page } from "../content/page";
 import { pageFromRow } from "../content/page";
-import { routeLocale } from "../frontend/load";
 import { whereLive } from "../content/pages";
 import type { Site } from "../site";
 import { translate } from "../support/strings";
@@ -260,17 +259,4 @@ export async function llmsTxtResponse(site: Site, locale?: string): Promise<Resp
 	}
 	const body = await llmsTxt(site, locale ?? (await site.languages.defaultLocale()));
 	return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
-}
-
-/**
- * `/llms.txt`, or `/{locale}/llms.txt` for another frontend locale, as
- * SetLanguage routes it: the default locale's prefix 301s to `/llms.txt`;
- * any other path (an inactive locale, a page named llms.txt) is the host's.
- */
-export async function localeLlmsTxt(site: Site, request: Request): Promise<Response | null> {
-	const route = await routeLocale(site, new URL(request.url));
-	if (route.type === "redirect") {
-		return route.location === "/llms.txt" ? new Response(null, { status: 301, headers: { location: route.location } }) : null;
-	}
-	return route.path === "llms.txt" ? llmsTxtResponse(site, route.locale) : null;
 }

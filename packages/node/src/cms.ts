@@ -13,7 +13,7 @@ import { type LoadResult, loadPage, type PageProps } from "./frontend/load";
 import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { type HealthResult, runHealthChecks, SCHEDULER_HEARTBEAT } from "./health";
 import { runSeoAudit, writeSeoSnapshot } from "./seo/audit";
-import { localeLlmsTxt } from "./seo/llmsTxt";
+import { localeLlmsTxt } from "./seo/llmsTxtRoute";
 import { markdownResponse } from "./seo/markdown/page";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
