@@ -5,7 +5,7 @@ import type { PageTypeDef, PageTypeUnion } from "../content/pageTypes";
 import { isEmptyArchive } from "../content/emptyArchives";
 import { PAGE_QUERY_KEY } from "../content/pagedPages";
 import { isExternal } from "../content/redirects";
-import { markdownAdvertHeaders } from "../seo/markdown/advert";
+import { agentHeaders } from "../seo/markdown/advert";
 import { resolveSeo, type Seo } from "../seo/resolver";
 import { schemaContext } from "../seo/schemaContext";
 import type { Site } from "../site";
@@ -163,7 +163,7 @@ export async function loadPage(
 		const notFound = await errorPageProps(site, 404, locale, path);
 		return { type: "notFound", status: 404, locale, path, cms: notFound.cms, props: notFound };
 	}
-	const headers = { ...(props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}), ...(await markdownAdvertHeaders(site, path, locale, props.isPreview)) };
+	const headers = { ...(props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}), ...(await agentHeaders(site, path, locale, props.isPreview)) };
 	return { type: "page", status: 200, headers, props: asJson(props) };
 }
 

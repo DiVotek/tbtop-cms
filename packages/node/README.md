@@ -458,7 +458,9 @@ props built without it (no settings, languages or layout).
 
 `cms.handle()` answers `GET /llms.txt` (llmstxt.org, the PHP package's
 `LlmsTxt`) once an editor turns it on in SEO settings → *For AI*; it 404s
-before that and while indexing is off. The file, in the default language:
+before that and while indexing is off. Every other frontend language has
+its own at `/{locale}/llms.txt` (`/uk/llms.txt`; `/en/llms.txt` for the
+default one 301s to `/llms.txt`). The file, in its language:
 the site name as `#`, `> summary` (`seo.llms_txt.summary`, else the default
 description), the editor's notes without headings, the contacts (phones,
 emails, address, opening hours, social links), one `## section` per base
@@ -466,7 +468,9 @@ page type with the live indexable pages (`seo.llms_txt.types`, empty = all;
 up to `seo.llms_txt.per_type`, default 50: articles newest first, others
 home first, then by depth, picked from the type's first 1000 pages by sort
 order), the host's sections, `## Optional` with the
-sitemap. A host section is `{ title(locale), links(locale, site) }`
+sitemap and the file in each other frontend language. `loadPage()` adds
+`Link: <…/llms.txt>; rel="describedby"` for the page's locale to `headers`
+while llms.txt is on. A host section is `{ title(locale), links(locale, site) }`
 returning `{ name, url, notes? }`; a relative `url` is made absolute.
 
 ```ts
@@ -497,8 +501,8 @@ alternates), `# heading`, summary, body, every block, the page type's part,
 page's JSON-LD graph as a `json` block. Headers: `text/markdown;
 charset=utf-8`, `Vary: Accept`, `Link: <canonical>; rel="canonical"`,
 `X-Robots-Tag: noindex` for a noindex page, `Content-Signal` while that is
-on. `loadPage()` adds `Vary: Accept` and `Link` to the `.md` and llms.txt
-to `headers` while markdown is on: pass them on, and keep a page cache
+on. `loadPage()` adds `Vary: Accept` and a `Link` to the `.md` to
+`headers` while markdown is on: pass them on, and keep a page cache
 keyed on `Accept`. llms.txt then links the `.md` versions.
 
 A block shapes its part with `toMarkdown(props, ctx)`: a string replaces
