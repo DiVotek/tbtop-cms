@@ -1,7 +1,7 @@
 import { type Dict, isDict } from "../support/values";
 
-const MAX_DEPTH = 64;
-const MAX_NODES = 10000;
+export const MAX_DEPTH = 64;
+export const MAX_NODES = 10000;
 const ALIGNMENTS = new Set(["center", "right", "justify"]);
 const FORMAT_TAGS: [number, string][] = [
 	[1, "strong"],
@@ -36,7 +36,8 @@ export function richtextHtml(value: unknown): string {
 	return children(root, 0, budget);
 }
 
-function normalize(value: unknown): Dict | null {
+/** The Lexical state of a stored value (object, JSON text, or plain text as one paragraph); null when empty. */
+export function normalize(value: unknown): Dict | null {
 	if (isDict(value) && "root" in value) {
 		return value;
 	}
@@ -142,7 +143,8 @@ function link(node: Dict, inner: string): string {
 	return `<a ${attrs}>${inner}</a>`;
 }
 
-function allowedUrl(raw: string): boolean {
+/** RichtextLinkRenderer::isAllowedUrl: relative, or http(s), mailto, tel. */
+export function allowedUrl(raw: string): boolean {
 	const url = raw.replace(/[\t\r\n]/g, "").replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, "");
 	if (url === "") {
 		return false;

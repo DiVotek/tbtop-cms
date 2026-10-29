@@ -314,6 +314,7 @@ export function seoSettings(cms: Cms) {
 			seo_llms_txt_intro: "seo.llms_txt.intro",
 			seo_llms_txt_types: "seo.llms_txt.types",
 			seo_llms_txt_per_type: "seo.llms_txt.per_type",
+			seo_markdown_enabled: "seo.markdown.enabled",
 			seo_content_signals_enabled: "seo.content_signals.enabled",
 			seo_content_signals_search: "seo.content_signals.search",
 			seo_content_signals_ai_input: "seo.content_signals.ai_input",
@@ -437,12 +438,6 @@ export function seoSettings(cms: Cms) {
 							.helperText("One or two sentences on what the site is. Left empty, the default meta description is used.")
 							.rules("nullable|max:500"),
 						s
-							.textarea("seo_llms_txt_intro")
-							.label("Notes for AI")
-							.translatable()
-							.helperText("Free text placed after the summary: what the business does, who it serves, how to order. Headings are not kept.")
-							.rules("nullable|max:5000"),
-						s
 							.checkboxlist("seo_llms_txt_types")
 							.label("Page types to list")
 							.options(cms.pageTypes.bases().map((type) => ({ value: type.key, label: type.label })))
@@ -453,6 +448,20 @@ export function seoSettings(cms: Cms) {
 							.label("Pages per type")
 							.placeholder(String(DEFAULT_PER_TYPE))
 							.rules(`nullable|integer|min:1|max:${MAX_PER_TYPE}`),
+						s
+							.boolean("seo_markdown_enabled")
+							.label("Serve pages as markdown")
+							.helperText(
+								"Serves every live page as markdown for AI agents at its URL plus .md (/about.md, /index.md for the home page) and to requests that ask for text/markdown: frontmatter, text, blocks and the page's structured data. Not served while indexing is off.",
+							),
+						s
+							.textarea("seo_llms_txt_intro")
+							.label("Notes for AI")
+							.translatable()
+							.helperText(
+								"Free text for AI: what the business does, who it serves, how to order. Placed after the summary in llms.txt and at the end of every page's markdown version. Headings are not kept.",
+							)
+							.rules("nullable|max:5000"),
 						s
 							.boolean("seo_content_signals_enabled")
 							.label("Add Content-Signal to robots.txt")

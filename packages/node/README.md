@@ -247,6 +247,7 @@ const cms = createCms({
 	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
 	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
 	llmsTxt: { sections: [docsSection] }, // host sections of /llms.txt; enabled: false leaves the URL to the host (see llms.txt)
+	// markdown: { enabled: false }, // never serve pages as markdown (see Markdown for agents)
 	admin: { locales: ["en", "uk"], locale: "en" }, // the panel's UI languages (not content languages), saved per admin
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
@@ -264,7 +265,7 @@ const result = await cms.loadPage(request);
 // { type: "page", status, headers, props: { page, render, seo, breadcrumbs, path, isPreview, cms } }
 // | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms, props } (props: ErrorPageProps)
 const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the host's own 5xx handler (see Error pages)
-(await cms.handle(request)) ?? ...; // robots.txt, llms.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/...
+(await cms.handle(request)) ?? ...; // robots.txt, llms.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/..., /about.md
 
 // Admin
 createAdmin({
@@ -477,6 +478,45 @@ const docsSection: LlmsTxtSection = {
 
 The same tab can add `Content-Signal: search=yes, ai-input=yes, ai-train=no`
 (contentsignals.org) to robots.txt, each signal switchable; off by default.
+
+### Markdown for agents
+
+Once an editor turns on *Serve pages as markdown* (SEO settings → *For
+AI*, `seo.markdown.enabled`), `cms.handle()` answers a live page as
+markdown at its path plus `.md` (`/about.md`, `/uk/about.md`, `/index.md`
+for the home page) and to a request whose `Accept` ranks `text/markdown`
+above `text/html` (a tie goes to the type listed first; `*/*` is HTML; an
+Inertia visit never). Not while indexing is off; never a draft. A path
+without a live page, or a request that did not ask, is left to the host
+(`null`), so its 404 and HTML answer as before; a redirect answers as for
+the HTML path. `createCms({ markdown: { enabled: false } })` turns it off.
+
+The document: YAML frontmatter (title, description, url, lang, image,
+alternates), `# heading`, summary, body, every block, the page type's part,
+`## About {site}` (the notes for AI and the llms.txt contacts) and the
+page's JSON-LD graph as a `json` block. Headers: `text/markdown;
+charset=utf-8`, `Vary: Accept`, `Link: <canonical>; rel="canonical"`,
+`X-Robots-Tag: noindex` for a noindex page, `Content-Signal` while that is
+on. `loadPage()` adds `Vary: Accept` and `Link` to the `.md` and llms.txt
+to `headers` while markdown is on: pass them on, and keep a page cache
+keyed on `Accept`. llms.txt then links the `.md` versions.
+
+A block shapes its part with `toMarkdown(props, ctx)`: a string replaces
+the fallback (the text of its translatable fields, a repeater row by row),
+`""` leaves it out, `null` keeps the fallback. A page type's
+`toMarkdown(page, ctx)` adds text after the blocks; by default a type with
+`allowedChildren` lists its live indexable children. `ctx` carries `page`,
+`locale`, `url`, `fields`, `site`, and helpers that escape stored text:
+`text`, `escape`, `heading(text, level = 2)`, `link`, `list`, `richtext`,
+`pageItem(page)`, `children(limit)`.
+
+```ts
+Faq: {
+	form: (s) => [...],
+	toMarkdown: (props, ctx) =>
+		[ctx.heading(props.heading), ...props.items.map((item) => `${ctx.heading(item.question, 3)}\n\n${ctx.text(item.answer)}`)].join("\n\n"),
+},
+```
 
 ### Access
 
@@ -1063,7 +1103,7 @@ export default {
 - SEO: the full `seo` prop (title/description templates, Open Graph,
   alternates, x-default, verification tokens, the GTM container id), JSON-LD (WebSite,
   BreadcrumbList, the WebPage/Article families, CollectionPage, block nodes,
-  site identity), robots.txt with an opt-in Content-Signal, llms.txt, chunked sitemap with hreflang alternates.
+  site identity), robots.txt with an opt-in Content-Signal, llms.txt, markdown versions of pages, chunked sitemap with hreflang alternates.
 - Forms: the submit endpoint, honeypot, a per-client rate limit, stored submissions with D1-safe
   claims, retries, outbox delivery; notifications over mail, Telegram and the
   admin bell with Liquid overrides and a delivery log.

@@ -97,6 +97,8 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	 * add H2 file lists after the page-type sections.
 	 */
 	llmsTxt?: { enabled?: boolean; sections?: LlmsTxtSection[] };
+	/** `enabled: false` never serves pages as markdown (`/about.md`, `Accept: text/markdown`); otherwise the «For AI» tab's switch decides. */
+	markdown?: { enabled?: boolean };
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */
 	adminPrefix?: string;
 	/**

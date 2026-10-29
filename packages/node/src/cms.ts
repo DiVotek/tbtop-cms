@@ -14,6 +14,7 @@ import { hasValidPreviewSignature } from "./frontend/previewLink";
 import { type HealthResult, runHealthChecks, SCHEDULER_HEARTBEAT } from "./health";
 import { runSeoAudit, writeSeoSnapshot } from "./seo/audit";
 import { llmsTxtResponse } from "./seo/llmsTxt";
+import { markdownResponse } from "./seo/markdown/page";
 import { robotsTxt } from "./seo/robots";
 import { SchemaTypes } from "./seo/schemaTypes";
 import { chunkCount, sitemapChunkXml, sitemapIndexXml } from "./seo/sitemap";
@@ -46,7 +47,10 @@ export type Cms<T extends readonly PageTypeDef[] = any> = {
 	 * `locale` or the default; `defineSettings(...).of(cms)` types it.
 	 */
 	settings(locale?: string): Promise<CmsSettings>;
-	/** robots.txt, llms.txt, sitemap.xml and its chunks, and form posts to /_cms/forms/...; null for every other URL. */
+	/**
+	 * robots.txt, llms.txt, sitemap.xml and its chunks, form posts to /_cms/forms/...,
+	 * and a page as markdown (`/about.md`, `Accept: text/markdown`) while that is on; null for every other URL.
+	 */
 	handle(request: Request): Promise<Response | null>;
 	/**
 	 * Props for an error answer at the request URL (ErrorResponse): the live
@@ -159,6 +163,10 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			}
 			const { pathname } = new URL(request.url);
 			const scope = site(request, { cached: true });
+			const markdown = await markdownResponse(scope, request);
+			if (markdown !== null) {
+				return markdown;
+			}
 			if (pathname === "/robots.txt") {
 				return new Response(await robotsTxt(scope), { headers: { "Content-Type": "text/plain" } });
 			}

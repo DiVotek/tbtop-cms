@@ -5,6 +5,7 @@ import type { BlockImpl } from "../blocks/registry";
 import type { CollectionDef } from "../content/collections";
 import type { PageTypeDef } from "../content/pageTypes";
 import type { BuiltinSettings, CmsSettings } from "../content/siteSettings";
+import type { MarkdownContext } from "../seo/markdown/context";
 import type { SchemaContext } from "../seo/schemaContext";
 import { type CmsFields, F, f, type Fields, formOf, type Output, zodOf } from "./fields";
 import { type CollectionType, nameCollections } from "./collections";
@@ -34,6 +35,8 @@ type BlockOptions<R extends Fields, P> = {
 	resolve?: (fields: Output<R>, ctx: ResolveContext) => P | Promise<P>;
 	/** A JSON-LD node the block adds to the page, or null. */
 	toSchema?: (props: P, ctx: SchemaContext) => Record<string, unknown> | null;
+	/** The block in the page's markdown version; null keeps the fallback (its translatable text), '' leaves it out. */
+	toMarkdown?: (props: P, ctx: MarkdownContext) => string | null | Promise<string | null>;
 };
 
 type FormBlockOptions<R extends Fields, P> = BlockOptions<R, P> & Required<Pick<BlockImpl<P>, "submit">> & Pick<BlockImpl<P>, "formName">;
@@ -151,7 +154,7 @@ export type SitePageTypes<D extends SiteDef> = {
 type PropsSchema<B> = B extends Block<any, infer Form, infer P> ? (Form extends true ? z.ZodType<P & FormProps> : z.ZodType<P>) : never;
 
 export type SiteCatalog<D extends SiteDef> = {
-	[K in keyof NonNullable<D["blocks"]>]: { props: PropsSchema<NonNullable<D["blocks"]>[K]> } & Omit<BlockOptions<Fields, unknown>, "resolve" | "toSchema">;
+	[K in keyof NonNullable<D["blocks"]>]: { props: PropsSchema<NonNullable<D["blocks"]>[K]> } & Omit<BlockOptions<Fields, unknown>, "resolve" | "toSchema" | "toMarkdown">;
 };
 
 /** A block's props as its component takes them: `BlockProps<typeof site, "Hero">`. */

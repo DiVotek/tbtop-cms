@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { StandardSchemaV1 } from "../forms/standardSchema";
 import type { Page } from "../content/page";
 import { safeHref, safeHrefRule } from "../content/safeHref";
+import { markdownString } from "../seo/markdown/strings";
+import type { MarkdownContext } from "../seo/markdown/context";
 import type { SchemaContext } from "../seo/schemaContext";
 import type { BlockMeta, Catalog, Placement } from "./catalog";
 import { cmsBlocks } from "./catalog";
@@ -33,6 +35,11 @@ export type BlockImpl<P = unknown> = BlockResolve<P> & {
 	form: (s: S) => unknown[];
 	/** A JSON-LD node the block adds to the page, or null. */
 	toSchema?: (props: P, ctx: SchemaContext) => Record<string, unknown> | null;
+	/**
+	 * The block in the page's markdown version (`/about.md`). Null or absent
+	 * keeps the fallback (the text of its translatable fields); '' leaves it out.
+	 */
+	toMarkdown?: (props: P, ctx: MarkdownContext) => string | null | Promise<string | null>;
 	/** The block posts a form: `action` (and `honeypotField`) are bound into its props, `/_cms/forms/...` takes the post. */
 	submit?: SubmitHandler;
 	/**
@@ -98,6 +105,8 @@ export type BlockKind = {
 	resolve: (input: Record<string, unknown>, ctx: ResolveContext) => Promise<unknown>;
 	translatableFields: () => string[];
 	toSchema: (props: unknown, ctx: SchemaContext) => Record<string, unknown> | null;
+	/** Null when the block has none: the page markdown falls back to its translatable text. */
+	toMarkdown: ((props: unknown, ctx: MarkdownContext) => string | null | Promise<string | null>) | null;
 	submit: SubmitHandler | null;
 	/** The HasForm name, or null when the form is reachable only where it is placed. */
 	formName: string | null;
@@ -159,6 +168,7 @@ export function implementBlocks<const C extends Catalog>(catalog: C, impls: Impl
 			resolve: blockResolve(kind, impl),
 			translatableFields: () => translatablePaths(impl.form(new S())),
 			toSchema: (props, ctx) => impl.toSchema?.(props, ctx) ?? null,
+			toMarkdown: impl.toMarkdown ?? null,
 			submit: impl.submit ?? null,
 			formName: impl.formName ?? null,
 		});
@@ -228,6 +238,8 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 				cta: label === null || href === null ? null : { label, href },
 			};
 		},
+		toMarkdown: (props, ctx) =>
+			[ctx.heading(props.title), ctx.text(props.subtitle), props.cta === null ? "" : ctx.link(props.cta.label, props.cta.href)].filter((part) => part !== "").join("\n\n"),
 	},
 	ContactForm: {
 		form: (s) => [
@@ -247,6 +259,8 @@ export const cmsBlockImpls: Implementations<typeof cmsBlocks> = {
 				action: "",
 			};
 		},
+		// An agent cannot fill the form in, but can tell a reader where to.
+		toMarkdown: (props, ctx) => [ctx.heading(props.heading), ctx.text(markdownString("form", ctx.locale))].filter((part) => part !== "").join("\n\n"),
 		submit: {
 			schema: (_data, ctx) => contactSchema(ctx),
 			// The labels resolve() renders on the form, in the readers' language.
