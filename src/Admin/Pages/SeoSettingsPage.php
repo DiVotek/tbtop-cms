@@ -113,6 +113,7 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_llms_txt_intro' => LlmsTxtSettings::INTRO,
             'seo_llms_txt_types' => LlmsTxtSettings::TYPES,
             'seo_llms_txt_per_type' => LlmsTxtSettings::PER_TYPE,
+            'seo_markdown_enabled' => LlmsTxtSettings::MARKDOWN,
             'seo_content_signals_enabled' => ContentSignals::ENABLED,
             'seo_content_signals_search' => ContentSignals::SIGNALS['search'][0],
             'seo_content_signals_ai_input' => ContentSignals::SIGNALS['ai-input'][0],
@@ -473,8 +474,9 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * llms.txt and the robots.txt Content-Signal line. Both are off until
-     * switched on here: each states something on the owner's behalf.
+     * llms.txt, markdown versions of pages and the robots.txt Content-Signal
+     * line. All are off until switched on here: each states something on the
+     * owner's behalf.
      *
      * @return list<Field|Node|TextBlock>
      */
@@ -500,10 +502,6 @@ class SeoSettingsPage extends SettingsPageBase
                     ->translatable()
                     ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_summary'))
                     ->rules('nullable|max:500'),
-                $s->textarea('seo_llms_txt_intro')->label(__('tbtop-cms::settings.seo.fields.llms_txt_intro'))
-                    ->translatable()
-                    ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_intro'))
-                    ->rules('nullable|max:5000'),
                 $s->checkboxlist('seo_llms_txt_types')->label(__('tbtop-cms::settings.seo.fields.llms_txt_types'))
                     ->options($types)
                     ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_types'))
@@ -512,6 +510,14 @@ class SeoSettingsPage extends SettingsPageBase
                     ->placeholder((string) LlmsTxtSettings::DEFAULT_PER_TYPE)
                     ->rules('nullable|integer|min:1|max:' . LlmsTxtSettings::MAX_PER_TYPE),
             ]),
+            $s->boolean('seo_markdown_enabled')->label(__('tbtop-cms::settings.seo.fields.markdown_enabled'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.markdown_enabled')),
+            // Both outputs carry the notes: llms.txt after the summary, every .md at its end.
+            $s->textarea('seo_llms_txt_intro')->label(__('tbtop-cms::settings.seo.fields.llms_txt_intro'))
+                ->translatable()
+                ->helperText(__('tbtop-cms::settings.seo.helpers.llms_txt_intro'))
+                ->rules('nullable|max:5000')
+                ->hiddenIf(Cond::not(Cond::any(Cond::truthy('seo_llms_txt_enabled'), Cond::truthy('seo_markdown_enabled')))),
             $s->boolean('seo_content_signals_enabled')->label(__('tbtop-cms::settings.seo.fields.content_signals_enabled'))
                 ->helperText(__('tbtop-cms::settings.seo.helpers.content_signals_enabled')),
             $signal('seo_content_signals_search'),

@@ -16,8 +16,15 @@ use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Form\FormActionBinder;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownPages;
+use Tbtop\Cms\Frontend\Markdown\MarkdownRequest;
+use Tbtop\Cms\Frontend\Markdown\PageMarkdown;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
+use Tbtop\Cms\Frontend\Seo\ContentSignals;
+use Tbtop\Cms\Frontend\Seo\IndexingSetting;
+use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -47,6 +54,11 @@ class PageController
         private readonly CurrentPage $currentPage,
         private readonly Languages $languages,
         private readonly RichtextHtmlRenderer $richtext,
+        private readonly PageMarkdown $markdown,
+        private readonly MarkdownPages $markdownPages,
+        private readonly LlmsTxtSettings $llms,
+        private readonly IndexingSetting $indexing,
+        private readonly ContentSignals $signals,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -54,7 +66,12 @@ class PageController
     {
         $locale = (string) app()->getLocale();
         $path = (string) $request->attributes->get('cms_path', '');
-        $previewAccess = $this->hasPreviewAccess($request);
+        $markdownOn = $this->llms->markdownEnabled() && $this->indexing->enabled();
+        $suffixPath = $markdownOn ? MarkdownRequest::suffixPath($path) : null;
+        $wantsMarkdown = $suffixPath !== null || ($markdownOn && MarkdownRequest::accepts($request));
+        $path = $suffixPath ?? $path;
+        // Markdown is for agents: never a draft or a preview.
+        $previewAccess = ! $wantsMarkdown && $this->hasPreviewAccess($request);
 
         $page = $this->resolver->resolve($path, $locale, $previewAccess);
 
@@ -80,6 +97,10 @@ class PageController
             return $this->notFound($path, $locale, $request);
         }
 
+        if ($wantsMarkdown) {
+            return $this->markdownResponse($page, $locale, $type, $source);
+        }
+
         $props = $this->props($page, $locale, $path, $type, $source);
         $response = Inertia::render($this->component(), $props)->toResponse($request);
 
@@ -90,7 +111,58 @@ class PageController
             $response->headers->set('X-Robots-Tag', 'noindex');
         }
 
+        if ($markdownOn) {
+            $this->advertiseMarkdown($response, $path, $locale, $props['isPreview'] === true);
+        }
+
         return $response;
+    }
+
+    private function markdownResponse(Page $page, string $locale, ?PageTypeInterface $type, ?object $source): Response
+    {
+        ['blocks' => $blocks, 'fields' => $fields, 'seo' => $seo] = $this->resolved($page, $locale, $type, $source);
+        $subtype = $page->subtype !== null && $this->pageTypes->has($page->subtype) ? $this->pageTypes->get($page->subtype) : $type;
+        $ctx = new MarkdownContext($page, $locale, $this->languages->defaultLocale(), (string) $seo['canonical'], $source, $fields, $this->markdownPages);
+
+        $response = response()->make($this->markdown->render($ctx, $blocks, $seo, $subtype), 200, [
+            'Content-Type' => MarkdownRequest::CONTENT_TYPE,
+            // The HTML version is the one to index and cite.
+            'Link' => '<' . $seo['canonical'] . '>; rel="canonical"',
+        ]);
+        $response->setVary('Accept', false);
+
+        if ($seo['noindex'] === true) {
+            $response->headers->set('X-Robots-Tag', 'noindex');
+        }
+
+        $signals = $this->signals->value();
+        if ($signals !== null) {
+            $response->headers->set('Content-Signal', $signals);
+        }
+
+        return $response;
+    }
+
+    /**
+     * The HTML answer names its markdown twin and llms.txt in `Link`
+     * headers, and varies on Accept so a cache never hands one to a client
+     * that asked for the other.
+     */
+    private function advertiseMarkdown(Response $response, string $path, string $locale, bool $isPreview): void
+    {
+        $response->setVary('Accept', false);
+
+        if ($isPreview) {
+            return;
+        }
+
+        $links = ['<' . $this->markdownPages->markdownUrl($path, $locale) . '>; rel="alternate"; type="text/markdown"'];
+
+        if ($this->llms->enabled()) {
+            $links[] = '<' . url('llms.txt') . '>; rel="describedby"; type="text/plain"';
+        }
+
+        $response->headers->set('Link', implode(', ', $links), false);
     }
 
     private function notFound(string $path, string $locale, Request $request): RedirectResponse
@@ -123,9 +195,7 @@ class PageController
     /** @return array<string, mixed> */
     private function props(Page $page, string $locale, string $path, ?PageTypeInterface $type, ?object $source): array
     {
-        $content = $page->content ?? $type?->template($page) ?? [];
-        ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($content, $page, $source);
-        $resolved = $this->forms->bind($blocks, $page);
+        ['blocks' => $resolved, 'fields' => $fields, 'seo' => $seo] = $this->resolved($page, $locale, $type, $source);
         // Not live covers draft, scheduled (published_at in the future), and
         // expired (unpublish_at in the past): reaching this page at all with
         // any of those means the caller has preview access (PageResolver's
@@ -133,9 +203,6 @@ class PageController
         // preview affordances, same as a plain draft did before scheduling.
         $isPreview = ! $page->isLive();
         $breadcrumbs = $this->breadcrumbs->forPage($page, $locale);
-        $ctx = $this->schemaContextFactory->make($page, $locale, $source);
-        $blockNodes = $this->blockSchemaNodes($resolved, $ctx);
-        $seo = $this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $blockNodes);
 
         if ($isPreview) {
             $seo['noindex'] = true;
@@ -163,6 +230,23 @@ class PageController
             'path' => $path,
             'isPreview' => $isPreview,
         ];
+    }
+
+    /**
+     * The page's blocks (forms bound), type fields and SEO, shared by the
+     * HTML and markdown answers so both carry the same JSON-LD.
+     *
+     * @return array{blocks: list<ResolvedBlock>, fields: array<string, mixed>, seo: array<string, mixed>}
+     */
+    private function resolved(Page $page, string $locale, ?PageTypeInterface $type, ?object $source): array
+    {
+        $content = $page->content ?? $type?->template($page) ?? [];
+        ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($content, $page, $source);
+        $resolved = $this->forms->bind($blocks, $page);
+        $ctx = $this->schemaContextFactory->make($page, $locale, $source);
+        $seo = $this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $this->blockSchemaNodes($resolved, $ctx));
+
+        return ['blocks' => $resolved, 'fields' => $fields, 'seo' => $seo];
     }
 
     /** The Body as HTML in the active locale, falling back to the default locale; '' when empty. */

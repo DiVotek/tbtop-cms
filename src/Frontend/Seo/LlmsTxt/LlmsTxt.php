@@ -51,7 +51,7 @@ final readonly class LlmsTxt
     }
 
     /** The H1 is required: the site name, else the app URL's host. */
-    private function siteName(): string
+    public function siteName(): string
     {
         $name = LlmsTxtMarkdown::inline((string) $this->settings->get('site.name', ''));
 

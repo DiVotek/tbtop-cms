@@ -478,6 +478,11 @@ rm public/robots.txt
 The same holds for `public/llms.txt` and the `tbtop-cms.llms-txt` route: the
 `llms_txt` health check warns when the file exists.
 
+With markdown versions of pages on (seo.md → Markdown for agents), a page URL
+answers HTML or markdown by the `Accept` header. Both answers send
+`Vary: Accept`; a full-page cache or CDN in front of the site must honour it
+(or key on `Accept`), or it hands one client the other's answer.
+
 ## Admin access and roles
 
 Access is binary, owned by this package: a user has it if a

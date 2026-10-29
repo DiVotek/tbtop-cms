@@ -9,6 +9,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Support\FormResolver;
 use Tbtop\Cms\Block\Support\TranslatablePaths;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 
 abstract class Block
@@ -99,6 +100,23 @@ abstract class Block
      * @return array<string, mixed>|null
      */
     public function toSchema(array $props, SchemaContext $ctx): ?array
+    {
+        return null;
+    }
+
+    /**
+     * This block in the page's markdown version (`/about.md`, a request
+     * with `Accept: text/markdown`). Null keeps the fallback: the text of
+     * the block's translatable fields, in form order, richtext converted.
+     * An empty string leaves the block out (a decorative block, a form an
+     * agent cannot fill in). `$props` are the resolved props, as in
+     * toSchema(). Use `$ctx` helpers (`heading()`, `text()`, `link()`,
+     * `list()`, `richtext()`) so stored text cannot break the markup; the
+     * page heading is the only H1, so a block's own heading is H2.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    public function toMarkdown(array $props, MarkdownContext $ctx): ?string
     {
         return null;
     }

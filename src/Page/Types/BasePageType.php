@@ -8,6 +8,8 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\Support\FormResolver;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
+use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 
@@ -80,5 +82,33 @@ abstract class BasePageType implements PageTypeInterface
     public function resolveFields(array $input, ResolveContext $ctx): array
     {
         return (new FormResolver)->resolve($this->fields(new S), $input, $ctx);
+    }
+
+    /**
+     * `## In this section` with the page's live, indexable children, up to
+     * the llms.txt per-type limit, for a type that allows children; null
+     * otherwise.
+     */
+    public function toMarkdown(Page $page, MarkdownContext $ctx): ?string
+    {
+        if ($this->allowedChildren() === []) {
+            return null;
+        }
+
+        $items = [];
+
+        foreach ($ctx->children(app(LlmsTxtSettings::class)->perType()) as $child) {
+            $item = $ctx->pageItem($child);
+
+            if ($item !== null) {
+                $items[] = $item;
+            }
+        }
+
+        if ($items === []) {
+            return null;
+        }
+
+        return $ctx->heading(__('tbtop-cms::llms.markdown.children', [], $ctx->locale)) . "\n\n" . $ctx->list($items);
     }
 }

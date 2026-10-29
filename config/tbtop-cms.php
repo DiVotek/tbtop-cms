@@ -118,6 +118,12 @@ return [
             // container, so they may take constructor dependencies.
             'sections' => [],
         ],
+        'markdown' => [
+            // false never serves a page as markdown (`/about.md`, `Accept:
+            // text/markdown`); true leaves the switch to the «For AI» tab
+            // (off until turned on).
+            'enabled' => true,
+        ],
     ],
     'preview' => [
         // Hours a signed draft-preview link stays valid for. Read with an

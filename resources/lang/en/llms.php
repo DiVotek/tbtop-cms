@@ -18,4 +18,9 @@ return [
         'sitemap' => 'Sitemap',
         'sitemap_notes' => 'Every indexable URL of the site',
     ],
+    'markdown' => [
+        'children' => 'In this section',
+        'about' => 'About :site',
+        'form' => 'This page has a contact form.',
+    ],
 ];

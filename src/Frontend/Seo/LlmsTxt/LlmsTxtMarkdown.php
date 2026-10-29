@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo\LlmsTxt;
 
-use Illuminate\Support\Facades\URL;
+use Tbtop\Cms\Frontend\Markdown\Markdown;
 
 /**
  * The few markdown rules llms.txt needs, so that editor text cannot break
@@ -32,9 +32,7 @@ final class LlmsTxtMarkdown
      */
     public static function url(string $url): string
     {
-        $url = URL::to(trim($url));
-
-        return strtr($url, [' ' => '%20', '(' => '%28', ')' => '%29', '<' => '%3C', '>' => '%3E', "\t" => '%09', "\n" => '%0A', "\r" => '%0D']);
+        return Markdown::url($url);
     }
 
     /**

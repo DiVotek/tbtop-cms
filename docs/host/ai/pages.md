@@ -66,8 +66,9 @@ re-implements a frontend read path — `PageResolver` already applies it.
 `PageTypeInterface` (`src/Page/Contracts/PageTypeInterface.php`): `key()`,
 `label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, `base()`,
 `fields()`, `resolveFields()`, `childSubtype()` (see
-Subtypes and type fields and Page references), plus the source-backed trio
-below. `BasePageType` (`src/Page/Types/BasePageType.php`)
+Subtypes and type fields and Page references), `toMarkdown()` (the type's
+part of the page's `.md`, seo.md → Markdown for agents), plus the
+source-backed trio below. `BasePageType` (`src/Page/Types/BasePageType.php`)
 gives every method a content-only, leaf-type default (`allowedChildren()`
 `[]`, `requiresParent()` `false`, `maxDepth()` `1`, not source-backed) — a
 host type extends it and overrides only what differs.

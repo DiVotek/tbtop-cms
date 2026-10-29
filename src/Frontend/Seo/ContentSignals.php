@@ -31,6 +31,14 @@ final readonly class ContentSignals
     /** `Content-Signal: search=yes, ai-input=yes, ai-train=no`, or null when off. */
     public function line(): ?string
     {
+        $value = $this->value();
+
+        return $value === null ? null : 'Content-Signal: ' . $value;
+    }
+
+    /** `search=yes, ai-input=yes, ai-train=no`, the value the markdown response's header carries; null when off. */
+    public function value(): ?string
+    {
         if (! (bool) $this->settings->get(self::ENABLED)) {
             return null;
         }
@@ -42,6 +50,6 @@ final readonly class ContentSignals
             $parts[] = $name . '=' . ((($value === null) ? $default : (bool) $value) ? 'yes' : 'no');
         }
 
-        return 'Content-Signal: ' . implode(', ', $parts);
+        return implode(', ', $parts);
     }
 }

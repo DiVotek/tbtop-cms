@@ -250,6 +250,34 @@ Overridable, all with sane defaults:
   schema.org node for the page's `seo.jsonLd`, or `null` (default) to
   publish nothing. Full contract, node placement, and examples (FAQPage,
   VideoObject) are in [seo.md](./seo.md#structured-data-json-ld).
+- **`toMarkdown(array $props, MarkdownContext $ctx): ?string`** — this block
+  in the page's markdown version ([seo.md](./seo.md#markdown-for-agents)).
+  `null` (default) keeps the fallback: the text of the block's translatable
+  fields in props order (a repeater row by row), richtext converted, other
+  fields left out. `''` leaves the block out. `$props` are the resolved props,
+  as in `toSchema()`. Build the string with the `$ctx` helpers so stored text
+  cannot become markup; the page heading is the only H1, so a block heading
+  is `$ctx->heading($text)` (H2). A block whose `toMarkdown()` throws is left
+  out with a warning (propagates under `tbtop-cms.blocks.strict`). Built-ins:
+  Hero gives its title, subtitle and CTA link; ContactForm its heading and
+  one line saying the page has a form. The workbench FAQ block:
+
+```php
+public function toMarkdown(array $props, MarkdownContext $ctx): string
+{
+    $parts = [$ctx->heading((string) ($props['heading'] ?? ''))];
+
+    foreach ((array) ($props['items'] ?? []) as $item) {
+        $question = $ctx->heading((string) ($item['question'] ?? ''), 3);
+
+        if ($question !== '') {
+            $parts[] = $question . "\n\n" . $ctx->text((string) ($item['answer'] ?? ''));
+        }
+    }
+
+    return implode("\n\n", array_filter($parts, static fn (string $part): bool => $part !== ''));
+}
+```
 
 ## `ResolveContext`
 
