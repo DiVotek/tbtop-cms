@@ -542,13 +542,13 @@ optional peer dependency):
 ```ts
 import { cmsAccess, cmsAuth, cmsRoles } from "@tbtop/cms/better-auth";
 import { betterAuth } from "better-auth";
-import { admin } from "better-auth/plugins";
+import { admin as adminPlugin } from "better-auth/plugins";
 
 export const auth = betterAuth({
 	database: { db, type: "sqlite" }, // the CMS's Kysely instance; on D1 pass the binding itself (`database: env.DB`)
 	emailAndPassword: { enabled: true },
 	user: { modelName: "tbtop_users" }, // and session, account, verification
-	plugins: [admin({ ac: cmsAccess, roles: cmsRoles })],
+	plugins: [adminPlugin({ ac: cmsAccess, roles: cmsRoles })],
 });
 const cms = createCms({ db, blocks, auth: cmsAuth(auth) });
 await migrateCms(db, { dialect: "sqlite", userKey: "string" }); // Better Auth's ids are strings
