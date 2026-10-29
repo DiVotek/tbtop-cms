@@ -20,8 +20,10 @@ concurrency:
 
 jobs:
   # Which parts of the repo the change touches. Jobs skip when their part is
-  # untouched; "CI ok" below is the one required check, so a skip never
-  # leaves branch protection waiting.
+  # untouched, and on draft PRs: a draft gets the triage review first, and the
+  # full run starts once it is marked ready (or on a manual run). "CI ok"
+  # below is the one required check, so a skip never leaves branch protection
+  # waiting.
   changes:
     name: Path filter
     runs-on: ubuntu-latest
@@ -29,8 +31,8 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      php: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.php == 'true' }}
-      frontend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.frontend == 'true' }}
+      php: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft != true && steps.filter.outputs.php == 'true') }}
+      frontend: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft != true && steps.filter.outputs.frontend == 'true') }}
       workflows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -175,15 +177,14 @@ jobs:
       - name: Execute tests
         run: vendor/bin/pest --ci --parallel
 
-  # The MySQL run of the suite, on PRs into main (release PRs) once they leave
-  # draft, and on pushes to main. Locally the same run is `composer test:mysql`.
+  # The MySQL run of the suite, on PRs into main (release PRs) and on pushes
+  # to main. Locally the same run is `composer test:mysql`.
   test-mysql:
     name: Test (MySQL)
     needs: changes
     if: >-
       needs.changes.outputs.php == 'true' &&
-      (github.base_ref == 'main' || github.ref == 'refs/heads/main') &&
-      github.event.pull_request.draft != true
+      (github.base_ref == 'main' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     services:
       mysql:

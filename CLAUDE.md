@@ -18,8 +18,11 @@ PHP ^8.4 · Laravel 11 / 12 / 13 · No Filament.
   A `Path filter` job gates them: PHP jobs run when PHP-side files change,
   Frontend when `resources/js` or bun config changes, everything when
   `.github/workflows` changes or on a manual run (`workflow_dispatch`);
-  a docs-only PR runs none. `Test (MySQL)` (`composer test:mysql`) runs only
-  on non-draft PRs into and pushes to `main`. `Workflow lint` (actionlint)
+  a docs-only PR runs none. A draft PR runs none either: it gets the `triage`
+  review first, and the full run starts on "Ready for review" (to test a draft,
+  run the workflow on its branch by hand). Merging needs a non-draft PR, so
+  every merge has a full run. `Test (MySQL)` (`composer test:mysql`) runs only
+  on PRs into and pushes to `main`. `Workflow lint` (actionlint)
   runs on workflow changes. `CI ok` sums them up and is the one required check:
   a skipped job counts as passed. A new job goes into its `needs`
 
