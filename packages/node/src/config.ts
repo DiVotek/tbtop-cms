@@ -2,6 +2,7 @@ import type { HostRule, NavLink, NotificationStore, PageDef, S, SessionResolver 
 import type { Kysely } from "kysely";
 import type { z } from "zod";
 import type { CmsAbility } from "./admin/abilities";
+import type { LlmsTxtSection } from "./seo/llmsTxt";
 import type { CollectionDef } from "./content/collections";
 import type { BlockRegistry } from "./blocks/registry";
 import type { Cms } from "./cms";
@@ -90,6 +91,12 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	};
 	/** Paths robots.txt disallows besides the admin prefix and `/login`. */
 	robotsDisallow?: string[];
+	/**
+	 * /llms.txt (`tbtop-cms.seo.llms_txt`): `enabled: false` removes the route
+	 * (default on; the editor's «For AI» switch still starts off); `sections`
+	 * add H2 file lists after the page-type sections.
+	 */
+	llmsTxt?: { enabled?: boolean; sections?: LlmsTxtSection[] };
 	/** The admin URL prefix, disallowed in robots.txt; default `/admin`. */
 	adminPrefix?: string;
 	/**

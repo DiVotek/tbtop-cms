@@ -4,6 +4,7 @@ import { EMAILS, PHONES, SOCIALS } from "../content/builtInCollections";
 import { tabFields } from "../content/hostSettings";
 import { BUSINESS_SUBTYPES, ORGANISATION_TYPES } from "../seo/identity";
 import { extractGtmId, verification } from "../seo/resolver";
+import { DEFAULT_PER_TYPE, MAX_PER_TYPE } from "../seo/llmsTxt";
 import { OWNED } from "../seo/robots";
 import type { Site } from "../site";
 import type { Dict } from "../support/values";
@@ -187,7 +188,7 @@ function robotsExtraError(value: unknown): string | null {
 			continue;
 		}
 		if (OWNED.includes((line.split(":", 1)[0] ?? "").trim().toLowerCase())) {
-			return `The line "${trimmed}" sets a directive this site writes itself. Remove it — User-agent, Allow, Disallow and Sitemap come from the indexing switch and the sitemap setting.`;
+			return `The line "${trimmed}" sets a directive this site writes itself. Remove it — User-agent, Allow, Disallow and Sitemap come from the indexing switch and the sitemap setting, Content-Signal from the «For AI» tab.`;
 		}
 	}
 	return null;
@@ -269,7 +270,15 @@ export function seoSettings(cms: Cms) {
 		title: "SEO settings",
 		subtitle: "Default metadata used across the site unless a page overrides it.",
 		nav: { label: "SEO settings", icon: "search", order: 30 },
-		defaults: { seo_indexing_enabled: true, seo_twitter_card: "auto", seo_identity_type: "none", seo_not_found_enabled: true },
+		defaults: {
+			seo_indexing_enabled: true,
+			seo_twitter_card: "auto",
+			seo_identity_type: "none",
+			seo_not_found_enabled: true,
+			seo_content_signals_search: true,
+			seo_content_signals_ai_input: true,
+			seo_content_signals_ai_train: false,
+		},
 		map: {
 			seo_indexing_enabled: "seo.indexing_enabled",
 			seo_sitemap_per_chunk: "seo.sitemap_per_chunk",
@@ -300,6 +309,15 @@ export function seoSettings(cms: Cms) {
 			seo_gtm_container_id: "seo.gtm_container_id",
 			seo_not_found_enabled: "seo.not_found.enabled",
 			seo_not_found_retention_days: "seo.not_found.retention_days",
+			seo_llms_txt_enabled: "seo.llms_txt.enabled",
+			seo_llms_txt_summary: "seo.llms_txt.summary",
+			seo_llms_txt_intro: "seo.llms_txt.intro",
+			seo_llms_txt_types: "seo.llms_txt.types",
+			seo_llms_txt_per_type: "seo.llms_txt.per_type",
+			seo_content_signals_enabled: "seo.content_signals.enabled",
+			seo_content_signals_search: "seo.content_signals.search",
+			seo_content_signals_ai_input: "seo.content_signals.ai_input",
+			seo_content_signals_ai_train: "seo.content_signals.ai_train",
 			...typeTemplateMap(cms),
 		},
 		prepare: prepareSeo,
@@ -310,7 +328,7 @@ export function seoSettings(cms: Cms) {
 					children: [
 						s.boolean("seo_indexing_enabled").label("Let search engines index the site"),
 						s.number("seo_sitemap_per_chunk").label("Sitemap URLs per file").rules("nullable|integer|min:1|max:50000"),
-						s.textarea("seo_robots_extra").label("Extra robots.txt lines").helperText("User-agent, Allow, Disallow and Sitemap lines are managed by the CMS and ignored here."),
+						s.textarea("seo_robots_extra").label("Extra robots.txt lines").helperText("User-agent, Allow, Disallow, Sitemap and Content-Signal lines are managed by the CMS and ignored here."),
 					],
 				},
 				{
@@ -403,6 +421,45 @@ export function seoSettings(cms: Cms) {
 							.label("Keep entries for (days)")
 							.rules("nullable|integer|min:1|max:3650")
 							.helperText("Entries not seen for this long are pruned (default 90)."),
+					],
+				},
+				{
+					label: "For AI",
+					children: [
+						s
+							.boolean("seo_llms_txt_enabled")
+							.label("Publish llms.txt")
+							.helperText("Serves /llms.txt: a markdown map of the site for AI agents with the summary, notes, contacts and the live indexable pages. Not served while indexing is off."),
+						s
+							.textarea("seo_llms_txt_summary")
+							.label("Site summary for AI")
+							.translatable()
+							.helperText("One or two sentences on what the site is. Left empty, the default meta description is used.")
+							.rules("nullable|max:500"),
+						s
+							.textarea("seo_llms_txt_intro")
+							.label("Notes for AI")
+							.translatable()
+							.helperText("Free text placed after the summary: what the business does, who it serves, how to order. Headings are not kept.")
+							.rules("nullable|max:5000"),
+						s
+							.checkboxlist("seo_llms_txt_types")
+							.label("Page types to list")
+							.options(cms.pageTypes.bases().map((type) => ({ value: type.key, label: type.label })))
+							.helperText("Leave all unticked to list every page type. Articles are listed newest first, other pages in tree order.")
+							.rules("nullable|array"),
+						s
+							.number("seo_llms_txt_per_type")
+							.label("Pages per type")
+							.placeholder(String(DEFAULT_PER_TYPE))
+							.rules(`nullable|integer|min:1|max:${MAX_PER_TYPE}`),
+						s
+							.boolean("seo_content_signals_enabled")
+							.label("Add Content-Signal to robots.txt")
+							.helperText("States in robots.txt how the content may be used (contentsignals.org). A signal, not an access control: crawlers decide whether to honour it."),
+						s.boolean("seo_content_signals_search").label("Allow search indexing"),
+						s.boolean("seo_content_signals_ai_input").label("Allow use as AI input (answers, grounding)"),
+						s.boolean("seo_content_signals_ai_train").label("Allow AI training"),
 					],
 				},
 			]),

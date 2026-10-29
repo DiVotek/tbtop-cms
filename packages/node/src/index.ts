@@ -70,6 +70,7 @@ export {
 	type Template,
 } from "./notifications";
 export type { Alternate, Seo } from "./seo/resolver";
+export type { LlmsTxtLink, LlmsTxtSection } from "./seo/llmsTxt";
 export { baseNode, identityId, type SchemaContext } from "./seo/schemaContext";
 export type { OpenGraph, SchemaTypeDef } from "./seo/schemaTypes";
 export { Site } from "./site";
