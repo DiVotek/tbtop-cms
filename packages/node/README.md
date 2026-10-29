@@ -417,7 +417,8 @@ description), the editor's notes without headings, the contacts (phones,
 emails, address, opening hours, social links), one `## section` per base
 page type with the live indexable pages (`seo.llms_txt.types`, empty = all;
 up to `seo.llms_txt.per_type`, default 50: articles newest first, others
-home first, then by depth), the host's sections, `## Optional` with the
+home first, then by depth, picked from the type's first 1000 pages by sort
+order), the host's sections, `## Optional` with the
 sitemap. A host section is `{ title(locale), links(locale, site) }`
 returning `{ name, url, notes? }`; a relative `url` is made absolute.
 
