@@ -255,3 +255,52 @@ it('appends the host sections from config', function (): void {
     expect($this->get('/llms.txt')->getContent())
         ->toContain("## Docs\n- [API](https://docs.example.com/api): REST reference\n\n## Optional");
 });
+
+it('serves another frontend locale under its prefix', function (): void {
+    Language::factory()->create(['locale' => 'uk', 'name' => 'Українська']);
+    app(Settings::class)->set('seo.llms_txt.summary', ['en' => 'Bike repair.', 'uk' => 'Ремонт велосипедів.']);
+    llmsTxtOn();
+    $about = llmsPage(['name' => ['en' => 'About', 'uk' => 'Про нас']]);
+
+    $response = $this->get('/uk/llms.txt')->assertOk();
+    $response->assertHeader('Content-Type', 'text/plain; charset=utf-8');
+
+    expect($response->getContent())->toContain("> Ремонт велосипедів.\n")
+        ->toContain('- [Про нас](' . url('/uk/' . $about->pathFor('uk')) . ')')
+        ->toContain('](' . url('llms.txt') . '): Цей файл іншою мовою');
+});
+
+it('lists the other languages under Optional', function (): void {
+    Language::factory()->create(['locale' => 'uk', 'name' => 'Українська']);
+    Language::factory()->create(['locale' => 'de', 'name' => 'Deutsch', 'is_frontend_active' => false]);
+    llmsTxtOn();
+
+    expect($this->get('/llms.txt')->getContent())->toContain('- [Українська](' . url('uk/llms.txt') . '): This file in another language')
+        ->not->toContain('Deutsch');
+});
+
+it('redirects the default locale prefix and 404s a locale that is not on the frontend', function (): void {
+    Language::factory()->create(['locale' => 'de', 'name' => 'Deutsch', 'is_frontend_active' => false]);
+    llmsTxtOn();
+
+    $this->get('/en/llms.txt')->assertRedirect('/llms.txt');
+    $this->getJson('/de/llms.txt')->assertNotFound();
+});
+
+it('keeps another locale off while llms.txt is off', function (): void {
+    Language::factory()->create(['locale' => 'uk', 'name' => 'Українська']);
+    app(Cms::class)->frontendRoutes();
+
+    $this->getJson('/uk/llms.txt')->assertNotFound();
+});
+
+it('points the HTML answer at its locale llms.txt', function (): void {
+    Language::factory()->create(['locale' => 'uk', 'name' => 'Українська']);
+    llmsTxtOn();
+    $about = llmsPage(['name' => ['en' => 'About', 'uk' => 'Про нас']]);
+
+    $this->get('/uk/' . $about->pathFor('uk'), ['X-Inertia' => 'true'])->assertOk()
+        ->assertHeader('Link', '<' . url('uk/llms.txt') . '>; rel="describedby"; type="text/plain"');
+    $this->get('/' . $about->pathFor('en'), ['X-Inertia' => 'true'])->assertOk()
+        ->assertHeader('Link', '<' . url('llms.txt') . '>; rel="describedby"; type="text/plain"');
+});

@@ -100,7 +100,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 |---|---|---|---|
 | `tbtop-cms.form.submit` | POST | `_cms/forms/{locale}/{page}/{block}` | `FormSubmitController` — handles a form block submission; `{block}` is a placed block id or a `HasForm` form name (blocks.md); throttled by `tbtop-cms.forms.throttle` |
 | `tbtop-cms.robots` | GET | `robots.txt` | `RobotsController` — dynamic robots.txt |
-| `tbtop-cms.llms-txt` | GET | `llms.txt` | `LlmsTxtController` — llms.txt in the default locale; only if `tbtop-cms.seo.llms_txt.enabled` (default true); 404 until the editor turns it on and while indexing is off |
+| `tbtop-cms.llms-txt` | GET | `llms.txt` | `LlmsTxtController` — llms.txt in the default locale (another frontend locale's `/{locale}/llms.txt` goes through `tbtop-cms.page` to `LlmsTxtController::forLocale()`); only if `tbtop-cms.seo.llms_txt.enabled` (default true); 404 until the editor turns it on and while indexing is off |
 | `tbtop-cms.sitemap` | GET | `sitemap.xml` | `SitemapController@index` — sitemap index; only if `tbtop-cms.seo.sitemap.enabled` (default true) |
 | `tbtop-cms.sitemap.chunk` | GET | `sitemap-{chunk}.xml` | `SitemapController@chunk` — one sitemap chunk; registered before the catch-all so it isn't shadowed by a page slug |
 | `tbtop-cms.page` | GET | `{path?}` (catch-all, `.*`) | `PageController` — resolves and renders any CMS page; must be registered last. While markdown versions are on, `{path}.md` (`index.md` = home) and an `Accept: text/markdown` request get the page as markdown (seo.md → Markdown for agents) |

@@ -6,13 +6,15 @@ namespace Tbtop\Cms\Frontend\Seo\LlmsTxt;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\URL;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Settings\Settings;
 
 /**
- * Builds /llms.txt (llmstxt.org): the site name as the H1, a one-paragraph
- * summary, the editor's free text and the contact details, then one H2 file
- * list per page type, the host's own sections, and an `## Optional` list an
- * agent may skip when its context is short.
+ * Builds /llms.txt (llmstxt.org) for one locale: the site name as the H1, a
+ * one-paragraph summary, the editor's free text and the contact details,
+ * then one H2 file list per page type, the host's own sections, and an
+ * `## Optional` list an agent may skip when its context is short (the
+ * sitemap and this file in the other frontend languages).
  */
 final readonly class LlmsTxt
 {
@@ -22,6 +24,8 @@ final readonly class LlmsTxt
         private LlmsTxtPages $pages,
         private LlmsTxtContacts $contacts,
         private Container $container,
+        private Languages $languages,
+        private LlmsTxtUrl $url,
     ) {}
 
     public function render(string $locale, string $defaultLocale): string
@@ -83,18 +87,23 @@ final readonly class LlmsTxt
     /** @return list<array{title: string, links: list<LlmsTxtLink>}> */
     private function optional(string $locale): array
     {
-        if (! config('tbtop-cms.seo.sitemap.enabled', true)) {
-            return [];
-        }
+        $links = [];
 
-        return [[
-            'title' => 'Optional',
-            'links' => [new LlmsTxtLink(
+        if (config('tbtop-cms.seo.sitemap.enabled', true)) {
+            $links[] = new LlmsTxtLink(
                 __('tbtop-cms::llms.optional.sitemap', [], $locale),
                 URL::to('sitemap.xml'),
                 __('tbtop-cms::llms.optional.sitemap_notes', [], $locale),
-            )],
-        ]];
+            );
+        }
+
+        foreach ($this->languages->frontendActive() as $language) {
+            if ($language['locale'] !== $locale) {
+                $links[] = new LlmsTxtLink($language['name'], $this->url->for($language['locale']), __('tbtop-cms::llms.optional.language_notes', [], $locale));
+            }
+        }
+
+        return $links === [] ? [] : [['title' => 'Optional', 'links' => $links]];
     }
 
     /** @param  list<LlmsTxtLink>  $links */

@@ -17,6 +17,7 @@ return [
     'optional' => [
         'sitemap' => 'Sitemap',
         'sitemap_notes' => 'Every indexable URL of the site',
+        'language_notes' => 'This file in another language',
     ],
     'markdown' => [
         'children' => 'In this section',
