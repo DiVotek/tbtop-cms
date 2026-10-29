@@ -115,10 +115,13 @@ Field-by-field:
 | Per-page-type templates | `Settings` (`seo.type_templates.{type}.{title\|description}`) | SEO settings → *Type templates* tab, one pair per registered page type and subtype; a page reads its subtype's pair first, then its type's |
 | Default description / default OG image | `Settings` (`seo.default_description`, `seo.default_og_image`) | SEO settings → *Titles* / *Social* tabs |
 | Twitter card mode | `Settings` (`seo.twitter_card`) | SEO settings → *Social* tab (`auto` picks `summary_large_image` iff an image resolved) |
-| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`; telephone, email and profile links only from `site.contacts.*`) | SEO settings → *Identity* tab exposes type and, for the organisation types, legal name, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win); telephone, email and sameAs are edited on Site settings → *Contacts* only |
+| Site identity (Person/Organization/OnlineStore/LocalBusiness) | `Settings` (`seo.identity.*`; telephone, email and profile links only from the built-in Phones/Emails/Socials collections) | SEO settings → *Identity* tab exposes type and, for the organisation types, legal name, address, plus the LocalBusiness subtype, opening hours and geo; name/logo fall back to the site's own `site.name`/`site.logo` unless a `seo.identity.name`/`seo.identity.logo` value already exists in the database (legacy/scripted values still win); telephone, email and sameAs are edited on the admin's Collections page only |
 | Indexing master switch | `Settings` (`seo.indexing_enabled`) | SEO settings → *Indexing* tab — gates robots.txt, the sitemap route (404s when off), and every page's `noindex` |
 | Sitemap chunk size | `Settings` (`seo.sitemap_per_chunk`), falls back to `config('tbtop-cms.seo.sitemap.per_chunk')` | SEO settings → *Indexing* tab; config is the fresh-install default only |
-| Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`) are rejected at save time |
+| Custom robots.txt lines | `Settings` (`seo.robots_extra`) | SEO settings → *Indexing* tab — lines claiming an owned directive (`user-agent`/`allow`/`disallow`/`sitemap`/`content-signal`) are rejected at save time |
+| llms.txt (on/off, summary, notes, page types, pages per type) | `Settings` (`seo.llms_txt.*`) | SEO settings → *For AI* tab; see llms.txt below |
+| Markdown versions of pages (on/off) | `Settings` (`seo.markdown.enabled`) | SEO settings → *For AI* tab; see Markdown for agents below |
+| Content signals for AI use | `Settings` (`seo.content_signals.*`) | SEO settings → *For AI* tab; see robots.txt below |
 | GTM container id | `Settings` (`seo.gtm_container_id`) | SEO settings → *Integrations* tab (accepts bare id or the full install snippet) |
 | Search-console verification tokens | `Settings` (`seo.verification.google` / `.bing`) | SEO settings → *Integrations* tab (accepts bare token or the pasted `<meta>` tag) |
 | 404 log toggle / retention | `Settings` (`seo.not_found.enabled`, `seo.not_found.retention_days`) | SEO settings → *Not found* tab |
@@ -357,11 +360,12 @@ order — `head.blade.php` and `CmsHead.tsx` both key on array index, not
    nothing when `seo.identity.type` is `none`. Name and logo fall back to
    the site's own `site.name`/`site.logo` when no
    `seo.identity.name`/`seo.identity.logo` is set. `telephone`, `email`
-   and `sameAs` come only from the Site settings contacts
-   (`site.contacts.phones/emails/socials`, see `SiteContacts`): the first
-   phone, the first email and every social `href`. There are no
+   and `sameAs` come only from the built-in Phones, Emails and Socials
+   collections (see `SiteContacts`, collections.md): the first published
+   phone, the first published email and every social `href`. There are no
    `seo.identity.telephone/email/same_as` keys any more — the
-   `2026_10_07_000001` migration moved them into the contacts.
+   `2026_10_07_000001` migration moved them into the contacts, and
+   `2026_10_28_000001` moved those into the collections.
 
    | `seo.identity.type` | `@type` | Extra properties |
    |---|---|---|
@@ -478,10 +482,19 @@ on), then the editor's `seo.robots_extra` lines spliced
 line would end the group and orphan everything after it in a real
 robots.txt parse), then a trailing `Sitemap:` line (only when indexing is on
 *and* the sitemap route is enabled). Lines claiming an owned directive
-(`user-agent`/`allow`/`disallow`/`sitemap`, case-insensitive) are rejected
+(`user-agent`/`allow`/`disallow`/`sitemap`/`content-signal`, case-insensitive) are rejected
 at save time in `SeoSettingsPage::guardRobotsExtra()`, not silently
 stripped — an editor who wrote a conflicting line gets a validation error
 naming it.
+
+### Content signals
+
+With `seo.content_signals.enabled` on, the owned group carries one
+`Content-Signal:` line after the owned `Disallow:` paths
+(contentsignals.org), e.g. `Content-Signal: search=yes, ai-input=yes,
+ai-train=no`. Each signal reads its own key (`seo.content_signals.search`,
+`.ai_input`, `.ai_train`); an unset one takes that default. Off by default,
+and absent while indexing is off. Reader: `ContentSignals`.
 
 ### Disallowed paths
 
@@ -516,6 +529,126 @@ preview URL out of an index.
 
 **Install trap**: a static `public/robots.txt` shadows this route — see
 wiring.md, "`public/robots.txt` must not exist".
+
+## llms.txt
+
+`GET /llms.txt` (`LlmsTxtController` → `LlmsTxt::render()`), in the default
+locale, `text/plain; charset=utf-8`, following llmstxt.org. Every other
+frontend-active locale has its own at `/{locale}/llms.txt` (`/uk/llms.txt`):
+the page route hands that path to `LlmsTxtController::forLocale()` once
+`SetLanguage` has picked the locale, so `/en/llms.txt` for the default locale
+301s to `/llms.txt` and a locale that is not on the frontend 404s. 404 until an
+editor turns on `seo.llms_txt.enabled` (SEO settings → *For AI*), and while
+indexing is off; `config('tbtop-cms.seo.llms_txt.enabled') === false`
+removes the route. Cached with `CmsCache::rememberLive` per origin and
+locale, so any content or settings write refreshes it (a changed
+`seo.llms_txt.sections` config shows once the cache TTL runs out or the
+cache is cleared).
+
+The file, in order:
+
+1. `# {site.name}` (the app URL's host when unset).
+2. `> {summary}`: `seo.llms_txt.summary`, else `seo.default_description`.
+3. The editor's notes (`seo.llms_txt.intro`), headings stripped: H1 and H2
+   belong to the format.
+4. Contacts: phones and emails (built-in collections), address and opening
+   hours (identity settings), social links. The same sources as the
+   identity JSON-LD node.
+5. One `## {type}` list per base page type (`seo.llms_txt.types`, empty =
+   all): live, indexable, non-error pages, up to `seo.llms_txt.per_type`
+   (default 50, max 500). `- [title](url): description` from the page's own
+   SEO title and description, without the site templates; the URL is the
+   page's `.md` while markdown versions are on. Articles newest
+   first by `published_at`; every other type home first, then by depth,
+   then `sort_order`, picked from that type's first 1000 pages by
+   `sort_order`. Built-in types use the plural names in
+   `tbtop-cms::llms.sections.*`, other types their `label()`.
+6. Host sections from `config('tbtop-cms.seo.llms_txt.sections')`:
+
+```php
+final class DocsSection implements LlmsTxtSection
+{
+    public function title(string $locale): string
+    {
+        return 'Docs';
+    }
+
+    public function links(string $locale): array
+    {
+        return [new LlmsTxtLink('API', 'https://docs.example.com/api', 'REST reference')];
+    }
+}
+```
+
+7. `## Optional`: the sitemap (when the sitemap route is on) and this file in
+   every other frontend language, `- [{language name}]({locale llms.txt})`;
+   left out when both are empty.
+
+**Install trap**: a static `public/llms.txt` shadows the route; the
+`llms_txt` health check warns about it.
+
+## Markdown for agents
+
+The page route answers in markdown (`PageController` → `PageMarkdown`) when
+the path ends in `.md` (`/about.md`, `/uk/about.md`; `/index.md` is the home
+page) or the `Accept` header ranks `text/markdown` above `text/html`
+(`MarkdownRequest::accepts()`: a tie goes to the type listed first, `*/*`
+counts for HTML only, an Inertia visit is never markdown). Off until an
+editor turns on `seo.markdown.enabled` (SEO settings → *For AI*), and while
+indexing is off; `config('tbtop-cms.seo.markdown.enabled') === false` turns
+it off for good. Without it, `/about.md` is an ordinary unknown path.
+
+Only live pages: a draft or scheduled page 404s, even for an admin, and
+redirects and 404s work as for the HTML path without `.md`. Not cached: it
+costs one page render, like the HTML answer.
+
+Headers: `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`,
+`Link: <canonical>; rel="canonical"`, `X-Robots-Tag: noindex` for a noindex
+page, `Content-Signal: …` while content signals are on. While markdown is on,
+the HTML answer carries `Vary: Accept` and `Link: </about.md>;
+rel="alternate"; type="text/markdown"`; while llms.txt is on it carries
+`Link: </llms.txt>; rel="describedby"; type="text/plain"` for its locale's
+file (`/uk/llms.txt` on a `/uk/…` page), with or without markdown. Neither
+for a preview.
+
+The document, in order:
+
+1. YAML frontmatter: `title`, `description` (the rendered head values),
+   `url` (canonical), `lang`, `image` (og:image), `alternates` (hreflang
+   locale → URL, the current locale left out).
+2. `# {heading}` (the page's title cascade when empty), the summary, the body
+   (richtext → markdown, `RichtextMarkdownRenderer`: headings start at H2,
+   links keep only the URLs the HTML renderer allows).
+3. Every active block in order, by `Block::toMarkdown()` (blocks.md).
+4. `PageTypeInterface::toMarkdown()`: by default, for a type that allows
+   children, `## In this section` with the live, indexable children (own
+   title and description, `.md` links), up to `seo.llms_txt.per_type`.
+5. `## About {site}`: the notes for AI (`seo.llms_txt.intro`) and the same
+   contact lines as llms.txt; left out when both are empty.
+6. The page's whole JSON-LD graph, the nodes the HTML head carries, as one
+   `json` code block.
+
+A type adds its own text by overriding `toMarkdown()`; call the parent to
+keep the children list:
+
+```php
+final class ProductType extends BasePageType
+{
+    public function toMarkdown(Page $page, MarkdownContext $ctx): ?string
+    {
+        $product = $ctx->source;
+
+        return $ctx->heading('Price') . "\n\n" . $ctx->text($product->price . ' UAH');
+    }
+}
+```
+
+`MarkdownContext` (`src/Frontend/Markdown/MarkdownContext.php`) carries
+`page`, `locale`, `defaultLocale`, `url` (canonical), `source`, `fields`
+(resolved type fields; `field($name)`), and helpers that escape stored text:
+`text()`, `escape()`, `heading($text, $level = 2)`, `link()`, `list()`,
+`richtext()`, `pageItem(Page)` (`[title](url.md): description`) and
+`children($limit)`.
 
 ## Verification tokens and GTM
 

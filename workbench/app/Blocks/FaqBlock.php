@@ -8,11 +8,13 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 
 /**
- * Reference Block::toSchema() implementation: an FAQ list that publishes a
- * FAQPage node alongside the page's own schema, per docs/host/ai/seo.md.
+ * Reference Block::toSchema() and toMarkdown() implementation: an FAQ list
+ * that publishes a FAQPage node alongside the page's own schema, per
+ * docs/host/ai/seo.md, and reads as questions and answers in the page's `.md`.
  */
 class FaqBlock extends Block
 {
@@ -101,6 +103,29 @@ class FaqBlock extends Block
             'mainEntityOfPage' => $ctx->url,
             'mainEntity' => $mainEntity,
         ];
+    }
+
+    /**
+     * Reference Block::toMarkdown(): the heading as H2, each question as H3
+     * with its answer below, per docs/host/ai/blocks.md.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    #[\Override]
+    public function toMarkdown(array $props, MarkdownContext $ctx): string
+    {
+        $parts = [$ctx->heading((string) ($props['heading'] ?? ''))];
+
+        /** @var array<string, mixed> $item */
+        foreach ((array) ($props['items'] ?? []) as $item) {
+            $question = $ctx->heading((string) ($item['question'] ?? ''), 3);
+
+            if ($question !== '') {
+                $parts[] = $question . "\n\n" . $ctx->text((string) ($item['answer'] ?? ''));
+            }
+        }
+
+        return implode("\n\n", array_filter($parts, static fn (string $part): bool => $part !== ''));
     }
 
     /**

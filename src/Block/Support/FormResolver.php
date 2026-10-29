@@ -7,8 +7,10 @@ namespace Tbtop\Cms\Block\Support;
 use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\Fields\Repeater;
 use Tbtop\Admin\Dsl\S;
+use Tbtop\Cms\Admin\Fields\CollectionField;
 use Tbtop\Cms\Admin\Fields\Pages;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Collection\EntryPicker;
 use Tbtop\Cms\Page\Refs\PageRefList;
 use Tbtop\Cms\Support\BlankValue;
 
@@ -104,6 +106,10 @@ final class FormResolver
             $field instanceof Pages => [
                 'type' => 'list<array{id: string, name: string, url: string}>',
                 'resolve' => static fn (mixed $v, ResolveContext $ctx): array => app(PageRefList::class)->resolve($v, $ctx->locale),
+            ],
+            $field instanceof CollectionField => [
+                'type' => $field->phpType(),
+                'resolve' => static fn (mixed $v, ResolveContext $ctx): ?array => app(EntryPicker::class)->pick($field, $v, $ctx),
             ],
             $kind === 'richtext' => [
                 'type' => 'string|null',

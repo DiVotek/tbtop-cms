@@ -384,5 +384,6 @@ return [
     ],
     'refs' => [
         'invalid' => 'This page cannot be referenced here.',
+        'create_needs_parent' => 'Create the first page of this type in Pages: new ones go under the same parent.',
     ],
 ];

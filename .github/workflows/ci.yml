@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main, 'release/**']
+    types: [opened, synchronize, reopened, ready_for_review]
+  # A manual run ignores the path filters and runs every job.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,8 +19,77 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Which parts of the repo the change touches. Jobs skip when their part is
+  # untouched. On a draft PR everything but Workflow lint skips: a draft gets
+  # the triage review first, and the full run starts once it is marked ready
+  # (or on a manual run). "CI ok" below is the one required check, so a skip
+  # never leaves branch protection waiting.
+  changes:
+    name: Path filter
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      php: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft != true && steps.filter.outputs.php == 'true') }}
+      frontend: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft != true && steps.filter.outputs.frontend == 'true') }}
+      workflows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.workflows == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # A change to CI itself runs everything.
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            workflows: &workflows
+              - '.github/workflows/**'
+            php:
+              - *workflows
+              - '**.php'
+              - 'composer.json'
+              # Not committed today; listed so a committed lock still runs PHP jobs.
+              - 'composer.lock'
+              - 'phpunit.xml.dist'
+              - 'testbench.yaml'
+              - 'phpstan.neon.dist'
+              - 'phpstan-baseline.neon'
+              - 'pint.json'
+              - 'config/**'
+              - 'database/**'
+              - 'resources/views/**'
+              - 'resources/lang/**'
+              - 'workbench/**'
+              - 'tests/**'
+              # PHP tests compare these to what PHP generates.
+              - 'resources/js/**/*.fixture.json'
+              - 'resources/js/**/*.generated.ts'
+            frontend:
+              - *workflows
+              - 'resources/js/**'
+              - 'workbench/resources/js/**'
+              - 'package.json'
+              - 'bun.lock'
+              - 'bunfig.toml'
+              - 'test-setup.ts'
+              - 'tsconfig*.json'
+              - 'vite.config.*'
+
+  actionlint:
+    name: Workflow lint
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +111,8 @@ jobs:
 
   analyse:
     name: Analyse
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +131,8 @@ jobs:
 
   blocks-types:
     name: Block types up to date
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,26 +149,24 @@ jobs:
       - name: Check generated block types are up to date
         run: composer types:blocks:check
 
+  # One combination: PHP 8.4 on Testbench 11 (Laravel 13).
   test:
-    name: Test - PHP ${{ matrix.php }} / Testbench ${{ matrix.testbench }}
+    name: Test
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['8.4']
-        testbench: ['^11.0']
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, fileinfo
           coverage: none
 
       - name: Constrain Testbench
-        run: composer require "orchestra/testbench:${{ matrix.testbench }}" --dev --no-interaction --no-update
+        run: composer require "orchestra/testbench:^11.0" --dev --no-interaction --no-update
 
       - name: Install dependencies
         uses: ramsey/composer-install@v3
@@ -105,12 +179,14 @@ jobs:
       - name: Execute tests
         run: vendor/bin/pest --ci --parallel
 
-  # The MySQL run of the suite, on PRs into main (release PRs) and pushes to
-  # main only: on a PR into release/** it shows as Skipped. Locally the same
-  # run is `composer test:mysql`.
+  # The MySQL run of the suite, on PRs into main (release PRs) and on pushes
+  # to main. Locally the same run is `composer test:mysql`.
   test-mysql:
     name: Test (MySQL)
-    if: github.base_ref == 'main' || github.ref == 'refs/heads/main'
+    needs: changes
+    if: >-
+      needs.changes.outputs.php == 'true' &&
+      (github.base_ref == 'main' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -155,6 +231,8 @@ jobs:
 
   frontend:
     name: Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -164,6 +242,14 @@ jobs:
         with:
           bun-version: latest
 
+      # setup-bun caches only the bun binary, not the packages.
+      - name: Cache bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -172,3 +258,15 @@ jobs:
 
       - name: Run tests
         run: bun run test
+
+  # The one required check: fails when any job failed or was cancelled,
+  # passes when the rest passed or skipped. A new job goes into `needs`.
+  ci-ok:
+    name: CI ok
+    needs: [changes, actionlint, lint, analyse, blocks-types, test, test-mysql, frontend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed or skipped
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

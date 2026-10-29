@@ -8,6 +8,7 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 use Tbtop\Cms\Link\SafeHref;
 
 class HeroBlock extends Block
@@ -60,6 +61,23 @@ class HeroBlock extends Block
             'image' => $this->clean($input['image'] ?? null),
             'cta' => $this->cta($input),
         ];
+    }
+
+    /**
+     * The title as H2, the subtitle, and the call to action as a link.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    #[\Override]
+    public function toMarkdown(array $props, MarkdownContext $ctx): string
+    {
+        $cta = is_array($props['cta'] ?? null) ? $ctx->link((string) $props['cta']['label'], (string) $props['cta']['href']) : '';
+
+        return implode("\n\n", array_filter([
+            $ctx->heading((string) ($props['title'] ?? '')),
+            $ctx->text(is_string($props['subtitle'] ?? null) ? $props['subtitle'] : null),
+            $cta,
+        ], static fn (string $part): bool => $part !== ''));
     }
 
     /**

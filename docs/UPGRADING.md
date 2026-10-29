@@ -561,6 +561,110 @@ key only to change the env-driven default. The package adds an auth guard
 `pages_api` check: a lang override of `tbtop-cms::health.checks.*` may add
 its keys.
 
+## Collections; Phones, Emails and Socials take over the site contacts
+
+Records that are not pages — reviews, team, vacancies — are now
+**collections** (`docs/host/ai/collections.md`): a `Collection` class listed
+in `config('tbtop-cms.collections')`, entries in the new `tbtop_entries`
+table, a `collection` block field and `Cms::collection()`. The admin shows
+every collection on one Collections page, a tab each.
+
+Three collections are built in, and they replace Site settings → Contacts:
+**Phones**, **Emails** and **Social links**, one entry per former row. The
+SEO identity's address, opening hours and coordinates stay in SEO settings.
+
+Run `php artisan migrate`. `2026_10_28_000000_create_entries_table` creates the
+table; `2026_10_28_000001_move_contacts_to_collections` turns each row of
+`site.contacts.phones`, `site.contacts.emails` and `site.contacts.socials`
+into a published entry, in order, then deletes that key. A collection that
+already has entries is left alone, its settings key included: it is no longer
+read, so remove it by hand once the entries match.
+
+What changes for a host:
+
+1. **`SiteContacts` reads the collections.** `phones()`, `emails()` and
+   `socials()` keep their return shapes (and gain an optional `$locale`).
+   Its constructor now takes `CollectionEntries`: resolve it from the
+   container rather than `new SiteContacts($settings)`.
+2. **`cms.settings` still carries `site.contacts.phones/emails/socials`**,
+   built from the collections in the old row shapes.
+3. **A published `admin.pages` config needs two more slots**,
+   `collection_entries` => `CollectionEntriesPage::class` and
+   `collection_entry_edit` => `CollectionEntryEditPage::class`. Without them
+   there is no Collections page and no menu item for it.
+4. **Import the admin blocks module** (`resources/js/cms/admin/blocks.ts`),
+   as for the `link` field: it now also registers `collectionFieldClient`,
+   the editor of the `collection` field.
+
+## Page types: `listedInAll()` and `archiveOf()` (tags and category archives)
+
+`PageTypeInterface` gains two methods, `listedInAll(): bool` and
+`archiveOf(): ?string`. `BasePageType` answers `true` and `null`, so a type
+extending it needs nothing. **A type that implements the interface directly
+must add both, or it fails at load.** `listedInAll()` false keeps the type off
+the Pages "All" tab; `archiveOf()` names the `pages` field the type is an
+archive of, and such a page stays noindex and out of the sitemap while no live
+page picks it. Tags as pages and the paged archive helpers
+(`Cms::referencedByPaged()`, `childrenPaged()`, …) are in
+`docs/host/ai/recipes.md`, "Tags and category archives".
+
+## `llms.txt` and the robots.txt `Content-Signal`
+
+`GET /llms.txt` is a new route, off until the editor turns it on in SEO
+settings → *For AI* (404 until then, and while indexing is off). A host that
+serves its own `/llms.txt` sets `tbtop-cms.seo.llms_txt.enabled` to `false`;
+a static `public/llms.txt` shadows the route, and the `llms_txt` health check
+warns about it. A published `seo` config section without `llms_txt` keys gets
+the inline defaults.
+
+Every frontend locale other than the default also gets its own file at
+`/{locale}/llms.txt` (`/uk/llms.txt`). The default locale's prefixed path
+(`/en/llms.txt` when `en` is the default) 301s to `/llms.txt`, like its pages.
+The *For AI* switch, indexing and `tbtop-cms.seo.llms_txt.enabled` turn these
+files off together with `/llms.txt`. While llms.txt is on, HTML pages send
+`Link: <…/llms.txt>; rel="describedby"` for their locale's file.
+
+`Content-Signal` is now a robots.txt directive the site writes itself (off by
+default, same tab): a `seo.robots_extra` line starting with it is dropped on
+render and refused on the next save. A site that already had such a line in
+`seo.robots_extra` moves it to SEO settings → *For AI* before upgrading, or
+robots.txt loses it. `RobotsTxt` takes a `ContentSignals` in
+its constructor: resolve it from the container rather than with `new`.
+
+## Markdown versions of pages for AI agents
+
+While the editor has it on (SEO settings → *For AI*, off by default), every
+live, indexable page also answers as markdown at its path plus `.md`
+(`/about.md`, `/index.md` for the home page) and to a request whose `Accept`
+ranks `text/markdown` above `text/html`. HTML answers gain `Vary: Accept` and a
+`Link` header to the markdown version; llms.txt links the `.md` versions while
+markdown is on. A host that never wants it sets
+`tbtop-cms.seo.markdown.enabled` to `false`; a published `seo` config section
+without the key gets the inline default.
+
+`PageTypeInterface` gains `toMarkdown(Page $page, MarkdownContext $ctx):
+?string`, appended after the page's blocks. `BasePageType` implements it (a
+type that allows children lists its live children), so a type extending it
+needs nothing. **A type that implements the interface directly must add it, or
+it fails at load.** `Block::toMarkdown()` is optional: the default renders the
+block's translatable fields, and `''` leaves a block out. Details are in
+`docs/host/ai/seo.md`.
+
+## The pages API is rate limited
+
+Every `/api/cms/v1` route now runs Laravel's `throttle` with
+`tbtop-cms.api.throttle` (default `'60,1'`, 60 requests a minute per token
+user; `''` turns it off). An integration that calls more often raises the
+limit there. A published `config/tbtop-cms.php` without the key gets the
+default.
+
+## The fallback error page shows its heading
+
+With no published 404/500 page in the database, the response carries an empty
+block spec and only `page.heading`. The package's `CmsPage.tsx` now renders
+that heading as an `<h1>` when `page.id` is `null`; a host with its own copy of
+`CmsPage.tsx` adds the same branch, or its fallback error pages stay blank.
+
 ## Upgrading from `main` to this release (checklist)
 
 The sections above cover each change in depth; this is what a host does by
@@ -652,6 +756,25 @@ hand, in order.
 11. **Run `php artisan tbtop:media-regenerate` once** after updating
     tbtop/admin, so media uploaded earlier gets the `sm`/`md`/`lg` variants
     `mediaImage()` lists in its `srcset`.
+12. **Page types that implement `PageTypeInterface` directly** add
+    `listedInAll()` and `archiveOf()` (see their section above).
+13. **Run `php artisan migrate`** for the collections:
+    `2026_10_28_000000_create_entries_table`, then
+    `2026_10_28_000001_move_contacts_to_collections` (no `down()`). A
+    published `admin.pages` config adds `collection_entries` and
+    `collection_entry_edit`; the host's admin JS imports
+    `resources/js/cms/admin/blocks.ts`.
+14. **Code that builds `SiteContacts` or `RobotsTxt` with `new`** passes the
+    new dependency (`CollectionEntries`, `ContentSignals`) or resolves it from
+    the container.
+15. **Pages API integrations calling more than 60 times a minute per token
+    user** raise `tbtop-cms.api.throttle` (or set it to `''` for no limit).
+16. **A `Content-Signal` line in `seo.robots_extra`** moves to SEO settings →
+    *For AI*: robots.txt now drops it from the extra lines.
+17. **A host copy of `CmsPage.tsx`** renders `page.heading` when `page.id` is
+    `null` (fallback error pages).
+18. **Page types that implement `PageTypeInterface` directly** add
+    `toMarkdown()` (see "Markdown versions of pages for AI agents").
 
 The remaining behaviour changes (form-resolved block props, Problem blocks,
 `page.fields` as an object, page-text fallback, site contacts, the admin

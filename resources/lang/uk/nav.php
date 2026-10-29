@@ -10,6 +10,7 @@ return [
     ],
     'items' => [
         'pages' => 'Сторінки',
+        'collections' => 'Колекції',
         'shared_blocks' => 'Спільні блоки',
         'redirects' => 'Перенаправлення',
         'not_found' => 'Журнал 404',

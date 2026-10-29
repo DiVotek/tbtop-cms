@@ -21,6 +21,13 @@ they do for an editor.
    argument is the user's email, the user must be a CMS admin; the token is
    printed once.
 
+Every route is rate limited by `tbtop-cms.api.throttle` (default `'60,1'`,
+60 requests a minute per token user; `''` turns it off). Over the limit the
+API answers 429 with a `Retry-After` header. The limit runs after
+authentication, so a request with a missing or wrong token gets its 401
+without being counted; a host that wants those limited too puts a per-IP
+limit in front (the proxy, or its own middleware on the `api/cms/v1` prefix).
+
 **The token's user is a full CMS admin.** The token limits what the API
 lets it reach, but the account itself could sign in to the panel with every
 admin right, which is why it gets a password nobody keeps. Revoking its admin

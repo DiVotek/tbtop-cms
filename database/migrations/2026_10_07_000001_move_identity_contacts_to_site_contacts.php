@@ -15,27 +15,28 @@ use Tbtop\Cms\Settings\SiteContacts;
  * the editor sees on the Contacts tab.
  *
  * Plain Settings reads and writes (no raw JSON in SQL), so it runs the same
- * on SQLite and MySQL. A rerun finds no identity keys and does nothing.
+ * on SQLite and MySQL. Reads the settings rows directly: SiteContacts reads
+ * the collections now, whose table a later migration creates. A rerun finds
+ * no identity keys and does nothing.
  */
 return new class extends Migration
 {
     public function up(): void
     {
         $settings = app(Settings::class);
-        $contacts = new SiteContacts($settings);
 
         $telephone = self::text($settings->get('seo.identity.telephone'));
-        if ($telephone !== null && $contacts->phones() === []) {
+        if ($telephone !== null && ! self::filled($settings, SiteContacts::PHONES, ['number'])) {
             $settings->set(SiteContacts::PHONES, [...self::rows($settings, SiteContacts::PHONES), ['number' => $telephone]]);
         }
 
         $email = self::text($settings->get('seo.identity.email'));
-        if ($email !== null && $contacts->emails() === []) {
+        if ($email !== null && ! self::filled($settings, SiteContacts::EMAILS, ['address'])) {
             $settings->set(SiteContacts::EMAILS, [...self::rows($settings, SiteContacts::EMAILS), ['address' => $email]]);
         }
 
         $profiles = self::profiles($settings->get('seo.identity.same_as'));
-        if ($profiles !== [] && $contacts->socials() === []) {
+        if ($profiles !== [] && ! self::filled($settings, SiteContacts::SOCIALS, ['label', 'href'])) {
             $settings->set(SiteContacts::SOCIALS, [...self::rows($settings, SiteContacts::SOCIALS), ...$profiles]);
         }
 
@@ -46,6 +47,19 @@ return new class extends Migration
 
     /** The SEO keys are gone for good: their values now live in the contacts, nothing reads them back. */
     public function down(): void {}
+
+    /**
+     * Whether a contacts list holds a usable row: one with every key filled.
+     *
+     * @param  list<string>  $keys
+     */
+    private static function filled(Settings $settings, string $key, array $keys): bool
+    {
+        return array_any(
+            self::rows($settings, $key),
+            static fn (mixed $row): bool => is_array($row) && array_all($keys, static fn (string $k): bool => self::text($row[$k] ?? null) !== null),
+        );
+    }
 
     private static function text(mixed $value): ?string
     {

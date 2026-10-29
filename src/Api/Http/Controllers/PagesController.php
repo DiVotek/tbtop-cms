@@ -41,7 +41,7 @@ final readonly class PagesController
             ->paginate((int) ($filters['per_page'] ?? self::PER_PAGE));
 
         return response()->json([
-            'data' => array_map($this->resource->toArray(...), $pages->items()),
+            'data' => $this->resource->collection(array_values($pages->items())),
             'meta' => [
                 'current_page' => $pages->currentPage(),
                 'last_page' => $pages->lastPage(),
