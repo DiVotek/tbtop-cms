@@ -152,6 +152,28 @@ describe("page markdown", () => {
 		expect(body).not.toContain("Gone");
 	});
 
+	test("a page type's toMarkdown that throws is left out; ctx.link drops an unsafe URL", async () => {
+		const { cms } = await on(
+			{
+				pageTypes: [
+					{ key: "broken", toMarkdown: () => Promise.reject(new Error("boom")) },
+					{ key: "linked", toMarkdown: (_page, ctx) => `${ctx.link("Bad", "javascript:alert(1)")} ${ctx.link("Good", "/ok")}` },
+				],
+			},
+			null,
+		);
+		await seedFixtures(cms, {
+			languages: [{ locale: "en", name: "English", default: true }],
+			pages: [
+				{ key: "b", type: "broken", name: { en: "Broken" } },
+				{ key: "l", type: "linked", name: { en: "Linked" } },
+			],
+		});
+		await cms.site().settings.set("seo.markdown.enabled", true);
+		expect((await md(cms, "/broken.md"))?.status).toBe(200);
+		expect(await (await md(cms, "/linked.md"))?.text()).toContain("Bad [Good](https://site.test/ok)");
+	});
+
 	test("a page type's toMarkdown is added after the blocks", async () => {
 		const { cms } = await on({ pageTypes: [{ key: "service", toMarkdown: (_page, ctx) => `${ctx.heading("Price")}\n\n${ctx.text("100 UAH")}` }] }, null);
 		await seedFixtures(cms, { languages: [{ locale: "en", name: "English", default: true }], pages: [{ key: "repair", type: "service", name: { en: "Repair" } }] });

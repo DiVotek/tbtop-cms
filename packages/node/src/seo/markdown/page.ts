@@ -213,10 +213,17 @@ async function typeMarkdown(ctx: MarkdownContext): Promise<string> {
 	if (type === null) {
 		return "";
 	}
-	if (type.toMarkdown !== null) {
-		return ((await type.toMarkdown(page, ctx)) ?? "").trim();
+	const toMarkdown = type.toMarkdown;
+	// Like a block's: a throw leaves the part out with a warning, unless strictBlocks.
+	try {
+		return toMarkdown === null ? await defaultTypeMarkdown(ctx, type.allowedChildren.length > 0) : ((await toMarkdown(page, ctx)) ?? "").trim();
+	} catch (error) {
+		if (site.config.strictBlocks === true) {
+			throw error;
+		}
+		console.warn("page_type.to_markdown_failed", { type: type.key, page: page.id, error: String(error) });
+		return "";
 	}
-	return defaultTypeMarkdown(ctx, type.allowedChildren.length > 0);
 }
 
 /** BasePageType::toMarkdown: `## In this section` with the live, indexable children, up to the llms.txt per-type limit. */

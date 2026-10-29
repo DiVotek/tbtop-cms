@@ -1,4 +1,5 @@
 import { type Page, pageFromRow } from "../../content/page";
+import { allowedUrl } from "../../content/richtext";
 import { whereLive } from "../../content/pages";
 import type { Site } from "../../site";
 import { ownDescription, ownTitle } from "../schemaContext";
@@ -26,7 +27,7 @@ export type MarkdownContext = {
 	escape(text: string): string;
 	/** `## text` (escaped); '' for empty text. The page heading is the only H1. */
 	heading(text: string, level?: number): string;
-	/** `[text](url)`, the URL made absolute. */
+	/** `[text](url)`, the URL made absolute; an unsafe scheme (javascript:, data:) leaves just the text. */
 	link(text: string, url: string): string;
 	/** A bulleted list; each item is markdown already (escape() plain text). */
 	list(items: readonly string[]): string;
@@ -58,7 +59,11 @@ export async function agentLink(site: Site, page: Page, locale: string, markdown
 	return site.absolute((markdown ?? (await markdownEnabled(site))) ? await markdownPath(site, path, locale) : await site.url(path, locale));
 }
 
-export const markdownLink = (site: Site, text: string, url: string): string => `[${escapeMarkdown(inline(text))}](${linkTarget(site.absolute(url.trim()))})`;
+/** `[text](url)`, absolute; a URL the richtext renderer would refuse (javascript:, data:) leaves the text alone. */
+export function markdownLink(site: Site, text: string, url: string): string {
+	const label = escapeMarkdown(inline(text));
+	return allowedUrl(url.trim()) ? `[${label}](${linkTarget(site.absolute(url.trim()))})` : label;
+}
 
 export function markdownContext(site: Site, page: Page, locale: string, defaultLocale: string, url: string, fields: Record<string, unknown>): MarkdownContext {
 	const absolute = (target: string) => site.absolute(target);
