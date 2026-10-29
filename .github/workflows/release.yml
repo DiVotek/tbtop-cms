@@ -115,6 +115,7 @@ jobs:
       # by ||) pass. devDependencies are not installed by consumers.
       - name: Refuse unpinned dependency ranges
         run: |
+          # shellcheck disable=SC2016 # the ${...} are JS template literals
           node -e '
             const pkg = require("./package.json");
             const pinned = /^[~^]?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
