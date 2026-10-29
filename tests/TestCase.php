@@ -10,6 +10,7 @@ use Inertia\Middleware as InertiaMiddleware;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Tbtop\Cms\Block\BlockRegistry;
+use Tbtop\Cms\Collection\CollectionRegistry;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
 use Tbtop\Cms\Page\PageTypeRegistry;
@@ -21,6 +22,7 @@ class TestCase extends Orchestra
     protected function setUp(): void
     {
         BlockRegistry::flushExtensions();
+        CollectionRegistry::flushExtensions();
         PageTypeRegistry::flushExtensions();
         RobotsRegistry::flushExtensions();
         SchemaTypeRegistry::flushExtensions();

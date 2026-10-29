@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Cms;
+use Tbtop\Cms\Collection\Models\Entry;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -25,6 +26,14 @@ beforeEach(function (): void {
     app(Cms::class)->frontendRoutes();
 });
 
+/** @param  list<array<string, mixed>>  $rows  published entries, in this order */
+function contactEntries(string $collection, array $rows): void
+{
+    foreach ($rows as $i => $data) {
+        Entry::query()->create(['collection' => $collection, 'status' => Entry::PUBLISHED, 'sort_order' => $i, 'data' => $data]);
+    }
+}
+
 /** @return list<array<string, mixed>> */
 function localBusinessJsonLd(string $path): array
 {
@@ -42,7 +51,7 @@ function identityNodes(array $jsonLd): array
 
 it('publishes a local business as the single identity node with address, telephone and opening hours', function (): void {
     $settings = app(Settings::class);
-    $settings->set('site.contacts.phones', [['number' => '+380 44 123 4567']]);
+    contactEntries('phones', [['number' => '+380 44 123 4567']]);
     $settings->set('seo.identity.opening_hours', [
         ['days' => ['Monday', 'Friday'], 'opens' => '09:00', 'closes' => '18:00'],
     ]);
@@ -111,13 +120,12 @@ it('links the article author and publisher to the identity node', function (stri
     'person' => ['person', 'Person', false],
 ]);
 
-it('takes telephone, email and sameAs from Site settings contacts', function (): void {
-    $settings = app(Settings::class);
-    $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001'], ['number' => '+380 44 555 0002']]);
-    $settings->set('site.contacts.emails', [['address' => 'hello@example.com']]);
-    $settings->set('site.contacts.socials', [
+it('takes telephone, email and sameAs from the built-in contact collections', function (): void {
+    contactEntries('phones', [['number' => '+380 44 555 0001'], ['number' => '+380 44 555 0002']]);
+    contactEntries('emails', [['address' => 'hello@example.com']]);
+    contactEntries('socials', [
         ['label' => 'FB', 'name' => 'Facebook', 'href' => 'https://facebook.com/acme'],
-        ['label' => 'TG', 'name' => null, 'href' => 'https://t.me/acme'],
+        ['label' => 'TG', 'href' => 'https://t.me/acme'],
     ]);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
@@ -129,10 +137,10 @@ it('takes telephone, email and sameAs from Site settings contacts', function ():
         ->and($identity[0]['sameAs'])->toBe(['https://facebook.com/acme', 'https://t.me/acme']);
 });
 
-it('gives an Organization the telephone of Site settings contacts when nothing else is set', function (): void {
+it('gives an Organization the first phone when nothing else is set', function (): void {
     $settings = app(Settings::class);
     $settings->set('seo.identity.type', 'organization');
-    $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001']]);
+    contactEntries('phones', [['number' => '+380 44 555 0001']]);
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $identity = identityNodes(localBusinessJsonLd('/about'));
@@ -143,9 +151,9 @@ it('gives an Organization the telephone of Site settings contacts when nothing e
 
 it('no longer reads the legacy SEO identity telephone, email and profile links', function (): void {
     $settings = app(Settings::class);
-    $settings->set('site.contacts.phones', [['number' => '+380 44 555 0001']]);
-    $settings->set('site.contacts.emails', [['address' => 'hello@example.com']]);
-    $settings->set('site.contacts.socials', [['label' => 'FB', 'name' => null, 'href' => 'https://facebook.com/acme']]);
+    contactEntries('phones', [['number' => '+380 44 555 0001']]);
+    contactEntries('emails', [['address' => 'hello@example.com']]);
+    contactEntries('socials', [['label' => 'FB', 'href' => 'https://facebook.com/acme']]);
     $settings->set('seo.identity.telephone', '+380 44 123 4567');
     $settings->set('seo.identity.email', 'press@example.com');
     $settings->set('seo.identity.same_as', ['https://www.wikidata.org/wiki/Q1']);

@@ -8,6 +8,8 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\ResolveContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
+use Tbtop\Cms\Link\SafeHref;
 
 class HeroBlock extends Block
 {
@@ -42,7 +44,7 @@ class HeroBlock extends Block
             $s->textarea('subtitle')->label('Subtitle')->translatable(),
             $s->text('image')->label('Image URL'),
             $s->text('ctaLabel')->label('CTA label')->translatable(),
-            $s->text('ctaHref')->label('CTA link'),
+            $s->text('ctaHref')->label('CTA link')->rules(SafeHref::RULE),
         ];
     }
 
@@ -62,6 +64,23 @@ class HeroBlock extends Block
     }
 
     /**
+     * The title as H2, the subtitle, and the call to action as a link.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    #[\Override]
+    public function toMarkdown(array $props, MarkdownContext $ctx): string
+    {
+        $cta = is_array($props['cta'] ?? null) ? $ctx->link((string) $props['cta']['label'], (string) $props['cta']['href']) : '';
+
+        return implode("\n\n", array_filter([
+            $ctx->heading((string) ($props['title'] ?? '')),
+            $ctx->text(is_string($props['subtitle'] ?? null) ? $props['subtitle'] : null),
+            $cta,
+        ], static fn (string $part): bool => $part !== ''));
+    }
+
+    /**
      * @param  array<string, mixed>  $input
      * @return array{label: string, href: string}|null
      */
@@ -70,7 +89,7 @@ class HeroBlock extends Block
         $label = $this->clean($input['ctaLabel'] ?? null);
         $href = $this->clean($input['ctaHref'] ?? null);
 
-        if ($label === null || $href === null) {
+        if ($label === null || $href === null || ! SafeHref::passes($href)) {
             return null;
         }
 

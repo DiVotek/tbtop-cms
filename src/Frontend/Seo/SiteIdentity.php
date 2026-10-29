@@ -57,7 +57,7 @@ final class SiteIdentity
 
     public function __construct(private readonly Settings $settings, ?SiteContacts $contacts = null)
     {
-        $this->contacts = $contacts ?? new SiteContacts($settings);
+        $this->contacts = $contacts ?? app(SiteContacts::class);
     }
 
     public function type(): string

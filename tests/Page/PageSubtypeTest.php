@@ -105,14 +105,14 @@ it('reads tree rules from the base type: a subtype that requires a parent does n
     expect($page->exists)->toBeTrue()->and($page->parent_id)->toBeNull();
 });
 
-it('shows the subtype in the pages list and filters by it', function (): void {
+it('shows the subtype in the pages list', function (): void {
     Page::create(['type' => 'event', 'subtype' => 'concert', 'status' => PageStatus::Draft, 'name' => ['en' => 'Gig']]);
     Page::create(['type' => 'event', 'status' => PageStatus::Draft, 'name' => ['en' => 'Fair']]);
 
-    $rows = subtypeAdmin()->getJson('/admin/pages/tables/pages?tab=all&filters[subtype]=concert')->assertOk()->json('data.data');
+    $rows = collect(subtypeAdmin()->getJson('/admin/pages/tables/pages?tab=all')->assertOk()->json('data.data'))->keyBy('name');
 
-    expect(array_column($rows, 'name'))->toBe(['Gig'])
-        ->and(array_column($rows, 'subtype'))->toBe(['Concert']);
+    expect($rows['Gig']['subtype'])->toBe('Concert')
+        ->and($rows['Fair']['subtype'])->toBe('');
 });
 
 it('refuses to store a subtype key in `type`, whoever writes the page', function (): void {

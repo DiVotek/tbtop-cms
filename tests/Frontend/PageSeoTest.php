@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tbtop\Admin\Media\Models\Media;
 use Tbtop\Cms\Cms;
+use Tbtop\Cms\Collection\Models\Entry;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
@@ -190,7 +191,7 @@ it('falls back the meta title to the page name when title and seo.title are empt
         ->assertJsonPath('props.seo.ogTitle', 'About');
 });
 
-it('uses the default-locale title fallback for a non-default-locale page', function (): void {
+it('prefers the locale\'s own name over the default-locale title for the meta title', function (): void {
     Language::factory()->create(['locale' => 'uk']);
 
     $page = Page::factory()->create([
@@ -203,7 +204,8 @@ it('uses the default-locale title fallback for a non-default-locale page', funct
     $this->get('/uk/' . $page->pathFor('uk'), ['X-Inertia' => 'true'])
         ->assertOk()
         ->assertJsonPath('props.page.title', 'About Page')
-        ->assertJsonPath('props.seo.title', 'About Page — Acme');
+        ->assertJsonPath('props.seo.title', 'Pro nas — Acme')
+        ->assertJsonPath('props.seo.ogTitle', 'Pro nas');
 });
 
 it('resolves siteName from settings, defaulting to an empty string when unset', function (): void {
@@ -440,12 +442,12 @@ it('emits no identity object when both seo.identity.name and site.name are empty
     expect(collect($jsonLd)->firstWhere('@type', 'Organization'))->toBeNull();
 });
 
-it('filters blank entries out of the contacts profile links', function (): void {
+it('filters blank entries out of the social profile links', function (): void {
     app(Settings::class)->set('seo.identity.type', 'organization');
     app(Settings::class)->set('seo.identity.name', 'Acme Inc');
-    app(Settings::class)->set('site.contacts.socials', [
-        ['label' => 'X', 'href' => 'https://twitter.com/acme'], ['label' => 'B', 'href' => ''], ['label' => 'GH', 'href' => 'https://github.com/acme'],
-    ]);
+    foreach ([['X', 'https://twitter.com/acme'], ['B', ''], ['GH', 'https://github.com/acme']] as $i => [$label, $href]) {
+        Entry::query()->create(['collection' => 'socials', 'status' => Entry::PUBLISHED, 'sort_order' => $i, 'data' => ['label' => $label, 'href' => $href]]);
+    }
     Page::factory()->create(['status' => PageStatus::Published, 'name' => ['en' => 'About']]);
 
     $jsonLd = $this->get('/about', ['X-Inertia' => 'true'])->assertOk()->json('props.seo.jsonLd');

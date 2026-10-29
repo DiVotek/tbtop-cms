@@ -250,17 +250,17 @@ class SeoResolver
     }
 
     /**
-     * Re-checked at emit time: the Contacts form only validates on save, so
-     * a programmatically-written setting could hold anything — non-URL
+     * Re-checked at emit time: the entry form only validates on save, so
+     * a programmatically-written entry could hold anything — non-URL
      * entries must never be published as sameAs structured data.
      *
      * @return list<string>
      */
     private function sameAs(): array
     {
-        // Site settings → Contacts is the only source of profile links.
+        // The built-in Socials collection is the only source of profile links.
         return array_values(array_filter(
-            array_column((new SiteContacts($this->settings))->socials(), 'href'),
+            array_column(app(SiteContacts::class)->socials(), 'href'),
             ProfileUrl::valid(...),
         ));
     }

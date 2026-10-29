@@ -344,7 +344,7 @@ response:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `page.id`, `.type`, `.subtype`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` resolved via `PageTranslation::text()` — the request locale, else the default locale, else `null` |
+| `page.id`, `.type`, `.subtype`, `.status`, `.name`, `.title`, `.heading`, `.summary` | scalars | Page identity/content fields, `.name`/`.title`/`.heading`/`.summary` resolved via `PageTranslation::text()` — the request locale, else the default locale, else `null`. `.title` is deprecated (no longer editable; see inventory.md) |
 | `page.body` | `string` | The Body rendered to HTML, same locale fallback; `''` when empty |
 | `page.image` | `string \| null` | Resolved media URL (page stores a media id, not a URL) |
 | `page.fields` | `object` | The page type's resolved type fields, keyed by field name; `{}` when none |
@@ -474,6 +474,14 @@ and sitemap reference then silently do nothing.
 ```bash
 rm public/robots.txt
 ```
+
+The same holds for `public/llms.txt` and the `tbtop-cms.llms-txt` route: the
+`llms_txt` health check warns when the file exists.
+
+With markdown versions of pages on (seo.md → Markdown for agents), a page URL
+answers HTML or markdown by the `Accept` header. Both answers send
+`Vary: Accept`; a full-page cache or CDN in front of the site must honour it
+(or key on `Accept`), or it hands one client the other's answer.
 
 ## Admin access and roles
 

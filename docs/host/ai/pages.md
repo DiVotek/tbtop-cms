@@ -53,9 +53,11 @@ on the frontend is never `status` alone:
   (`PageDisplayState`: `Draft`/`Scheduled`/`Published`/`Expired`), folding
   the schedule into the plain status for the pages list and dashboard.
 
-Publish now: leave `published_at`/`unpublish_at` null and set `status` to
-`Published`. Schedule a future go-live or go-dark by setting the datetime
-columns; no separate "scheduled" status value exists. A host writing pages
+Publish now: set `status` to `Published` and leave `published_at` null. The
+first publish stamps `published_at` with the current time (so the page has a
+`datePublished`), and a later unpublish/republish keeps that stamp. A date you
+set yourself is never overwritten. Schedule a future go-live or go-dark by
+setting the datetime columns; no separate "scheduled" status value exists. A host writing pages
 outside the admin only needs `scopeLive()`/`isLive()` itself if it
 re-implements a frontend read path — `PageResolver` already applies it.
 
@@ -64,8 +66,9 @@ re-implements a frontend read path — `PageResolver` already applies it.
 `PageTypeInterface` (`src/Page/Contracts/PageTypeInterface.php`): `key()`,
 `label()`, `allowedChildren()`, `requiresParent()`, `maxDepth()`, `base()`,
 `fields()`, `resolveFields()`, `childSubtype()` (see
-Subtypes and type fields and Page references), plus the source-backed trio
-below. `BasePageType` (`src/Page/Types/BasePageType.php`)
+Subtypes and type fields and Page references), `toMarkdown()` (the type's
+part of the page's `.md`, seo.md → Markdown for agents), plus the
+source-backed trio below. `BasePageType` (`src/Page/Types/BasePageType.php`)
 gives every method a content-only, leaf-type default (`allowedChildren()`
 `[]`, `requiresParent()` `false`, `maxDepth()` `1`, not source-backed) — a
 host type extends it and overrides only what differs.
@@ -241,6 +244,11 @@ Differences from the home page:
   (`resources/views/errors/fallback.blade.php`) with no DB/Inertia/settings
   dependency of its own — see `docs/host/ai/seo.md` and `wiring.md` for the
   full fallback chain and the `errors.handle`/`errors.statuses` config.
+- With no published DB error page, the response is still `Cms/Page`, with an
+  empty `render` spec and `page.id === null`; only `page.heading` carries the
+  lang-file text. The package's `CmsPage.tsx` renders that heading as an `<h1>`
+  in this case alone, so a host that copied an older `CmsPage.tsx` shows a
+  blank error page until it adds the same branch.
 
 ### Building a URL
 
@@ -494,7 +502,8 @@ final class ConcertType extends BasePageType
   (`?tab=section`) and labelled by `pages.types.{key}` when that translation
   exists, else the type's `label()`, else the raw key. A host base type
   (`section`, `event`) gets its own tab; subtypes share their base's tab and
-  use the Subtype filter.
+  use the Subtype filter, except one with `listedInAll()` false, which has a
+  tab of its own instead.
 - **`childSubtype()`.** A category type (or subtype) may return the key of a
   subtype of `article`; an article that arrives under that category without
   a subtype of its own — created there, or a page that just became an
@@ -588,6 +597,45 @@ public function resolveFields(array $input, ResolveContext $ctx): array
   `Page` models from `referencedBy()`. Type the key in the override's
   `@return array{...}` (see Page prop types) — the base's keys stay typed
   from its form.
+- **Paged archive.** `Cms::referencedByPaged(?Page $page, string $field,
+  ?string $from = null, int $perPage = 20, ?int $pageNumber = null)` returns
+  `{pages: list<Page>, pagination: {page, pages, total, perPage}}`: the same
+  pages as `referencedBy()`, but newest first (`published_at`, a missing one
+  last, then id) and one page at a time. `Cms::referencedByLinksPaged()`
+  (plus `?string $locale`) returns `{items, pagination}` with `items` as
+  `{id, name, url}` links, ready to return from `resolveFields()`.
+  `Cms::childrenPaged(?Page $page, ?string $from = null, int $perPage = 20,
+  ?int $pageNumber = null)` and `Cms::childrenLinksPaged()` do the same for
+  the live children of a page (a category's articles). The page number is
+  the request's `?page=` (a positive integer, else 1) unless given. Once a
+  paged call listed the page being rendered (its own tag or category, by the
+  request's number; a sidebar listing another page, or a given
+  `$pageNumber`, does not count; such a listing also starts at page 1
+  instead of following `?page=`), page 2 and on get `?page=N` on
+  `seo.canonical` and `seo.ogUrl`, and a page number past the last answers
+  404; a `?page=` on a page that listed nothing paged keeps the plain
+  canonical. The title is not suffixed: render "page N" from `pagination`.
+- **Creating from the select.** `->creatable()` adds "+ Create" to the
+  select: the typed name becomes a **published** page of the field's one
+  `of()` type (more or fewer pairs throws), under the parent of the newest
+  page of that type, slugs derived from the name in every locale like any
+  new page; the name is stored in the admin's locale. The first page of the
+  type is made in Pages: until one exists the select answers a validation
+  error. A name a page of that type already has in the locale (any case)
+  picks that page instead of making a second one.
+  `creatable($fields, $using)` with your own closure is tbtop/admin's
+  `Select::creatable()` unchanged.
+- **Archive types.** A type whose `archiveOf(): ?string` names the field
+  that picks its pages (`'tags'`) is an archive: while no live page picks a
+  page of it through that field, the page is noindex (meta and
+  `X-Robots-Tag`) and left out of the sitemap. `listedInAll(): bool`
+  (default true) set to false keeps the type's pages off the admin Pages
+  "All" tab; they stay on their own tab (an unlisted subtype gets one too,
+  and leaves its base's tab). Both
+  default in `BasePageType`. Each registered type answers for itself: a
+  subtype class that extends its base's class inherits its answers, one
+  extending `BasePageType` gets the defaults. Tags and categories end to end:
+  recipes.md.
 - **Index.** The lookup reads `tbtop_page_refs` (`page_id`, `field`,
   `target_id`, `position`), which `PageRefs` (a `Page` observer) rewrites
   for a page on every save; a force delete cascades. Only a page type's

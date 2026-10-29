@@ -34,10 +34,24 @@ final class TemplateProbe
             return;
         }
 
+        // The stub's arrays are empty, so any key a template reads from them is
+        // missing here while a real payload carries it (`$fields['phone']`).
+        // Those warnings are let through, and the rest of the template is
+        // still rendered and checked; every other error still fails.
+        $previous = set_error_handler(static function (int $level, string $message, string $file = '', int $line = 0) use (&$previous): bool {
+            if ($level === E_WARNING && str_starts_with($message, 'Undefined array key')) {
+                return true;
+            }
+
+            return is_callable($previous) && (bool) $previous($level, $message, $file, $line);
+        });
+
         try {
             $this->renderer->render($template, $payload, $locale);
         } catch (Throwable $e) {
             throw new InvalidTemplate($e->getMessage(), previous: $e);
+        } finally {
+            restore_error_handler();
         }
     }
 

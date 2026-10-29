@@ -176,6 +176,8 @@ class PageObserver
             $this->guardTypeAndSubtype($page);
         }
 
+        self::stampFirstPublish($page);
+
         // Recomputed on every save, so a save that threw before saved()
         // leaves no stale mark for the next one.
         self::$columnlessSaves ??= new WeakMap;
@@ -190,6 +192,20 @@ class PageObserver
         }
 
         self::takeLock($page, write: $this->slugs->overridesChange($page, $page->pendingSlugOverrides));
+    }
+
+    /**
+     * The first publish with no date set stamps published_at with now, so the
+     * page has a publish time for its datePublished. A date the editor set
+     * (including a future one, which schedules the page) is left alone, and a
+     * republish keeps the stamp from the first publish: unpublishing does not
+     * clear published_at.
+     */
+    private static function stampFirstPublish(Page $page): void
+    {
+        if ($page->status === PageStatus::Published && $page->published_at === null && $page->isDirty('status')) {
+            $page->published_at = now();
+        }
     }
 
     private static function changesColumns(Page $page): bool

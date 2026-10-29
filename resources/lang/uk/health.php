@@ -94,6 +94,14 @@ return [
                 'present' => 'Видаліть public/robots.txt — Laravel віддає статичні файли з public/ до будь-якого маршруту, тому цей файл непомітно вимикає перемикач індексації та посилання на карту сайту з SEO-налаштувань.',
             ],
         ],
+        'llms_txt' => [
+            'label' => 'Статичний llms.txt',
+            'ok' => 'Статичний public/llms.txt відсутній, динамічний маршрут не перекрито.',
+            'present' => 'Файл public/llms.txt існує і перекриває динамічний маршрут /llms.txt.',
+            'hints' => [
+                'present' => 'Видаліть public/llms.txt, щоб файл будувала вкладка «Для ШІ» SEO-налаштувань, або залиште його, якщо він ведеться вручну навмисно.',
+            ],
+        ],
         'media_disk_writable' => [
             'label' => 'Диск медіа доступний для запису',
             'ok' => 'Диск ":disk" прийняв пробний файл (запис і видалення).',
@@ -146,6 +154,17 @@ return [
                 'owner_missing' => 'Жоден користувач не має is_owner у своєму записі cms_user_profiles. Виконайте php artisan cms:admin:create, щоб створити такого, або призначте власника наявному адміну в базі даних.',
                 'language_missing' => 'Немає активної мови фронтенду за замовчуванням. Створіть або активуйте її на сторінці "Мови" в адмінці.',
                 'both_missing' => 'Немає ні власника, ні активної мови фронтенду за замовчуванням. Виконайте php artisan cms:install та php artisan cms:admin:create, щоб налаштувати обидва.',
+            ],
+        ],
+        'pages_api' => [
+            'label' => 'API сторінок',
+            'off' => 'API сторінок вимкнено (tbtop-cms.api.enabled).',
+            'ok' => 'API сторінок увімкнено за адресою /api/cms/v1.',
+            'no_sanctum' => 'API сторінок увімкнено, але laravel/sanctum не встановлено, тож його маршрути не зареєстровано.',
+            'no_tokens' => 'API сторінок увімкнено, але :model не може мати API-токенів.',
+            'hints' => [
+                'no_sanctum' => 'Виконайте composer require laravel/sanctum, опублікуйте й застосуйте його міграцію (php artisan vendor:publish --tag=sanctum-migrations && php artisan migrate) і додайте Laravel\\Sanctum\\HasApiTokens до моделі користувача.',
+                'no_tokens' => 'Додайте трейт Laravel\\Sanctum\\HasApiTokens до :model.',
             ],
         ],
         'session_driver' => [

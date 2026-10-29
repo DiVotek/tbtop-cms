@@ -281,6 +281,50 @@ cross-page query in a page-content block needs its own caching around that
 query (e.g. wrap the query itself in `CmsCache::remember()`, keyed by
 whatever varies it) — the package gives no cache-for-free here.
 
+### Tags and category archives
+
+There is no taxonomy entity: a tag is a page, the link "article → tags" is a
+`pages` field, the tag's archive reads it back (pages.md, "Page
+references"). Translations, a slug per locale, 301 on a slug change,
+hreflang and the sitemap come with the page.
+
+```php
+// A tag: a category subtype, so it lives under a "Tags" category (/tags/japan).
+final class TagType extends CategoryType
+{
+    public function key(): string { return 'tag'; }
+    public function base(): string { return 'category'; }
+    public function listedInAll(): bool { return false; }   // its own tab in Pages, not "All" or "Category"
+    public function archiveOf(): ?string { return 'tags'; } // noindex and off the sitemap while empty
+
+    /** @return array{items: list<array{id: string, name: string, url: string}>, pagination: array{page: int, pages: int, total: int, perPage: int}} */
+    public function resolveFields(array $input, ResolveContext $ctx): array
+    {
+        return Cms::referencedByLinksPaged($ctx->page, 'tags', from: 'article', perPage: 20);
+    }
+}
+
+// The article picks its tags; an editor creates a missing one from the select.
+public function fields(S $s): array
+{
+    return [$s->pages('tags')->label('Tags')->of('category', 'tag')->creatable()->max(10)];
+}
+
+// A category lists its own articles the same way (an override of CategoryType bound in the container).
+public function resolveFields(array $input, ResolveContext $ctx): array
+{
+    return [...parent::resolveFields($input, $ctx), ...Cms::childrenLinksPaged($ctx->page, 'article', perPage: 20)];
+}
+```
+
+Create the "Tags" category and the first tag in Pages (seeders work too):
+`creatable()` puts new tags next to the newest one. The frontend reads
+`page.fields.items` and `page.fields.pagination` and links `?page=N`; page 2
+and on are their own canonical. A second vocabulary (cities, brands) is
+another subtype and another field. Not built in: merging two tags,
+`article:tag` from the field, a parent archive that includes its children's
+tags.
+
 ### Contact modal / client-only interactivity shared across blocks
 
 A modal or other client-only UI state that several unrelated blocks need to

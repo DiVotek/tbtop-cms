@@ -13,12 +13,18 @@ use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Admin\Commands\CreateAdminCommand;
 use Tbtop\Cms\Admin\Commands\GrantAdminCommand;
 use Tbtop\Cms\Admin\Commands\RevokeAdminCommand;
+use Tbtop\Cms\Admin\Fields\CollectionField;
 use Tbtop\Cms\Admin\Fields\Link;
 use Tbtop\Cms\Admin\Fields\Pages;
+use Tbtop\Cms\Api\ApiWiring;
+use Tbtop\Cms\Api\Commands\ApiTokenCommand;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\Block\BlockContentResolver;
 use Tbtop\Cms\Block\BlockRegistry;
 use Tbtop\Cms\Cache\CmsCache;
+use Tbtop\Cms\Collection\CollectionEntries;
+use Tbtop\Cms\Collection\CollectionRegistry;
+use Tbtop\Cms\Collection\CollectionValueValidator;
 use Tbtop\Cms\Console\BlocksTypesCommand;
 use Tbtop\Cms\Console\DoctorCommand;
 use Tbtop\Cms\Console\InstallCommand;
@@ -35,6 +41,7 @@ use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Layout\LayoutResolver;
 use Tbtop\Cms\Link\LinkResolver;
 use Tbtop\Cms\Link\LinkShapeValidator;
+use Tbtop\Cms\Link\SafeHref;
 use Tbtop\Cms\Mail\CmsMailer;
 use Tbtop\Cms\NotFound\Commands\PruneNotFoundHitsCommand;
 use Tbtop\Cms\Notifications\Contracts\TemplateStore;
@@ -104,6 +111,9 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_10_07_000002_create_page_refs_table')
             ->hasMigration('2026_10_13_000000_add_payload_order_to_form_submissions_table')
             ->hasMigration('2026_10_22_000000_update_notifications_notifiable_id_match_host_key_type')
+            ->hasMigration('2026_10_26_000000_copy_page_title_to_seo_title')
+            ->hasMigration('2026_10_28_000000_create_entries_table')
+            ->hasMigration('2026_10_28_000001_move_contacts_to_collections')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,
@@ -114,6 +124,7 @@ class CmsServiceProvider extends PackageServiceProvider
                 DoctorCommand::class,
                 BlocksTypesCommand::class,
                 RebuildPageRefsCommand::class,
+                ApiTokenCommand::class,
             ])
             ->runsMigrations();
     }
@@ -125,6 +136,8 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(Languages::class);
         $this->app->singleton(PageTypeRegistry::class);
         $this->app->singleton(BlockRegistry::class);
+        $this->app->singleton(CollectionRegistry::class);
+        $this->app->scoped(CollectionEntries::class);
         $this->app->singleton(Forms::class);
         $this->app->singleton(RobotsRegistry::class);
         $this->app->singleton(SchemaTypeRegistry::class);
@@ -159,11 +172,14 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->gateSsrByRequest();
         AdminWiring::wire($this->app);
         LinkShapeValidator::register();
+        CollectionValueValidator::register();
+        SafeHref::register();
         PageRefRule::register();
         ContentEventsWiring::wire($this->app);
         NotificationWiring::wire($this->app);
         ErrorPagesWiring::wire($this->app);
         ScheduleWiring::wire($this->app);
+        ApiWiring::wire();
         // The admin client reads/writes this cookie from JS; the profile
         // preferences form sets it server-side. Both must see plain text.
         EncryptCookies::except('tbtop_theme');
@@ -188,6 +204,7 @@ class CmsServiceProvider extends PackageServiceProvider
     {
         S::register('link', Link::class);
         S::register('pages', Pages::class);
+        S::register('collection', CollectionField::class);
     }
 
     /**

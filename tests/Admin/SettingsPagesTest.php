@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
+use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
@@ -101,6 +102,7 @@ it('splits the SEO settings into one tab per topic, indexing first', function ()
             __('tbtop-cms::settings.seo.tabs.identity'),
             __('tbtop-cms::settings.seo.tabs.integrations'),
             __('tbtop-cms::settings.seo.tabs.not_found'),
+            __('tbtop-cms::settings.seo.tabs.ai'),
         ]);
 });
 
@@ -134,6 +136,16 @@ it('keeps every settings field reachable after the regrouping', function (): voi
         'seo_type_category_description',
         'seo_type_article_title',
         'seo_type_article_description',
+        'seo_llms_txt_enabled',
+        'seo_llms_txt_summary',
+        'seo_llms_txt_intro',
+        'seo_llms_txt_types',
+        'seo_llms_txt_per_type',
+        'seo_markdown_enabled',
+        'seo_content_signals_enabled',
+        'seo_content_signals_search',
+        'seo_content_signals_ai_input',
+        'seo_content_signals_ai_train',
     );
 });
 
@@ -234,6 +246,50 @@ it('rejects an extra robots rule that claims a directive the site writes itself'
     ])->assertSessionHasErrors('seo_robots_extra');
 
     expect(app(Settings::class)->get('seo.robots_extra'))->toBeNull();
+});
+
+it('rejects a Content-Signal line in the extra robots rules', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_robots_extra' => 'Content-Signal: ai-train=yes',
+    ])->assertSessionHasErrors('seo_robots_extra');
+});
+
+it('saves the For AI tab under the keys llms.txt and robots.txt read', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_llms_txt_enabled' => true,
+        'seo_llms_txt_types' => ['article'],
+        'seo_llms_txt_per_type' => 20,
+        'seo_markdown_enabled' => true,
+        'seo_content_signals_enabled' => true,
+        'seo_content_signals_ai_train' => true,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $settings = app(Settings::class);
+
+    expect($settings->get('seo.llms_txt.enabled'))->toBeTrue()
+        ->and($settings->get('seo.llms_txt.types'))->toBe(['article'])
+        ->and((int) $settings->get('seo.llms_txt.per_type'))->toBe(20)
+        ->and($settings->get('seo.markdown.enabled'))->toBeTrue()
+        ->and($settings->get('seo.content_signals.ai_train'))->toBeTrue();
+});
+
+it('turns a content signal off when the editor unticks it', function (): void {
+    app(Cms::class)->frontendRoutes();
+
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_content_signals_enabled' => true,
+        'seo_content_signals_search' => false,
+        'seo_content_signals_ai_input' => false,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect((string) test()->get('/robots.txt')->getContent())
+        ->toContain('Content-Signal: search=no, ai-input=no, ai-train=no');
+});
+
+it('rejects more pages per type than llms.txt lists', function (): void {
+    test()->post('/admin/seo-settings/forms/seo-settings', [
+        'seo_llms_txt_per_type' => 501,
+    ])->assertSessionHasErrors('seo_llms_txt_per_type');
 });
 
 it('accepts extra robots rules that stay clear of the owned directives', function (): void {

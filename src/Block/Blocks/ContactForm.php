@@ -8,8 +8,10 @@ use Tbtop\Admin\Dsl\Fields\Field;
 use Tbtop\Admin\Dsl\S;
 use Tbtop\Cms\Block\Block;
 use Tbtop\Cms\Block\HandlesFormSubmission;
+use Tbtop\Cms\Block\HasFieldLabels;
 use Tbtop\Cms\Block\ResolveContext;
 use Tbtop\Cms\Block\SubmitContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 
 /**
  * Reference form block: an anonymous contact form. Notifying the team about
@@ -22,7 +24,7 @@ use Tbtop\Cms\Block\SubmitContext;
  * SubmissionRetrier) for that purpose, independent of the notification
  * fan-out.
  */
-class ContactForm extends Block implements HandlesFormSubmission
+class ContactForm extends Block implements HandlesFormSubmission, HasFieldLabels
 {
     /** @var list<array{name: string, type: string, required: bool}> Labels come from tbtop-cms::forms.contact.fields.<name>. */
     private const array FIELDS = [
@@ -77,24 +79,52 @@ class ContactForm extends Block implements HandlesFormSubmission
             'successMessage' => self::copy($input['successMessage'] ?? null, 'success', $ctx),
             'fields' => array_map(static fn (array $field): array => [
                 'name' => $field['name'],
-                'label' => self::lang('fields.' . $field['name'], $ctx),
+                'label' => self::lang('fields.' . $field['name'], $ctx->locale),
                 'type' => $field['type'],
                 'required' => $field['required'],
             ], self::FIELDS),
         ];
     }
 
+    /**
+     * The heading and one line saying there is a form: an agent cannot fill
+     * it in, but can tell a reader where to.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    #[\Override]
+    public function toMarkdown(array $props, MarkdownContext $ctx): string
+    {
+        return trim($ctx->heading((string) ($props['heading'] ?? '')) . "\n\n" . $ctx->text(__('tbtop-cms::llms.markdown.form', [], $ctx->locale)));
+    }
+
     /** The editor's copy, or the default in the page locale when it is blank. */
     private static function copy(mixed $value, string $key, ResolveContext $ctx): string
     {
-        return is_scalar($value) && trim((string) $value) !== '' ? (string) $value : self::lang($key, $ctx);
+        return is_scalar($value) && trim((string) $value) !== '' ? (string) $value : self::lang($key, $ctx->locale);
     }
 
-    private static function lang(string $key, ResolveContext $ctx): string
+    private static function lang(string $key, string $locale): string
     {
-        $text = __('tbtop-cms::forms.contact.' . $key, [], $ctx->locale);
+        $text = __('tbtop-cms::forms.contact.' . $key, [], $locale);
 
         return is_string($text) ? $text : '';
+    }
+
+    /**
+     * The built-in labels; the editor cannot change them, so `$input` is unused.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, string>
+     */
+    public function fieldLabels(string $locale, array $input): array
+    {
+        $labels = [];
+        foreach (self::FIELDS as $field) {
+            $labels[$field['name']] = self::lang('fields.' . $field['name'], $locale);
+        }
+
+        return $labels;
     }
 
     /**

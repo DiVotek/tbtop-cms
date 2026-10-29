@@ -16,8 +16,16 @@ use Tbtop\Cms\Block\MediaUrlResolver;
 use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Form\FormActionBinder;
+use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
+use Tbtop\Cms\Frontend\Markdown\MarkdownPages;
+use Tbtop\Cms\Frontend\Markdown\MarkdownRequest;
+use Tbtop\Cms\Frontend\Markdown\PageMarkdown;
 use Tbtop\Cms\Frontend\PageResolver;
 use Tbtop\Cms\Frontend\Render\PageSpecAssembler;
+use Tbtop\Cms\Frontend\Seo\ContentSignals;
+use Tbtop\Cms\Frontend\Seo\IndexingSetting;
+use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
+use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtUrl;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContext;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaContextFactory;
 use Tbtop\Cms\Frontend\Seo\SeoResolver;
@@ -27,6 +35,8 @@ use Tbtop\Cms\NotFound\Events\PageNotFound;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Refs\EmptyArchives;
+use Tbtop\Cms\Page\Refs\PagedPages;
 use Tbtop\Cms\Page\Support\PageTranslation;
 use Tbtop\Cms\Redirect\RedirectResolver;
 use Tbtop\Cms\Richtext\RichtextHtmlRenderer;
@@ -47,6 +57,13 @@ class PageController
         private readonly CurrentPage $currentPage,
         private readonly Languages $languages,
         private readonly RichtextHtmlRenderer $richtext,
+        private readonly PageMarkdown $markdown,
+        private readonly MarkdownPages $markdownPages,
+        private readonly LlmsTxtSettings $llms,
+        private readonly IndexingSetting $indexing,
+        private readonly ContentSignals $signals,
+        private readonly LlmsTxtUrl $llmsTxtUrl,
+        private readonly EmptyArchives $emptyArchives,
         private readonly MediaUrlResolver $mediaUrlResolver = new MediaUrlResolver,
     ) {}
 
@@ -54,7 +71,20 @@ class PageController
     {
         $locale = (string) app()->getLocale();
         $path = (string) $request->attributes->get('cms_path', '');
-        $previewAccess = $this->hasPreviewAccess($request);
+
+        // `/uk/llms.txt`: the llms.txt route only matches the bare path, so
+        // another locale's file arrives here once SetLanguage has stripped
+        // the prefix (the default locale's prefix already 301'd to /llms.txt).
+        if ($path === 'llms.txt' && $locale !== $this->languages->defaultLocale() && config('tbtop-cms.seo.llms_txt.enabled', true)) {
+            return app(LlmsTxtController::class)->forLocale($locale);
+        }
+
+        $markdownOn = $this->llms->markdownEnabled() && $this->indexing->enabled();
+        $suffixPath = $markdownOn ? MarkdownRequest::suffixPath($path) : null;
+        $wantsMarkdown = $suffixPath !== null || ($markdownOn && MarkdownRequest::accepts($request));
+        $path = $suffixPath ?? $path;
+        // Markdown is for agents: never a draft or a preview.
+        $previewAccess = ! $wantsMarkdown && $this->hasPreviewAccess($request);
 
         $page = $this->resolver->resolve($path, $locale, $previewAccess);
 
@@ -80,6 +110,10 @@ class PageController
             return $this->notFound($path, $locale, $request);
         }
 
+        if ($wantsMarkdown) {
+            return $this->markdownResponse($page, $locale, $type, $source);
+        }
+
         $props = $this->props($page, $locale, $path, $type, $source);
         $response = Inertia::render($this->component(), $props)->toResponse($request);
 
@@ -90,7 +124,95 @@ class PageController
             $response->headers->set('X-Robots-Tag', 'noindex');
         }
 
+        $this->advertise($response, $path, $locale, $markdownOn, $props['isPreview'] === true);
+
         return $response;
+    }
+
+    private function markdownResponse(Page $page, string $locale, ?PageTypeInterface $type, ?object $source): Response
+    {
+        ['blocks' => $blocks, 'fields' => $fields, 'seo' => $seo] = $this->resolved($page, $locale, $type, $source);
+        $subtype = $page->subtype !== null && $this->pageTypes->has($page->subtype) ? $this->pageTypes->get($page->subtype) : $type;
+        $ctx = new MarkdownContext($page, $locale, $this->languages->defaultLocale(), (string) $seo['canonical'], $source, $fields, $this->markdownPages);
+
+        $response = response()->make($this->markdown->render($ctx, $blocks, $seo, $subtype), 200, [
+            'Content-Type' => MarkdownRequest::CONTENT_TYPE,
+            // The HTML version is the one to index and cite.
+            'Link' => '<' . $seo['canonical'] . '>; rel="canonical"',
+        ]);
+        $response->setVary('Accept', false);
+
+        if ($seo['noindex'] === true) {
+            $response->headers->set('X-Robots-Tag', 'noindex');
+        }
+
+        $signals = $this->signals->value();
+        if ($signals !== null) {
+            $response->headers->set('Content-Signal', $signals);
+        }
+
+        return $response;
+    }
+
+    /**
+     * The HTML answer names its markdown twin and its locale's llms.txt in
+     * `Link` headers; with markdown on it varies on Accept, so a cache never
+     * hands one to a client that asked for the other. No `Link` for a preview.
+     */
+    private function advertise(Response $response, string $path, string $locale, bool $markdownOn, bool $isPreview): void
+    {
+        if ($markdownOn) {
+            $response->setVary('Accept', false);
+        }
+
+        if ($isPreview) {
+            return;
+        }
+
+        $links = [];
+
+        if ($markdownOn) {
+            $links[] = '<' . $this->markdownPages->markdownUrl($path, $locale) . '>; rel="alternate"; type="text/markdown"';
+        }
+
+        if ($this->llms->enabled() && $this->indexing->enabled() && config('tbtop-cms.seo.llms_txt.enabled', true)) {
+            $links[] = '<' . $this->llmsTxtUrl->for($locale) . '>; rel="describedby"; type="text/plain"';
+        }
+
+        if ($links !== []) {
+            $response->headers->set('Link', implode(', ', $links), false);
+        }
+    }
+
+    /**
+     * A page that listed a paged archive (PagedPages) past its last page is
+     * a 404; page 2 and on are their own canonical, `?page=N`, as search
+     * engines expect of a paginated series. Any other `?page=` keeps the
+     * plain canonical.
+     *
+     * @param  array<string, mixed>  $seo
+     * @return array<string, mixed>
+     */
+    private function pagedSeo(array $seo): array
+    {
+        $pagination = $this->currentPage->pagination();
+
+        if ($pagination === null || $pagination['page'] === 1) {
+            return $seo;
+        }
+
+        if ($pagination['page'] > $pagination['pages']) {
+            throw new NotFoundHttpException;
+        }
+
+        $query = '?' . PagedPages::QUERY_KEY . '=' . $pagination['page'];
+        foreach (['canonical', 'ogUrl'] as $key) {
+            if (is_string($seo[$key] ?? null) && ! str_contains($seo[$key], '?')) {
+                $seo[$key] .= $query;
+            }
+        }
+
+        return $seo;
     }
 
     private function notFound(string $path, string $locale, Request $request): RedirectResponse
@@ -123,9 +245,7 @@ class PageController
     /** @return array<string, mixed> */
     private function props(Page $page, string $locale, string $path, ?PageTypeInterface $type, ?object $source): array
     {
-        $content = $page->content ?? $type?->template($page) ?? [];
-        ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($content, $page, $source);
-        $resolved = $this->forms->bind($blocks, $page);
+        ['blocks' => $resolved, 'fields' => $fields, 'seo' => $seo] = $this->resolved($page, $locale, $type, $source);
         // Not live covers draft, scheduled (published_at in the future), and
         // expired (unpublish_at in the past): reaching this page at all with
         // any of those means the caller has preview access (PageResolver's
@@ -133,9 +253,6 @@ class PageController
         // preview affordances, same as a plain draft did before scheduling.
         $isPreview = ! $page->isLive();
         $breadcrumbs = $this->breadcrumbs->forPage($page, $locale);
-        $ctx = $this->schemaContextFactory->make($page, $locale, $source);
-        $blockNodes = $this->blockSchemaNodes($resolved, $ctx);
-        $seo = $this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $blockNodes);
 
         if ($isPreview) {
             $seo['noindex'] = true;
@@ -163,6 +280,28 @@ class PageController
             'path' => $path,
             'isPreview' => $isPreview,
         ];
+    }
+
+    /**
+     * The page's blocks (forms bound), type fields and SEO, shared by the
+     * HTML and markdown answers so both carry the same JSON-LD, noindex
+     * verdict and paged canonical.
+     *
+     * @return array{blocks: list<ResolvedBlock>, fields: array<string, mixed>, seo: array<string, mixed>}
+     */
+    private function resolved(Page $page, string $locale, ?PageTypeInterface $type, ?object $source): array
+    {
+        $content = $page->content ?? $type?->template($page) ?? [];
+        ['blocks' => $blocks, 'fields' => $fields] = $this->blocks->resolveWithFields($content, $page, $source);
+        $resolved = $this->forms->bind($blocks, $page);
+        $ctx = $this->schemaContextFactory->make($page, $locale, $source);
+        $seo = $this->pagedSeo($this->seo->resolve($page, $locale, $this->breadcrumbs->ancestors($page, $locale), $ctx, $this->blockSchemaNodes($resolved, $ctx)));
+
+        if ($this->emptyArchives->isEmpty($page)) {
+            $seo['noindex'] = true;
+        }
+
+        return ['blocks' => $resolved, 'fields' => $fields, 'seo' => $seo];
     }
 
     /** The Body as HTML in the active locale, falling back to the default locale; '' when empty. */

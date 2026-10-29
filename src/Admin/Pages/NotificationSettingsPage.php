@@ -163,8 +163,13 @@ class NotificationSettingsPage extends SettingsPageBase
                 ->rules('nullable|integer'),
             $s->text('mail_username')->label(__('tbtop-cms::settings.notifications.fields.mail_username'))
                 ->rules('nullable|max:255'),
-            $s->password('mail_password')->label(__('tbtop-cms::settings.notifications.fields.mail_password'))
-                ->rules('nullable|max:255')->helperText(__('tbtop-cms::settings.notifications.helpers.mail_password')),
+            ...$this->secretFields(
+                $s,
+                'mail_password',
+                'mail.password',
+                __('tbtop-cms::settings.notifications.fields.mail_password'),
+                __('tbtop-cms::settings.notifications.helpers.mail_password'),
+            ),
             $s->select('mail_encryption')->label(__('tbtop-cms::settings.notifications.fields.mail_encryption'))
                 ->options([
                     ['value' => 'none', 'label' => __('tbtop-cms::settings.notifications.encryption.none')],
@@ -178,8 +183,13 @@ class NotificationSettingsPage extends SettingsPageBase
                 ->rules('nullable|max:255'),
             $s->displayDivider(),
             $s->displayText(__('tbtop-cms::settings.notifications.sections.telegram'))->variant('subheading'),
-            $s->password('notification_telegram_bot_token')->label(__('tbtop-cms::settings.notifications.fields.telegram_bot_token'))
-                ->rules('nullable|max:255')->helperText(__('tbtop-cms::settings.notifications.helpers.mail_password')),
+            ...$this->secretFields(
+                $s,
+                'notification_telegram_bot_token',
+                'notifications.telegram.bot_token',
+                __('tbtop-cms::settings.notifications.fields.telegram_bot_token'),
+                __('tbtop-cms::settings.notifications.helpers.telegram_bot_token'),
+            ),
             $s->tags('notification_telegram_chat_ids')->label(__('tbtop-cms::settings.notifications.fields.telegram_chat_ids'))
                 ->rules('nullable|array')->helperText(__('tbtop-cms::settings.notifications.helpers.telegram_chat_ids')),
         ];

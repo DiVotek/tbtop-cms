@@ -4,6 +4,8 @@ declare(strict_types=1);
 use Tbtop\Cms\Admin\Pages\AuditActivityPage;
 use Tbtop\Cms\Admin\Pages\AuditLogPage;
 use Tbtop\Cms\Admin\Pages\BlocksPage;
+use Tbtop\Cms\Admin\Pages\CollectionEntriesPage;
+use Tbtop\Cms\Admin\Pages\CollectionEntryEditPage;
 use Tbtop\Cms\Admin\Pages\DashboardPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionPage;
 use Tbtop\Cms\Admin\Pages\FormSubmissionsPage;
@@ -62,6 +64,11 @@ return [
             ],
         ],
     ],
+    // Collection classes (Tbtop\Cms\Collection\Collection): records that are
+    // not pages — reviews, team, vacancies. The built-in Phones, Emails and
+    // Socials are always registered. Read with an inline default.
+    // collections.md.
+    'collections' => [],
     'blocks' => [
         // Block classes listed by hand. Keep for blocks outside the discovered
         // folders; everything else goes through 'discover'.
@@ -101,6 +108,21 @@ return [
             // for being oversized. Read with an inline default — published
             // host configs override whole sections and won't have this key.
             'per_chunk' => 1000,
+        ],
+        'llms_txt' => [
+            // false removes the /llms.txt route; true leaves the switch to the
+            // «For AI» tab of the SEO settings page (off until turned on).
+            'enabled' => true,
+            // Host classes implementing LlmsTxtSection, each adding one H2
+            // file list after the page-type sections. Resolved from the
+            // container, so they may take constructor dependencies.
+            'sections' => [],
+        ],
+        'markdown' => [
+            // false never serves a page as markdown (`/about.md`, `Accept:
+            // text/markdown`); true leaves the switch to the «For AI» tab
+            // (off until turned on).
+            'enabled' => true,
         ],
     ],
     'preview' => [
@@ -197,6 +219,16 @@ return [
         'root_kind' => 'Fragment',
         'root_view' => null,
     ],
+    'api' => [
+        // The token-authenticated pages API under /api/cms/v1 (docs/host/ai/api.md).
+        // Off unless enabled, and only with laravel/sanctum installed by the host;
+        // `php artisan cms:doctor` names what is missing. Tokens are issued with
+        // `php artisan cms:api-token`. Read with an inline default.
+        'enabled' => (bool) env('TBTOP_CMS_API', false),
+        // Rate limit on every API route (`max,minutes`, Laravel's `throttle`),
+        // counted per token user. An empty string turns it off.
+        'throttle' => '60,1',
+    ],
     // Who answers the tbtop-cms.* section abilities: false leaves every
     // section open to anyone with admin access; true hands them to the host,
     // which must define the gates first — an unanswered ability denies.
@@ -213,6 +245,8 @@ return [
             'languages' => LanguagesPage::class,
             'pages' => PagesPage::class,
             'page_edit' => PageEditPage::class,
+            'collection_entries' => CollectionEntriesPage::class,
+            'collection_entry_edit' => CollectionEntryEditPage::class,
             'redirects' => RedirectsPage::class,
             'not_found' => NotFoundLogPage::class,
             'seo_report' => SeoReportPage::class,

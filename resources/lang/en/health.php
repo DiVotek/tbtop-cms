@@ -94,6 +94,14 @@ return [
                 'present' => 'Delete public/robots.txt — Laravel serves static files under public/ before any route runs, so it silently disables the SEO settings indexing toggle and sitemap reference.',
             ],
         ],
+        'llms_txt' => [
+            'label' => 'Static llms.txt',
+            'ok' => 'No static public/llms.txt is shadowing the dynamic route.',
+            'present' => 'public/llms.txt exists and shadows the dynamic /llms.txt route.',
+            'hints' => [
+                'present' => 'Delete public/llms.txt to let the «For AI» tab of the SEO settings build the file, or keep it if it is maintained by hand on purpose.',
+            ],
+        ],
         'media_disk_writable' => [
             'label' => 'Media disk writable',
             'ok' => 'The ":disk" disk accepted a write+delete probe file.',
@@ -146,6 +154,17 @@ return [
                 'owner_missing' => 'No user has is_owner set on their cms_user_profiles row. Run php artisan cms:admin:create to create one, or promote an existing admin in the database.',
                 'language_missing' => 'No frontend-active default language exists. Create or activate one from the Languages admin page.',
                 'both_missing' => 'No owner account and no active default frontend language exist. Run php artisan cms:install and php artisan cms:admin:create to set up both.',
+            ],
+        ],
+        'pages_api' => [
+            'label' => 'Pages API',
+            'off' => 'The pages API is off (tbtop-cms.api.enabled).',
+            'ok' => 'The pages API is on under /api/cms/v1.',
+            'no_sanctum' => 'The pages API is enabled but laravel/sanctum is not installed, so its routes are not registered.',
+            'no_tokens' => 'The pages API is enabled but :model cannot hold API tokens.',
+            'hints' => [
+                'no_sanctum' => 'Run composer require laravel/sanctum, publish and run its migration (php artisan vendor:publish --tag=sanctum-migrations && php artisan migrate), and add Laravel\\Sanctum\\HasApiTokens to the user model.',
+                'no_tokens' => 'Add the Laravel\\Sanctum\\HasApiTokens trait to :model.',
             ],
         ],
         'session_driver' => [

@@ -24,6 +24,7 @@ use Tbtop\Cms\Admin\Support\AuthorNames;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Admin\Support\EnumLabel;
 use Tbtop\Cms\Language\Languages;
+use Tbtop\Cms\Page\Enums\PageDisplayState;
 use Tbtop\Cms\Page\Enums\SeoState;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\Models\PageSlug;
@@ -85,7 +86,7 @@ class PagesPage extends AdminPage
             ->query($this->query(...))
             ->columns($this->columns($subtypes))
             ->tabs($this->tabs($pages))
-            ->filters($this->filters($s, $pages, $subtypes))
+            ->filters($this->filters($s, $pages))
             ->searchable(["{$pages}.name"])
             ->defaultSort('sort_key', 'asc')
             ->emptyState(
@@ -178,7 +179,7 @@ class PagesPage extends AdminPage
     private function tabs(string $pages): array
     {
         return [
-            $this->tab('all', __('tbtop-cms::pages.tabs.all')),
+            $this->allTab($pages),
             ...$this->typeTabs($pages),
             Tab::make('deleted')->label(__('tbtop-cms::pages.tabs.deleted'))->count()
                 ->description(__('tbtop-cms::pages.tabs_deleted_description'))
@@ -186,17 +187,54 @@ class PagesPage extends AdminPage
         ];
     }
 
-    /**
-     * @param  list<array{value: string, label: string}>  $subtypes
-     * @return list<Field>
-     */
-    private function filters(S $s, string $pages, array $subtypes): array
+    /** @return list<Field> */
+    private function filters(S $s, string $pages): array
     {
-        return $subtypes === [] ? [] : [
-            // Qualified: PageSortKey self-joins the pages table, so a bare `subtype` is ambiguous.
-            $s->select('subtype')->label(__('tbtop-cms::pages.columns.subtype'))->options($subtypes)
-                ->filterUsing(static fn (Builder $q, mixed $value): Builder => $q->where("{$pages}.subtype", $value)),
+        return [
+            // Qualified: PageSortKey self-joins the pages table, so a bare `parent_id` is ambiguous.
+            $s->select('parent_id')->label(__('tbtop-cms::pages.columns.parent'))->options($this->parentOptions())
+                ->filterUsing(static fn (Builder $q, mixed $value): Builder => $q->where("{$pages}.parent_id", $value)),
+            $s->select('display_state')->label(__('tbtop-cms::pages.columns.status'))->options($this->displayStateOptions())
+                ->filterUsing(static fn (Builder $q, mixed $value): Builder => PageListState::whereDisplayState($q, $pages, $value)),
+            $s->select('seo_state')->label(__('tbtop-cms::pages.columns.seo'))->options($this->seoStateOptions())
+                ->filterUsing(static fn (Builder $q, mixed $value): Builder => PageListState::whereSeoState($q, $pages, $value)),
         ];
+    }
+
+    /**
+     * Only pages that have a child are a useful parent to filter by.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function parentOptions(): array
+    {
+        $default = app(Languages::class)->defaultLocale();
+
+        return Page::query()->whereHas('children')->orderBy('sort_order')->orderBy('id')->get()
+            ->map(static fn (Page $page): array => [
+                'value' => (string) $page->getKey(),
+                'label' => $page->getTranslation('name', $default, false) ?: ('#' . $page->getKey()),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    private function displayStateOptions(): array
+    {
+        return array_map(
+            static fn (PageDisplayState $state): array => ['value' => $state->value, 'label' => __('tbtop-cms::pages.status.' . $state->value)],
+            PageDisplayState::cases(),
+        );
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    private function seoStateOptions(): array
+    {
+        return array_map(
+            static fn (SeoState $state): array => ['value' => (string) $state->value, 'label' => $state->label()],
+            SeoState::cases(),
+        );
     }
 
     /** @return Builder<Page> */
@@ -286,6 +324,20 @@ class PagesPage extends AdminPage
             ->description(__('tbtop-cms::pages.tab_description', ['tab' => $label]));
     }
 
+    /** Every page but those of a type kept to its own tab (PageTypeInterface::listedInAll()). */
+    private function allTab(string $pages): Tab
+    {
+        $tab = $this->tab('all', __('tbtop-cms::pages.tabs.all'));
+        $registry = app(PageTypeRegistry::class);
+        $unlisted = $registry->unlistedInAllKeys();
+        // A row's own type decides: its subtype when registered, else its base (a listed subtype of an unlisted base stays).
+        $listed = array_values(array_diff($registry->keys(), $unlisted));
+
+        return $unlisted === [] ? $tab : $tab->query(static fn (Builder $q): Builder => $q
+            ->where(static fn (Builder $sub): Builder => $sub->whereNull("{$pages}.subtype")->orWhereNotIn("{$pages}.subtype", $unlisted))
+            ->where(static fn (Builder $sub): Builder => $sub->whereNotIn("{$pages}.type", $unlisted)->orWhereIn("{$pages}.subtype", $listed)));
+    }
+
     /**
      * One tab per type a live page has, registered types in registry order
      * and then any type that outlived its registration, labelled by its key.
@@ -298,12 +350,40 @@ class PagesPage extends AdminPage
         $present = Page::query()->distinct()->pluck('type')->all();
         $unregistered = array_diff($present, $registry->keys());
         sort($unregistered);
+        // A base type's tab leaves its unlisted subtypes to their own tab, as "All" does.
+        $unlisted = $registry->unlistedInAllKeys();
 
-        return array_map(
-            fn (string $type): Tab => $this->tab($type, PageFormOptions::typeLabelFor($type, $registry->has($type) ? $registry->get($type)->label() : $type))
-                ->query(static fn (Builder $q): Builder => $q->where("{$pages}.type", $type)),
-            [...array_intersect($registry->keys(), $present), ...$unregistered],
+        return [
+            ...array_map(
+                fn (string $type): Tab => $this->tab($type, PageFormOptions::typeLabelFor($type, $registry->has($type) ? $registry->get($type)->label() : $type))
+                    ->query(static fn (Builder $q): Builder => $unlisted === [] ? $q->where("{$pages}.type", $type) : $q->where("{$pages}.type", $type)
+                        ->where(static fn (Builder $sub): Builder => $sub->whereNull("{$pages}.subtype")->orWhereNotIn("{$pages}.subtype", $unlisted))),
+                [...array_intersect($registry->keys(), $present), ...$unregistered],
+            ),
+            ...$this->unlistedSubtypeTabs($pages),
+        ];
+    }
+
+    /**
+     * A subtype left out of "All" (a tag under a "Tags" category) still
+     * needs a tab of its own: its base's tab mixes it with the rest.
+     *
+     * @return list<Tab>
+     */
+    private function unlistedSubtypeTabs(string $pages): array
+    {
+        $registry = app(PageTypeRegistry::class);
+        $subtypes = array_filter(
+            $registry->unlistedInAllKeys(),
+            static fn (string $key): bool => $registry->get($key)->base() !== $key,
         );
+        $present = Page::query()->distinct()->whereIn('subtype', $subtypes)->pluck('subtype')->all();
+
+        return array_values(array_map(
+            fn (string $subtype): Tab => $this->tab($subtype, PageFormOptions::typeLabelFor($subtype, $registry->get($subtype)->label()))
+                ->query(static fn (Builder $q): Builder => $q->where("{$pages}.subtype", $subtype)),
+            array_intersect($subtypes, $present),
+        ));
     }
 
     /** Same label as the type's tab: the translation, then the type's own label(), then the raw key. */

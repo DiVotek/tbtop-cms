@@ -23,3 +23,19 @@ it("shows the draft-preview banner in the text the server translated", () => {
     expect(container.textContent).toContain("Чернетка — сторінку не опубліковано.");
     expect(container.textContent).not.toContain("Draft preview");
 });
+
+it("shows the error heading when there is no error page to render", () => {
+    props.isPreview = false;
+    props.page = { id: null, heading: "Page not found" };
+    const { container } = render(<CmsPage />);
+
+    expect(container.querySelector("h1")?.textContent).toBe("Page not found");
+});
+
+it("leaves the heading of a real page to its blocks", () => {
+    props.isPreview = false;
+    props.page = { id: 5, heading: "About us" };
+    const { container } = render(<CmsPage />);
+
+    expect(container.querySelector("h1")).toBeNull();
+});

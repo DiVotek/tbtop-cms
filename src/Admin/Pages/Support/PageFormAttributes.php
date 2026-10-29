@@ -20,8 +20,9 @@ final class PageFormAttributes
     public static function for(Page $page, array $form, ?int $parentId, bool $isCreate): array
     {
         $attributes = [
+            // No `title`: the editor has no field for it, so writing the key
+            // would wipe a stored value. The meta title is `seo.title`.
             'name' => $form['name'] ?? [],
-            'title' => $form['title'] ?? [],
             'heading' => $form['heading'] ?? [],
             'summary' => $form['summary'] ?? [],
             'body' => $form['body'] ?? [],
@@ -98,32 +99,6 @@ final class PageFormAttributes
         throw ValidationException::withMessages([
             'subtype' => __('tbtop-cms::pages.validation.subtype_invalid', ['subtype' => $value, 'type' => $type]),
         ]);
-    }
-
-    /**
-     * Create-only: when a locale's title is empty but its name is set, fall
-     * the title back to the name — the create form has no heading/summary
-     * but title still drives <title>/OG tags, so it should not start blank.
-     * Edits never run this: an admin clearing the title on the edit page
-     * means it, and re-filling it from the name would override that intent.
-     *
-     * @param  array<string, mixed>  $form
-     * @return array<string, mixed>
-     */
-    public static function withTitleFallback(array $form): array
-    {
-        $name = PageFormValues::stringMap($form['name'] ?? null);
-        $title = PageFormValues::stringMap($form['title'] ?? null);
-
-        foreach ($name as $locale => $value) {
-            if ($value !== '' && ($title[$locale] ?? '') === '') {
-                $title[$locale] = $value;
-            }
-        }
-
-        $form['title'] = $title;
-
-        return $form;
     }
 
     /**

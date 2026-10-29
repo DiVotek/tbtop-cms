@@ -38,6 +38,7 @@ frame, block, layout slot.
 |---|---|---|
 | A block | **all three**: PHP class + its zod schema + a component in `components_dir`, same change; `cms:blocks:types` generates the schema and the catalog/registry wiring, and a missing component fails it; a props mismatch renders nothing, silently | [blocks.md](./blocks.md) |
 | A page's text, picture, typed data or fixed parts | the standard page fields first, then type fields, `resolveFields()`, a host frame by `page.subtype` — blocks only for optional sections | [placement.md](./placement.md) |
+| Records shown inside pages but with no URL of their own (reviews, team, vacancies) | a `Collection` class + the block field `$s->collection()->of(...)`; `Cms::collection()` in host code | [collections.md](./collections.md) |
 | A section that holds pages other than `category`/`article` | a host page type extending `BasePageType` (`CategoryType` is not configurable) | [pages.md](./pages.md) |
 | Site content | idempotent seeders per section, keyed by slug — never admin clicks | [pages.md](./pages.md#seeding-content) |
 | Header / footer | layout blocks in the two slots, rendered by the host's `SiteChrome` from `cms.layout` | [wiring.md](./wiring.md), [recipes.md](./recipes.md) |
@@ -46,6 +47,7 @@ frame, block, layout slot.
 | A form that sends somewhere | `HandlesFormSubmission` on the block; admin fan-out (mail/telegram/bell) is automatic | [blocks.md](./blocks.md#form-handling-blocks), [notifications.md](./notifications.md) |
 | A new notification type or channel | `Notifications::type()` / `::channel()` from a provider's `boot()` | [notifications.md](./notifications.md) |
 | Host wiring (routes, Vite entries, `<head>`, SSR, admin access) | the host's own files — `cms:install` prints the list, `cms:doctor` checks it | [wiring.md](./wiring.md) |
+| Another service writing articles (import, social) | the pages API: Sanctum, `tbtop-cms.api.enabled`, a token from `cms:api-token` limited to categories | [api.md](./api.md) |
 | Something the CMS "doesn't have" | check [recipes.md](./recipes.md) first — most compositions exist; the rest is listed as verified absent | [recipes.md](./recipes.md) |
 | A config key, command, route, prop, event, Settings key, table | look it up, don't guess | [inventory.md](./inventory.md) |
 
@@ -57,10 +59,12 @@ If the table can't place it, ask.
 2. **[wiring.md](./wiring.md)** — installing and connecting a host: route order, the two Vite entries, why the host owns `CmsPage.tsx`, shared props, `<head>`/SSR fallbacks, admin access, symptom → cause.
 3. **[blocks.md](./blocks.md)** — the three-layer rule, `Block` API, `ResolveContext`, envelope → spec data flow, locale flattening, form-handling blocks, the client catalog/registry.
 4. **[pages.md](./pages.md)** — `Page` columns, status vs. live, page types and hierarchy rules, slugs/URLs/redirects, source-backed pages, revisions, layout slots, seeding, cache invalidation, events.
-5. **[seo.md](./seo.md)** — what the `seo` prop contains and where each value is edited, structured data, sitemap, robots, GTM, the audit/checklist, 404 log.
-6. **[notifications.md](./notifications.md)** — submission lifecycle, the type/channel registry, built-in channels and their Settings keys, templates, where to register.
-7. **[recipes.md](./recipes.md)** — compositions real hosts built from existing parts, and what is verified absent with the least-bad workaround.
-8. **[inventory.md](./inventory.md)** — every config key, command, route, Inertia prop, contract, event, Settings key, ability, table, facade method.
+5. **[collections.md](./collections.md)** — records that are not pages: declaring a collection, the admin, the `collection` block field and its modes, `Cms::collection()`, cache, the built-in Phones, Emails and Socials.
+6. **[seo.md](./seo.md)** — what the `seo` prop contains and where each value is edited, structured data, sitemap, robots, GTM, the audit/checklist, 404 log.
+7. **[notifications.md](./notifications.md)** — submission lifecycle, the type/channel registry, built-in channels and their Settings keys, templates, where to register.
+8. **[recipes.md](./recipes.md)** — compositions real hosts built from existing parts, and what is verified absent with the least-bad workaround.
+9. **[api.md](./api.md)** — the token-authenticated pages API: turning it on, what a token reaches, endpoints and shapes, the field description.
+10. **[inventory.md](./inventory.md)** — every config key, command, route, Inertia prop, contract, event, Settings key, ability, table, facade method.
 
 ## Ground rules
 
@@ -82,6 +86,7 @@ Used consistently across all files:
 - **resolved block** — `{id, kind, props}`, the output of `resolve()`.
 - **page spec** — the json-render tree `{root, elements}` the client renders.
 - **catalog** / **registry** — the host's zod schemas / React components, keyed by kind (distinct from the PHP `BlockRegistry`/`PageTypeRegistry`/`NotificationRegistry` singletons).
+- **collection** / **entry** — a code-defined kind of record with no URL / one of its records (`tbtop_entries`).
 - **page type** — a registered key governing hierarchy rules and (optionally) a source.
 - **source-backed** — a page type whose pages are created by an external domain object and render a template when `content` is null.
 - **slot** — a layout region; exactly `header` and `footer`.

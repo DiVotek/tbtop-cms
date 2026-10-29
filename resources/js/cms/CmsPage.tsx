@@ -8,6 +8,7 @@ import { CmsRenderer } from "./CmsRenderer";
 import { registry } from "./registry";
 
 interface CmsPageProps {
+    page?: { id: number | null; heading?: string | null };
     render: RenderSpec;
     seo: Seo;
     isPreview?: boolean;
@@ -27,12 +28,15 @@ const bannerStyle: CSSProperties = {
 };
 
 export default function CmsPage() {
-    const { render, seo, isPreview, cms } = usePage<CmsPageProps>().props;
+    const { page, render, seo, isPreview, cms } = usePage<CmsPageProps>().props;
+    // A 404/500 with no error page in the database comes with no blocks, only a heading (FallbackProps).
+    const fallbackHeading = page?.id === null ? page.heading : null;
 
     return (
         <>
             <CmsHead seo={seo} />
             {isPreview ? <div style={bannerStyle}>{cms?.strings?.previewBanner ?? "Draft preview — this page is not published."}</div> : null}
+            {fallbackHeading ? <h1>{fallbackHeading}</h1> : null}
             <JSONUIProvider registry={registry}>
                 <CmsRenderer spec={render} catalog={catalog} registry={registry} showErrors={isPreview === true || cms?.debug === true} />
             </JSONUIProvider>
