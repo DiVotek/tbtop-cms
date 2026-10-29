@@ -25,8 +25,8 @@ export function suffixPath(path: string): string | null {
 
 /**
  * MarkdownRequest::accepts: `Accept` ranks `text/markdown` above `text/html`
- * (a tie goes to the type listed first; `*\/*` counts for HTML only). An
- * Inertia visit is never markdown.
+ * (a tie goes to the type listed first; `*\/*` counts for HTML only; a type
+ * listed twice counts at its best q). An Inertia visit is never markdown.
  */
 export function acceptsMarkdown(request: Request): boolean {
 	if (request.headers.has("X-Inertia")) {
@@ -40,7 +40,9 @@ export function acceptsMarkdown(request: Request): boolean {
 		const parsed = qParam === undefined ? 1 : Number(qParam.slice(2));
 		const q = Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : 1;
 		if (type === "text/markdown") {
-			markdown ??= { q, index };
+			if (markdown === null || q > markdown.q) {
+				markdown = { q, index };
+			}
 		} else if (["text/html", "text/*", "*/*"].includes(type) && (html === null || q > html.q)) {
 			html = { q, index };
 		}

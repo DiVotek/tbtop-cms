@@ -191,6 +191,7 @@ describe("markdown requests", () => {
 		["text/markdown;q=0.5, text/html", false],
 		["*/*", false],
 		["text/markdown;q=0", false],
+		["text/markdown;q=0, text/markdown", true],
 	])("Accept %s → %p", (accept, expected) => {
 		expect(acceptsMarkdown(get("/", { headers: { Accept: accept } }))).toBe(expected);
 	});
