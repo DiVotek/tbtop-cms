@@ -20,10 +20,10 @@ concurrency:
 
 jobs:
   # Which parts of the repo the change touches. Jobs skip when their part is
-  # untouched, and on draft PRs: a draft gets the triage review first, and the
-  # full run starts once it is marked ready (or on a manual run). "CI ok"
-  # below is the one required check, so a skip never leaves branch protection
-  # waiting.
+  # untouched. On a draft PR everything but Workflow lint skips: a draft gets
+  # the triage review first, and the full run starts once it is marked ready
+  # (or on a manual run). "CI ok" below is the one required check, so a skip
+  # never leaves branch protection waiting.
   changes:
     name: Path filter
     runs-on: ubuntu-latest
