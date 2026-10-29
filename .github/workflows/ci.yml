@@ -48,6 +48,8 @@ jobs:
               - *workflows
               - '**.php'
               - 'composer.json'
+              # Not committed today; listed so a committed lock still runs PHP jobs.
+              - 'composer.lock'
               - 'phpunit.xml.dist'
               - 'testbench.yaml'
               - 'phpstan.neon.dist'
