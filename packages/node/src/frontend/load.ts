@@ -2,6 +2,8 @@ import { assembleSpec, bindForms, type RenderSpec, type ResolvedBlock, resolveBl
 import { SLOTS, type Slot } from "../content/layouts";
 import { isLive, type Page } from "../content/page";
 import type { PageTypeDef, PageTypeUnion } from "../content/pageTypes";
+import { isEmptyArchive } from "../content/emptyArchives";
+import { PAGE_QUERY_KEY } from "../content/pagedPages";
 import { isExternal } from "../content/redirects";
 import { resolveSeo, type Seo } from "../seo/resolver";
 import { schemaContext } from "../seo/schemaContext";
@@ -153,7 +155,13 @@ export async function loadPage(
 		const props = await errorPageProps(site, 404, locale, path);
 		return { type: "notFound", status: 404, locale, path, cms: props.cms, props };
 	}
+	site.paging.read(url, page.id);
 	const props = await pageProps(site, page, locale, path);
+	const paged = site.paging.result;
+	if (paged !== null && paged.page > paged.pages) {
+		const notFound = await errorPageProps(site, 404, locale, path);
+		return { type: "notFound", status: 404, locale, path, cms: notFound.cms, props: notFound };
+	}
 	return { type: "page", status: 200, headers: props.seo.noindex ? { "X-Robots-Tag": "noindex" } : {}, props: asJson(props) };
 }
 
@@ -180,8 +188,8 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 		.filter((node): node is Record<string, unknown> => node !== null)
 		// Each node is a JSON-LD document of its own: one without @context is not schema.org to a crawler.
 		.map((node) => ("@context" in node ? node : { "@context": "https://schema.org", ...node }));
-	const seo = await resolveSeo(site, page, locale, parents, ctx, blockNodes);
-	if (isPreview) {
+	const seo = pagedSeo(site, await resolveSeo(site, page, locale, parents, ctx, blockNodes));
+	if (isPreview || (await isEmptyArchive(site, page))) {
 		seo.noindex = true;
 	}
 	return {
@@ -192,6 +200,23 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 		path,
 		isPreview,
 		cms,
+	};
+}
+
+/**
+ * A page that listed a paged archive is its own canonical from page 2 on,
+ * `?page=N`, as search engines expect of a paginated series (PageController::pagedSeo).
+ */
+function pagedSeo(site: Site, seo: Seo): Seo {
+	const paged = site.paging.result;
+	if (paged === null || paged.page === 1 || paged.page > paged.pages) {
+		return seo;
+	}
+	const query = `?${PAGE_QUERY_KEY}=${paged.page}`;
+	return {
+		...seo,
+		canonical: seo.canonical.includes("?") ? seo.canonical : `${seo.canonical}${query}`,
+		ogUrl: seo.ogUrl.includes("?") ? seo.ogUrl : `${seo.ogUrl}${query}`,
 	};
 }
 

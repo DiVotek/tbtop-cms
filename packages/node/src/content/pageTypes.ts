@@ -32,9 +32,22 @@ export type PageTypeDef = {
 	resolveFields?: (input: Record<string, unknown>, ctx: ResolveContext) => Record<string, unknown> | Promise<Record<string, unknown>>;
 	/** Block content for a page that has none of its own. */
 	template?: (page: Page) => unknown[] | null;
+	/**
+	 * False keeps this type's pages off the admin Pages list's "All" tab (a
+	 * subtype gets a tab of its own): tags would crowd out the content.
+	 * Default true; a subtype inherits its base's.
+	 */
+	listedInAll?: boolean;
+	/**
+	 * The pages field this type is an archive of (a tag of `tags`): a page of
+	 * it that no live page picks through that field is noindex and left out
+	 * of the sitemap. A subtype inherits its base's.
+	 */
+	archiveOf?: string;
 };
 
-export type PageType = Required<Omit<PageTypeDef, "template" | "resolveFields" | "schema">> & {
+export type PageType = Required<Omit<PageTypeDef, "template" | "resolveFields" | "schema" | "archiveOf">> & {
+	archiveOf: string | null;
 	schema: FieldsSchema | null;
 	template: (page: Page) => unknown[] | null;
 	resolveFields: (input: Record<string, unknown>, ctx: ResolveContext) => Promise<Record<string, unknown>>;
@@ -126,6 +139,8 @@ function normalize(def: PageTypeDef, baseDef: PageTypeDef | undefined): PageType
 		schema,
 		form,
 		template: def.template ?? (() => null),
+		listedInAll: def.listedInAll ?? baseDef?.listedInAll ?? true,
+		archiveOf: def.archiveOf ?? baseDef?.archiveOf ?? null,
 		resolveFields: async (input, ctx) => {
 			const resolved = await resolve(input, ctx);
 			if (schema === null) {
@@ -201,6 +216,18 @@ export class PageTypes {
 
 	schemaTypesFor(page: Page): readonly string[] {
 		return this.forPage(page).at(-1)?.schemaTypes ?? [];
+	}
+
+	/** The type that speaks for a page: its subtype when registered, else its base type. */
+	ownType(page: Pick<Page, "type" | "subtype">): PageType | null {
+		return (page.subtype ? this.types.get(page.subtype) : undefined) ?? this.types.get(page.type) ?? null;
+	}
+
+	/** Type keys (base or subtype) whose pages the "All" tab leaves out. */
+	unlistedInAll(): string[] {
+		return this.all()
+			.filter((type) => !type.listedInAll)
+			.map((type) => type.key);
 	}
 }
 

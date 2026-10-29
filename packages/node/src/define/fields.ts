@@ -10,9 +10,14 @@ import { type CollectionType, collectionKeyOf, type EntryOf } from "./collection
  */
 export type CmsFields = {
 	link(name: string): { types(types: LinkType[]): unknown };
-	pages(name: string): { of(type: string, subtype?: string): unknown };
+	pages(name: string): PagesFieldLike;
 	collection(name: string): { of(key: string): CollectionFieldLike };
 };
+
+type PagesFieldLike = { of(type: string, subtype?: string): PagesFieldLike; creatable(): PagesFieldLike; max(count: number): PagesFieldLike };
+
+/** `f.pages()`'s options: a subtype of the type, a cap, and whether the editor may add a page by typing its name. */
+type PagesOptions = { subtype?: string; max?: number; creatable?: boolean };
 
 type CollectionFieldLike = { single(): CollectionFieldLike; max(count: number): CollectionFieldLike; modes(modes: PickMode[]): CollectionFieldLike };
 
@@ -124,8 +129,22 @@ export const f = {
 	image: () => field(text(), (s, _cms, name) => s.upload(name).accept("image/*")),
 	/** A page or a URL, as `{ href, type, label }`; `types` limits the choice. */
 	link: (types?: LinkType[]) => field(link.nullable(), (_s, cms, name) => (types === undefined ? cms.link(name) : cms.link(name).types(types))),
-	/** Live pages, as `{ id, name, url }[]`; `type` limits them to one page type. */
-	pages: (type?: string) => field(z.array(pageRef), (_s, cms, name) => (type === undefined ? cms.pages(name) : cms.pages(name).of(type))),
+	/**
+	 * Live pages, as `{ id, name, url }[]`; `type` (and `subtype`) limits them
+	 * to one page type. `creatable: true` lets the editor add one by typing its
+	 * name (a new tag), published next to the newest page of that type.
+	 */
+	pages: (type?: string, opts: PagesOptions = {}) =>
+		field(z.array(pageRef), (_s, cms, name) => {
+			let built = cms.pages(name);
+			if (type !== undefined) {
+				built = built.of(type, ...(opts.subtype === undefined ? [] : [opts.subtype]));
+			}
+			if (opts.max !== undefined) {
+				built = built.max(opts.max);
+			}
+			return opts.creatable === true ? built.creatable() : built;
+		}),
 	/**
 	 * Entries of a collection (`collections` in defineSite, or a built-in by
 	 * key: `"phones"`, `"socials"`): the editor picks all, the latest N,

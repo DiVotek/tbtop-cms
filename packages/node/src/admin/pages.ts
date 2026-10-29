@@ -7,7 +7,8 @@ import { PageRuleError } from "../content/pageRules";
 import { type Dict, decodeJson, isDict, sqlDate } from "../support/values";
 import { dialectOfDb } from "../support/db";
 import { formParentId, formSubtype, resolveLeafType, subtypeOptions } from "./pageLeafType";
-import { adminPrefix, blockId, listHeader, NAV, siteOf } from "./support";
+import { draftPage, templateContent } from "../content/pageTemplate";
+import { adminPrefix, listHeader, NAV, siteOf } from "./support";
 
 export const STATUS = [
 	{ value: "draft", label: "Draft" },
@@ -108,6 +109,29 @@ export function pagesIndex(cms: Cms) {
 			const keys = cms.pageTypes.bases().map((type) => type.key);
 			const tabTypes = [...keys.filter((key) => present.includes(key)), ...present.filter((key) => !keys.includes(key)).sort()];
 			const live = (qb: unknown) => (qb as PagesTable).where("tbtop_pages.deleted_at", "is", null);
+			// Types with listedInAll: false (tags) stay off "All"; an unlisted subtype gets a tab of its own.
+			const unlisted = cms.pageTypes.unlistedInAll();
+			// A row's own type decides: its subtype when registered, else its base (a listed subtype of an unlisted base stays).
+			const listedKeys = cms.pageTypes
+				.all()
+				.map((type) => type.key)
+				.filter((key) => !unlisted.includes(key));
+			const listed = (qb: unknown) =>
+				unlisted.length === 0
+					? live(qb)
+					: live(qb)
+							.where((eb) => eb.or([eb("tbtop_pages.subtype", "is", null), eb("tbtop_pages.subtype", "not in", unlisted)]))
+							.where((eb) =>
+								eb.or([
+									eb("tbtop_pages.type", "not in", unlisted),
+									...(listedKeys.length === 0 ? [] : [eb("tbtop_pages.subtype", "in", listedKeys)]),
+								]),
+							);
+			// A base type's tab leaves its unlisted subtypes to their own tab, as "All" does.
+			const listedSubtypes = (qb: unknown) =>
+				unlisted.length === 0 ? live(qb) : live(qb).where((eb) => eb.or([eb("tbtop_pages.subtype", "is", null), eb("tbtop_pages.subtype", "not in", unlisted)]));
+			const presentSubtypes = (await site.pages.query().select("subtype").distinct().where("subtype", "is not", null).execute()).map((row) => row.subtype);
+			const subtypeTabs = unlisted.filter((key) => cms.pageTypes.get(key).base !== key && presentSubtypes.includes(key));
 			const now = sqlDate(new Date());
 			const tab = (name: string, label: string) => Tab.make(name).label(label).count().description(`${label} — categories group content, pages stand alone, articles live under a category.`);
 			return s.stack([
@@ -150,8 +174,9 @@ export function pagesIndex(cms: Cms) {
 						Column.make("path").label("Path").muted().toggleable(true, true),
 					])
 					.tabs([
-						tab("all", "All").query(live),
-						...tabTypes.map((type) => tab(type, typeLabel(cms, type)).query((qb) => live(qb).where("tbtop_pages.type", "=", type))),
+						tab("all", "All").query(listed),
+						...tabTypes.map((type) => tab(type, typeLabel(cms, type)).query((qb) => listedSubtypes(qb).where("tbtop_pages.type", "=", type))),
+						...subtypeTabs.map((key) => tab(key, typeLabel(cms, key)).query((qb) => live(qb).where("tbtop_pages.subtype", "=", key))),
 						Tab.make("deleted")
 							.label("Deleted")
 							.count()
@@ -325,48 +350,10 @@ export function parentOptions(rows: { id: number; name: string | null }[], local
 async function createPage(cms: Cms, ctx: ActionCtx, tree: { type: string; parentId: number | null; subtype: string | null }): Promise<Page> {
 	const form = ctx.form as Dict;
 	const name = isDict(form.name) ? form.name : {};
-	const content = templateContent(cms, draftPage({ ...tree, name }));
+	const content = templateContent(cms.pageTypes, draftPage({ ...tree, name }));
 	return siteOf(cms, ctx).pages.create({ ...tree, name, content }, { by: userKey(ctx) });
 }
 
-/**
- * TypeTemplateContent::contentFor: the type's template() (the subtype's first) with a fresh id
- * per block, and active/sort/data defaults the template may leave out. The
- * frontend renders template() only for a null content, so an admin-made page
- * starts with the rows instead of `[]`.
- */
-function templateContent(cms: Cms, page: Page): Dict[] {
-	return (cms.pageTypes.templateFor(page) ?? [])
-		.filter(isDict)
-		.map((block, index) => ({ active: true, sort: index, data: {}, ...block, id: blockId() }));
-}
-
-/** The page about to be created, for template(): PHP passes the unsaved model. */
-const draftPage = (input: Pick<Page, "type" | "parentId" | "subtype" | "name">): Page => ({
-	id: 0,
-	sourceId: null,
-	status: "draft",
-	publishedAt: null,
-	unpublishAt: null,
-	content: null,
-	fields: null,
-	starterBlocks: null,
-	heading: {},
-	summary: {},
-	body: {},
-	image: null,
-	seo: {},
-	isIndexable: true,
-	isSystem: false,
-	errorClass: null,
-	sortOrder: 0,
-	lockVersion: 0,
-	createdBy: null,
-	updatedBy: null,
-	createdAt: null,
-	updatedAt: null,
-	...input,
-});
 
 export const userKey = (ctx: ActionCtx): string | number | null => {
 	const user = ctx.user as { id?: unknown } | null;

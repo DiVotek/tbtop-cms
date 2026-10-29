@@ -1,4 +1,5 @@
 import { sql } from "kysely";
+import { excludeEmptyArchives } from "../content/emptyArchives";
 import { whereLive } from "../content/pages";
 import { pageFromRow } from "../content/page";
 import type { Site } from "../site";
@@ -20,8 +21,9 @@ async function perChunk(site: Site): Promise<number> {
 	return Math.max(1, Math.min(site.config.sitemapPerChunk ?? 1000, MAX_PER_CHUNK));
 }
 
+/** Live, indexable, not an error page, and not an empty archive (EmptyArchives). */
 function query(site: Site) {
-	return whereLive(site.pages.query()).where("is_indexable", "=", 1).where("error_class", "is", null);
+	return excludeEmptyArchives(site, whereLive(site.pages.query()).where("is_indexable", "=", 1).where("error_class", "is", null));
 }
 
 async function pagesPerChunk(site: Site): Promise<{ locales: string[]; size: number }> {

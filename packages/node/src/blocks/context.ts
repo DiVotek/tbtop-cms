@@ -1,6 +1,7 @@
 import type { MediaImage } from "../config";
 import type { ResolvedLink } from "../content/link";
 import type { Page, TranslatableField } from "../content/page";
+import type { PagedRefs } from "../content/pagedPages";
 import type { PageRef } from "../content/pageRefs";
 import type { PageColumns } from "../frontend/pageView";
 import type { EntryList } from "../content/entryList";
@@ -36,6 +37,14 @@ export type ResolveContext = {
 	pages(value: unknown, options: { fields: true }): Promise<PageRefWithFields[]>;
 	/** The live pages whose page-type pages field `field` picks this page (Cms::referencedByLinks), only of type or subtype `from` when given. */
 	referencedBy(field: string, from?: string): Promise<PageRef[]>;
+	/**
+	 * One page of referencedBy for an archive (a tag's articles), newest first,
+	 * with where it stands; the page number is the request's `?page=`. Page 2
+	 * on gets a `?page=N` canonical, a page past the end is a 404.
+	 */
+	referencedByPaged(field: string, options?: { from?: string; perPage?: number }): Promise<PagedRefs<PageRef>>;
+	/** One page of this page's live children (a category's articles), the same way. */
+	childrenPaged(options?: { from?: string; perPage?: number }): Promise<PagedRefs<PageRef>>;
 	/** A collection's published entries in this locale (Cms::collection), filtered in memory. */
 	collection(key: string): Promise<EntryList>;
 	/** A translatable page column as text, locale then fallback. */

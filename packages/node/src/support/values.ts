@@ -119,3 +119,6 @@ export const bool = (value: unknown): boolean => value === true || value === 1 |
 
 /** A boolean column's write value: 0/1 binds on every driver (better-sqlite3 rejects booleans). */
 export const flag = (value: boolean): 0 | 1 => (value ? 1 : 0);
+
+/** A fresh block id: the PHP editor's 8-character random ids. */
+export const blockId = (): string => crypto.randomUUID().replaceAll("-", "").slice(0, 8);

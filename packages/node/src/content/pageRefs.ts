@@ -1,4 +1,5 @@
 import { isLive, type Page, pageFromRow } from "./page";
+import { type PagedRefs, takePage } from "./pagedPages";
 import { whereLive } from "./pages";
 import type { Site } from "../site";
 
@@ -120,6 +121,14 @@ export async function pageExists(site: Site, id: number, options: { withTrashed?
 
 const natural = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
 
+/** PageRefIndex::sourcesQuery: the live pages whose pages field `field` picks `target`, of type or subtype `from` when given. */
+function sourcesQuery(site: Site, target: Page, field: string, from: string | undefined) {
+	const qb = whereLive(site.pages.query()).where("tbtop_pages.id", "in", (eb) =>
+		eb.selectFrom("tbtop_page_refs").select("page_id").where("target_id", "=", target.id).where("field", "=", field),
+	);
+	return from === undefined ? qb : qb.where((eb) => eb.or([eb("tbtop_pages.type", "=", from), eb("tbtop_pages.subtype", "=", from)]));
+}
+
 /**
  * PageRefIndex::sources: the live pages whose page-type pages field `field`
  * picks `target`, only those of type or subtype `from` when given; by
@@ -129,16 +138,9 @@ export async function referencedBy(site: Site, target: Page | null, field: strin
 	if (target === null) {
 		return [];
 	}
-	let qb = whereLive(site.pages.query().selectAll("tbtop_pages")).where("tbtop_pages.id", "in", (eb) =>
-		eb.selectFrom("tbtop_page_refs").select("page_id").where("target_id", "=", target.id).where("field", "=", field),
-	);
-	if (options.from !== undefined) {
-		const from = options.from;
-		qb = qb.where((eb) => eb.or([eb("tbtop_pages.type", "=", from), eb("tbtop_pages.subtype", "=", from)]));
-	}
 	const fallback = await site.languages.defaultLocale();
 	const name = (page: Page) => pageNameOf(page, options.locale, fallback) ?? "";
-	return (await qb.execute())
+	return (await sourcesQuery(site, target, field, options.from).selectAll("tbtop_pages").execute())
 		.map(pageFromRow)
 		.sort((a, b) => a.sortOrder - b.sortOrder || natural.compare(name(a), name(b)) || a.id - b.id);
 }
@@ -148,3 +150,45 @@ export async function referencedByLinks(site: Site, target: Page | null, field: 
 	const pages = await referencedBy(site, target, field, options);
 	return resolvePageRefs(site, pages.map((page) => page.id), options.locale);
 }
+
+/** What a paged archive takes: the type or subtype of the pages listed, the page size and, else the request's, the page number. */
+export type PagedOptions = { from?: string; locale: string; perPage?: number; page?: number };
+
+const DEFAULT_PER_PAGE = 20;
+
+/**
+ * Cms::referencedByLinksPaged: one page of referencedBy for an archive (a
+ * tag's articles), newest first, as links. The page number is the request's
+ * `?page=` unless given; page 2 on gets a `?page=N` canonical and a page past
+ * the end is a 404.
+ */
+export async function referencedByLinksPaged(site: Site, target: Page | null, field: string, options: PagedOptions): Promise<PagedRefs<PageRef>> {
+	if (target === null) {
+		return emptyPage(options);
+	}
+	return linksOf(site, target, sourcesQuery(site, target, field, options.from), options);
+}
+
+/** Cms::childrenLinksPaged: one page of a page's live children (a category's articles), the same way. */
+export async function childrenLinksPaged(site: Site, parent: Page | null, options: PagedOptions): Promise<PagedRefs<PageRef>> {
+	if (parent === null) {
+		return emptyPage(options);
+	}
+	const children = whereLive(site.pages.query()).where("tbtop_pages.parent_id", "=", parent.id);
+	const from = options.from;
+	return linksOf(site, parent, from === undefined ? children : children.where((eb) => eb.or([eb("tbtop_pages.type", "=", from), eb("tbtop_pages.subtype", "=", from)])), options);
+}
+
+async function linksOf(site: Site, owner: Page, query: Parameters<typeof takePage>[1], options: PagedOptions): Promise<PagedRefs<PageRef>> {
+	const { pages, pagination } = await takePage(site.paging, query, {
+		owner: owner.id,
+		perPage: options.perPage ?? DEFAULT_PER_PAGE,
+		...(options.page === undefined ? {} : { page: options.page }),
+	});
+	return { items: await resolvePageRefs(site, pages.map((page) => page.id), options.locale), pagination };
+}
+
+const emptyPage = (options: PagedOptions): PagedRefs<PageRef> => ({
+	items: [],
+	pagination: { page: 1, pages: 1, total: 0, perPage: options.perPage ?? DEFAULT_PER_PAGE },
+});

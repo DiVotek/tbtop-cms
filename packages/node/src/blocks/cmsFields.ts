@@ -1,4 +1,5 @@
-import { currentContext, defaultLocale, Field, Select, walk, type WithValue } from "@tbtop/admin";
+import { currentContext, defaultLocale, Field, S, Select, walk, type WithValue } from "@tbtop/admin";
+import { quickCreatePage } from "../content/pageQuickCreate";
 import { LINK_TYPES, type LinkType } from "../content/link";
 import { acceptsType, pageId, pageNameOf, searchPages } from "../content/pageRefs";
 import type { Site } from "../site";
@@ -102,6 +103,7 @@ const SEARCH_LIMIT = 20;
  */
 export class PagesField<N extends string = string> extends Select<N, string[]> {
 	private exceptId: number | null = null;
+	private site: Site | null = null;
 
 	constructor(name: N) {
 		super(name);
@@ -123,6 +125,29 @@ export class PagesField<N extends string = string> extends Select<N, string[]> {
 			throw new Error(`"${this.name}": max() needs at least 1.`);
 		}
 		return this.rules(`max:${count}`);
+	}
+
+	/**
+	 * Lets the editor add a page by typing its name: published, of the one
+	 * `of()` type, under the parent of the newest page of that type (a tag
+	 * next to the other tags). The first page of the type is made in Pages.
+	 * With `fields` and `using`, the plain Select creatable().
+	 */
+	override creatable(fields: Field[] = [], using?: (validated: Record<string, unknown>) => unknown): this {
+		if (using !== undefined) {
+			return super.creatable(fields, using);
+		}
+		if (fields.length > 0) {
+			throw new Error(`"${this.name}": creatable(fields) needs a using closure: without one the CMS creates the page from a name.`);
+		}
+		return super.creatable([new S().text("name").label("Name").required().rules("max:255")], (validated) => {
+			if (this.site === null) {
+				throw new Error(`"${this.name}": creatable() runs only on a form the CMS admin built.`);
+			}
+			const { locale, user } = currentContext();
+			const id = (user as { id?: unknown } | null)?.id;
+			return quickCreatePage(this.site, this.typePairs(), { name: String(validated.name ?? ""), locale, by: typeof id === "number" || typeof id === "string" ? id : null });
+		});
 	}
 
 	/** Leaves this page out of the search and rejects it on save: a page does not reference itself. */
@@ -151,6 +176,7 @@ export class PagesField<N extends string = string> extends Select<N, string[]> {
 	/** The search and label lookup over the site's pages, drafts included: an editor may reference a page before publishing it. */
 	bindCms(binding: CmsFieldBinding): this {
 		const { site } = binding;
+		this.site = site;
 		const accepts = (page: { id: number; type: string; subtype: string | null }) =>
 			page.id !== this.exceptId && acceptsType(this.typePairs(), page.type, page.subtype);
 		const label = async (page: { id: number; name: Record<string, unknown> }) =>
