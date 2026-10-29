@@ -246,6 +246,7 @@ const cms = createCms({
 	auth: cmsAuth(auth), // a betterAuth({...}) instance: section access, the panel session, sign-in and Users pages (see Users and sign-in)
 	// authorize: (user, ability) => can(user, ability), // without an auth adapter: "tbtop-cms.pages", … (CMS_ABILITIES)
 	adminPrefix: "/admin", // the panel's prefix; robots.txt disallows it
+	llmsTxt: { sections: [docsSection] }, // host sections of /llms.txt; enabled: false leaves the URL to the host (see llms.txt)
 	admin: { locales: ["en", "uk"], locale: "en" }, // the panel's UI languages (not content languages), saved per admin
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
@@ -263,7 +264,7 @@ const result = await cms.loadPage(request);
 // { type: "page", status, headers, props: { page, render, seo, breadcrumbs, path, isPreview, cms } }
 // | { type: "redirect", status, location } | { type: "notFound", status: 404, locale, path, cms, props } (props: ErrorPageProps)
 const errorProps = await cms.errorPage(request, 500); // ErrorPageProps for the host's own 5xx handler (see Error pages)
-(await cms.handle(request)) ?? ...; // robots.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/...
+(await cms.handle(request)) ?? ...; // robots.txt, llms.txt, sitemap.xml, sitemap-N.xml, POST /_cms/forms/...
 
 // Admin
 createAdmin({
@@ -405,6 +406,31 @@ in the default language) and a fixture page with `errorClass: "4xx"` is one.
 They have no slug and are not in the sitemap. For a 5xx `errorPage` never
 throws: when the database is what failed, it logs and answers fallback
 props built without it (no settings, languages or layout).
+
+### llms.txt
+
+`cms.handle()` answers `GET /llms.txt` (llmstxt.org, the PHP package's
+`LlmsTxt`) once an editor turns it on in SEO settings → *For AI*; it 404s
+before that and while indexing is off. The file, in the default language:
+the site name as `#`, `> summary` (`seo.llms_txt.summary`, else the default
+description), the editor's notes without headings, the contacts (phones,
+emails, address, opening hours, social links), one `## section` per base
+page type with the live indexable pages (`seo.llms_txt.types`, empty = all;
+up to `seo.llms_txt.per_type`, default 50: articles newest first, others
+home first, then by depth, picked from the type's first 1000 pages by sort
+order), the host's sections, `## Optional` with the
+sitemap. A host section is `{ title(locale), links(locale, site) }`
+returning `{ name, url, notes? }`; a relative `url` is made absolute.
+
+```ts
+const docsSection: LlmsTxtSection = {
+	title: () => "Docs",
+	links: () => [{ name: "API", url: "/docs/api", notes: "REST reference" }],
+};
+```
+
+The same tab can add `Content-Signal: search=yes, ai-input=yes, ai-train=no`
+(contentsignals.org) to robots.txt, each signal switchable; off by default.
 
 ### Access
 
@@ -989,7 +1015,7 @@ export default {
 - SEO: the full `seo` prop (title/description templates, Open Graph,
   alternates, x-default, verification tokens, the GTM container id), JSON-LD (WebSite,
   BreadcrumbList, the WebPage/Article families, CollectionPage, block nodes,
-  site identity), robots.txt, chunked sitemap with hreflang alternates.
+  site identity), robots.txt with an opt-in Content-Signal, llms.txt, chunked sitemap with hreflang alternates.
 - Forms: the submit endpoint, honeypot, a per-client rate limit, stored submissions with D1-safe
   claims, retries, outbox delivery; notifications over mail, Telegram and the
   admin bell with Liquid overrides and a delivery log.
