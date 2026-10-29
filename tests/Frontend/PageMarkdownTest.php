@@ -12,6 +12,8 @@ use Tbtop\Cms\Frontend\Markdown\MarkdownContext;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Types\BasePageType;
 use Tbtop\Cms\Settings\Settings;
 use Tbtop\Cms\Tests\Fixtures\AdminUser;
 
@@ -312,4 +314,56 @@ it('still 404s an unknown .md path', function (): void {
     markdownOn();
 
     $this->getJson('/missing.md')->assertNotFound();
+});
+
+/** A page type whose markdown part throws. */
+final class MdBrokenType extends BasePageType
+{
+    public function key(): string
+    {
+        return 'md_broken';
+    }
+
+    #[Override]
+    public function toMarkdown(Page $page, MarkdownContext $ctx): string
+    {
+        throw new RuntimeException('boom');
+    }
+}
+
+/** A page type that links an unsafe and a safe URL. */
+final class MdLinkedType extends BasePageType
+{
+    public function key(): string
+    {
+        return 'md_linked';
+    }
+
+    #[Override]
+    public function toMarkdown(Page $page, MarkdownContext $ctx): string
+    {
+        return $ctx->link('Bad', 'javascript:alert(1)') . ' ' . $ctx->link('Good', '/ok');
+    }
+}
+
+it('leaves out a page type part that throws; strict mode rethrows', function (): void {
+    PageTypeRegistry::extend(fn (): array => [MdBrokenType::class]);
+    markdownOn();
+    mdPage(['type' => 'md_broken', 'name' => ['en' => 'Broken']]);
+
+    expect($this->get('/broken.md')->assertOk()->getContent())->toContain('# Broken');
+
+    config(['tbtop-cms.blocks.strict' => true]);
+    $this->withoutExceptionHandling();
+
+    expect(fn () => $this->get('/broken.md'))->toThrow(RuntimeException::class, 'boom');
+});
+
+it('drops the link of an unsafe URL and keeps its text', function (): void {
+    PageTypeRegistry::extend(fn (): array => [MdLinkedType::class]);
+    markdownOn();
+    mdPage(['type' => 'md_linked', 'name' => ['en' => 'Linked']]);
+
+    expect($this->get('/linked.md')->assertOk()->getContent())->toContain('Bad [Good](' . url('/ok') . ')')
+        ->not->toContain('javascript:');
 });

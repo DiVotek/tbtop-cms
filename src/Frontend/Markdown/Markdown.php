@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Frontend\Markdown;
 
 use Illuminate\Support\Facades\URL;
+use Tbtop\Cms\Richtext\RichtextLinkRenderer;
 
 /**
  * Markdown building blocks for a page's `.md` version, so that stored text
@@ -64,6 +65,11 @@ final class Markdown
 
     public static function link(string $text, string $url): string
     {
+        // The richtext renderer's check: a javascript: or data: URL keeps only its text.
+        if (! app(RichtextLinkRenderer::class)->isAllowedUrl($url)) {
+            return self::escape(self::inline($text));
+        }
+
         return '[' . self::escape(self::inline($text)) . '](' . self::url($url) . ')';
     }
 

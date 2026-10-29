@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Markdown;
 
+use Illuminate\Support\Facades\Log;
 use Tbtop\Cms\Block\ResolvedBlock;
 use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxt;
 use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtContacts;
@@ -11,6 +12,7 @@ use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtMarkdown;
 use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Support\PageTranslation;
+use Throwable;
 
 /**
  * A page's markdown version: YAML frontmatter from the resolved SEO, the
@@ -48,11 +50,27 @@ final readonly class PageMarkdown
             $parts[] = $this->blocks->render($block, $ctx);
         }
 
-        $parts[] = trim((string) $type?->toMarkdown($page, $ctx));
+        $parts[] = self::typeMarkdown($ctx, $type);
         $parts[] = $this->about($ctx);
         $parts[] = self::jsonLd($seo['jsonLd'] ?? []);
 
         return implode("\n\n", array_filter($parts, static fn (string $part): bool => $part !== '')) . "\n";
+    }
+
+    /** The page type's part; like a block's, a throw leaves it out with a warning unless `tbtop-cms.blocks.strict`. */
+    private static function typeMarkdown(MarkdownContext $ctx, ?PageTypeInterface $type): string
+    {
+        try {
+            return trim((string) $type?->toMarkdown($ctx->page, $ctx));
+        } catch (Throwable $e) {
+            if ((bool) config('tbtop-cms.blocks.strict', false)) {
+                throw $e;
+            }
+
+            Log::warning('tbtop-cms: page type toMarkdown() failed', ['type' => $type?->key(), 'page' => $ctx->page->getKey(), 'exception' => $e]);
+
+            return '';
+        }
     }
 
     /** @param  array<string, mixed>  $seo */

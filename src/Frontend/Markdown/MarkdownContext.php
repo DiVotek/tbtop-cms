@@ -52,7 +52,7 @@ final readonly class MarkdownContext
         return Markdown::heading($level, $text);
     }
 
-    /** `[text](url)`, the URL made absolute. */
+    /** `[text](url)`, the URL made absolute; an unsafe URL (javascript:, data:) leaves the text alone. */
     public function link(string $text, string $url): string
     {
         return Markdown::link($text, $url);
