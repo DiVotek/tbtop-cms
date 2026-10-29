@@ -63,10 +63,11 @@ export function mightWantMarkdown(request: Request): boolean {
 /**
  * The page as markdown (PageController::markdownResponse), or null to leave
  * the request to the host: markdown off, not asked for, or no live page there
- * (the host's 404 then answers it). Drafts are never served.
+ * (the host's 404 then answers it). Drafts are never served; only GET and
+ * HEAD are answered.
  */
 export async function markdownResponse(site: Site, request: Request): Promise<Response | null> {
-	if (!mightWantMarkdown(request) || !(await markdownEnabled(site)) || !(await indexingEnabled(site))) {
+	if ((request.method !== "GET" && request.method !== "HEAD") || !mightWantMarkdown(request) || !(await markdownEnabled(site)) || !(await indexingEnabled(site))) {
 		return null;
 	}
 	const url = new URL(request.url);

@@ -50,6 +50,7 @@ describe("page markdown", () => {
 		expect(await res?.text()).toContain("# About us");
 		expect(await md(cms, "/about-us", { headers: { Accept: "text/html,application/xhtml+xml,*/*;q=0.8" } })).toBeNull();
 		expect(await md(cms, "/about-us", { headers: { Accept: "text/markdown", "X-Inertia": "true" } })).toBeNull();
+		expect(await md(cms, "/about-us.md", { method: "POST" })).toBeNull();
 	});
 
 	test("the home page at /index.md, with its blocks", async () => {
