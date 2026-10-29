@@ -14,9 +14,17 @@ PHP ^8.4 · Laravel 11 / 12 / 13 · No Filament.
 - Static analysis: PHPStan / Larastan (level 6)
 - Refactor: Rector
 - CI: GitHub Actions — `ci.yml` runs lint, analyse, blocks-types
-  (`composer types:blocks:check`), test and frontend (bun) as parallel jobs;
-  `Test (MySQL)` (`composer test:mysql`) runs only on PRs into and pushes to
-  `main`, so it shows Skipped on PRs into `release/**`
+  (`composer types:blocks:check`), test and frontend (bun) as parallel jobs.
+  A `Path filter` job gates them: PHP jobs run when PHP-side files change,
+  Frontend when `resources/js` or bun config changes, everything when
+  `.github/workflows` changes or on a manual run (`workflow_dispatch`);
+  a docs-only PR runs none. A draft PR runs none but `Workflow lint`: it gets the `triage`
+  review first, and the full run starts on "Ready for review" (to test a draft,
+  run the workflow on its branch by hand). Merging needs a non-draft PR, so
+  every merge has a full run. `Test (MySQL)` (`composer test:mysql`) runs only
+  on PRs into and pushes to `main`. `Workflow lint` (actionlint)
+  runs on workflow changes. `CI ok` sums them up and is the one required check:
+  a skipped job counts as passed. A new job goes into its `needs`
 
 ## Commands
 
@@ -119,7 +127,7 @@ branch. The release is a PR `release/<version>` → `main`, merged with
 `gh pr merge --squash`; GitHub deletes the branch. History lives in
 `.changes/*.md` and the closed PRs.
 
-Merging to `main` needs the Lint, Analyse, Test and Frontend checks green and
+Merging to `main` needs the `CI ok` check green and
 every review thread resolved. Auto-merge is off: merge with
 `gh pr merge --squash`. Auto-review is `pr-agent-pilot[bot]`: its verdict is
 the `triage` check-run, its findings are inline review comments. A clean re-run

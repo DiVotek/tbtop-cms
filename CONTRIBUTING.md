@@ -55,9 +55,10 @@ CI is authoritative for frontend tests.
 
 CI (`.github/workflows/ci.yml`) runs the check-only variants of these:
 `composer validate --strict`, Pint in check mode (`test:lint`), PHPStan
-(`analyse`), the Pest suite against each supported `orchestra/testbench`
-version, and the frontend type check and tests. Rector is a local aid and is
-not enforced in CI. All CI jobs must pass before merge.
+(`analyse`), the Pest suite on PHP 8.4 / Testbench 11, and the frontend type
+check and tests. Each job runs only when its files change (see the `Path
+filter` job); the `CI ok` check sums them up and must pass before merge.
+Rector is a local aid and is not enforced in CI.
 
 ## Manual review (Workbench)
 
