@@ -72,8 +72,8 @@ jobs:
               - 'bun.lock'
               - 'bunfig.toml'
               - 'test-setup.ts'
-              - 'tsconfig.json'
-              - 'vite.config.js'
+              - 'tsconfig*.json'
+              - 'vite.config.*'
 
   actionlint:
     name: Workflow lint
