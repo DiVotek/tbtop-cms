@@ -13,7 +13,7 @@
         "@json-render/core": "^0.19.0",
         "@json-render/react": "^0.19.0",
         "@tbtop/admin": "file:.tbtop/packages/node",
-        "@tbtop/inertia-admin": "^0.7.1",
+        "@tbtop/inertia-admin": "^0.7.3",
         "@testing-library/react": "^16.3.2",
         "@types/bun": "^1.3.11",
         "@types/pg": "^8.23.1",
@@ -33,7 +33,7 @@
         "@json-render/core": "^0.19.0",
         "@json-render/react": "^0.19.0",
         "@tbtop/admin": "*",
-        "@tbtop/inertia-admin": "^0.7.1",
+        "@tbtop/inertia-admin": "^0.7.3",
         "better-auth": "^1.7.0",
         "kysely": "^0.28.0",
         "react": "^19.0.0",
@@ -428,7 +428,7 @@
 
     "@tbtop/admin": ["@tbtop/admin@file:.tbtop/packages/node", { "dependencies": { "markdown-it": "^15.0.3" }, "devDependencies": { "@arethetypeswrong/cli": "^0.18.5", "@electric-sql/pglite": "^0.5.11", "@types/bun": "^1.3.11", "@types/markdown-it": "^14.2.0", "ajv": "^8.17.1", "kysely": "^0.28.2", "kysely-bun-sqlite": "^0.4.0", "kysely-pglite-dialect": "^1.4.0", "publint": "^0.3.25", "sharp": "0.34", "tsup": "^8.5.1", "typescript": "^5.9.0" }, "peerDependencies": { "kysely": "^0.28.0" }, "optionalPeers": ["kysely"] }],
 
-    "@tbtop/inertia-admin": ["@tbtop/inertia-admin@0.7.1", "", { "dependencies": { "@base-ui/react": "^1.5.0", "@dnd-kit/core": "^6.3.1", "@dnd-kit/modifiers": "^9.0.0", "@dnd-kit/sortable": "^10.0.0", "@dnd-kit/utilities": "^3.2.2", "@inertiajs/react": "^3.3.1", "@lexical/code": "^0.44.0", "@lexical/html": "^0.44.0", "@lexical/link": "^0.44.0", "@lexical/list": "^0.44.0", "@lexical/markdown": "^0.44.0", "@lexical/react": "^0.44.0", "@lexical/rich-text": "^0.44.0", "@lexical/selection": "^0.44.0", "@lexical/utils": "^0.44.0", "@radix-ui/react-checkbox": "^1.1.4", "@radix-ui/react-dropdown-menu": "^2.1.17", "@radix-ui/react-label": "^2.1.2", "@radix-ui/react-popover": "^1.1.6", "@radix-ui/react-radio-group": "^1.2.3", "@radix-ui/react-select": "^2.1.6", "@radix-ui/react-separator": "^1.1.2", "@radix-ui/react-slider": "^1.4.1", "@radix-ui/react-slot": "^1.1.2", "@radix-ui/react-switch": "^1.1.3", "@radix-ui/react-tabs": "^1.1.3", "@radix-ui/react-toggle-group": "^1.1.13", "@radix-ui/react-tooltip": "^1.2.9", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "input-otp": "^1.4.2", "lexical": "^0.44.0", "lucide-react": "^0.469.0", "react-colorful": "^5", "react-day-picker": "^9", "react-hook-form": "^7.75.0", "recharts": "^2.15.0", "sonner": "^2.0.7", "tailwind-merge": "^2.6.0", "tw-animate-css": "^1.4.0" }, "peerDependencies": { "react": "^19", "react-dom": "^19" } }, "sha512-A82bHkT8ALPAx6DAaZJy/qHoUgoYNfVDCs6E2qa/g3oTRjPJSRbbB8JZUY0o0v43nbCe/QSYhybPvg01FRkMLg=="],
+    "@tbtop/inertia-admin": ["@tbtop/inertia-admin@0.7.3", "", { "dependencies": { "@base-ui/react": "^1.5.0", "@dnd-kit/core": "^6.3.1", "@dnd-kit/modifiers": "^9.0.0", "@dnd-kit/sortable": "^10.0.0", "@dnd-kit/utilities": "^3.2.2", "@inertiajs/react": "^3.3.1", "@lexical/code": "^0.44.0", "@lexical/html": "^0.44.0", "@lexical/link": "^0.44.0", "@lexical/list": "^0.44.0", "@lexical/markdown": "^0.44.0", "@lexical/react": "^0.44.0", "@lexical/rich-text": "^0.44.0", "@lexical/selection": "^0.44.0", "@lexical/utils": "^0.44.0", "@radix-ui/react-checkbox": "^1.1.4", "@radix-ui/react-dropdown-menu": "^2.1.17", "@radix-ui/react-label": "^2.1.2", "@radix-ui/react-popover": "^1.1.6", "@radix-ui/react-radio-group": "^1.2.3", "@radix-ui/react-select": "^2.1.6", "@radix-ui/react-separator": "^1.1.2", "@radix-ui/react-slider": "^1.4.1", "@radix-ui/react-slot": "^1.1.2", "@radix-ui/react-switch": "^1.1.3", "@radix-ui/react-tabs": "^1.1.3", "@radix-ui/react-toggle-group": "^1.1.13", "@radix-ui/react-tooltip": "^1.2.9", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "input-otp": "^1.4.2", "lexical": "^0.44.0", "lucide-react": "^0.469.0", "react-colorful": "^5", "react-day-picker": "^9", "react-hook-form": "^7.75.0", "recharts": "^2.15.0", "sonner": "^2.0.7", "tailwind-merge": "^2.6.0", "tw-animate-css": "^1.4.0" }, "peerDependencies": { "react": "^19", "react-dom": "^19" } }, "sha512-t+cKnHpsf8/JI+fuh0izyxgH0fc04KDT7Yf509Q3GbC7qvXbHyQLiVMrmiNQBkBS/D0zhvxj5ZjnWVKWj2mCgw=="],
 
     "@testing-library/dom": ["@testing-library/dom@10.4.2", "", { "dependencies": { "@babel/code-frame": "^7.10.4", "@babel/runtime": "^7.12.5", "@types/aria-query": "^5.0.1", "aria-query": "5.3.0", "dom-accessibility-api": "^0.5.9", "lz-string": "^1.5.0", "picocolors": "1.1.1", "pretty-format": "^27.0.2" } }, "sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q=="],
 
