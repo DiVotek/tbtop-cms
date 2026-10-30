@@ -25,7 +25,8 @@ PHP ^8.4 · Laravel 11 / 12 / 13 · No Filament.
   every merge has a full run. `Test (MySQL)` (`composer test:mysql`) runs only
   on PRs into and pushes to `main`. `Workflow lint` (actionlint)
   runs on workflow changes. `CI ok` sums them up and is the one required check:
-  a skipped job counts as passed. A new job goes into its `needs`
+  a skipped job counts as passed. A new job goes into its `needs`, and
+  `bin/verify` mirrors the path filter: change both together
 
 ## Commands
 
@@ -37,6 +38,7 @@ composer test:lint   # Pint (check only)
 composer analyse     # PHPStan
 composer refactor    # Rector (apply)
 composer serve       # Boot the Workbench app for manual review
+bin/verify           # The gate before a push to main (see Pushing to main)
 ```
 
 `:changed` variants (`composer test:all:changed`, `lint:changed`, `analyse:changed`, …)
@@ -119,22 +121,32 @@ Bump `tbtop/admin` in `composer.json` and `@tbtop/inertia-admin` in
 `package.json` together. `bun.lock` is committed, `composer.lock` is not.
 `bun update` rewrites the `package.json` range, so set the range by hand.
 
-## PRs
+## Pushing to main
 
-Work for a release goes to `release/<version>` (e.g. `release/0.1`), cut from
-a fresh `main` only after the previous release merged — a branch cut earlier
-diverges once that release is squashed. Feature and fix PRs target the release
-branch. The release is a PR `release/<version>` → `main`, merged with
-`gh pr merge --squash`; GitHub deletes the branch. History lives in
-`.changes/*.md` and the closed PRs.
+Maintainers push straight to `main` in small commits; there are no release or
+feature branches. Split a large change into steps that each keep `main`
+working (add the column, then the code that uses it; unused code or a config
+flag until the last step). One commit per step, a conventional subject
+(`feat:`, `fix:`, `feat!:` …), and a `.changes/*.md` fragment for a
+user-facing change.
 
-Merging to `main` needs the `CI ok` check green and
-every review thread resolved. Auto-merge is off: merge with
-`gh pr merge --squash`. Auto-review is `pr-agent-pilot[bot]`: its verdict is
-the `triage` check-run, its findings are inline review comments. A clean re-run
-posts no new review, so poll the check-run, not reviews. Validate each finding,
-fix or reply, then resolve the thread (GraphQL `resolveReviewThread`). The
-`Devin Review` check passes without reviewing (no credits left).
+1. `bin/vendor-cache` at the start (plain `composer install` when
+   `TBTOP_VENDOR_CACHE` is unset); `composer hooks` once per clone.
+2. Commit, `git pull --rebase origin main`, then `bin/verify`: the CI checks for
+   the areas changed since `origin/main` and the `triage` review (CLI on PATH,
+   `TRIAGE_URL`/`TRIAGE_TOKEN` set; `triage ack <id> --reason …` accepts a
+   finding). Green stamps HEAD.
+3. `git push origin HEAD:main`. The pre-push hook refuses a commit `bin/verify`
+   did not stamp, so a rebase that pulled new commits needs a fresh verify.
+
+CI on `main` is the record. A red `main` is fixed first, by whoever pushed the
+commit: fix forward or revert. Public API changes take the same path; they are
+agreed in the discussion before they land. A release is the Release workflow run
+from `main`.
+
+Outside contributors open PRs to `main`: `CI ok` is the required check and
+`pr-agent-pilot[bot]` reviews them (its verdict is the `triage` check-run).
+Merge with `gh pr merge --squash` once every review thread is resolved.
 
 ## Docs
 
