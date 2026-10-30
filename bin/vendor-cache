@@ -30,4 +30,6 @@ if [ ! -f "$want" ]; then
 	tar --exclude=.git -czf "$want.tmp" vendor composer.lock
 	mv "$want.tmp" "$want"
 	echo "vendor-cache: saved $(basename "$want")"
+	# Keep the three newest.
+	ls -t "$dir"/tbtop-cms-vendor-*.tgz | tail -n +4 | xargs -r rm -f
 fi
