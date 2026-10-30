@@ -5,7 +5,8 @@
 #
 # The tarball is keyed by the hash of composer.json. On a miss it starts from
 # the newest tarball, so `composer install` only fetches what changed, then
-# saves a tarball for the new key.
+# saves a tarball for the new key. Every sandbox that can write the directory
+# can change the code the others run: point it only at storage you trust.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

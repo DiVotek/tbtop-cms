@@ -138,6 +138,8 @@ user-facing change.
    finding). Green stamps HEAD.
 3. `git push origin HEAD:main`. The pre-push hook refuses a commit `bin/verify`
    did not stamp, so a rebase that pulled new commits needs a fresh verify.
+   The hook is local and opt-in: never push with `--no-verify`, and use
+   `bin/verify --no-triage` only when triage is down, saying so in the commit.
 
 CI on `main` is the record. A red `main` is fixed first, by whoever pushed the
 commit: fix forward or revert. Public API changes take the same path; they are

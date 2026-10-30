@@ -6,15 +6,23 @@
 #
 #   bin/verify          checks for what changed since origin/main
 #   bin/verify --all    every check, whatever changed
+#   --no-triage         stamp without the triage review (say so in the commit)
 #
-# Triage runs when TRIAGE_URL is set and a `triage` binary is on PATH (or at
-# $TRIAGE_BIN). Its exit 1 (confirmed blocking finding) or 2 (no verdict) fails
-# the gate; accept a finding with `triage ack <id> --reason …` and re-run.
+# Triage needs TRIAGE_URL and a `triage` binary on PATH (or at $TRIAGE_BIN);
+# without them verify fails unless --no-triage is passed. Its exit 1
+# (confirmed blocking finding) or 2 (no verdict) fails the gate; accept a finding with `triage ack <id> --reason …` and re-run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 all=false
-[ "${1:-}" = "--all" ] && all=true
+skip_triage=false
+for arg in "$@"; do
+	case "$arg" in
+	--all) all=true ;;
+	--no-triage) skip_triage=true ;;
+	*) echo "usage: bin/verify [--all] [--no-triage]" >&2; exit 2 ;;
+	esac
+done
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 	echo "verify: commit or stash your changes first; the stamp is for HEAD" >&2
@@ -27,8 +35,9 @@ changed="$(git diff --name-only "$base" HEAD)"
 
 touches() { $all || grep -qE "$1" <<<"$changed"; }
 
-# The same areas as the Path filter job in .github/workflows/ci.yml.
-php_re='(\.php$|^composer\.json$|^phpunit\.xml\.dist$|^testbench\.yaml$|^phpstan|^pint\.json$|^config/|^database/|^resources/(views|lang)/|^workbench/|^tests/|\.fixture\.json$|\.generated\.ts$|^\.github/workflows/)'
+# The same areas as the Path filter job in .github/workflows/ci.yml, plus
+# bin/ (this gate itself) under PHP.
+php_re='(^bin/|\.php$|^composer\.json$|^phpunit\.xml\.dist$|^testbench\.yaml$|^phpstan|^pint\.json$|^config/|^database/|^resources/(views|lang)/|^workbench/|^tests/|\.fixture\.json$|\.generated\.ts$|^\.github/workflows/)'
 front_re='(^resources/js/|^workbench/resources/js/|^package\.json$|^bun\.lock$|^bunfig\.toml$|^test-setup\.ts$|^tsconfig.*\.json$|^vite\.config\.|^\.github/workflows/)'
 node_re='(^packages/node/|^\.github/workflows/)'
 
@@ -69,12 +78,16 @@ if [ -f "$triage" ] && ! "$triage" --help >/dev/null 2>&1; then
 	chmod +x "$local_copy"
 	triage="$local_copy"
 fi
-if [ -n "${TRIAGE_URL:-}" ] && [ -n "$triage" ]; then
+if $skip_triage; then
+	echo
+	echo "verify: triage skipped on request (--no-triage)"
+elif [ -n "${TRIAGE_URL:-}" ] && [ -n "$triage" ]; then
 	step "Triage: review of $base..HEAD"
 	"$triage" "$base..HEAD"
 else
-	echo
-	echo "verify: triage skipped (set TRIAGE_URL and put triage on PATH)"
+	echo "verify: triage is not set up (TRIAGE_URL, triage on PATH or TRIAGE_BIN);" >&2
+	echo "        pass --no-triage to stamp without the review" >&2
+	exit 1
 fi
 
 git rev-parse HEAD > "$(git rev-parse --git-path tbtop-verified)"
