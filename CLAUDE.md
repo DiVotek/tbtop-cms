@@ -148,9 +148,9 @@ CI on `main` is the record. A red `main` comes before any other work: whoever
 pushed the commit fixes forward or reverts. A release is the Release workflow
 run from `main`.
 
-Outside contributors open PRs to `main`; `CI ok` is the required check and
-`pr-agent-pilot[bot]` posts the `triage` check-run and inline findings. Merge
-with `gh pr merge --squash` once every review thread is resolved.
+Outside contributors take the PR path in `CONTRIBUTING.md`; when you handle
+their PR, `pr-agent-pilot[bot]` findings are inline threads, its verdict is the
+`triage` check-run, and you merge with `gh pr merge --squash`.
 
 ## Docs
 

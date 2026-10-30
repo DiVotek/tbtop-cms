@@ -84,7 +84,9 @@ admin blocks).
 - Add or adjust tests for any behavior change — see the testing policy below.
 - All CI jobs (lint, analyse, test matrix, frontend) must be green.
 - All review conversation threads must be resolved before merge — this repo
-  enforces conversation resolution as a merge requirement.
+  enforces conversation resolution as a merge requirement. An automated
+  reviewer (`triage`) comments on every PR; reply to or fix each finding.
+- Maintainers merge with a squash, so the PR title becomes the commit subject.
 
 ### Testing policy
 
