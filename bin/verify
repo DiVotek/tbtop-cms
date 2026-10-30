@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# The local gate before a push to main: runs the checks CI runs for the areas
+# the commits since origin/main touch, then the triage review. On success it
+# stamps HEAD, and the pre-push hook (bin/git-hooks/pre-push) lets only a
+# stamped commit go to main.
+#
+#   bin/verify          checks for what changed since origin/main
+#   bin/verify --all    every check, whatever changed
+#
+# Triage runs when TRIAGE_URL is set and a `triage` binary is on PATH (or in
+# $TRIAGE_BIN). Its exit 1 (confirmed blocking finding) or 2 (no verdict) fails
+# the gate; accept a finding with `triage ack <id> --reason …` and re-run.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+all=false
+[ "${1:-}" = "--all" ] && all=true
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+	echo "verify: commit or stash your changes first; the stamp is for HEAD" >&2
+	exit 1
+fi
+
+git fetch -q origin main
+base="$(git merge-base origin/main HEAD)"
+changed="$(git diff --name-only "$base" HEAD)"
+
+touches() { $all || grep -qE "$1" <<<"$changed"; }
+
+# The same areas as the Path filter job in .github/workflows/ci.yml.
+php_re='(\.php$|^composer\.json$|^phpunit\.xml\.dist$|^testbench\.yaml$|^phpstan|^pint\.json$|^config/|^database/|^resources/(views|lang)/|^workbench/|^tests/|\.fixture\.json$|\.generated\.ts$|^\.github/workflows/)'
+front_re='(^resources/js/|^workbench/resources/js/|^package\.json$|^bun\.lock$|^bunfig\.toml$|^test-setup\.ts$|^tsconfig.*\.json$|^vite\.config\.|^\.github/workflows/)'
+node_re='(^packages/node/|^\.github/workflows/)'
+
+step() { echo; echo "== $*"; }
+
+if touches "$php_re"; then
+	step "PHP: lint, analyse, block types, tests"
+	composer validate --strict --no-check-publish -q
+	vendor/bin/pint --test
+	vendor/bin/phpstan analyse --no-progress
+	composer types:blocks:check
+	vendor/bin/pest --parallel
+fi
+
+if touches "$front_re"; then
+	step "Frontend: typecheck, tests"
+	bun install --frozen-lockfile
+	bun run typecheck
+	bun run test
+fi
+
+if touches "$node_re"; then
+	step "Node: typecheck, tests (postgres, mysql and E2E stay in CI)"
+	(
+		cd packages/node
+		./scripts/fetch-admin.sh
+		bun install --frozen-lockfile
+		bun run typecheck
+		bun run test
+	)
+fi
+
+triage="${TRIAGE_BIN:-$(command -v triage || true)}"
+if [ -n "${TRIAGE_URL:-}" ] && [ -n "$triage" ]; then
+	step "Triage: review of $base..HEAD"
+	"$triage" "$base..HEAD"
+else
+	echo
+	echo "verify: triage skipped (set TRIAGE_URL and put triage on PATH)"
+fi
+
+git rev-parse HEAD > "$(git rev-parse --git-path tbtop-verified)"
+echo
+echo "verify: $(git rev-parse --short HEAD) is green, push it"

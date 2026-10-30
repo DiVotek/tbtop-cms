@@ -96,7 +96,12 @@
             "@test:changed"
         ],
         "types:blocks": "@php bin/generate-block-types.php",
-        "types:blocks:check": "@php bin/generate-block-types.php --check"
+        "types:blocks:check": "@php bin/generate-block-types.php --check",
+        "verify": [
+            "Composer\\Config::disableProcessTimeout",
+            "bin/verify"
+        ],
+        "hooks": "git config core.hooksPath bin/git-hooks"
     },
     "extra": {
         "laravel": {
