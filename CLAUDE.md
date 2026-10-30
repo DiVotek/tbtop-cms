@@ -19,11 +19,9 @@ PHP ^8.4 · Laravel 11 / 12 / 13 · No Filament.
   Frontend when `resources/js` or bun config changes, the Node jobs (`Node`,
   `Node (postgres|mysql)`, `Node E2E`) when `packages/node/**` changes, everything when
   `.github/workflows` changes or on a manual run (`workflow_dispatch`);
-  a docs-only PR runs none. A draft PR runs none but `Workflow lint`: it gets the `triage`
-  review first, and the full run starts on "Ready for review" (to test a draft,
-  run the workflow on its branch by hand). Merging needs a non-draft PR, so
-  every merge has a full run. `Test (MySQL)` (`composer test:mysql`) runs only
-  on PRs into and pushes to `main`. `Workflow lint` (actionlint)
+  a docs-only change runs none, and a draft PR runs only `Workflow lint`.
+  `Test (MySQL)` (`composer test:mysql`) runs only on pushes to and PRs into
+  `main`. `Workflow lint` (actionlint)
   runs on workflow changes. `CI ok` sums them up and is the one required check:
   a skipped job counts as passed. A new job goes into its `needs`, and
   `bin/verify` mirrors the path filter: change both together
@@ -50,7 +48,6 @@ database must exist and the user needs `CREATE DATABASE`: each parallel worker
 gets its own `{DB_DATABASE}_test_N`. Those worker databases persist between
 runs (the first `migrate:fresh` of each run resets them); drop them for a
 clean start.
-Before the release PR, the local run stands in for the CI job.
 
 Headless checks: `vendor/bin/testbench route:list`, `vendor/bin/testbench tinker
 --execute=…`, or a one-off Pest test on the existing TestCase.
@@ -143,7 +140,7 @@ and a user-facing one adds its `.changes/*.md` fragment.
 
 ## Docs
 
-`docs/host/ai/` is verified against `src/`. A PR that changes a host-facing
+`docs/host/ai/` is verified against `src/`. A change to a host-facing
 extension point — `Block`, `PageTypeInterface`, `Channel`, a config key, a
 command, a route, an Inertia prop, a `Settings` key — updates the matching
-file there (and `inventory.md`) in the same PR.
+file there (and `inventory.md`) in the same commit.
