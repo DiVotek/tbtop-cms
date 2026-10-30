@@ -81,6 +81,9 @@ fi
 if $skip_triage; then
 	echo
 	echo "verify: triage skipped on request (--no-triage)"
+elif [ "$base" = "$(git rev-parse HEAD)" ]; then
+	echo
+	echo "verify: no commits since origin/main, nothing for triage to review"
 elif [ -n "${TRIAGE_URL:-}" ] && [ -n "$triage" ]; then
 	step "Triage: review of $base..HEAD"
 	"$triage" "$base..HEAD"

@@ -132,7 +132,7 @@ and a user-facing one adds its `.changes/*.md` fragment.
    lists what it runs and its flags). Done when it ends with `is green`, which
    stamps HEAD. On a `triage` finding, fix it, or accept it with
    `triage ack <id> --reason …`, then verify again.
-2. `git push origin HEAD:main`. The pre-push hook (`composer hooks` enables it
+2. `git push origin HEAD:main`. The pre-push hook (`composer hooks` or `bin/vendor-cache` enables it
    once per clone) passes only the stamped commit: a rejected push means new
    commits came in, so go back to step 1. Always push through the hook
    (`--no-verify` is off-limits); when the triage server is down,

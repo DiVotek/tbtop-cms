@@ -10,6 +10,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Sandboxes run as root, where composer disables plugins (phpstan's
+# extension-installer among them) and refuses to run scripts.
+[ "$(id -u)" = 0 ] && export COMPOSER_ALLOW_SUPERUSER=1
+
+# The same as `composer hooks`, which a root shell refuses to run.
+git config core.hooksPath bin/git-hooks
+
 dir="${TBTOP_VENDOR_CACHE:-}"
 if [ -z "$dir" ]; then
 	composer install --no-interaction
