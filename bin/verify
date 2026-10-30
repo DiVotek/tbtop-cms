@@ -7,7 +7,7 @@
 #   bin/verify          checks for what changed since origin/main
 #   bin/verify --all    every check, whatever changed
 #
-# Triage runs when TRIAGE_URL is set and a `triage` binary is on PATH (or in
+# Triage runs when TRIAGE_URL is set and a `triage` binary is on PATH (or at
 # $TRIAGE_BIN). Its exit 1 (confirmed blocking finding) or 2 (no verdict) fails
 # the gate; accept a finding with `triage ack <id> --reason …` and re-run.
 set -euo pipefail
@@ -62,6 +62,13 @@ if touches "$node_re"; then
 fi
 
 triage="${TRIAGE_BIN:-$(command -v triage || true)}"
+# A shared mount may be noexec: run a local copy then.
+if [ -f "$triage" ] && ! "$triage" --help >/dev/null 2>&1; then
+	local_copy="$(git rev-parse --git-path triage-bin)"
+	cmp -s "$triage" "$local_copy" 2>/dev/null || cp "$triage" "$local_copy"
+	chmod +x "$local_copy"
+	triage="$local_copy"
+fi
 if [ -n "${TRIAGE_URL:-}" ] && [ -n "$triage" ]; then
 	step "Triage: review of $base..HEAD"
 	"$triage" "$base..HEAD"
