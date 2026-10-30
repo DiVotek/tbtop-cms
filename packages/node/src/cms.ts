@@ -182,11 +182,13 @@ export function createCms<const T extends readonly PageTypeDef[] = []>(config: C
 			if (!(await indexingEnabled(scope))) {
 				return new Response(null, { status: 404 });
 			}
+			// SitemapController: the XML under the content cache per origin, the indexing check above it.
 			if (pathname === "/sitemap.xml") {
-				return xml(await sitemapIndexXml(scope));
+				return xml(await scope.rememberLive(`sitemap:index:${scope.origin}`, () => sitemapIndexXml(scope)));
 			}
 			const chunk = Number(SITEMAP_CHUNK.exec(pathname)?.[1]);
-			return chunk > (await chunkCount(scope)) ? new Response(null, { status: 404 }) : xml(await sitemapChunkXml(scope, chunk));
+			const count = await scope.rememberLive(`sitemap:count:${scope.origin}`, () => chunkCount(scope));
+			return chunk > count ? new Response(null, { status: 404 }) : xml(await scope.rememberLive(`sitemap:chunk:${scope.origin}:${chunk}`, () => sitemapChunkXml(scope, chunk)));
 		},
 		errorPage: (request, status) => errorPage(site(request, { cached: true }), request, status),
 		tasks: {

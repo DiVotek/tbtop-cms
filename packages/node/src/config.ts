@@ -155,11 +155,12 @@ export type CmsConfig<T extends readonly PageTypeDef[] = readonly PageTypeDef[]>
 	/** `redirects.allowedExternalHosts`: hosts an external redirect target may use, matched case-insensitively (`tbtop-cms.redirects.allowed_external_hosts`); default none. */
 	redirects?: { allowedExternalHosts?: string[] };
 	/**
-	 * Cross-request cache of the settings and languages that frontend reads
-	 * hit on every request (`tbtop-cms.cache`): `memoryCache()` on one server,
+	 * Cross-request cache of what frontend requests read every time
+	 * (`tbtop-cms.cache`): settings, languages, collections, the header and
+	 * footer, the sitemap and llms.txt. `memoryCache()` on one server,
 	 * `kvCache(env.KV)` on Workers. Admin reads stay live; any write through
-	 * the CMS bumps the content version. `ttl` in seconds, default 3600. Off
-	 * without a store.
+	 * the CMS bumps the content version, and an entry never outlives the next
+	 * scheduled publish. `ttl` in seconds, default 3600. Off without a store.
 	 */
 	cache?: { store: CmsCacheStore; ttl?: number };
 	/** The 404 log's noise filter (`tbtop-cms.not_found.ignore`): case-insensitive path fragments; default scanner probes (`.php`, `wp-`, …). */

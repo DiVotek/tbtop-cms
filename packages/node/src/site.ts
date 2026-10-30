@@ -83,9 +83,10 @@ export class Site {
 		options: { cached?: boolean } = {},
 	) {
 		const db = config.db;
-		this.audit = new AuditLog(db);
 		const cache = config.cache === undefined ? null : { store: new ContentCache(config.cache.store, config.cache.ttl ?? 3600), read: options.cached === true };
 		this.cache = cache;
+		// Every content write goes through the audit log: the one place that bumps the cache (InvalidatesContentCache).
+		this.audit = new AuditLog(db, async () => cache?.store.bump());
 		this.languages = new Languages(db, cache, this.audit);
 		this.settings = new Settings(db, {
 			cache,
@@ -383,11 +384,19 @@ export class Site {
 		return this.publishedEntries;
 	}
 
-	/** An entry write: this request's lists and every cached one are stale. */
+	/**
+	 * CmsCache::rememberLive on a frontend request: the value under the
+	 * content cache until a write or the next schedule transition; computed
+	 * every time otherwise.
+	 */
+	rememberLive<T>(key: string, compute: () => Promise<T>): Promise<T> {
+		return this.cache?.read === true ? this.cache.store.rememberLive(key, compute, () => this.pages.nextTransition()) : compute();
+	}
+
+	/** An entry write: this request's lists are stale (the write bumped the cached ones). */
 	private async collectionsChanged(): Promise<void> {
 		this.collectionLists.clear();
 		this.publishedEntries = null;
-		await this.cache?.store.bump();
 	}
 
 	/** Forms::props: `action` (and `honeypotField`) for a named form (`formName`) posted from `page`; the default locale unless given. */

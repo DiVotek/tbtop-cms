@@ -257,6 +257,8 @@ export async function llmsTxtResponse(site: Site, locale?: string): Promise<Resp
 	if (!(await llmsTxtEnabled(site)) || !(await indexingEnabled(site))) {
 		return new Response(null, { status: 404 });
 	}
-	const body = await llmsTxt(site, locale ?? (await site.languages.defaultLocale()));
+	const resolved = locale ?? (await site.languages.defaultLocale());
+	// LlmsTxtController: the body under the content cache per origin and locale, the switches above it.
+	const body = await site.rememberLive(`llms:${site.origin}:${resolved}`, () => llmsTxt(site, resolved));
 	return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }

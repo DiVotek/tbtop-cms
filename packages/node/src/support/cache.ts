@@ -42,32 +42,49 @@ export function kvCache(kv: KvNamespaceLike): CmsCacheStore {
 
 const VERSION_KEY = "tbtop-cms:content-version";
 const VERSION_TTL = 315_360_000;
+const TRANSITION_KEY = "next-schedule-transition";
 
 /**
  * CmsCache: frontend reads under a content version; any content write bumps
- * the version, so every older entry stops being read and ages out.
+ * the version, so every older entry stops being read and ages out. The store
+ * is written only on a miss and on a bump: a hit costs one read.
  */
 export class ContentCache {
 	private version: string | null = null;
+	/** NextScheduleTransition: the epoch second of the next published_at/unpublish_at, read once per request. */
+	private transition: Promise<number | null> | null = null;
 
 	constructor(
 		private readonly store: CmsCacheStore,
 		private readonly ttl: number,
 	) {}
 
-	async remember<T>(key: string, compute: () => Promise<T>): Promise<T> {
+	async remember<T>(key: string, compute: () => Promise<T>, ttl: number | ((value: T) => number) = this.ttl): Promise<T> {
 		const versioned = `tbtop-cms:v${await this.currentVersion()}:${key}`;
 		const hit = await this.store.get(versioned);
 		if (typeof hit === "string") {
 			return JSON.parse(hit) as T;
 		}
 		const value = await compute();
-		await this.store.set(versioned, JSON.stringify(value), this.ttl);
+		await this.store.set(versioned, JSON.stringify(value), Math.max(1, typeof ttl === "function" ? ttl(value) : ttl));
 		return value;
+	}
+
+	/**
+	 * rememberLive: like remember, but the entry never outlives the nearest
+	 * schedule transition, since a page's live scope changes then without a
+	 * write. `next` is that transition's epoch second (null: none scheduled),
+	 * itself kept under its own key until it passes, so no cron is needed.
+	 */
+	async rememberLive<T>(key: string, compute: () => Promise<T>, next: () => Promise<number | null>): Promise<T> {
+		this.transition ??= this.remember(TRANSITION_KEY, next, (at) => (at === null ? this.ttl : at - nowSeconds()));
+		const at = await this.transition;
+		return this.remember(key, compute, at === null ? this.ttl : Math.min(this.ttl, at - nowSeconds()));
 	}
 
 	async bump(): Promise<void> {
 		this.version = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+		this.transition = null;
 		await this.store.set(VERSION_KEY, this.version, VERSION_TTL);
 	}
 
@@ -79,3 +96,5 @@ export class ContentCache {
 		return this.version;
 	}
 }
+
+const nowSeconds = (): number => Math.floor(Date.now() / 1000);

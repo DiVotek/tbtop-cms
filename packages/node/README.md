@@ -252,7 +252,7 @@ const cms = createCms({
 	redirects: { allowedExternalHosts: ["partner.example"] }, // external redirect targets; default none
 	revisions: { keep: 25 }, // content snapshots per page; 0 turns revisions off
 	audit: { retentionDays: 365 }, // the admin audit trail's daily prune
-	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; settings and languages for the frontend
+	cache: { store: memoryCache(), ttl: 3600 }, // or kvCache(env.KV) on Workers; the frontend's internal reads (see Caching)
 	secretSettings: ["site.api_token"], settingsKey: env.CMS_SETTINGS_KEY, // sealed settings, never sent to the frontend
 	// The host's own tabs on Site settings: a field "tagline" saves at site.tagline and reaches the settings
 	// object as `tagline`; list a token's key (site.<name>) in secretSettings to seal it instead.
@@ -1038,6 +1038,59 @@ export default {
 ```
 
 
+### Caching
+
+`cache` keeps what every frontend request would query again: settings,
+languages, published collections, the header and footer, the sitemap
+(index, chunk count and chunks) and llms.txt, each per origin and locale
+where it varies, as `CmsCache` does in PHP. Entries live under a content
+version: any write through the CMS (a page, layout, redirect, shared block,
+language, setting or collection entry, by an admin, a seeder or a host
+script) bumps it, and every older entry stops being read. A scheduled page
+needs no write and no cron: an entry never outlives the nearest
+`published_at` or `unpublish_at` of a published page (`rememberLive`). KV
+keeps an entry at least 60 seconds, so there a page can show up to a
+minute late.
+
+The store is written only on a miss and on a bump: a warm request reads
+it and writes nothing. That matters on Workers KV, whose free plan takes
+1000 writes a day: one edit costs the bump plus one write per entry the
+next visitors miss. The scheduler's own bookkeeping (`system.*` settings)
+does not bump. KV is eventually consistent, so an edit can take about a
+minute to show in other regions.
+
+The rendered HTML is the host's to cache, as in PHP. Cache only anonymous
+`GET`s: an editor's preview and the admin carry cookies or a signed
+preview link (`?signature=`), and `loadPage` adds `Vary: Accept` while
+markdown is on; the locale is in the path. The Workers cache keys on the
+URL and ignores `Vary`, so the recipe leaves a markdown request
+(`Accept: text/markdown`) uncached. The package has no purge hook yet, so
+keep the TTL short. On Workers:
+
+```ts
+// worker.ts: anonymous page HTML in the Workers cache for 60 s
+async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+	const url = new URL(request.url);
+	const cacheable =
+		request.method === "GET" && !request.headers.has("cookie") && !url.searchParams.has("signature") && !(request.headers.get("accept") ?? "").includes("text/markdown");
+	const key = new Request(url.toString());
+	const hit = cacheable ? await caches.default.match(key) : undefined;
+	if (hit !== undefined) {
+		return hit;
+	}
+	const response = await app.fetch(request, env, ctx); // the host's own handler
+	if (cacheable && response.status === 200 && !response.headers.has("set-cookie")) {
+		const copy = new Response(response.clone().body, response);
+		copy.headers.set("Cache-Control", "public, max-age=60");
+		ctx.waitUntil(caches.default.put(key, copy));
+	}
+	return response;
+}
+```
+
+On a VPS, a reverse proxy (nginx `proxy_cache`, Caddy, a CDN) does the
+same with the same rules.
+
 ## What 0.0 has
 
 - Schema and a baseline migration equal to the PHP migrations (SQLite,
@@ -1070,10 +1123,12 @@ export default {
   `cms.tasks.pruneNotFound()` prunes, and the admin's 404 log turns a miss
   into a redirect or ignores it.
 - Cache: with `cache: { store: memoryCache() }` (one server) or
-  `kvCache(env.KV)` (Workers), frontend reads of settings and languages go
-  through a content-versioned cache (`ttl` default 3600 s). Admin reads stay
-  live and every write through the CMS bumps the version; a write made
-  around the CMS shows once the entry expires.
+  `kvCache(env.KV)` (Workers), the frontend's settings, languages,
+  collections, header and footer, sitemap and llms.txt go through a
+  content-versioned cache (`ttl` default 3600 s, capped at the next
+  scheduled publish). Admin reads stay live and every write through the CMS
+  bumps the version; a write made around the CMS shows once the entry
+  expires. See Caching.
 - Audit log: a write to a page, redirect, language, shared block, layout or collection entry
   made by a signed-in admin records the event (created, updated, deleted,
   restored, revision_restored), the user and the changed fields with old

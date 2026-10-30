@@ -28,7 +28,7 @@ export type LanguageInput = {
 
 /**
  * The languages table, read once per Languages instance (Languages.php);
- * with `cache` its reads go through it and every write bumps it.
+ * with `cache` its reads go through it, and every write bumps it (AuditLog.track).
  */
 export class Languages {
 	/** The rows as one promise: concurrent readers of a render share the query. */
@@ -107,7 +107,7 @@ export class Languages {
 	async setDefault(locale: string): Promise<boolean> {
 		const target = await this.db.selectFrom("tbtop_languages").select("id").where("locale", "=", locale).executeTakeFirst();
 		const activated = await this.audit.track(AUDIT_SUBJECTS.language, target === undefined ? null : Number(target.id), () => this.makeDefault(locale));
-		await this.changed();
+		this.changed();
 		return activated;
 	}
 
@@ -239,7 +239,7 @@ export class Languages {
 			throw defaultNotDeletable(row.locale);
 		}
 		await this.audit.track(AUDIT_SUBJECTS.language, id, () => this.db.updateTable("tbtop_languages").set({ deleted_at: sqlDate(new Date()) }).where("id", "=", id).execute());
-		await this.changed();
+		this.changed();
 	}
 
 	/** Brings a trashed language back with its flags as they were. */
@@ -258,7 +258,7 @@ export class Languages {
 			throw defaultNotDeletable(row.locale);
 		}
 		await this.audit.track(AUDIT_SUBJECTS.language, id, () => this.db.deleteFrom("tbtop_languages").where("id", "=", id).execute());
-		await this.changed();
+		this.changed();
 	}
 
 	/** A live (`trashed` false) or trashed row by id, or a LanguageError. */
@@ -277,7 +277,7 @@ export class Languages {
 
 	/** After a write: create, update and restore read their row back through here. */
 	private async mustFind(locale: string): Promise<Language> {
-		await this.changed();
+		this.changed();
 		const language = await this.find(locale);
 		if (language === null) {
 			throw new LanguageError(`Language ${locale} does not exist.`);
@@ -289,9 +289,9 @@ export class Languages {
 		this.rows = null;
 	}
 
-	private async changed(): Promise<void> {
+	/** After a write; the write itself bumped the content cache (AuditLog.track). */
+	private changed(): void {
 		this.rows = null;
-		await this.cache?.store.bump();
 	}
 }
 

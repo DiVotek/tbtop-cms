@@ -241,14 +241,24 @@ export async function sharedProps(site: Site, locale: string, page: Page | null)
 	};
 }
 
+/**
+ * ShareCmsProps::resolveLayout: the header and footer resolve once per
+ * locale under the content cache (rememberLive: their page links follow the
+ * live scope), per origin as a host resolver may build absolute URLs.
+ * Form actions depend on the page on screen, so they are bound after the
+ * read, per request.
+ */
 async function layout(site: Site, locale: string, page: Page | null): Promise<Record<Slot, ResolvedBlock[]>> {
-	const content = await site.layouts.content();
-	const out = { header: [], footer: [] } as Record<Slot, ResolvedBlock[]>;
-	const resolved = await Promise.all(SLOTS.map((slot) => resolveBlocks(site, content[slot], locale, null)));
-	SLOTS.forEach((slot, index) => {
-		const blocks = resolved[index]?.blocks ?? [];
-		out[slot] = validateProps(site, page === null ? blocks : bindForms(site, blocks, page, locale));
+	const resolved = await site.rememberLive(`layout:${site.origin}:${locale}`, async () => {
+		const content = await site.layouts.content();
+		const slots = await Promise.all(SLOTS.map(async (slot) => [slot, (await resolveBlocks(site, content[slot], locale, null)).blocks] as const));
+		return Object.fromEntries(slots) as Record<Slot, ResolvedBlock[]>;
 	});
+	const out = { header: [], footer: [] } as Record<Slot, ResolvedBlock[]>;
+	for (const slot of SLOTS) {
+		const blocks = resolved[slot] ?? [];
+		out[slot] = validateProps(site, page === null ? blocks : bindForms(site, blocks, page, locale));
+	}
 	return out;
 }
 

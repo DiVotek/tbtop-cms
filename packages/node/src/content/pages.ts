@@ -1,7 +1,7 @@
 import { type Kysely, type SelectQueryBuilder, sql } from "kysely";
 import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
-import { encodeJson, flag, sqlDate } from "../support/values";
+import { encodeJson, flag, parseDate, sqlDate } from "../support/values";
 import { AUDIT_SUBJECTS, AuditLog } from "./audit";
 import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
 import { assertHierarchy, assertTypePair, PageRuleError } from "./pageRules";
@@ -121,6 +121,20 @@ export class Pages {
 			qb = qb.limit(options.limit);
 		}
 		return (await qb.execute()).map(pageFromRow);
+	}
+
+	/** NextScheduleTransition::compute: the epoch second of the nearest future published_at/unpublish_at of a published page, null when none. */
+	async nextTransition(now = new Date()): Promise<number | null> {
+		const at = sqlDate(now);
+		const row = await this.query()
+			.where("status", "=", "published")
+			.select((eb) => [
+				eb.fn.min(eb.case().when("published_at", ">", at).then(eb.ref("published_at")).end()).as("publish"),
+				eb.fn.min(eb.case().when("unpublish_at", ">", at).then(eb.ref("unpublish_at")).end()).as("unpublish"),
+			])
+			.executeTakeFirst();
+		const times = [row?.publish, row?.unpublish].map(parseDate).filter((date): date is Date => date !== null);
+		return times.length === 0 ? null : Math.floor(Math.min(...times.map((date) => date.getTime())) / 1000);
 	}
 
 	/** AncestorChain::forPage: root first, the page itself excluded, cycles cut. */

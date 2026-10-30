@@ -17,8 +17,8 @@ type EntryRow = { id: number | string | bigint; collection: string; data: unknow
 /**
  * The entries of every collection (the Entry model). Each write sets the
  * `title` column from the collection's title field in the default locale,
- * goes in the audit trail when an admin makes it, and calls `changed()`,
- * which bumps the content cache.
+ * goes in the audit trail when an admin makes it (which bumps the content
+ * cache) and calls `onChange`, which drops this request's lists.
  */
 export class Entries {
 	constructor(
@@ -30,8 +30,9 @@ export class Entries {
 	) {}
 
 	/** Entries changed outside the store (a drag reorder through the admin driver): drop the cached lists. */
-	changed(): Promise<void> {
-		return this.onChange();
+	async changed(): Promise<void> {
+		await this.onChange();
+		await this.audit.changed();
 	}
 
 	async find(id: number): Promise<Entry | null> {
@@ -81,7 +82,7 @@ export class Entries {
 			},
 			{ idOf: (created) => created },
 		);
-		await this.changed();
+		await this.onChange();
 		return id;
 	}
 
@@ -109,14 +110,14 @@ export class Entries {
 				throw new EntryConflictError(id);
 			}
 		});
-		await this.changed();
+		await this.onChange();
 	}
 
 	async delete(id: number): Promise<void> {
 		await this.audit.track(AUDIT_SUBJECTS.entry, id, async () => {
 			await this.db.deleteFrom("tbtop_entries").where("id", "=", id).execute();
 		});
-		await this.changed();
+		await this.onChange();
 	}
 
 	/** The title field's text in the default locale, else in any locale, cut to the column. */

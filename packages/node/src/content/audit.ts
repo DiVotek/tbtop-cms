@@ -82,10 +82,19 @@ function blockSummary(value: unknown): unknown {
  * The audit trail in `activity_log` (spatie activitylog + AuditContext):
  * a store write made by a signed-in admin records its event, the changed
  * fields and their old and new values. Writes outside the admin record
- * nothing, as in PHP.
+ * nothing, as in PHP. Every tracked write, audited or not, then calls
+ * `onWrite` (InvalidatesContentCache: the content cache's bump).
  */
 export class AuditLog {
-	constructor(private readonly db: Kysely<CmsDatabase>) {}
+	constructor(
+		private readonly db: Kysely<CmsDatabase>,
+		private readonly onWrite: () => Promise<void> = async () => {},
+	) {}
+
+	/** A content write made outside `track` (a drag reorder): the same `onWrite`. */
+	changed(): Promise<void> {
+		return this.onWrite();
+	}
 
 	/**
 	 * Runs a write and records it: created, updated (only when an audited
@@ -95,10 +104,13 @@ export class AuditLog {
 	async track<T>(subject: AuditSubject, id: number | null, run: () => Promise<T>, options: { idOf?: (result: T) => number; event?: string; context?: Dict } = {}): Promise<T> {
 		const by = causer();
 		if (by === null) {
-			return run();
+			const result = await run();
+			await this.onWrite();
+			return result;
 		}
 		const before = id === null ? null : await this.row(subject, id);
 		const result = await run();
+		await this.onWrite();
 		const afterId = id ?? options.idOf?.(result) ?? null;
 		const after = afterId === null ? null : await this.row(subject, afterId);
 		const event = options.event ?? inferEvent(before, after);
