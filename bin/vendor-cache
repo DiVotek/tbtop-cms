@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Installs vendor/ from a tarball cache, for sandboxes where a cold
+# `composer install` is slow (packages cloned from source). No-op unless
+# TBTOP_VENDOR_CACHE names a directory, which is shared between sandboxes.
+#
+# The tarball is keyed by the hash of composer.json. On a miss it starts from
+# the newest tarball, so `composer install` only fetches what changed, then
+# saves a tarball for the new key. Every sandbox that can write the directory
+# can change the code the others run: point it only at storage you trust.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+dir="${TBTOP_VENDOR_CACHE:-}"
+if [ -z "$dir" ]; then
+	composer install --no-interaction
+	exit 0
+fi
+
+key="$(sha256sum composer.json | cut -c1-12)"
+want="$dir/tbtop-cms-vendor-$key.tgz"
+from="$want"
+[ -f "$from" ] || from="$(ls -t "$dir"/tbtop-cms-vendor-*.tgz 2>/dev/null | head -1 || true)"
+
+[ -n "$from" ] && [ ! -d vendor ] && tar -xzf "$from"
+# A lock from another composer.json would pin the old requirements.
+[ -f "$want" ] || rm -f composer.lock
+
+composer install --no-interaction
+
+if [ ! -f "$want" ]; then
+	tmp="$(mktemp "$dir/.vendor-XXXXXX")"
+	tar --exclude=.git -czf "$tmp" vendor composer.lock
+	mv "$tmp" "$want"
+	echo "vendor-cache: saved $(basename "$want")"
+	# Keep the three newest.
+	ls -t "$dir"/tbtop-cms-vendor-*.tgz | tail -n +4 | xargs -r rm -f
+fi

@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# The local gate before a push to main: runs the checks CI runs for the areas
+# the commits since origin/main touch, then the triage review. On success it
+# stamps HEAD, and the pre-push hook (bin/git-hooks/pre-push) lets only a
+# stamped commit go to main.
+#
+#   bin/verify          checks for what changed since origin/main
+#   bin/verify --all    every check, whatever changed
+#   --no-triage         stamp without the triage review (say so in the commit)
+#
+# Triage needs TRIAGE_URL and a `triage` binary on PATH (or at $TRIAGE_BIN);
+# without them verify fails unless --no-triage is passed. Its exit 1
+# (confirmed blocking finding) or 2 (no verdict) fails the gate; accept a finding with `triage ack <id> --reason …` and re-run.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+all=false
+skip_triage=false
+for arg in "$@"; do
+	case "$arg" in
+	--all) all=true ;;
+	--no-triage) skip_triage=true ;;
+	*) echo "usage: bin/verify [--all] [--no-triage]" >&2; exit 2 ;;
+	esac
+done
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+	echo "verify: commit or stash your changes first; the stamp is for HEAD" >&2
+	exit 1
+fi
+
+git fetch -q origin main
+base="$(git merge-base origin/main HEAD)"
+changed="$(git diff --name-only "$base" HEAD)"
+
+touches() { $all || grep -qE "$1" <<<"$changed"; }
+
+# The same areas as the Path filter job in .github/workflows/ci.yml, plus
+# bin/ (this gate itself) under PHP.
+php_re='(^bin/|\.php$|^composer\.json$|^phpunit\.xml\.dist$|^testbench\.yaml$|^phpstan|^pint\.json$|^config/|^database/|^resources/(views|lang)/|^workbench/|^tests/|\.fixture\.json$|\.generated\.ts$|^\.github/workflows/)'
+front_re='(^resources/js/|^workbench/resources/js/|^package\.json$|^bun\.lock$|^bunfig\.toml$|^test-setup\.ts$|^tsconfig.*\.json$|^vite\.config\.|^\.github/workflows/)'
+node_re='(^packages/node/|^\.github/workflows/)'
+
+step() { echo; echo "== $*"; }
+
+if touches "$php_re"; then
+	step "PHP: lint, analyse, block types, tests"
+	composer validate --strict --no-check-publish -q
+	vendor/bin/pint --test
+	vendor/bin/phpstan analyse --no-progress
+	php bin/generate-block-types.php --check
+	vendor/bin/pest --parallel
+fi
+
+if touches "$front_re"; then
+	step "Frontend: typecheck, tests"
+	bun install --frozen-lockfile
+	bun run typecheck
+	bun run test
+fi
+
+if touches "$node_re"; then
+	step "Node: typecheck, tests (postgres, mysql and E2E stay in CI)"
+	(
+		cd packages/node
+		./scripts/fetch-admin.sh
+		bun install --frozen-lockfile
+		bun run typecheck
+		bun run test
+	)
+fi
+
+triage="${TRIAGE_BIN:-$(command -v triage || true)}"
+# A shared mount may be noexec: run a local copy then.
+if [ -f "$triage" ] && ! "$triage" --help >/dev/null 2>&1; then
+	local_copy="$(git rev-parse --git-path triage-bin)"
+	cmp -s "$triage" "$local_copy" 2>/dev/null || cp "$triage" "$local_copy"
+	chmod +x "$local_copy"
+	triage="$local_copy"
+fi
+if $skip_triage; then
+	echo
+	echo "verify: triage skipped on request (--no-triage)"
+elif [ -n "${TRIAGE_URL:-}" ] && [ -n "$triage" ]; then
+	step "Triage: review of $base..HEAD"
+	"$triage" "$base..HEAD"
+else
+	echo "verify: triage is not set up (TRIAGE_URL, triage on PATH or TRIAGE_BIN);" >&2
+	echo "        pass --no-triage to stamp without the review" >&2
+	exit 1
+fi
+
+git rev-parse HEAD > "$(git rev-parse --git-path tbtop-verified)"
+echo
+echo "verify: $(git rev-parse --short HEAD) is green, push it"

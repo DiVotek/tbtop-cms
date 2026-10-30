@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Lets a push to main through only when bin/verify stamped that exact commit.
+# A rebase or pull that brings in new commits changes the SHA, so it needs a
+# fresh verify. Enable with: git config core.hooksPath bin/git-hooks
+set -euo pipefail
+
+stamp="$(cat "$(git rev-parse --git-path tbtop-verified)" 2>/dev/null || true)"
+
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+	[ "$remote_ref" = "refs/heads/main" ] || continue
+	[[ "$local_sha" =~ ^0+$ ]] && continue
+	if [ "$local_sha" != "$stamp" ]; then
+		echo "pre-push: ${local_sha:0:7} is not verified; run bin/verify, then push" >&2
+		exit 1
+	fi
+done
