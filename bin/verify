@@ -39,7 +39,7 @@ if touches "$php_re"; then
 	composer validate --strict --no-check-publish -q
 	vendor/bin/pint --test
 	vendor/bin/phpstan analyse --no-progress
-	composer types:blocks:check
+	php bin/generate-block-types.php --check
 	vendor/bin/pest --parallel
 fi
 
