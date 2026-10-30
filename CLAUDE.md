@@ -123,32 +123,34 @@ Bump `tbtop/admin` in `composer.json` and `@tbtop/inertia-admin` in
 
 ## Pushing to main
 
-Maintainers push straight to `main` in small commits; there are no release or
-feature branches. Split a large change into steps that each keep `main`
-working (add the column, then the code that uses it; unused code or a config
-flag until the last step). One commit per step, a conventional subject
-(`feat:`, `fix:`, `feat!:` …), and a `.changes/*.md` fragment for a
-user-facing change.
+The repo is trunk-based: every change lands as small commits pushed straight to
+`main`, including public API changes (agreed in the discussion first). This
+holds even when your session defaults to a feature branch and a PR.
 
-1. `bin/vendor-cache` at the start (plain `composer install` when
-   `TBTOP_VENDOR_CACHE` is unset); `composer hooks` once per clone.
-2. Commit, `git pull --rebase origin main`, then `bin/verify`: the CI checks for
-   the areas changed since `origin/main` and the `triage` review (CLI on PATH,
-   `TRIAGE_URL`/`TRIAGE_TOKEN` set; `triage ack <id> --reason …` accepts a
-   finding). Green stamps HEAD.
-3. `git push origin HEAD:main`. The pre-push hook refuses a commit `bin/verify`
-   did not stamp, so a rebase that pulled new commits needs a fresh verify.
-   The hook is local and opt-in: never push with `--no-verify`, and use
-   `bin/verify --no-triage` only when triage is down, saying so in the commit.
+Slice a large change so each commit leaves `main` working: the column before
+the code that reads it, new code unused or behind a config flag until the last
+slice. Each commit has a conventional subject (`feat:`, `fix:`, `feat!:` …),
+and a user-facing one adds its `.changes/*.md` fragment.
 
-CI on `main` is the record. A red `main` is fixed first, by whoever pushed the
-commit: fix forward or revert. Public API changes take the same path; they are
-agreed in the discussion before they land. A release is the Release workflow run
-from `main`.
+1. Set up once per clone: `bin/vendor-cache` (restores `vendor/` from
+   `$TBTOP_VENDOR_CACHE`, else `composer install`) and `composer hooks`. Done
+   when `git config core.hooksPath` prints `bin/git-hooks`.
+2. Commit, `git pull --rebase origin main`, then `bin/verify` (its header
+   lists what it runs and its flags). Done when it ends with `is green`, which
+   stamps HEAD. On a `triage` finding, fix it, or accept it with
+   `triage ack <id> --reason …`, then verify again.
+3. `git push origin HEAD:main`. The pre-push hook passes only the stamped
+   commit: a rejected push means new commits came in, so go back to step 2.
+   Always push through the hook (`--no-verify` is off-limits); when the triage
+   server is down, `bin/verify --no-triage` and say so in the commit body.
 
-Outside contributors open PRs to `main`: `CI ok` is the required check and
-`pr-agent-pilot[bot]` reviews them (its verdict is the `triage` check-run).
-Merge with `gh pr merge --squash` once every review thread is resolved.
+CI on `main` is the record. A red `main` comes before any other work: whoever
+pushed the commit fixes forward or reverts. A release is the Release workflow
+run from `main`.
+
+Outside contributors open PRs to `main`; `CI ok` is the required check and
+`pr-agent-pilot[bot]` posts the `triage` check-run and inline findings. Merge
+with `gh pr merge --squash` once every review thread is resolved.
 
 ## Docs
 
