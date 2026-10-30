@@ -124,33 +124,22 @@ Bump `tbtop/admin` in `composer.json` and `@tbtop/inertia-admin` in
 ## Pushing to main
 
 The repo is trunk-based: every change lands as small commits pushed straight to
-`main`, including public API changes (agreed in the discussion first). This
-holds even when your session defaults to a feature branch and a PR.
+`main`, including public API changes (agreed in the discussion first).
 
 Slice a large change so each commit leaves `main` working: the column before
 the code that reads it, new code unused or behind a config flag until the last
 slice. Each commit has a conventional subject (`feat:`, `fix:`, `feat!:` …),
 and a user-facing one adds its `.changes/*.md` fragment.
 
-1. Set up once per clone: `bin/vendor-cache` (restores `vendor/` from
-   `$TBTOP_VENDOR_CACHE`, else `composer install`) and `composer hooks`. Done
-   when `git config core.hooksPath` prints `bin/git-hooks`.
-2. Commit, `git pull --rebase origin main`, then `bin/verify` (its header
+1. Commit, `git pull --rebase origin main`, then `bin/verify` (its header
    lists what it runs and its flags). Done when it ends with `is green`, which
    stamps HEAD. On a `triage` finding, fix it, or accept it with
    `triage ack <id> --reason …`, then verify again.
-3. `git push origin HEAD:main`. The pre-push hook passes only the stamped
-   commit: a rejected push means new commits came in, so go back to step 2.
-   Always push through the hook (`--no-verify` is off-limits); when the triage
-   server is down, `bin/verify --no-triage` and say so in the commit body.
-
-CI on `main` is the record. A red `main` comes before any other work: whoever
-pushed the commit fixes forward or reverts. A release is the Release workflow
-run from `main`.
-
-Outside contributors take the PR path in `CONTRIBUTING.md`; when you handle
-their PR, `pr-agent-pilot[bot]` findings are inline threads, its verdict is the
-`triage` check-run, and you merge with `gh pr merge --squash`.
+2. `git push origin HEAD:main`. The pre-push hook (`composer hooks` enables it
+   once per clone) passes only the stamped commit: a rejected push means new
+   commits came in, so go back to step 1. Always push through the hook
+   (`--no-verify` is off-limits); when the triage server is down,
+   `bin/verify --no-triage` and say so in the commit body.
 
 ## Docs
 
