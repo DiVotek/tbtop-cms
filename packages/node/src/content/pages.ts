@@ -3,7 +3,7 @@ import type { CmsDatabase } from "../db/schema";
 import { insertId } from "../support/db";
 import { encodeJson, flag, parseDate, sqlDate } from "../support/values";
 import { AUDIT_SUBJECTS, AuditLog } from "./audit";
-import { isLive, type Page, pageFromRow, TRANSLATABLE } from "./page";
+import { isLive, type Page, type PageStatus, pageFromRow, TRANSLATABLE } from "./page";
 import { assertHierarchy, assertTypePair, PageRuleError } from "./pageRules";
 import { PageTypes } from "./pageTypes";
 import { writePageRefs } from "./pageRefIndex";
@@ -34,7 +34,7 @@ export class Pages {
 
 	constructor(
 		private readonly db: Kysely<CmsDatabase>,
-		frontendLocales: () => Promise<string[]>,
+		private readonly frontendLocales: () => Promise<string[]>,
 		defaultLocale: () => Promise<string>,
 		/** The tree rules every write checks; the built-ins when omitted. */
 		private readonly types: PageTypes = new PageTypes(),
@@ -271,6 +271,86 @@ export class Pages {
 		return [current, page];
 	}
 
+	/** The page (not trashed) of a source-backed type for a source id; null when there is none. */
+	async findBySource(type: string, sourceId: string): Promise<Page | null> {
+		const row = await this.query().selectAll("tbtop_pages").where("type", "=", type).where("source_id", "=", sourceId).orderBy("id").executeTakeFirst();
+		return row === undefined ? null : pageFromRow(row);
+	}
+
+	/** Every page (not trashed) of a source-backed type, for a reconcile against the sources. */
+	async allBySource(type: string): Promise<Page[]> {
+		return (await this.query().selectAll("tbtop_pages").where("type", "=", type).where("source_id", "is not", null).orderBy("id").execute()).map(pageFromRow);
+	}
+
+	/**
+	 * The page of `(type, sourceId)`, created once when missing: its name, its
+	 * slug (one for every frontend locale, or one per locale; a taken path gets
+	 * `-2`…; else from the name) and its parent are written only then, never
+	 * again. Idempotent: two racing calls leave one page. Only for a
+	 * source-backed type (PageRuleError otherwise).
+	 */
+	async ensureSource(
+		type: string,
+		sourceId: string,
+		input: { name: Record<string, unknown>; slug?: string | Record<string, string>; parentId?: number | null; status?: PageStatus },
+		options: { by?: string | number | null } = {},
+	): Promise<{ page: Page; created: boolean }> {
+		this.assertSourceBacked(type);
+		const existing = await this.findBySource(type, sourceId);
+		if (existing !== null) {
+			return { page: existing, created: false };
+		}
+		const slugs = typeof input.slug === "string" ? Object.fromEntries((await this.frontendLocales()).map((locale) => [locale, input.slug as string])) : (input.slug ?? {});
+		const page = await this.create(
+			{ type, sourceId, name: input.name, parentId: input.parentId ?? null, status: input.status ?? "draft", content: null },
+			{ slugs, by: options.by ?? null },
+		);
+		// A racing call may have created one meanwhile: the oldest stays, this one goes (its audit entry, if any, stays).
+		const first = await this.findBySource(type, sourceId);
+		if (first !== null && first.id !== page.id) {
+			await this.discard(page.id);
+			return { page: first, created: false };
+		}
+		return { page, created: true };
+	}
+
+	/** Publishes or unpublishes the page of `(type, sourceId)`; null when there is none. */
+	async setSourceStatus(type: string, sourceId: string, status: PageStatus, options: { by?: string | number | null } = {}): Promise<Page | null> {
+		const page = await this.findBySource(type, sourceId);
+		if (page === null) {
+			return null;
+		}
+		return page.status === status ? page : this.update(page.id, { status }, { by: options.by ?? null });
+	}
+
+	/**
+	 * Moves the page of `(type, sourceId)` to the trash, as the editor's
+	 * delete does; false when there is none. A page with child pages refuses
+	 * (PageRuleError): delete or move them first.
+	 */
+	async deleteSource(type: string, sourceId: string): Promise<boolean> {
+		const page = await this.findBySource(type, sourceId);
+		if (page === null) {
+			return false;
+		}
+		await this.delete(page.id);
+		return true;
+	}
+
+	private assertSourceBacked(type: string): void {
+		if (!this.types.has(type) || !this.types.get(type).sourceBacked) {
+			throw new PageRuleError(`Page type [${type}] is not source-backed.`);
+		}
+	}
+
+	/** A page a racing ensureSource created twice: gone with its slugs, revisions and link index. */
+	private async discard(id: number): Promise<void> {
+		await this.slugs.remove(id);
+		await this.db.deleteFrom("tbtop_page_revisions").where("page_id", "=", id).execute();
+		await this.db.deleteFrom("tbtop_page_refs").where("page_id", "=", id).execute();
+		await this.db.deleteFrom("tbtop_pages").where("id", "=", id).execute();
+	}
+
 	/** Soft delete; the slugs go, so the path frees up. A system page or one with live children throws PageRuleError. */
 	async delete(id: number): Promise<void> {
 		const page = await this.find(id);
@@ -297,6 +377,10 @@ export class Pages {
 			throw new PageRuleError("The page is not in the trash.");
 		}
 		const trashed = pageFromRow(row);
+		// One page per source: code made a new one after this went to the trash.
+		if (trashed.sourceId !== null && this.types.isSourceBacked(trashed) && (await this.findBySource(trashed.type, trashed.sourceId)) !== null) {
+			throw new PageRuleError("Another page already shows this record.");
+		}
 		if (trashed.parentId !== null) {
 			const parent = await this.db.selectFrom("tbtop_pages").select("deleted_at").where("id", "=", trashed.parentId).executeTakeFirst();
 			if (parent !== undefined && parent.deleted_at !== null) {
@@ -354,6 +438,9 @@ export class Pages {
 		const source = await this.find(id);
 		if (source === null) {
 			throw new PageRuleError("The page is already gone.");
+		}
+		if (this.types.isSourceBacked(source)) {
+			throw new PageRuleError("This page mirrors a record of another system: it cannot be duplicated.");
 		}
 		const last = await this.db
 			.selectFrom("tbtop_pages")

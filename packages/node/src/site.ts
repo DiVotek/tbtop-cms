@@ -18,6 +18,7 @@ import { PageRevisions } from "./content/revisions";
 import { richtextHtml } from "./content/richtext";
 import { Settings } from "./content/settings";
 import { SharedBlocks } from "./content/sharedBlocks";
+import { PageTemplates } from "./content/templates";
 import { type CmsSettings, settingsObject } from "./content/siteSettings";
 import { namedFormProps } from "./forms/locate";
 import { Submissions } from "./forms/submissions";
@@ -49,6 +50,8 @@ export class Site {
 	readonly pages: Pages;
 	readonly layouts: Layouts;
 	readonly sharedBlocks: SharedBlocks;
+	/** Stored page templates by type (`blockEditor` edits one; a page with no blocks of its own renders it). */
+	readonly templates: PageTemplates;
 	readonly redirects: Redirects;
 	readonly blocks: BlockRegistry;
 	readonly submissions: Submissions;
@@ -67,6 +70,10 @@ export class Site {
 	readonly audit: AuditLog;
 	/** The request's `?page=` and the paged archive its page listed (`referencedByLinksPaged`, `childrenLinksPaged`). */
 	readonly paging = new Paging();
+	/** The URL of the frontend request being rendered (loadPage sets it); null elsewhere. */
+	requestUrl: URL | null = null;
+	/** Source-backed pages' sources by `{page id}:{locale}`, read once per request. */
+	private readonly sources = new Map<string, Promise<unknown>>();
 	/** The settings object by locale, once per request. */
 	private readonly settingsByLocale = new Map<string, Promise<CmsSettings>>();
 	/** Link targets by locale and page id, on a frontend render (`cached`). */
@@ -103,6 +110,7 @@ export class Site {
 		);
 		this.layouts = new Layouts(db, this.audit);
 		this.sharedBlocks = new SharedBlocks(db, this.audit);
+		this.templates = new PageTemplates(this.settings, pageTypes);
 		this.redirects = new Redirects(db, config.redirects?.allowedExternalHosts ?? [], this.audit);
 		this.blocks = config.blocks;
 		this.submissions = new Submissions(db);
@@ -249,6 +257,35 @@ export class Site {
 		return loading;
 	}
 
+	/**
+	 * A source-backed page's source in a locale (its type's `source()`), read
+	 * once per request; null for a page of another type, and for one whose
+	 * source is gone, which then answers as not found.
+	 */
+	async sourceOf(page: Page, locale: string): Promise<unknown> {
+		const type = this.pageTypes.ownType(page);
+		if (type === null || !type.sourceBacked || type.source === null || page.sourceId === null) {
+			return null;
+		}
+		const key = `${page.id}:${locale}`;
+		let found = this.sources.get(key);
+		if (found === undefined) {
+			const source = type.source;
+			found = Promise.resolve(source(page, { locale, url: this.requestUrl, site: this })).then((value) => value ?? null);
+			this.sources.set(key, found);
+			found.catch(() => this.sources.delete(key));
+		}
+		return found;
+	}
+
+	/** A page of a source-backed type whose source is missing in the locale (or which has no `source_id`). */
+	async sourceMissing(page: Page, locale: string): Promise<boolean> {
+		if (!this.pageTypes.isSourceBacked(page)) {
+			return false;
+		}
+		return page.sourceId === null || (this.pageTypes.ownType(page)?.source !== null && (await this.sourceOf(page, locale)) === null);
+	}
+
 	async resolveContext(locale: string, page: Page | null, fields: Record<string, unknown> = {}, targets?: LinkTargets, nested = false): Promise<ResolveContext> {
 		const fallback = await this.languages.defaultLocale();
 		return {
@@ -256,6 +293,8 @@ export class Site {
 			fallbackLocale: fallback,
 			page,
 			fields,
+			source: page === null ? null : await this.sourceOf(page, locale),
+			url: this.requestUrl,
 			mediaUrl: (ref) => this.mediaUrl(ref),
 			mediaImage: (ref) => this.mediaImage(ref),
 			richtextHtml,

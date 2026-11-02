@@ -107,7 +107,7 @@ async function tabs(s: S, cms: Cms, site: Site, page: Page, rows: Dict[], back: 
 	return [
 		{ label: "General", body: s.stack([...generalFields(s, page), ...typeFieldSections(s, cms, page)]) },
 		{ label: "SEO", body: s.stack(await seoFields(s, cms, site, page, defaultLocale)) },
-		...blockTabs(s, cms, rows, {
+		...(cms.pageTypes.isSourceBacked(page) ? [await sourceTab(s, cms, page)] : blockTabs(s, cms, rows, {
 			// A block may name the page's type or its subtype in placements (PageEditBlockTabs::placements).
 			placement: page.subtype !== null && page.subtype !== "" ? [page.type, page.subtype] : [page.type],
 			save,
@@ -116,8 +116,29 @@ async function tabs(s: S, cms: Cms, site: Site, page: Page, rows: Dict[], back: 
 			problems,
 			skipsValidation: page.status !== "published",
 			...(mayShare ? { sharing: { owner: firstText(page, ["name"], defaultLocale, defaultLocale) || `#${page.id}` } } : {}),
-		}),
+		})),
 	];
+}
+
+/**
+ * A source-backed page has no blocks of its own: the Source card says where
+ * its facts and its blocks come from, with the type's links (the record's
+ * card, the template), read-only.
+ */
+async function sourceTab(s: S, cms: Cms, page: Page) {
+	const type = cms.pageTypes.ownType(page);
+	const label = type?.label ?? page.type;
+	const links = type?.sourceLinks === null || type === null ? [] : await type.sourceLinks(page);
+	return {
+		label: "Source",
+		body: s.section({ title: "Source", variant: "card" }, [
+			s.displayText(`This ${label.toLowerCase()} page shows a record kept outside the CMS. Its blocks come from the ${label} template; edit its name, text, SEO and publication here.`).variant("muted"),
+			s.flex([s.displayText("Source id").variant("muted"), s.displayValue(page.sourceId ?? "—")], { gap: 2, align: "center" }),
+			...(links.length === 0
+				? []
+				: [s.flex(links.map((link, i) => s.action(`pageSourceLink_${i}`).label(link.label).icon("external-link").url(link.url).outlined()), { gap: 2, wrap: true })]),
+		]),
+	};
 }
 
 /** PageDisplayState: what the badge says, from the status and the schedule. */
@@ -244,10 +265,11 @@ async function sidebar(s: S, cms: Cms, site: Site, page: Page, defaultLocale: st
  * system page keeps its type.
  */
 function typeSelects(s: S, cms: Cms, page: Page): unknown[] {
-	if (page.isSystem) {
+	// A system page keeps its type, and so does a source-backed one: code made it of that type.
+	if (page.isSystem || cms.pageTypes.isSourceBacked(page)) {
 		return [];
 	}
-	const types = cms.pageTypes.bases().map((type) => ({ value: type.key, label: type.label }));
+	const types = cms.pageTypes.creatable().map((type) => ({ value: type.key, label: type.label }));
 	const subtypes = subtypeOptions(cms.pageTypes, page.type);
 	return [
 		s.select("type").label("Type").options(types).required(),
@@ -259,7 +281,8 @@ function typeSelects(s: S, cms: Cms, page: Page): unknown[] {
 
 /** PageEditPage::canDelete: no button for a page that would refuse to go. */
 async function canDelete(site: Site, page: Page): Promise<boolean> {
-	return !page.isSystem && (await site.pages.query().select("id").where("parent_id", "=", page.id).executeTakeFirst()) === undefined;
+	// A source-backed page goes with its source: code deletes it.
+	return !page.isSystem && !site.pageTypes.isSourceBacked(page) && (await site.pages.query().select("id").where("parent_id", "=", page.id).executeTakeFirst()) === undefined;
 }
 
 function deleteAction(s: S, cms: Cms, page: Page) {
@@ -379,6 +402,9 @@ async function editedTree(cms: Cms, ctx: ActionCtx, page: Page): Promise<Partial
 		return {};
 	}
 	const picked = typeof form.type === "string" && form.type !== "" ? form.type : page.type;
+	if (picked !== page.type && (cms.pageTypes.isSourceBacked(page) || (cms.pageTypes.has(picked) && cms.pageTypes.get(picked).sourceBacked))) {
+		throw new PageRuleError("A page that mirrors a record keeps its type.");
+	}
 	const parent = "parent_id" in form ? formParentId(form.parent_id) : page.parentId;
 	const tree = await resolveLeafType(siteOf(cms, ctx), cms.pageTypes, page, picked, parent === page.id ? page.parentId : parent);
 	return { ...tree, ...("subtype" in form ? { subtype: formSubtype(form.subtype) } : {}) };
@@ -442,7 +468,8 @@ async function savePage(cms: Cms, ctx: ActionCtx, page: Page, content: Dict[], o
 			...("image" in form ? { image: typeof form.image === "string" && form.image !== "" ? form.image : null } : {}),
 			...(fields === null ? {} : { fields }),
 			seo,
-			content,
+			// A source-backed page keeps no blocks: it renders its type's template.
+			...(cms.pageTypes.isSourceBacked(page) ? {} : { content }),
 		},
 		{
 			slugs: isDict(form.slug) ? (Object.fromEntries(Object.entries(form.slug).map(([k, v]) => [k, String(v ?? "")])) as Record<string, string>) : {},

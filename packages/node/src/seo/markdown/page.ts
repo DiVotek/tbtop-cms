@@ -80,6 +80,7 @@ export async function markdownResponse(site: Site, request: Request): Promise<Re
 		return null;
 	}
 	const path = stripped ?? route.path;
+	site.requestUrl = url;
 	const page = await resolvePage(site, path, route.locale, false);
 	if (page === null) {
 		return redirectFor(site, path, route.locale);

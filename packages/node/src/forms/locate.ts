@@ -10,14 +10,15 @@ import { type Dict, isDict } from "../support/values";
 export type LocatedForm = { block: BlockKind; submit: SubmitHandler; data: Dict; ctx: SubmitContext };
 
 /**
- * FormBlockLocator: the page's own rows first, then the header/footer
+ * FormBlockLocator: the page's own rows (its template's without them) first, then the header/footer
  * slots. Only an active row of a registered kind with a submit handler
  * counts; a row placed by reference reads the shared block's data. With no
  * row of that id, the id is tried as a form name (HasForm), with no editor data.
  */
 export async function locateForm(site: Site, page: Page, blockId: string, locale: string): Promise<LocatedForm | null> {
 	const layouts = await site.layouts.content();
-	const row = findRow(page.content ?? [], blockId) ?? findRow(layouts.header, blockId) ?? findRow(layouts.footer, blockId);
+	// A page with no blocks of its own renders its template: a form there posts too.
+	const row = findRow(page.content ?? (await site.templates.contentFor(page)) ?? [], blockId) ?? findRow(layouts.header, blockId) ?? findRow(layouts.footer, blockId);
 	const fallback = await site.languages.defaultLocale();
 	const ctx: SubmitContext = { locale, fallbackLocale: fallback, page, t: (key, params) => translate(key, locale, fallback, site.config.strings, params) };
 	if (row === null) {

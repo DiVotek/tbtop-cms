@@ -376,6 +376,49 @@ types too to keep them pickable), and the tree rules stay the package's
 const page = definePageType({ key: "page", form: (s) => [s.text("tagline").translatable()], schema: z.object({ tagline: z.string().nullable() }) });
 ```
 
+#### Source-backed pages and stored templates
+
+A source-backed type's pages mirror records another system keeps (a shop's
+products): code makes them by `(type, source_id)`, the editor writes their
+text, SEO and publication, and every page of the type renders the type's
+template. `source(page, ctx)` reads the record once per page and locale
+(`ctx.source` in every resolve); null answers the page as unpublished (not
+found, then redirects), preview too, and a throw is an error (a 500: the
+record's system is down, the page is not gone). `requestSeo(page, ctx)` changes the SEO
+of one request: `noindex` (also `X-Robots-Tag`) and the canonical (and
+og:url), for a listing with an open filter. `ctx.url` is the request's URL
+on a render (`?variant=`), null elsewhere.
+
+```ts
+const product = definePageType({
+	key: "product",
+	allowedChildren: ["variant"],
+	sourceBacked: true,
+	source: (page, ctx) => shop.productView(page.sourceId, ctx.locale), // null: gone or hidden
+	sourceLinks: (page) => [{ label: "Open product", url: `/admin/products/${page.sourceId}` }],
+	requestSeo: (page, ctx) => (ctx.url?.searchParams.has("filter") ? { noindex: true } : null),
+});
+
+const pages = cms.site().pages;
+await pages.ensureSource("product", id, { name, slug: handle, parentId }); // once: name, slug, parent; races leave one page
+await pages.setSourceStatus("product", id, "published");
+await pages.deleteSource("product", id); // to the trash; a page with children refuses; restoring it once a new one exists refuses
+await pages.findBySource("product", id); // and allBySource("product") for a reconcile
+```
+
+"New page" does not offer a source-backed type, and the editor shows a
+Source card (the source id, `sourceLinks`) instead of blocks, keeps the
+type, and has no delete; a page of it cannot be duplicated.
+
+`site.templates` stores a type's template (Settings
+`page_templates.{type}`): a page whose `content` is null (a source-backed
+page always) renders the
+stored template of its subtype, then its type, then the code `template()`.
+`templateEditor(cms, s, request, { type, back })` (design ability, 403 without) is the admin's block
+editor over it, for a host's own admin page; `blockEditor(cms, s, request,
+{ id, content, placement, save, back })` is the same editor over rows the
+host keeps itself.
+
 `migrateCms` creates the tables on a fresh database.
 Like `cms:install`, it then gives a database with no live language its
 default: `defaultLanguage` (a catalog locale, default `en`; `false` skips it).

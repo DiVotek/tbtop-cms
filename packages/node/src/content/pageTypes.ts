@@ -4,6 +4,21 @@ import type { ResolveContext } from "../blocks/context";
 import { formFields, resolveForm } from "../blocks/fields";
 import type { MarkdownContext } from "../seo/markdown/context";
 import type { Page } from "./page";
+import type { Site } from "../site";
+
+/** What a source-backed type's `source()` and a type's `requestSeo()` read. */
+export type SourceContext = {
+	locale: string;
+	/** The request's URL on a frontend render; null elsewhere (a sitemap, a task). */
+	url: URL | null;
+	site: Site;
+};
+
+/** A type's per-request SEO change: what it sets replaces the page's own. */
+export type RequestSeo = { noindex?: boolean; canonical?: string };
+
+/** A link on a source-backed page's Source card (the product card in a shop, the type's template). */
+export type SourceLink = { label: string; url: string };
 
 /** The zod object a page type's resolved custom fields match. */
 export type FieldsSchema = z.ZodObject;
@@ -51,9 +66,34 @@ export type PageTypeDef = {
 	 * ones (`## In this section`). A subtype inherits its base's.
 	 */
 	toMarkdown?: (page: Page, ctx: MarkdownContext) => string | null | Promise<string | null>;
+	/**
+	 * A source-backed type's pages mirror a record kept elsewhere (a shop's
+	 * product): code creates them by `(type, source_id)` (`site.pages.ensureSource`),
+	 * the admin's "New page" does not offer the type, and the editor shows a
+	 * Source card instead of blocks, which come from the type's template. A
+	 * subtype inherits its base's.
+	 */
+	sourceBacked?: boolean;
+	/**
+	 * The page's source for this request (`ctx.source` in a resolve), read
+	 * once per page and locale; null answers the page like an unpublished one
+	 * (not found, then redirects). Only on a source-backed type.
+	 */
+	source?: (page: Page, ctx: SourceContext) => unknown | Promise<unknown>;
+	/** The Source card's links: where the source is edited, where the type's template is. */
+	sourceLinks?: (page: Page) => SourceLink[] | Promise<SourceLink[]>;
+	/**
+	 * Per-request SEO after the page's own (a listing with an open filter:
+	 * `noindex`, its canonical the unfiltered page). `source` is the page's
+	 * source, null for a type without one.
+	 */
+	requestSeo?: (page: Page, ctx: SourceContext & { source: unknown }) => RequestSeo | null | Promise<RequestSeo | null>;
 };
 
-export type PageType = Required<Omit<PageTypeDef, "template" | "resolveFields" | "schema" | "archiveOf" | "toMarkdown">> & {
+export type PageType = Required<Omit<PageTypeDef, "template" | "resolveFields" | "schema" | "archiveOf" | "toMarkdown" | "source" | "sourceLinks" | "requestSeo">> & {
+	source: NonNullable<PageTypeDef["source"]> | null;
+	sourceLinks: NonNullable<PageTypeDef["sourceLinks"]> | null;
+	requestSeo: NonNullable<PageTypeDef["requestSeo"]> | null;
 	archiveOf: string | null;
 	/** Null: the default (the children list for a type that allows children). */
 	toMarkdown: NonNullable<PageTypeDef["toMarkdown"]> | null;
@@ -151,6 +191,10 @@ function normalize(def: PageTypeDef, baseDef: PageTypeDef | undefined): PageType
 		listedInAll: def.listedInAll ?? baseDef?.listedInAll ?? true,
 		archiveOf: def.archiveOf ?? baseDef?.archiveOf ?? null,
 		toMarkdown: def.toMarkdown ?? baseDef?.toMarkdown ?? null,
+		sourceBacked: def.sourceBacked ?? baseDef?.sourceBacked ?? false,
+		source: def.source ?? baseDef?.source ?? null,
+		sourceLinks: def.sourceLinks ?? baseDef?.sourceLinks ?? null,
+		requestSeo: def.requestSeo ?? baseDef?.requestSeo ?? null,
 		resolveFields: async (input, ctx) => {
 			const resolved = await resolve(input, ctx);
 			if (schema === null) {
@@ -179,6 +223,9 @@ export class PageTypes {
 				throw new Error(`Page type [${def.key}] is already registered.`);
 			}
 			assertFormMatchesSchema(def);
+			if (def.source !== undefined && def.sourceBacked !== true && defs.find((other) => other.key === def.base)?.sourceBacked !== true) {
+				throw new Error(`Page type [${def.key}]: source() needs sourceBacked: true.`);
+			}
 			this.types.set(def.key, normalize(def, defs.find((other) => other.key === def.base)));
 		}
 	}
@@ -211,6 +258,16 @@ export class PageTypes {
 	/** Base types only: what the "new page" picker lists. */
 	bases(): PageType[] {
 		return this.all().filter((type) => type.base === type.key);
+	}
+
+	/** Base types an editor may create or switch a page to: not the source-backed ones, which code creates. */
+	creatable(): PageType[] {
+		return this.bases().filter((type) => !type.sourceBacked);
+	}
+
+	/** Whether the page's own type mirrors a source (its pages are made by code). */
+	isSourceBacked(page: Pick<Page, "type" | "subtype">): boolean {
+		return this.ownType(page)?.sourceBacked ?? false;
 	}
 
 	subtypesOf(base: string): PageType[] {

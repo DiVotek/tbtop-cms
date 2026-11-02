@@ -259,7 +259,8 @@ function rowActions(s: S, cms: Cms) {
 				}
 				return Effects.make().notify("Page duplicated").refreshTable("pages");
 			}, ["row"])
-			.hiddenIf(Cond.notEmpty("deleted_at")),
+			// A copy of a source-backed page would be a second page of one source.
+			.hiddenIf(Cond.any(Cond.notEmpty("deleted_at"), Cond.notEmpty("source_id"))),
 		s
 			.action("pageRestore")
 			.label("Restore")
@@ -292,7 +293,8 @@ function rowActions(s: S, cms: Cms) {
 
 function createAction(s: S, cms: Cms, categories: Option[]) {
 	const prefix = adminPrefix(cms);
-	const bases = cms.pageTypes.bases();
+	// A source-backed type's pages are made by code, never here.
+	const bases = cms.pageTypes.creatable();
 	const types = bases.map((type) => ({ value: type.key, label: type.label }));
 	// A parent is always a category: an article's (required while the article type requires one), a subcategory's optional one.
 	const parent = s.select("parent_id").label("Category").options(categories).hiddenIf(Cond.notIn("type", ["category", "article"]));
@@ -322,7 +324,7 @@ function createAction(s: S, cms: Cms, categories: Option[]) {
 				.onSubmit(async (ctx) => {
 					const form = ctx.form as Dict;
 					const type = String(form.type ?? "page");
-					if (!cms.pageTypes.has(type)) {
+					if (!cms.pageTypes.has(type) || cms.pageTypes.get(type).sourceBacked) {
 						return Effects.make().notify("Unknown page type.", "error");
 					}
 					try {

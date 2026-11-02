@@ -22,6 +22,10 @@ export type ResolveContext = {
 	page: Page | null;
 	/** The page type's resolved custom fields. */
 	fields: Record<string, unknown>;
+	/** A source-backed page's source (its type's `source()`); null for any other page and for layout blocks. */
+	source: unknown;
+	/** The frontend request's URL (its query: a filter, a selected variant); null outside a page render. */
+	url: URL | null;
 	mediaUrl(ref: string): string | null;
 	/** The image with its srcset (config `imageLoader`), width, height and alt; null like mediaUrl. */
 	mediaImage(ref: string): MediaImage | null;

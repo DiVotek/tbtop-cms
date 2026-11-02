@@ -143,6 +143,7 @@ export async function loadPage(
 		return { type: "redirect", status: 301, location: route.location };
 	}
 	const { locale, path } = route;
+	site.requestUrl = url;
 	const page = await resolvePage(site, path, locale, options.preview);
 	if (page === null) {
 		const redirect = await site.redirects.resolve(path, locale);
@@ -167,13 +168,17 @@ export async function loadPage(
 	return { type: "page", status: 200, headers, props: asJson(props) };
 }
 
-/** PageResolver: the page at a path in a locale, live only unless previewing. */
+/**
+ * PageResolver: the page at a path in a locale, live only unless previewing.
+ * A source-backed page whose source is gone answers as no page, preview too.
+ */
 export async function resolvePage(site: Site, path: string, locale: string, preview = false): Promise<Page | null> {
-	return site.pages.findAt(path.replace(/^\/+|\/+$/g, ""), locale, { live: !preview });
+	const page = await site.pages.findAt(path.replace(/^\/+|\/+$/g, ""), locale, { live: !preview });
+	return page !== null && (await site.sourceMissing(page, locale)) ? null : page;
 }
 
 export async function pageProps(site: Site, page: Page, locale: string, path: string): Promise<PageShape> {
-	const content = page.content ?? site.pageTypes.templateFor(page) ?? [];
+	const content = page.content ?? (await site.templates.contentFor(page)) ?? [];
 	// Independent reads start together: on D1 each query is a round trip, and only a chain of them adds up.
 	const [{ blocks, fields }, ctx, parents, trail, cms, fallback] = await Promise.all([
 		resolveBlocks(site, content, locale, page),
@@ -190,7 +195,7 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 		.filter((node): node is Record<string, unknown> => node !== null)
 		// Each node is a JSON-LD document of its own: one without @context is not schema.org to a crawler.
 		.map((node) => ("@context" in node ? node : { "@context": "https://schema.org", ...node }));
-	const seo = pagedSeo(site, await resolveSeo(site, page, locale, parents, ctx, blockNodes));
+	const seo = await requestSeo(site, page, locale, pagedSeo(site, await resolveSeo(site, page, locale, parents, ctx, blockNodes)));
 	if (isPreview || (await isEmptyArchive(site, page))) {
 		seo.noindex = true;
 	}
@@ -202,6 +207,28 @@ export async function pageProps(site: Site, page: Page, locale: string, path: st
 		path,
 		isPreview,
 		cms,
+	};
+}
+
+/**
+ * The page type's `requestSeo()` for this request (a filtered listing):
+ * `noindex` only ever adds to the page's own, a canonical replaces the
+ * canonical and the og:url.
+ */
+async function requestSeo(site: Site, page: Page, locale: string, seo: Seo): Promise<Seo> {
+	const hook = site.pageTypes.ownType(page)?.requestSeo ?? null;
+	if (hook === null) {
+		return seo;
+	}
+	const change = await hook(page, { locale, url: site.requestUrl, site, source: await site.sourceOf(page, locale) });
+	if (change === null) {
+		return seo;
+	}
+	const canonical = typeof change.canonical === "string" && change.canonical !== "" ? site.absolute(change.canonical) : null;
+	return {
+		...seo,
+		noindex: seo.noindex || change.noindex === true,
+		...(canonical === null ? {} : { canonical, ogUrl: canonical }),
 	};
 }
 
