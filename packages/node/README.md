@@ -993,6 +993,14 @@ sent or has failed (`status`, `stage` render or send, `error`, `to` the
 recipient), on retries too. Both are awaited; a throw in either is logged
 and never fails the submit or the delivery.
 
+A host's own staff notification (a shop's new order) reaches the same team
+with `staffRecipients(site, locale?, channels?)`: the bell's staff users in
+each one's saved admin locale, the mail recipients and Telegram chats from
+the notification settings in `locale` (the panel's default unless given);
+a channel the host did not configure adds nobody, and `channels` keeps only
+those keys. Pass the list to `site.notifications.send(type, payload, recipients)`
+for a type registered in `notifications.types`.
+
 Template overrides are Liquid (`{{ leadIdentity }}`, or `{{ leadName }}` and
 `{{ leadContact }}` apart, `{% for f in fields %}`),
 edited per type, format and locale in the notification settings and stored

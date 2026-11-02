@@ -1,30 +1,16 @@
 import { type Page, translationText } from "../content/page";
 import type { Site } from "../site";
 import { formatPhpDate } from "@tbtop/admin";
-import { adminLocale, localesFor } from "../admin/locales";
+import { adminLocale } from "../admin/locales";
 import type { FormSubmissionPayload } from "../notifications/formSubmission";
-import type { Delivery, Recipient } from "../notifications/types";
+import { staffRecipients } from "../notifications/staff";
+import type { Delivery } from "../notifications/types";
 import { hasString } from "../support/strings";
 import { formatFields, leadContact, leadIdentity, leadName } from "./lead";
 import { locateForm } from "./locate";
 import { type Submission, staleBefore } from "./submissions";
 
 const TYPE = "form.submission";
-
-/** A raw setting split on comma, semicolon or newline, from a string or a list (Mail\Recipients, ChatIds). */
-const pieces = (raw: unknown): string[] =>
-	(Array.isArray(raw) ? raw.map(String) : typeof raw === "string" ? raw.split(/[,;\r\n]+/) : []).map((piece) => piece.trim()).filter((piece) => piece !== "");
-
-export const mailRecipients = (raw: unknown): string[] => pieces(raw).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
-
-/** Chat ids are signed integers; a `# label` after one is the admin's note and never sent. */
-export const chatIds = (raw: unknown): string[] => [
-	...new Set(
-		pieces(raw)
-			.map((piece) => piece.split("#", 1)[0]?.trim() ?? "")
-			.filter((id) => /^-?\d+$/.test(id)),
-	),
-];
 
 /**
  * SubmissionNotifier: the form.submission fan-out under the row's claim,
@@ -101,30 +87,15 @@ async function rerun(site: Site, submission: Submission): Promise<string | null>
 export async function deliverSubmission(site: Site, submission: Submission, page: Page): Promise<string[]> {
 	const enabled = await site.notifications.enabledChannels(TYPE);
 	const locale = adminLocale(site.config);
-	const recipients: Recipient[] = [];
+	const recipients = await staffRecipients(site, locale, enabled);
 	const errors: string[] = [];
-	const bell = site.config.notifications?.bell;
-	if (enabled.includes("bell") && bell !== undefined) {
-		const staff = await bell.staff();
-		const locales = await localesFor(site.config, staff);
-		recipients.push(...staff.map((user, index): Recipient => ({ audience: "staff", locale: locales[index] ?? locale, user })));
-	}
 	if (enabled.includes("mail") && !site.notifications.hasChannel("mail")) {
 		errors.push(await site.t("notifications.errors.mail", locale, { error: "no mail transport is configured" }));
-	} else if (enabled.includes("mail")) {
-		const emails = mailRecipients(await site.settings.get("notifications.mail.recipients"));
-		if (emails.length === 0) {
-			errors.push(await site.t("notifications.errors.mail_no_recipients", locale));
-		}
-		recipients.push(...emails.map((email): Recipient => ({ audience: "staff", locale, email })));
+	} else if (enabled.includes("mail") && !recipients.some((recipient) => recipient.email !== undefined)) {
+		errors.push(await site.t("notifications.errors.mail_no_recipients", locale));
 	}
-	if (enabled.includes("telegram")) {
-		const ids = chatIds(await site.settings.get("notifications.telegram.chat_ids"));
-		if (!site.notifications.hasChannel("telegram") || ids.length === 0) {
-			errors.push(await site.t("notifications.errors.telegram_not_configured", locale));
-		} else {
-			recipients.push(...ids.map((phone): Recipient => ({ audience: "staff", locale, phone })));
-		}
+	if (enabled.includes("telegram") && !recipients.some((recipient) => recipient.phone !== undefined)) {
+		errors.push(await site.t("notifications.errors.telegram_not_configured", locale));
 	}
 	for (const reader of new Set(recipients.map((recipient) => recipient.locale))) {
 		const group = recipients.filter((recipient) => recipient.locale === reader);

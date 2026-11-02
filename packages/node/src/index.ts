@@ -56,6 +56,7 @@ export { type ErrorClass, type ErrorPageProps, type ErrorSeo, ensureErrorPages }
 export { previewLink } from "./frontend/previewLink";
 export { htmlToText } from "./notifications/channels";
 export { formSubmissionType, type FormSubmissionPayload } from "./notifications/formSubmission";
+export { staffRecipients } from "./notifications/staff";
 export {
 	type Channel,
 	type Delivery,

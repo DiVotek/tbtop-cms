@@ -1,6 +1,6 @@
 import { rowProblem } from "./blocks/resolver";
 import { pageFromRow } from "./content/page";
-import { chatIds, mailRecipients } from "./forms/notifier";
+import { chatIds, mailRecipients } from "./notifications/staff";
 import type { Site } from "./site";
 import { isDict } from "./support/values";
 
