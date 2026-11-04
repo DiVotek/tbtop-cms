@@ -181,13 +181,13 @@ A shop package registers five order types and one inventory type, then sends fro
 // ShopServiceProvider::packageBooted()
 Notifications::type(
     TypeDefinition::make('order.placed')
-        ->label(fn () => __('tbtop-storefront::notifications.order.placed.label'))
+        ->label(fn () => __('shop::notifications.order.placed.label'))
         ->group('orders')
         ->payload(OrderPayload::class)
         ->templates([
-            Format::Html->value => 'tbtop-storefront::notifications.order-placed.html',
-            Format::Text->value => 'tbtop-storefront::notifications.order-placed.text',
-            Format::Short->value => 'tbtop-storefront::notifications.order-placed.short',
+            Format::Html->value => 'shop::notifications.order-placed.html',
+            Format::Text->value => 'shop::notifications.order-placed.text',
+            Format::Short->value => 'shop::notifications.order-placed.short',
         ])
         ->audiences([Audience::Customer, Audience::Staff])
         ->defaultChannels(['mail', 'bell']),

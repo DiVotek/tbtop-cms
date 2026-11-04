@@ -6,7 +6,9 @@ This file owns "I think I need something the CMS does not have": compositions
 that work today built from existing package parts, and gaps confirmed absent
 in `src/` with the least-bad workaround. Block/page-type mechanics live in
 `blocks.md`/`pages.md`; SEO detail lives in `seo.md`; this file only shows how
-real hosts combined those primitives.
+real hosts combined those primitives. "Both real hosts" below means the two
+production sites surveyed while writing this guide (their code is not public);
+file paths are relative to such a host app.
 
 ## Recipes — compositions that work today
 
