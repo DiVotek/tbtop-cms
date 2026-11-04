@@ -1,4 +1,8 @@
-# @tbtop/cms (Node) — 0.0
+# @tbtop/cms (Node)
+
+> **Alpha.** The API may still break between minors. Versions are shared
+> with the Laravel package `tbtop/cms` (one number, one
+> [CHANGELOG](../../CHANGELOG.md)) and are independent from `@tbtop/admin`'s.
 
 The tbtop CMS core for Bun, Node and Cloudflare Workers: pages, blocks and SEO
 over the host's Kysely, edited in [`@tbtop/admin`](https://github.com/DiVotek/tbtop/tree/main/packages/node).
@@ -9,7 +13,16 @@ The frontend is headless: the host framework (TanStack Start, Hono + React,
 Astro…) asks the CMS for a page's props and renders them. `@tbtop/cms/react`
 has the React half: the SEO head, the block renderer and the built-in blocks.
 
-## Install (until it is published)
+## Install
+
+```bash
+npm install @tbtop/cms @tbtop/admin kysely
+```
+
+Node 22+ or Bun. React, `better-auth`, `@tbtop/inertia-admin` and
+`@json-render/*` are optional peers, needed only for the parts that use them.
+
+## Develop
 
 ```bash
 cd packages/node

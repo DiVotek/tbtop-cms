@@ -2,9 +2,14 @@
 
 Minimal `tbtop` + `json-render` CMS core for Laravel.
 
-> Greenfield package. Core CMS domains (languages, pages, redirects, blocks,
-> layouts, settings, forms, notifications, SEO) are implemented; not yet tagged
-> or published to Packagist.
+Core CMS domains: languages, pages, redirects, blocks, layouts, settings,
+forms, notifications, SEO.
+
+> **Versions.** `tbtop/cms` (Packagist) and its Bun/Node twin `@tbtop/cms`
+> (npm, [`packages/node`](packages/node)) ship in lockstep: one version, one
+> tag, one [CHANGELOG](CHANGELOG.md). That number is independent from
+> `tbtop/admin`'s; each release names the admin version it needs. The Node
+> package is alpha: its API may still break between minors.
 
 ## Requirements
 
