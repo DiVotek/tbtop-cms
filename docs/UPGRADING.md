@@ -418,7 +418,7 @@ format.
   `DeliveryStage $stage` (`Tbtop\Cms\Notifications\DeliveryStage`: `Render`
   or `Send`, default `Send`). Positional construction stays compatible.
 - **Queued senders stop retrying render errors.** A queued listener that
-  calls `send()` (for example storefront's `SendsOrderNotification`) used to
+  calls `send()` (for example a shop's `SendsOrderNotification`) used to
   fail on a render error and be retried by the queue. Its job now completes
   with `Failed` log rows instead. A template error is deterministic; the
   retry never fixed it.

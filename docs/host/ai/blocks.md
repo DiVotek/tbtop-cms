@@ -434,8 +434,7 @@ here. Block-specific usage:
   each row is well-formed (an admin can save a partial row, or `$input`
   itself is untrusted per the table below), so `resolve()` must still guard
   each row (`is_array($row)`, `$row['field'] ?? null`) rather than assuming
-  the form's shape. See any real block's `resolve()` for the pattern
-  (`ProjectsGridBlock::items()` in the divotek host).
+  the form's shape.
   A row of **one text field** is a `tags` field instead
   ([placement.md](./placement.md#picking-the-field-a-list-of-single-texts-is-tags)).
 - **Media fields** (`$s->media('image')`) — store the media *id*
@@ -706,7 +705,7 @@ are the client's half of the three-layer contract:
 - **Extending vs. rewriting the catalog**: the package ships exactly two
   built-in blocks (`Hero`, `ContactForm`) with their own `catalog.ts`/
   `registry.tsx` as a working example, importable via the `@cms` alias. In
-  practice, every real host surveyed (divotek_com_ua, autofocus) does not
+  practice, the real hosts surveyed do not
   import or spread the package's `catalog`/`registry` — each writes its own
   `resources/js/cms/catalog.ts` and `registry.tsx` from scratch, reimplementing
   even `Hero`/`ContactForm`/`Fragment` to match its own visual language and
@@ -715,12 +714,11 @@ are the client's half of the three-layer contract:
   staying with the stock `Hero`/`ContactForm` blocks unmodified
   (`cms-starter-kit`-style bare wiring — see wiring.md).
 - **Host-only client interactivity**: state that spans multiple blocks on a
-  page (e.g. divotek's `ContactModalContext` — a CTA in one block opens a
+  page (e.g. a `ContactModalContext` — a CTA in one block opens a
   contact form rendered by a different block) is not a package concern.
   Provide it as a React context around `<CmsRenderer>` in the host's own
   `CmsPage.tsx`, with a no-op fallback value so a page without the relevant
-  block still renders (see `ContactModalContext.tsx`'s `NOOP` value in
-  divotek_com_ua). The package's `ResolveContext`/props contract has no
+  block still renders. The package's `ResolveContext`/props contract has no
   concept of cross-block client state — it's resolved entirely client-side.
 
 ## Server-side / Blade rendering
@@ -843,7 +841,7 @@ the same rows per container: `unregistered_block_rows` and
   (`resources/js/cms/blocks/Hero.tsx`) — the minimal PHP/catalog/registry
   triple; `ContactForm` (`src/Block/Blocks/ContactForm.php`) + `ContactForm.tsx`
   — the minimal form-handling block, honeypot included.
-- Host examples: `divotek_com_ua/app/Cms/Blocks/*` (26 blocks) — notably
+- Host examples: a 26-block host keeps
   `Concerns/NormalisesInput.php`, a **host-authored** trait (`str()`,
   `text()`, `rows()`, `link()`, `bool()`, `cta()`, `divider()`) that every
   block in that host uses to coerce loose admin input into typed props. It

@@ -11,8 +11,8 @@ use Tbtop\Admin\Dsl\S;
 
 /**
  * The three self-contained forms of the profile page tabs. Each tab
- * submits independently — mirrors the divotek profile, where a broken
- * call in one section never blocks the others. No cancel button:
+ * submits independently, so a broken call in one section never
+ * blocks the others. No cancel button:
  * there is no list to go back to from a self-service profile.
  */
 final class ProfileForms

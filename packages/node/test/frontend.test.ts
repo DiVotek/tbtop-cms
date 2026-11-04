@@ -208,7 +208,7 @@ describe("handle", () => {
 			seo: {
 				extend: async (nodes, ctx) => [
 					...nodes.filter((node) => node["@id"] !== identityId(ctx.site)),
-					{ "@context": "https://schema.org", "@type": "ProfessionalService", "@id": identityId(ctx.site), name: "Divotek", geo: { "@type": "GeoCoordinates", latitude: 50.45 } },
+					{ "@context": "https://schema.org", "@type": "ProfessionalService", "@id": identityId(ctx.site), name: "Acme", geo: { "@type": "GeoCoordinates", latitude: 50.45 } },
 				],
 			},
 		});

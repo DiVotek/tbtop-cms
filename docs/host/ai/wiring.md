@@ -205,7 +205,7 @@ export { default } from '@cms/CmsPage';
 
 — pointing straight at the vendor copy via the `@cms` alias, and that's what
 this package's own workbench host uses. But both real hosts surveyed
-(divotek_com_ua, autofocus) instead keep a local copy at
+instead keep a local copy at
 `resources/js/cms/CmsPage.tsx` and re-export from **that**:
 
 ```tsx
@@ -279,7 +279,7 @@ dedicated `admin.tsx` existed, checking `admin.tsx`/`.jsx`/`.ts` first, then
 `app.tsx`/`.jsx`/`.ts` — but new installs should use `admin.tsx`.
 
 **Known gap, not a documented alternative:** neither real host surveyed
-(divotek_com_ua, autofocus) has this wired — both use a single `app.tsx`
+has this wired — both use a single `app.tsx`
 fallback entry with no `@cms/admin/blocks` import and no local
 `resources/js/cms/admin` directory, so their admin page editors render those
 block kinds as the unknown-kind placeholder. Wire the import if the editor
@@ -459,7 +459,7 @@ own risk, outside this package's contract.
 - Flag on, gateway down/erroring: falls back to blade head + client-rendered
   body, same as flag off — a broken SSR process is never a missing `<head>`.
 
-autofocus is the SSR reference host among those surveyed: single `app.tsx`
+The SSR reference host among those surveyed has a single `app.tsx`
 entry whose `setup({ el, App, props })` returns `<App {...props} />` when
 `el` is absent (no DOM container under SSR) instead of calling
 `createRoot(el).render(...)`.

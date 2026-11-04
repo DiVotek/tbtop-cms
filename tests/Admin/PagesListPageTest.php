@@ -55,7 +55,7 @@ function pagesTableNode(): array
     return $found;
 }
 
-it('renders the divotek-style pages list wire shape', function (): void {
+it('renders the minimal pages list wire shape', function (): void {
     Page::create(['type' => 'category', 'status' => 'published', 'name' => ['en' => 'Blog']]);
     Page::create(['type' => 'page', 'status' => 'published', 'name' => ['en' => 'About']]);
     $node = pagesTableNode();

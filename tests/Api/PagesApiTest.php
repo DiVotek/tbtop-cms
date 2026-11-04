@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
-    $this->user = ApiUser::create(['name' => 'tbtop-social', 'email' => 'social@example.com', 'password' => 'secret']);
+    $this->user = ApiUser::create(['name' => 'Publisher', 'email' => 'social@example.com', 'password' => 'secret']);
     CmsUserProfile::query()->forceCreate(['user_id' => $this->user->id]);
     $this->category = Page::factory()->category()->create(['name' => ['en' => 'News'], 'status' => PageStatus::Published]);
 });

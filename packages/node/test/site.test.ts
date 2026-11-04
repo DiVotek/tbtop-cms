@@ -155,13 +155,13 @@ function checks(start: () => Promise<Host>): void {
 		// A block's resolve gets its fields resolved, and its return is the props.
 		expect(body).toContain(JSON.stringify({ heading: "Контакти", phone: "+380 44 000 00 00", address: "Київ" }).replaceAll('"', "&#34;"));
 		// The settings object, typed by the site's tabs, in the page's locale.
-		expect(body).toContain("<footer>Divotek · +380 44 000 00 00 · Київ</footer>");
-		expect(body).toContain("https://divotek.com.ua/audit");
+		expect(body).toContain("<footer>Acme · +380 44 000 00 00 · Київ</footer>");
+		expect(body).toContain("https://example.com/audit");
 		expect(jsonLd(body).find((node) => node["@type"] === "FAQPage")?.mainEntity?.[0]?.name).toBe("Скільки?");
 	});
 
 	test("the settings object is in the page's locale: a translatable setting falls to its English value", async () => {
-		expect(await (await visit("/en")).text()).toContain("<footer>Divotek · +380 44 000 00 00 · Kyiv</footer>");
+		expect(await (await visit("/en")).text()).toContain("<footer>Acme · +380 44 000 00 00 · Kyiv</footer>");
 	});
 
 	test("service page: typed fields, the site's Service JSON-LD, the Organization from `seo` at the identity @id", async () => {
@@ -171,7 +171,7 @@ function checks(start: () => Promise<Host>): void {
 		const service = nodes.find((node) => node["@type"] === "Service");
 		const org = nodes.find((node) => node["@type"] === "Organization");
 		expect(service?.offers?.price).toBe(1200);
-		expect(org).toMatchObject({ name: "Divotek", telephone: "+380 44 000 00 00" });
+		expect(org).toMatchObject({ name: "Acme", telephone: "+380 44 000 00 00" });
 		expect(service?.provider?.["@id"]).toBe(org?.["@id"]);
 	});
 
@@ -245,7 +245,7 @@ describe("defineSite", () => {
 	});
 
 	test("the settings object is typed by the tabs: built-in keys, every tab's fields, nothing else", () => {
-		const typed: typeof site.settings = { name: "Divotek", logo: null, favicon: null, phones: [], emails: [], socials: [], phone: null, address: "Kyiv", brandColor: null, links: [] };
+		const typed: typeof site.settings = { name: "Acme", logo: null, favicon: null, phones: [], emails: [], socials: [], phone: null, address: "Kyiv", brandColor: null, links: [] };
 		// @ts-expect-error not a field of any tab
 		const unknownKey: typeof site.settings = { ...typed, fax: "1" };
 		// @ts-expect-error phone is text

@@ -109,10 +109,10 @@ none of these are `article`, so a plain `category` cannot parent them. Both
 real hosts hit this and both solved it the same way: a host-owned container
 type.
 
-`autofocus/app/Cms/PageTypes/SectionType.php` (key `section`, children
+One host's `SectionType` (key `section`, children
 `['service', 'guide']`, `maxDepth() = 2`) parents its `ServiceType` and
 `ArticleType` (key `guide`), both `requiresParent() = true` leaves.
-`divotek_com_ua/app/Cms/PageTypes/SectionType.php` does the same for its
+The other host's `SectionType` does the same for its
 services/portfolio/blog tree (children `['page', 'article', 'section']`,
 `maxDepth() = 3`, sections can nest).
 
@@ -421,14 +421,11 @@ hidden in the UI. Duplicating one is refused the same way:
 (`tbtop-cms::pages.validation.type_source_backed`), and the pages list hides
 the Duplicate row action for those rows.
 
-`tbtop-ecom/docs/storefront-cms-contract.md` documents the intended host
-usage pattern — a storefront package registering `ProductType`,
+The intended host usage pattern is a shop package registering `ProductType`,
 `VariantType`, `CollectionType` via `PageTypeRegistry::extend()`, each
 loading its aggregate by `source_id` and rendering one shared per-kind
-template. Treat it as the pattern to follow, not as a description of what
-has landed — at the time of writing it is a frozen-contract planning doc
-for an unbuilt package, though its `PageTypeInterface` snippet matches what
-actually shipped (`.changes/feat-source-backed-pages.md`).
+template (`.changes/feat-source-backed-pages.md`). No such package has
+landed yet: treat it as the pattern to follow, not as a working example.
 
 **Assumptions worth knowing:** `source_id` is trusted to be set by the
 host's own sync — nothing here writes it or enforces a source-backed page
@@ -726,9 +723,8 @@ HeaderBlocks::content()])`.
 ## Seeding content
 
 The recommended way to load a site's content is idempotent PHP seeders, not
-clicking through the admin — every real host does this. The pattern (from
-`divotek_com_ua/database/seeders/Concerns/SeedsPages.php`,
-`HomePageSeeder.php`, `LayoutSeeder.php`):
+clicking through the admin — every real host does this. The pattern
+(a `SeedsPages` trait used by `HomePageSeeder`, `LayoutSeeder`, …):
 
 - **Key by slug, not id.** Find an existing page by
   `whereHas('slugs', fn ($q) => $q->where('slug', $slug))`, or the home page

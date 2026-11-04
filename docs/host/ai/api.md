@@ -3,7 +3,7 @@
 > Part of the host-builder guide. Start at [./README.md](./README.md).
 
 A token-authenticated JSON API under `/api/cms/v1` that lets another service
-(tbtop-social, an importer) write articles into the categories it was given.
+(a social posting service, an importer) write articles into the categories it was given.
 It is off by default and writes through the same model saves as the admin:
 slugs, revisions, page refs, the audit entry and the cache bump happen as
 they do for an editor.
@@ -15,7 +15,7 @@ they do for an editor.
 2. Add `Laravel\Sanctum\HasApiTokens` to the user model (`tbtop-cms.admin.model`).
 3. `TBTOP_CMS_API=true` (`tbtop-cms.api.enabled`).
 4. Create a dedicated user for the service and never log in as it:
-   `php artisan cms:admin:create social@example.com --name="tbtop-social"`
+   `php artisan cms:admin:create social@example.com --name="Publisher"`
    prints a generated random password — discard it.
 5. `php artisan cms:api-token social@example.com --parents=12,15` — the
    argument is the user's email, the user must be a CMS admin; the token is

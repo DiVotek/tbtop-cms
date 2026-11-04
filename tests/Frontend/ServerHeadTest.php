@@ -173,24 +173,24 @@ it('prepends home to an existing nested trail without reordering it', function (
 
 it('labels every BreadcrumbList item by name, not by the SEO-length title', function (): void {
     // Google may show these crumbs in place of the URL; a title like
-    // "Camera repair in Dnipro — Autofocus" reads as spam there.
+    // "Camera repair in Springfield — Acme Repair" reads as spam there.
     app(Cms::class)->frontendRoutes();
     Page::factory()->create([
         'status' => PageStatus::Published,
         'is_system' => true,
         'name' => ['en' => 'Home'],
-        'title' => ['en' => 'Camera repair in Dnipro — Autofocus'],
+        'title' => ['en' => 'Camera repair in Springfield — Acme Repair'],
     ]);
     $parent = Page::factory()->category()->create([
         'status' => PageStatus::Published,
         'name' => ['en' => 'Services'],
-        'title' => ['en' => 'Photo and video repair services in Dnipro'],
+        'title' => ['en' => 'Photo and video repair services in Springfield'],
     ]);
     $page = Page::factory()->article()->create([
         'status' => PageStatus::Published,
         'parent_id' => $parent->getKey(),
         'name' => ['en' => 'DSLR cameras'],
-        'title' => ['en' => 'DSLR camera repair in Dnipro'],
+        'title' => ['en' => 'DSLR camera repair in Springfield'],
     ]);
 
     $html = $this->get($page->pathFor('en'))->assertOk()->getContent();

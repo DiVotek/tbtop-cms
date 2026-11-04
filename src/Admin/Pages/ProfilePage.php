@@ -53,7 +53,7 @@ class ProfilePage extends Page
     }
 
     /**
-     * Divotek-style profile: three tabs, each with its own form and
+     * Profile: three tabs, each with its own form and
      * submit, so one failing section never blocks the others.
      */
     public function view(S $s): Node
@@ -91,7 +91,7 @@ class ProfilePage extends Page
             ),
         ];
 
-        // Compact column like the divotek profile — the panel itself
+        // Compact column — the panel itself
         // runs full-width, so the page narrows its own content.
         return $s->stack([$s->tabs($tabs)], ['class' => 'mx-auto w-full max-w-2xl']);
     }

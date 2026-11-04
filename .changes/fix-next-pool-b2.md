@@ -53,5 +53,5 @@ links, uk-only, no slug, error page), `tests/Frontend/BreadcrumbsTest.php`
   (every save writes one per locale); tests delete slug rows to reach it.
 - The error text may include the view path from Blade's `ViewException`;
   only admins see it.
-- The storefront queue claim is not verified here (storefront is not
+- The queued-listener claim is not verified here (no queued sender is
   installed in this repo).

@@ -256,7 +256,7 @@ describe("collections: phones, emails and socials", () => {
 	test("the first phone and email feed the identity, every social link its sameAs; cms.settings comes from the collections", async () => {
 		const { cms } = await makeCms({ languages: [{ locale: "en", name: "English", default: true }], pages: [{ key: "home", system: true, name: { en: "Home" } }] });
 		const site = cms.site();
-		await site.settings.setMany({ "site.name": "Autofocus", "seo.identity.type": "local_business", "seo.identity.subtype": "AutoRepair", "seo.identity.address.locality": { en: "Kyiv" } });
+		await site.settings.setMany({ "site.name": "Acme Repair", "seo.identity.type": "local_business", "seo.identity.subtype": "AutoRepair", "seo.identity.address.locality": { en: "Kyiv" } });
 		await site.entries.create({ collection: "phones", status: "published", data: { number: "+380 44 000 0001" } });
 		await site.entries.create({ collection: "phones", status: "published", data: { number: "+380 44 000 0002" } });
 		await site.entries.create({ collection: "phones", data: { number: "+380 44 000 0003" } });

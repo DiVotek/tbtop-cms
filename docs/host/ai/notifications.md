@@ -56,7 +56,7 @@ Once `notify()` or `retry()` holds the claim, any exception — the page or bloc
 
 Do not reconstruct the outcome by re-reading `tbtop_notification_log`: the log is shared by every concurrent request and carries no column tying a row to the entity that triggered a send — a window query there can attribute another caller's failure to yours (`tests/Notifications/NotificationsTest.php`, "reports only its own deliveries when an unrelated failed row shares the log").
 
-**To make a send asynchronous**, run it from inside a queued job or listener yourself — `send()` never queues on your behalf. `SubmissionNotifier` does this already via `app()->terminating()`; `packages/storefront`'s order listeners (`Tbtop\Storefront\Notifications\Listeners\SendsOrderNotification` and its five subclasses) instead implement `Illuminate\Contracts\Queue\ShouldQueue` so a host with a queue worker never blocks the triggering request on `send()`'s synchronous delivery.
+**To make a send asynchronous**, run it from inside a queued job or listener yourself — `send()` never queues on your behalf. `SubmissionNotifier` does this already via `app()->terminating()`; a shop package's order listeners (`SendsOrderNotification` and its five subclasses) instead implement `Illuminate\Contracts\Queue\ShouldQueue` so a host with a queue worker never blocks the triggering request on `send()`'s synchronous delivery.
 
 ### `TypeDefinition`
 
@@ -64,7 +64,7 @@ Built with `TypeDefinition::make($key)` and its fluent setters, then handed to `
 
 - `label(string|Closure)` — display label (settings page, bell title). Pass a closure (`fn () => __('…')`) for a translated label: types are registered at boot, so `__('…')` passed directly is fixed in the boot locale (`app.locale`), while a closure is resolved per `labelValue()` call in the current request's locale.
 - `group(string)` — which settings tab/section this type is grouped under (real values in use: `'forms'`, `'orders'`, `'inventory'`).
-- `payload(class-string $payloadClass)` — **must be a `readonly` DTO whose public properties are exactly the template variables** (`FormSubmissionPayload`, `Tbtop\Storefront\Notifications\OrderPayload`). Plain values only — a template never queries; a money amount is pre-formatted before it reaches the payload, not formatted in the Blade view.
+- `payload(class-string $payloadClass)` — **must be a `readonly` DTO whose public properties are exactly the template variables** (`FormSubmissionPayload`, a shop's `OrderPayload`). Plain values only — a template never queries; a money amount is pre-formatted before it reaches the payload, not formatted in the Blade view.
 - `templates(array<value-of<Format>, string> $views)` — one view name per `Format` the type supports; `templateFor(Format $format)` returns `null` for a format with no view, which `Notifications::send()` treats as "skip this channel for this recipient" rather than an error.
 - `audiences(list<Audience> $audiences)` — which `Audience` cases (`Customer`, `Staff`) may receive this type; `send()` silently skips a recipient outside this list.
 - `defaultChannels(list<string> $channelKeys)` — channel keys enabled unless a merchant overrides `notifications.{typeKey}.channels` in Settings (see below).
@@ -171,14 +171,14 @@ Every delivery attempt — regardless of type — writes one row to `tbtop_notif
 
 ## Where to register
 
-Register types and channels from a host service provider's `packageBooted()`/`boot()`, **not** `packageRegistered()`/`register()`: `NotificationRegistry` is bound as a singleton in `Tbtop\Cms\CmsServiceProvider::packageRegistered()`, and `Notifications::channel()`/`::type()` resolve it eagerly through the container at call time. Laravel runs every provider's `register()` before any provider's `boot()`, so calling either method from `boot()` guarantees the binding already exists regardless of provider discovery order — `CmsServiceProvider` itself registers its own built-in channels and the `form.submission` type from `packageBooted()` (`NotificationWiring::wireNotificationRegistry()`), and `packages/storefront`'s `StorefrontServiceProvider::packageBooted()` documents the same reasoning verbatim.
+Register types and channels from a host service provider's `packageBooted()`/`boot()`, **not** `packageRegistered()`/`register()`: `NotificationRegistry` is bound as a singleton in `Tbtop\Cms\CmsServiceProvider::packageRegistered()`, and `Notifications::channel()`/`::type()` resolve it eagerly through the container at call time. Laravel runs every provider's `register()` before any provider's `boot()`, so calling either method from `boot()` guarantees the binding already exists regardless of provider discovery order — `CmsServiceProvider` itself registers its own built-in channels and the `form.submission` type from `packageBooted()` (`NotificationWiring::wireNotificationRegistry()`).
 
 ## Worked example
 
-`packages/storefront` (`tbtop-ecom/packages/storefront/src/StorefrontServiceProvider.php`) registers five order types and one inventory type, then sends from queued domain-event listeners:
+A shop package registers five order types and one inventory type, then sends from queued domain-event listeners:
 
 ```php
-// StorefrontServiceProvider::packageBooted()
+// ShopServiceProvider::packageBooted()
 Notifications::type(
     TypeDefinition::make('order.placed')
         ->label(fn () => __('tbtop-storefront::notifications.order.placed.label'))

@@ -17,7 +17,7 @@ beforeEach(function (): void {
     Language::factory()->default()->create(['locale' => 'en']);
 
     $settings = app(Settings::class);
-    $settings->set('site.name', 'Autofocus');
+    $settings->set('site.name', 'Acme Repair');
     $settings->set('seo.identity.type', 'local_business');
     $settings->set('seo.identity.subtype', 'AutoRepair');
     $settings->set('seo.identity.address.street', ['en' => '1 Main St']);
@@ -106,11 +106,11 @@ it('links the article author and publisher to the identity node', function (stri
     $node = collect(localBusinessJsonLd('/' . $article->pathFor('en')))->firstWhere('@type', 'Article');
     $id = url('/') . '#identity';
 
-    expect($node['author'])->toBe(['@type' => $schemaType, 'name' => 'Autofocus', '@id' => $id]);
+    expect($node['author'])->toBe(['@type' => $schemaType, 'name' => 'Acme Repair', '@id' => $id]);
 
     if ($hasPublisher) {
         expect($node['publisher']['@type'])->toBe($schemaType)
-            ->and($node['publisher']['name'])->toBe('Autofocus')
+            ->and($node['publisher']['name'])->toBe('Acme Repair')
             ->and($node['publisher']['@id'])->toBe($id);
     } else {
         expect($node)->not->toHaveKey('publisher');

@@ -21,10 +21,9 @@ shared Inertia prop and renders each slot's resolved blocks through the same
 ShareCmsProps::resolveLayout()` supplies that prop, cached per locale via
 `CmsCache::rememberLive('layout:{locale}', ...)` — see "Custom cached frontend
 read" below for what that caching implies. Both real hosts hand-roll a chrome component rather than
-using anything the package ships (there is no package `SiteChrome`):
-`divotek_com_ua/resources/js/cms/SiteChrome.tsx`,
-`autofocus/resources/js/cms/CmsPage.tsx` (chrome wrapping is inline in this
-host's `CmsPage.tsx` rather than a separate file). divotek's chrome also has
+using anything the package ships (there is no package `SiteChrome`): one
+keeps a `SiteChrome.tsx`, the other wraps the chrome inline in its
+`CmsPage.tsx`. The first host's chrome also has
 one non-obvious extra: a `HEADER_ABSORBING_KINDS` map that inserts a spacer
 `<div>` when the page's first block is a kind meant to sit under a fixed
 header — see "Not yet expressible" below, this is a *workaround* for a real
@@ -40,12 +39,12 @@ points at a **host-owned** `resources/js/cms/CmsPage.tsx` that is a rewrite,
 not a copy, of the package's version. The package's own `CmsPage.tsx` is
 intentionally thin — `<Head>` SEO tags, `JSONUIProvider`, `Renderer`, nothing
 else. Hosts need it as the one place every frontend page passes through, so
-they graft onto it: divotek's version wraps `ContactModalProvider` and
+they graft onto it: one host's version wraps `ContactModalProvider` and
 `SiteChrome` around the renderer, adds the `og:type`/`og:url` tags `SeoResolver`
 leaves out, and injects a JSON-LD `<script>` tag from the
-`schema` Inertia prop (`divotek_com_ua/resources/js/cms/CmsPage.tsx`).
-autofocus's version adds a draft-preview banner keyed off `isPreview` and
-swaps in its own block `registry` (`autofocus/resources/js/cms/CmsPage.tsx`).
+`schema` Inertia prop.
+The other adds a draft-preview banner keyed off `isPreview` and
+swaps in its own block `registry`.
 Treat "own your `CmsPage.tsx`" as the norm, not the exception, the moment a
 host needs chrome, a React context provider, or extra `<head>` tags — the
 package's `CmsPage` default export has no slots for any of those. **Do not
@@ -236,7 +235,7 @@ extend()` (see "A package that ships blocks/page types" below) is for packages.
 Content authored by clicking in the admin lives only in that environment's
 database — not diffable, not reproducible. Both real hosts write content as
 Laravel seeders instead, one seeder per site section, idempotent on slug so a
-repeat run doesn't duplicate pages: divotek's `database/seeders/Concerns/
+repeat run doesn't duplicate pages: one host's `database/seeders/Concerns/
 SeedsPages.php` trait, method `upsertPage()`, looks the page up by
 `Page::whereHas('slugs', ...)` and only calls `Tbtop\Cms\Page\Support\
 PageSlugWriter::sync()` on first insert (see `BlogSeeder.php` for a concrete
@@ -253,7 +252,7 @@ trait also works around `seo.description` not accepting a locale map — stale:
 A block whose `resolve()` needs data from *other* pages (not just its own
 envelope's `data`) queries `Tbtop\Cms\Page\Models\Page` directly inside
 `resolve()`, using `ResolveContext::$page` for the current page's own
-context. autofocus's `app/Cms/Blocks/Concerns/ResolvesPageCards.php` is the
+context. One host's `app/Cms/Blocks/Concerns/ResolvesPageCards.php` is the
 concrete pattern: `pageCards($ids, ResolveContext $ctx)` takes an ID list
 (populated by an admin field paired with `app/Cms/Blocks/Concerns/
 PagePickerOptions.php::pageOptions(string $type)`, which lists pages of one
@@ -330,7 +329,7 @@ tags.
 A modal or other client-only UI state that several unrelated blocks need to
 trigger (a "Contact us" CTA button inside a Hero block, a pricing block, a
 footer block) is ordinary React context, not a CMS concept — `json-render`
-resolves block *props*, not shared client state. divotek's
+resolves block *props*, not shared client state. One host's
 `resources/js/cms/ContactModalContext.tsx` exports `ContactModalProvider`
 (plain `useState` + memoized context value) and a `useContactModal()` hook
 with a no-op fallback so a block rendered outside the provider (e.g. in a
@@ -350,9 +349,8 @@ exactly this: a package (not the host app itself) that can't ask the host to
 edit `config/tbtop-cms.php`. Both are static, append-only, and **latch on
 first read** — an extension registered after the registry singleton's first
 `get()`/`has()`/`all()` call is silently ignored, so it must run from a
-service provider's `boot()`, before any request resolves a page. Call shape,
-verified in `tbtop-ecom/docs/storefront-cms-contract.md` and matching
-`BlockRegistry`'s actual signature in `src/Block/BlockRegistry.php`:
+service provider's `boot()`, before any request resolves a page. Call shape
+(`BlockRegistry`'s signature in `src/Block/BlockRegistry.php`):
 
 ```php
 // A package's own ServiceProvider::boot() (or packageBooted() for spatie tools)
@@ -360,22 +358,17 @@ BlockRegistry::extend(fn (): array => [ProductGallery::class, ProductBuyBox::cla
 PageTypeRegistry::extend(fn (): array => [ProductType::class, CollectionType::class]);
 ```
 
-Caveat: `extend()` is **not yet used
-by a landed host or package** — `tbtop-ecom/packages/storefront` documents
-this exact call in its contract but its `src/` tree has no `Blocks/` or
-`PageTypes/` directory yet (the calls above are the *documented plan*, cited
-here as the verified shape of the API, not as a working example). Both real
-app hosts (divotek, autofocus) register their own blocks/page types the
-plainer way instead — `config('tbtop-cms.blocks.types')` /
+Caveat: no landed host or package uses `extend()` yet; the calls above show
+the API's shape, not a working example. App hosts register their own
+blocks/page types the plainer way instead — `config('tbtop-cms.blocks.types')` /
 `config('tbtop-cms.pages.types')` arrays in their own `config/tbtop-cms.php`
 — because they own that file and don't need the boot-order independence
 `extend()` buys a package. Use `extend()` only when shipping a reusable
 package; use the config arrays for a host's own blocks/page types.
 
-The one thing that *is* landed and working end-to-end in `tbtop-ecom`: a
-notifications bridge, registered the same "package boots into the package"
-way but via `Tbtop\Cms\Notifications\Notifications::type(TypeDefinition::
-make(...))` rather than a registry `extend()`. `StorefrontServiceProvider`
+A package's notifications bridge follows the same "package boots into the
+package" way via `Tbtop\Cms\Notifications\Notifications::type(TypeDefinition::
+make(...))` rather than a registry `extend()`. Its service provider
 registers it from `packageBooted()` (Spatie's post-boot hook, not
 `packageRegistered()`), with the reasoning spelled out in its own doc
 comment: the `NotificationRegistry` singleton this writes into is bound by
@@ -527,12 +520,8 @@ package's Site Health page.
 A block has no way to signal anything to the chrome/layout that
 renders around it. There is no equivalent of "this Hero wants a transparent,
 overlaid header" as a block prop or context value the chrome could read.
-divotek's old (pre-package) CMS had exactly this flag; the port to this
-package explicitly could not carry it over — the host's own port brief
-(`divotek_com_ua/PORT_PROMPT.md`) instructs: *"если блок старого сайта
-опирается на возможность, которой в новой CMS нет (например, `absorbsHeader`
-у hero) — не изобретай обходной путь молча, зафиксируй и спроси"* (don't
-silently invent a workaround, flag it and ask). The workaround divotek's
+One host's old (pre-package) CMS had exactly this flag, and its port to this
+package could not carry it over. The workaround that host's
 `SiteChrome.tsx` actually ships is a client-side lookup table
 (`HEADER_ABSORBING_KINDS`, matching specific block `kind` strings) that
 conditionally renders a spacer `<div>` instead — chrome-side knowledge of

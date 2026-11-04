@@ -3,7 +3,7 @@ import { z } from "zod";
 import { cmsBlockImpls, cmsBlocks, definePageType, demoFixture, type Fixture, implementBlocks, isFreshSite, pageFromRow, pagesField, whereLive, type SchemaTypeDef, seedFixtures } from "../src";
 import { get, makeCms } from "./support";
 
-// Findings from the dogfood sites (Golfstrimfish, Lumen Studio) that need no new API.
+// Findings from sample host sites that need no new API.
 
 describe("Dogfood: a host JSON-LD type for a catalog subtype", () => {
 	// The README's Product example: a host schema type named by a subtype's schemaTypes.

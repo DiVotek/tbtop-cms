@@ -405,12 +405,12 @@ service details, article body content, etc.) contribute **nothing** to
 available today — see recipes.md for the current workaround).
 
 **Host pattern for block-derived schema** (what both real hosts that needed
-it — divotek_com_ua, autofocus — actually built; not shipped by the
+it actually built; not shipped by the
 package): a host-owned middleware shares a *separate* `schema` Inertia prop
 built from the same block-resolution the page controller already does, and
 the host's own `CmsPage.tsx` renders it as a second `<script
 type="application/ld+json">` tag alongside the package's `seo.jsonLd`
-output. Shape, from `divotek_com_ua`:
+output. Shape, from one of them:
 
 - `app/Http/Middleware/AttachSchemaGraph.php` — registered on the frontend
   route group, resolves the current page via `PageResolver` + resolves its

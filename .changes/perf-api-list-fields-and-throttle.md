@@ -13,4 +13,4 @@ the API more often than 60 times a minute per token raises the limit there.
 Tests now cover publish scheduling and its refusals, a slug change on a
 published page (and its redirect), select/media/repeater shape rules, the
 RestrictedHtml refusals, a refused media import and `cms:api-token` refusing
-ids that are not categories (hub #150).
+ids that are not categories.
