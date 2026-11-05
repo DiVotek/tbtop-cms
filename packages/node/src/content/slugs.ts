@@ -8,6 +8,8 @@ import { clearAt, recordMove } from "./slugRedirects";
 
 type SlugRow = { id: number; slug: string; path: string };
 
+const MAX_WRITE_ATTEMPTS = 100;
+
 /**
  * One slug and full path per page and frontend locale (PageSlugWriter.php).
  * The slug comes from the override, else the stored slug, else the name;
@@ -183,29 +185,40 @@ export class PageSlugs {
 	}
 
 	private async writeRow(page: Page, locale: string, override: string): Promise<boolean> {
-		const existing = await this.findRow(page.id, locale);
-		const base = await this.baseFor(page, locale, existing, override);
-		const parentPath = page.parentId === null ? "" : ((await this.pathFor(page.parentId, locale)) ?? "");
-		const [slug, path] = await this.free(page.id, locale, parentPath, base);
-		if (existing !== null && existing.slug === slug && existing.path === path) {
-			return false;
-		}
-		const now = sqlDate(new Date());
-		if (existing === null) {
-			await insertId(
-				this.db,
-				this.db
-					.insertInto("tbtop_page_slugs")
-					.values({ page_id: page.id, locale, slug, path, created_at: now, updated_at: now }),
-			);
-		} else {
-			await this.db.updateTable("tbtop_page_slugs").set({ slug, path, updated_at: now }).where("id", "=", existing.id).execute();
-			if (existing.path !== path) {
+		for (let attempt = 1; ; attempt++) {
+			const existing = await this.findRow(page.id, locale);
+			const base = await this.baseFor(page, locale, existing, override);
+			const parentPath = page.parentId === null ? "" : ((await this.pathFor(page.parentId, locale)) ?? "");
+			const [slug, path] = await this.free(page.id, locale, parentPath, base);
+			if (existing !== null && existing.slug === slug && existing.path === path) {
+				return false;
+			}
+			const now = sqlDate(new Date());
+			try {
+				if (existing === null) {
+					await insertId(
+						this.db,
+						this.db
+							.insertInto("tbtop_page_slugs")
+							.values({ page_id: page.id, locale, slug, path, created_at: now, updated_at: now }),
+					);
+				} else {
+					await this.db.updateTable("tbtop_page_slugs").set({ slug, path, updated_at: now }).where("id", "=", existing.id).execute();
+				}
+			} catch (error) {
+				// A racing writer took the path after free() looked: its row is visible now, so the next free() steps past it (PageSlugWriter::write).
+				const holder = await this.pageAt(path, locale);
+				if (attempt < MAX_WRITE_ATTEMPTS && holder !== null && holder !== page.id) {
+					continue;
+				}
+				throw error;
+			}
+			if (existing !== null && existing.path !== path) {
 				await recordMove(this.db, locale, existing.path, path);
 			}
+			await clearAt(this.db, locale, path);
+			return true;
 		}
-		await clearAt(this.db, locale, path);
-		return true;
 	}
 
 	private async free(pageId: number, locale: string, parentPath: string, base: string): Promise<[string, string]> {
