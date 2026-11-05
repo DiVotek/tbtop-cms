@@ -6,9 +6,10 @@ namespace Tbtop\Cms\Admin\Pages\Support;
 
 /**
  * Builds the raw-HTML fragments the blocks showcase feeds to displayHtml():
- * the colored placeholder preview and the read-only fields table. displayHtml
- * is not sanitized, so every value that originates from a block is escaped
- * here; the colors and initials are computed, never author-controlled.
+ * the colored placeholder preview and the read-only fields table. Callers mark
+ * them ->trusted(): the sanitizer would strip the inline styles, so every value
+ * that originates from a block is escaped here; the colors and initials are
+ * computed, never author-controlled.
  */
 class BlockShowcaseHtml
 {
