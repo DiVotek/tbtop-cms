@@ -3,9 +3,9 @@
 # tbtop/cms (Packagist) and @tbtop/cms (npm) share one version number and one
 # CHANGELOG. The single source of truth is the `version` field in
 # packages/node/package.json; the PHP package has no version field, its
-# version is the git tag. Bump the version and add its `## X.Y.Z` section to
-# CHANGELOG.md in the release PR, merge to main, then run this workflow from
-# main. It:
+# version is the git tag. bin/release bumps it from the commits since the last
+# tag and writes its `## X.Y.Z` section to CHANGELOG.md; push that commit to
+# main, then run this workflow from main. It:
 #   1. checks CI is green on the commit and CHANGELOG.md has the version's section
 #   2. builds and packs the npm tarball (read-only token, no OIDC)
 #   3. fails if that tag already exists

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Fails when a commit subject in the range is not a conventional commit:
+# `type(scope)!: subject`. git-cliff builds CHANGELOG.md from these subjects
+# (cliff.toml), so a subject without a type would drop out of it.
+#
+#   bin/check-commits <range>        e.g. origin/main..HEAD
+#   bin/check-commits --subject <s>  one subject, e.g. a PR title
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+pattern='^(feat|fix|perf|revert|docs|refactor|chore|ci|build|test|style)(\([a-z0-9._/-]+\))?!?: [^ ]'
+
+if [ "${1:-}" = "--subject" ]; then
+	subjects="${2:-}"
+else
+	[ -n "${1:-}" ] || { echo "usage: bin/check-commits <range> | --subject <s>" >&2; exit 2; }
+	subjects="$(git log --no-merges --format='%s' "$1")"
+fi
+
+bad="$(grep -vE "$pattern" <<<"$subjects" | grep -v '^$' || true)"
+if [ -n "$bad" ]; then
+	echo "check-commits: not a conventional commit subject (type(scope)!: subject):" >&2
+	sed 's/^/  /' <<<"$bad" >&2
+	exit 1
+fi

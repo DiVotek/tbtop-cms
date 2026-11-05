@@ -1,0 +1,54 @@
+# git-cliff config: renders each release's CHANGELOG.md section and its bumped
+# version from the conventional commit subjects on main. bin/release uses it;
+# entries before 0.11 were written by hand and stay as they are.
+
+[changelog]
+header = ""
+body = """
+## {{ version | trim_start_matches(pat="v") }} — {{ timestamp | date(format="%Y-%m-%d") }}
+{% set breaking = commits | filter(attribute="breaking", value=true) -%}
+{% if breaking | length > 0 %}
+### Breaking changes
+{% for commit in breaking %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}
+{%- if commit.breaking_description and commit.breaking_description != commit.message %}
+
+{{ commit.breaking_description | upper_first | indent(prefix="  ", first=true) }}
+{%- endif %}
+{%- endfor %}
+{% endif -%}
+{% for group, commits in commits | filter(attribute="breaking", value=false) | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}
+{%- endfor %}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+topo_order = false
+sort_commits = "oldest"
+# The <!-- n --> prefixes only order the sections; the template strips them.
+commit_parsers = [
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^feat(\\(.*\\))?!?:", group = "<!-- 1 -->Features" },
+  { message = "^fix(\\(.*\\))?!?:", group = "<!-- 2 -->Fixes" },
+  { message = "^perf(\\(.*\\))?!?:", group = "<!-- 3 -->Performance" },
+  { message = "^revert(\\(.*\\))?!?:", group = "<!-- 4 -->Reverts" },
+  { message = "^docs(\\(.*\\))?!?:", group = "<!-- 5 -->Documentation" },
+  { message = "^(refactor|chore|ci|build|test|style)(\\(.*\\))?!?:", skip = true },
+  { message = ".*", skip = true },
+]
+
+# 0.x: a feature or a breaking change bumps the minor, a fix the patch.
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = false

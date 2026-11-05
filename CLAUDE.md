@@ -37,6 +37,7 @@ composer analyse     # PHPStan
 composer refactor    # Rector (apply)
 composer serve       # Boot the Workbench app for manual review
 bin/verify           # The gate before a push to main (see Pushing to main)
+bin/release          # Commit the next version + its CHANGELOG.md section
 ```
 
 `:changed` variants (`composer test:all:changed`, `lint:changed`, `analyse:changed`, …)
@@ -125,8 +126,10 @@ The repo is trunk-based: every change lands as small commits pushed straight to
 
 Slice a large change so each commit leaves `main` working: the column before
 the code that reads it, new code unused or behind a config flag until the last
-slice. Each commit has a conventional subject (`feat:`, `fix:`, `feat!:` …),
-and a user-facing one adds its `.changes/*.md` fragment.
+slice. Each subject is a conventional commit (`feat:`, `fix:`, `feat!:` …) and
+is its line in CHANGELOG.md, written for a host (git-cliff, `cliff.toml`). A
+breaking commit carries the host's upgrade steps in a `BREAKING CHANGE:`
+footer, which the changelog prints under it.
 
 1. Commit, `git pull --rebase origin main`, then `bin/verify` (its header
    lists what it runs and its flags). Done when it ends with `is green`, which

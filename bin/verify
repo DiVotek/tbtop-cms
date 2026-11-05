@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The local gate before a push to main: runs the checks CI runs for the areas
-# the commits since origin/main touch, then the triage review. On success it
+# The local gate before a push to main: checks the commit subjects, runs the
+# checks CI runs for the areas the commits since origin/main touch, then the
+# triage review. On success it
 # stamps HEAD, and the pre-push hook (bin/git-hooks/pre-push) lets only a
 # stamped commit go to main.
 #
@@ -32,6 +33,7 @@ fi
 git fetch -q origin main
 base="$(git merge-base origin/main HEAD)"
 changed="$(git diff --name-only "$base" HEAD)"
+bin/check-commits "$base..HEAD"
 
 touches() { $all || grep -qE "$1" <<<"$changed"; }
 

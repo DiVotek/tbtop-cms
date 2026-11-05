@@ -90,6 +90,35 @@ jobs:
       - name: Run actionlint
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
+  # git-cliff builds CHANGELOG.md from commit subjects: on a push every new
+  # commit needs a conventional subject, on a PR its title (the squash subject).
+  commits:
+    name: Commit format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit subjects
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          case "$EVENT" in
+          pull_request) bin/check-commits --subject "$TITLE" ;;
+          push)
+            if [[ "$BEFORE" =~ ^0+$ ]]; then
+              echo "new branch: nothing to compare"
+            else
+              bin/check-commits "$BEFORE..$AFTER"
+            fi
+            ;;
+          *) echo "no new commits on $EVENT" ;;
+          esac
+
   lint:
     name: Lint
     needs: changes
@@ -408,7 +437,7 @@ jobs:
   # passes when the rest passed or skipped. A new job goes into `needs`.
   ci-ok:
     name: CI ok
-    needs: [changes, actionlint, lint, analyse, blocks-types, test, test-mysql, frontend, node, node-db, node-e2e]
+    needs: [changes, commits, actionlint, lint, analyse, blocks-types, test, test-mysql, frontend, node, node-db, node-e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:

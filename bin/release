@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Prepares a release commit on main: the next version from the conventional
+# commits since the last tag (cliff.toml [bump]), written to
+# packages/node/package.json, and its section on top of CHANGELOG.md.
+# Then bin/verify, push, and run the Release workflow from main.
+#
+#   bin/release          commit "chore(release): X.Y.Z"
+#   bin/release --check  print the next version, or exit 3 when nothing ships
+#
+# Only feat, fix, perf and revert ship a release; docs and chores wait.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# The root devDependency, so bun.lock pins it. RUST_LOG keeps its errors only.
+[ -x node_modules/.bin/git-cliff ] || { echo "release: run bun install first" >&2; exit 1; }
+cliff() { RUST_LOG=error ./node_modules/.bin/git-cliff "$@"; }
+
+last="$(git tag --merged HEAD --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)"
+subjects="$(git log --format='%s' "$last..HEAD")"
+if ! grep -qE '^(feat|fix|perf|revert)(\([^)]*\))?!?: ' <<<"$subjects"; then
+	echo "release: nothing to ship since $last"
+	exit 3
+fi
+
+next="$(cliff --unreleased --bumped-version)"
+next="${next#v}"
+if [ "${1:-}" = "--check" ]; then
+	echo "$next"
+	exit 0
+fi
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+	echo "release: commit or stash your changes first" >&2
+	exit 1
+fi
+
+node -e '
+	const fs = require("fs");
+	const file = "packages/node/package.json";
+	const text = fs.readFileSync(file, "utf8");
+	fs.writeFileSync(file, text.replace(/"version": "[^"]+"/, `"version": "${process.argv[1]}"`));
+' "$next"
+
+section="$(cliff --unreleased --tag "v$next" --strip all)"
+{
+	head -n 2 CHANGELOG.md
+	printf '%s\n\n' "$section"
+	tail -n +3 CHANGELOG.md
+} > CHANGELOG.md.tmp
+mv CHANGELOG.md.tmp CHANGELOG.md
+
+git commit -q -am "chore(release): $next"
+echo "release: committed $next (since $last); now bin/verify, push, and run Release"
