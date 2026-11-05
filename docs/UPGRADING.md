@@ -13,6 +13,14 @@ npm install @tbtop/inertia-admin@^0.8.1
 
 Read `tbtop/admin`'s UPGRADE.md (0.7 → 0.8) for its own host steps.
 
+Node hosts: `@tbtop/cms` 0.10.0 is its first npm release and needs
+`@tbtop/admin` `^0.8.1` from npm (a peer dependency). A host that built the
+admin from the tbtop repo or a tarball switches to the registry packages:
+
+```bash
+npm install @tbtop/cms@^0.10 @tbtop/admin@^0.8.1
+```
+
 ## Table names now use the `tbtop_` prefix
 
 All package tables have been renamed to a single `tbtop_` prefix, for example
