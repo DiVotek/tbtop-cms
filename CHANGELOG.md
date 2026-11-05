@@ -1,6 +1,24 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 — 2026-11-05
+
+First public release. `tbtop/cms` (Packagist) and `@tbtop/cms` (npm) ship
+together from here on, with one version and this one changelog.
+
+- **Laravel package:** pages and page types, blocks and layouts, languages,
+  redirects, forms, notifications, collections and taxonomies, settings, SEO
+  (JSON-LD, sitemap, robots.txt, llms.txt, markdown versions of pages) and a
+  token-authenticated pages API. Needs PHP 8.4, Laravel 12 or 13 and
+  `tbtop/admin` 0.8.1.
+- **Node package (alpha):** the same CMS for Bun, Node 22+ and Cloudflare
+  Workers over the host's Kysely, edited in `@tbtop/admin` 0.8.1. Its API may
+  still break between minors.
+- **Breaking for internal hosts:** Laravel 11 is no longer supported, following
+  `tbtop/admin` 0.8.
+
+Earlier entries describe internal builds that were never published.
+
+## Before 0.10.0 (internal builds)
 
 ### Breaking — the built-in role system was removed
 
