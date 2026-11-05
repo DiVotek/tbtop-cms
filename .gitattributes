@@ -14,8 +14,8 @@
 /rector.php             export-ignore
 /tests                  export-ignore
 /workbench              export-ignore
-/.changes               export-ignore
 /CONTEXT.md             export-ignore
+/cliff.toml             export-ignore
 /bin                    export-ignore
 /bun.lock               export-ignore
 /bunfig.toml            export-ignore
