@@ -37,7 +37,7 @@ function card(s: S, cms: Cms, block: BlockKind, usage: Usage[]) {
 	const category = block.category ?? "Uncategorized";
 	return s.stack(
 		[
-			s.displayHtml(placeholder(block.kind, block.label)),
+			s.displayHtml(placeholder(block.kind, block.label)).trusted(),
 			s.stack(
 				[
 					s.displayText(block.label).variant("subheading"),
@@ -63,13 +63,13 @@ function details(s: S, cms: Cms, block: BlockKind, usage: Usage[]) {
 			block.label,
 			s.stack(
 				[
-					s.displayHtml(placeholder(block.kind, block.label, "21 / 9", "3rem")),
+					s.displayHtml(placeholder(block.kind, block.label, "21 / 9", "3rem")).trusted(),
 					...(block.description === null ? [] : [s.displayText(block.description).variant("muted")]),
 					s.displayKeyValue(meta),
 					s.displayText("Fields").variant("subheading"),
-					s.displayHtml(fieldsTable(fields)),
+					s.displayHtml(fieldsTable(fields)).trusted(),
 					s.displayText("Used on pages").variant("subheading"),
-					s.displayHtml(usageTable(usage)),
+					s.displayHtml(usageTable(usage)).trusted(),
 				],
 				{ class: "gap-4" },
 			),

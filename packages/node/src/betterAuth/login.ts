@@ -63,9 +63,9 @@ function brandedCard(s: S, title: string, form: unknown) {
 	]);
 	return s.stack(
 		[
-			s.displayHtml(LOGO_SVG),
+			s.displayHtml(LOGO_SVG).trusted(),
 			card,
-			s.displayHtml('<a href="/" class="block text-center text-sm text-muted-foreground hover:text-foreground">&larr; Go to site</a>'),
+			s.displayHtml('<a href="/" class="block text-center text-sm text-muted-foreground hover:text-foreground">&larr; Go to site</a>').trusted(),
 			// Pinned to the viewport bottom; the outer pb-14 keeps it off the site link.
 			s.stack([s.displayText(`${CMS_BRAND} © ${new Date().getFullYear()}`).variant("muted")], { class: "fixed bottom-0 inset-x-0 py-4 text-center bg-background" }),
 		],
