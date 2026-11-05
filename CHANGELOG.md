@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Breaking — tbtop/admin 0.8.1, Laravel 12 or 13
+
+The package now requires `tbtop/admin ^0.8.1` and `@tbtop/inertia-admin ^0.8.1`,
+and drops Laravel 11 (`illuminate/contracts ^12.0||^13.0`), as tbtop/admin 0.8
+does. Upgrade the host to Laravel 12 or 13 and bump both admin packages with
+this release; the host steps are in tbtop/admin's
+[Upgrade to 0.8](https://docs.tbtop.dev/docs/getting-started/upgrade-0-8).
+The package's own raw-HTML fragments (blocks showcase, problem-block data,
+login logo and site link) are marked `->trusted()`, because 0.8 sanitizes
+`displayHtml()` by default and would strip their inline styles and SVG.
+
 ### Breaking — the built-in role system was removed
 
 The package no longer ships roles. `CmsRole` (superadministrator /

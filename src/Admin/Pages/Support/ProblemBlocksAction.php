@@ -75,7 +75,7 @@ final class ProblemBlocksAction
                 $deleteAction,
             ], align: 'center', gap: 2),
             $s->displayText(self::reason($problem))->variant('muted'),
-            $s->displayHtml(self::dataHtml($problem['data'])),
+            $s->displayHtml(self::dataHtml($problem['data']))->trusted(),
         ], direction: 'col', gap: 2, variant: 'card');
     }
 
@@ -90,7 +90,8 @@ final class ProblemBlocksAction
 
     /**
      * The saved data as pretty JSON. The DSL has no code node, so it is a <pre>
-     * through displayHtml, which renders unsanitised — hence e().
+     * through a trusted() displayHtml (it keeps the inline style), so the data is
+     * escaped with e().
      *
      * @param  array<string, mixed>  $data
      */

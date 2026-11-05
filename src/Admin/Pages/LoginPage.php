@@ -99,9 +99,9 @@ class LoginPage extends Page
             // The product mark: tbtop.dev's hero tiles (t·b·t·o·p) over the product
             // name, the name stretched to the tiles' width. Inline SVG; the name
             // uses currentColor so it follows the theme.
-            $s->displayHtml(self::LOGO_SVG),
+            $s->displayHtml(self::LOGO_SVG)->trusted(),
             $card,
-            $s->displayHtml($siteLink),
+            $s->displayHtml($siteLink)->trusted(),
             // Pinned to the viewport bottom, outside the centered flow; opaque
             // background so content scrolling beneath stays readable. The
             // outer stack's pb-14 reserves matching space in the flow so the

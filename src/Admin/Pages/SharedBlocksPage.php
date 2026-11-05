@@ -120,7 +120,7 @@ class SharedBlocksPage extends AdminPage
 
         // Delete sits over the preview, shown on hover: it exists only for a
         // block nothing places, so it must not claim room on every card.
-        $preview = [$s->displayHtml(BlockShowcaseHtml::placeholder($kind, $label))];
+        $preview = [$s->displayHtml(BlockShowcaseHtml::placeholder($kind, $label))->trusted()];
         if ($pages === 0) {
             $preview[] = $s->stack([$this->deleteAction($s, $block)], [
                 'class' => 'absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity',

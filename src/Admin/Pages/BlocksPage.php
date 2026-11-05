@@ -104,7 +104,7 @@ class BlocksPage extends AdminPage
         // A hand-built card (not the section 'card' variant) so the preview
         // sits flush against the border.
         return $s->stack([
-            $s->displayHtml(BlockShowcaseHtml::placeholder($info['kind'], $info['label'])),
+            $s->displayHtml(BlockShowcaseHtml::placeholder($info['kind'], $info['label']))->trusted(),
             $s->stack([
                 $s->displayText($info['label'])->variant('subheading'),
                 $s->displayValue($category)->badge([$category => ['color' => Color::Info]]),
@@ -136,7 +136,7 @@ class BlocksPage extends AdminPage
     private function detailBody(S $s, array $info, array $usage): Node
     {
         $children = [
-            $s->displayHtml(BlockShowcaseHtml::placeholder($info['kind'], $info['label'], aspect: '21 / 9', markSize: '3rem')),
+            $s->displayHtml(BlockShowcaseHtml::placeholder($info['kind'], $info['label'], aspect: '21 / 9', markSize: '3rem'))->trusted(),
         ];
 
         if ($info['description'] !== null) {
@@ -153,14 +153,14 @@ class BlocksPage extends AdminPage
             __('tbtop-cms::blocks_showcase.table.attributes'),
             __('tbtop-cms::blocks_showcase.field.required'),
             __('tbtop-cms::blocks_showcase.field.translatable'),
-        ));
+        ))->trusted();
 
         $children[] = $s->displayText(__('tbtop-cms::blocks_showcase.section.usage'))->variant('subheading');
         $children[] = $s->displayHtml(BlockShowcaseHtml::usageTable(
             $usage,
             __('tbtop-cms::blocks_showcase.table.page'),
             __('tbtop-cms::blocks_showcase.usage_empty'),
-        ));
+        ))->trusted();
 
         return $s->stack($children, ['class' => 'gap-4']);
     }
