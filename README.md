@@ -14,7 +14,7 @@ forms, notifications, SEO.
 ## Requirements
 
 - PHP `^8.4`
-- Laravel 11, 12, or 13
+- Laravel 12 or 13
 
 ## Installation
 

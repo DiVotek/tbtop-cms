@@ -1,5 +1,18 @@
 # Upgrading
 
+## 0.10.0: Laravel 12 or 13 and tbtop/admin 0.8.1
+
+`tbtop/cms` now requires `tbtop/admin` `^0.8.1`, which dropped Laravel 11, so
+the package needs Laravel 12 or 13. Upgrade Laravel first, then bump both
+packages together:
+
+```bash
+composer require tbtop/cms:^0.10 tbtop/admin:^0.8.1 -W
+npm install @tbtop/inertia-admin@^0.8.1
+```
+
+Read `tbtop/admin`'s UPGRADE.md (0.7 → 0.8) for its own host steps.
+
 ## Table names now use the `tbtop_` prefix
 
 All package tables have been renamed to a single `tbtop_` prefix, for example

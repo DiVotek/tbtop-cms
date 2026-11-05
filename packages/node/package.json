@@ -78,9 +78,9 @@
 		"zod": "^4.4.3"
 	},
 	"peerDependencies": {
-		"@tbtop/admin": "*",
+		"@tbtop/admin": "^0.8.1",
 		"better-auth": "^1.7.0",
-		"@tbtop/inertia-admin": "^0.7.3",
+		"@tbtop/inertia-admin": "^0.8.1",
 		"kysely": "^0.28.0",
 		"@json-render/core": "^0.19.0",
 		"@json-render/react": "^0.19.0",
@@ -91,7 +91,7 @@
 		"@json-render/core": "^0.19.0",
 		"@json-render/react": "^0.19.0",
 		"@tbtop/admin": "file:.tbtop/packages/node",
-		"@tbtop/inertia-admin": "^0.7.3",
+		"@tbtop/inertia-admin": "^0.8.1",
 		"@testing-library/react": "^16.3.2",
 		"@types/bun": "^1.3.11",
 		"@types/pg": "^8.23.1",
