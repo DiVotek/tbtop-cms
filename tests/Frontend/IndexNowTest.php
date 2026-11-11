@@ -101,6 +101,15 @@ it('submits nothing for a page that is not public before or after the save', fun
     'noindex' => [['status' => PageStatus::Published, 'is_indexable' => false]],
 ]);
 
+it('submits nothing when a draft is scheduled to go live later', function (): void {
+    indexNowOn();
+    $page = Page::factory()->create(['name' => ['en' => 'About'], 'status' => PageStatus::Draft]);
+    $page->update(['status' => PageStatus::Published, 'published_at' => now()->addDay()]);
+    endRequest();
+
+    Http::assertNothingSent();
+});
+
 it('submits the URL of a published page that goes noindex or back to draft', function (array $change): void {
     indexNowOn();
     $page = Page::factory()->create(['name' => ['en' => 'About'], 'status' => PageStatus::Published]);

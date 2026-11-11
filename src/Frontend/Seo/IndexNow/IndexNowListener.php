@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Frontend\Seo\IndexNow;
 
-use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Events\PageDeleted;
 use Tbtop\Cms\Page\Events\PageSaved;
 use Tbtop\Cms\Page\Events\PageUnpublished;
@@ -43,24 +42,14 @@ final readonly class IndexNowListener
 
     private function saved(Page $page): void
     {
-        if ($page->isLive() && $page->is_indexable) {
-            $this->submitter->queuePage($page);
-
-            return;
-        }
-
-        $mayHaveBeenLive = $page->status === PageStatus::Published
-            && self::wasIndexable($page)
-            && $page->wasChanged(['is_indexable', 'published_at', 'unpublish_at']);
-
-        if ($mayHaveBeenLive) {
+        if (($page->isLive() && $page->is_indexable) || self::wasLiveAndIndexable($page)) {
             $this->submitter->queuePage($page);
         }
     }
 
     private function unpublished(Page $page): void
     {
-        if (self::wasIndexable($page)) {
+        if (self::wasLiveAndIndexable($page)) {
             $this->submitter->queuePage($page);
         }
     }
@@ -73,8 +62,21 @@ final readonly class IndexNowListener
         }
     }
 
-    private static function wasIndexable(Page $page): bool
+    /**
+     * Whether the page was publicly indexable before this write: the same
+     * model with the raw values getPrevious() kept for the changed columns.
+     * getOriginal() cannot be used, as the event may run after a transaction
+     * commits, once the original is already synced.
+     */
+    private static function wasLiveAndIndexable(Page $page): bool
     {
-        return $page->wasChanged('is_indexable') ? ! $page->is_indexable : (bool) $page->is_indexable;
+        if ($page->wasRecentlyCreated && $page->getPrevious() === []) {
+            return false;
+        }
+
+        $before = clone $page;
+        $before->setRawAttributes(array_merge($page->getAttributes(), $page->getPrevious()));
+
+        return $before->isLive() && (bool) $before->is_indexable;
     }
 }
