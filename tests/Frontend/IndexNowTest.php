@@ -124,7 +124,7 @@ it('submits the URL of a published page that goes noindex or back to draft', fun
 })->with([
     'noindex' => [['is_indexable' => false]],
     'unpublished' => [['status' => PageStatus::Draft]],
-    'rescheduled to later' => [['published_at' => '2999-01-01 00:00:00']],
+    'rescheduled to later' => [fn (): array => ['published_at' => now()->addYear()]],
 ]);
 
 it('submits the URL of a published page an editor deletes', function (): void {
