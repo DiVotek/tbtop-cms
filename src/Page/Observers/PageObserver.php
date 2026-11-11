@@ -239,6 +239,9 @@ class PageObserver
             throw new DomainException(__('tbtop-cms::pages.validation.delete_has_children'));
         }
 
+        // Kept on the model so PageDeleted subscribers (IndexNow) can still
+        // name the URLs the page had; restored() re-syncs from the table.
+        $page->loadMissing('slugs');
         $this->slugs->remove($page);
     }
 

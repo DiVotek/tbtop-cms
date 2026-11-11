@@ -13,6 +13,7 @@ use Tbtop\Admin\Dsl\TextBlock;
 use Tbtop\Cms\Admin\Pages\Support\PageFormOptions;
 use Tbtop\Cms\Frontend\Seo\ContentSignals;
 use Tbtop\Cms\Frontend\Seo\GtmContainerId;
+use Tbtop\Cms\Frontend\Seo\IndexNow\IndexNowSettings;
 use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSettings;
 use Tbtop\Cms\Frontend\Seo\RobotsTxt;
 use Tbtop\Cms\Frontend\Seo\SeoTemplates;
@@ -87,6 +88,7 @@ class SeoSettingsPage extends SettingsPageBase
             'seo_default_og_image' => 'seo.default_og_image',
             'seo_indexing_enabled' => 'seo.indexing_enabled',
             'seo_robots_extra' => 'seo.robots_extra',
+            'seo_indexnow_enabled' => IndexNowSettings::ENABLED,
             'seo_sitemap_per_chunk' => 'seo.sitemap_per_chunk',
             'seo_gtm_container_id' => 'seo.gtm_container_id',
             'seo_verification_google' => 'seo.verification.google',
@@ -231,7 +233,8 @@ class SeoSettingsPage extends SettingsPageBase
     }
 
     /**
-     * The master switch and the two documents that answer to it. Grouped so
+     * The master switch, the two documents that answer to it, and IndexNow,
+     * which only submits while it is on. Grouped so
      * the consequence of turning indexing off — robots.txt disallowing
      * everything, the sitemap going away — is visible in the same view as the
      * switch itself.
@@ -240,6 +243,9 @@ class SeoSettingsPage extends SettingsPageBase
      */
     private function indexingFields(S $s): array
     {
+        $indexNow = app(IndexNowSettings::class);
+        $indexNowKey = $indexNow->storedKey();
+
         return [
             $s->boolean('seo_indexing_enabled')->label(__('tbtop-cms::settings.seo.fields.indexing_enabled'))
                 ->helperText(__('tbtop-cms::settings.seo.helpers.indexing_enabled')),
@@ -255,6 +261,12 @@ class SeoSettingsPage extends SettingsPageBase
                 ->helperText(__('tbtop-cms::settings.seo.helpers.robots_extra'))
                 ->placeholder(__('tbtop-cms::settings.seo.placeholders.robots_extra'))
                 ->rules(['nullable', 'string', 'max:4000']),
+            $s->boolean('seo_indexnow_enabled')->label(__('tbtop-cms::settings.seo.fields.indexnow_enabled'))
+                ->helperText(__('tbtop-cms::settings.seo.helpers.indexnow_enabled')),
+            // Read on render: the key appears once a save with the switch on has created it.
+            $s->displayText(__('tbtop-cms::settings.seo.helpers.indexnow_key_file', ['url' => url('/' . $indexNowKey . '.txt')]))
+                ->variant('muted')
+                ->when($indexNowKey !== null && $indexNow->active()),
         ];
     }
 
@@ -581,6 +593,20 @@ class SeoSettingsPage extends SettingsPageBase
         }
 
         return $token;
+    }
+
+    /**
+     * Turning IndexNow on creates its key, so the key file is served before
+     * the first page change is submitted.
+     *
+     * @param  array<string, mixed>  $form
+     */
+    #[\Override]
+    protected function afterSave(array $form): void
+    {
+        if ((bool) ($form['seo_indexnow_enabled'] ?? false)) {
+            app(IndexNowSettings::class)->key();
+        }
     }
 
     /**

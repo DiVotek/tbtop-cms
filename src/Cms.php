@@ -13,6 +13,7 @@ use Tbtop\Cms\Form\Forms;
 use Tbtop\Cms\Frontend\Breadcrumbs;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Controllers\FormSubmitController;
+use Tbtop\Cms\Frontend\Http\Controllers\IndexNowKeyController;
 use Tbtop\Cms\Frontend\Http\Controllers\LlmsTxtController;
 use Tbtop\Cms\Frontend\Http\Controllers\PageController;
 use Tbtop\Cms\Frontend\Http\Controllers\RobotsController;
@@ -22,6 +23,7 @@ use Tbtop\Cms\Frontend\Http\Middleware\InjectGtm;
 use Tbtop\Cms\Frontend\Http\Middleware\SetLanguage;
 use Tbtop\Cms\Frontend\Http\Middleware\ShareCmsProps;
 use Tbtop\Cms\Frontend\PageResolver;
+use Tbtop\Cms\Frontend\Seo\IndexNow\IndexNowSettings;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageUrl;
 use Tbtop\Cms\Page\Refs\PagedPages;
@@ -66,6 +68,11 @@ class Cms
     private function seoRoutes(): void
     {
         Route::get('robots.txt', RobotsController::class)->name('tbtop-cms.robots');
+        // Before the catch-all, constrained to the generated key's shape, so
+        // every other `*.txt` path still reaches the page route as before.
+        Route::get('{key}.txt', IndexNowKeyController::class)
+            ->where('key', IndexNowSettings::KEY_PATTERN)
+            ->name('tbtop-cms.indexnow-key');
 
         if (config('tbtop-cms.seo.llms_txt.enabled', true)) {
             Route::get('llms.txt', LlmsTxtController::class)->name('tbtop-cms.llms-txt');
