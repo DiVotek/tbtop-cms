@@ -8,14 +8,24 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Tbtop\Cms\Frontend\Markdown\MarkdownPages;
 use Tbtop\Cms\Frontend\Seo\PageOwnSeo;
+use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Page\Contracts\PageTypeInterface;
 use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
+use Tbtop\Cms\Page\Support\PageTranslation;
 
 /**
  * One llms.txt section per base page type: the live, indexable pages of
  * that type, by the rules the sitemap uses (live scope, `is_indexable`, no
  * error pages).
+ *
+ * Articles are split by their parent category instead: one section per
+ * category, titled with its name and in the order of the category list,
+ * then the generic article section for those without a category parent. A
+ * repair shop's services and its blog posts are different things to an
+ * agent, and the category is where the editor already told them apart.
+ * The category itself only names the section: its articles list by their
+ * own rules even while it is unpublished or noindex.
  *
  * Links point at the page's `.md` while markdown versions are on.
  *
@@ -39,6 +49,7 @@ final readonly class LlmsTxtPages
         private PageTypeRegistry $types,
         private MarkdownPages $pages,
         private LlmsTxtSettings $settings,
+        private Languages $languages,
     ) {}
 
     /** @return list<array{title: string, links: list<LlmsTxtLink>}> */
@@ -47,7 +58,13 @@ final readonly class LlmsTxtPages
         $sections = [];
 
         foreach ($this->listedTypes() as $type) {
-            $links = $this->links($type->key(), $locale);
+            if ($type->key() === 'article') {
+                array_push($sections, ...$this->articleSections($locale, self::title($type, $locale)));
+
+                continue;
+            }
+
+            $links = $this->links($this->treeOrder($type->key(), $locale), $locale);
 
             if ($links !== []) {
                 $sections[] = ['title' => self::title($type, $locale), 'links' => $links];
@@ -55,6 +72,72 @@ final readonly class LlmsTxtPages
         }
 
         return $sections;
+    }
+
+    /** @return list<array{title: string, links: list<LlmsTxtLink>}> */
+    private function articleSections(string $locale, string $genericTitle): array
+    {
+        $limit = $this->settings->perType();
+        $categories = $this->articleCategories($locale);
+        $fallback = $this->languages->defaultLocale();
+        $sections = [];
+
+        foreach ($categories as $category) {
+            $links = $this->links($this->newestFirst($this->query('article', $locale)->where('parent_id', $category->id), $limit), $locale);
+
+            if ($links !== []) {
+                $title = PageTranslation::text($category, 'name', $locale, $fallback) ?? $genericTitle;
+                $sections[] = ['title' => $title, 'links' => $links];
+            }
+        }
+
+        $categoryIds = array_map(static fn (Page $category): int => $category->id, $categories);
+        $uncategorised = $this->query('article', $locale)->where(
+            static fn (Builder $query): Builder => $query->whereNull('parent_id')->orWhereNotIn('parent_id', $categoryIds),
+        );
+        $links = $this->links($this->newestFirst($uncategorised, $limit), $locale);
+
+        if ($links !== []) {
+            $sections[] = ['title' => $genericTitle, 'links' => $links];
+        }
+
+        return $sections;
+    }
+
+    /**
+     * The category pages (any subtype of the base) that are parents of listed
+     * articles, in the category list's order. A category without a slug in
+     * the locale has no depth to sort by and goes last.
+     *
+     * @return list<Page>
+     */
+    private function articleCategories(string $locale): array
+    {
+        $parentIds = $this->query('article', $locale)->whereNotNull('parent_id')->distinct()->pluck('parent_id')->all();
+
+        if ($parentIds === []) {
+            return [];
+        }
+
+        $categories = Page::query()->whereIn('id', $parentIds)->where('type', 'category')->with('slugs')->get()->all();
+
+        usort($categories, static fn (Page $a, Page $b): int => self::treeKey($a, $locale) <=> self::treeKey($b, $locale));
+
+        return $categories;
+    }
+
+    /** @return array{int, int, int, int} Home first, then depth, sort order and id. */
+    private static function treeKey(Page $page, string $locale): array
+    {
+        $path = $page->pathFor($locale);
+
+        if ($path === null) {
+            return [2, 0, $page->sort_order, $page->id];
+        }
+
+        $path = trim($path, '/');
+
+        return [$path === '' ? 0 : 1, substr_count($path, '/'), $page->sort_order, $page->id];
     }
 
     /** @return list<PageTypeInterface> Base types in registry order, narrowed by the editor's choice. */
@@ -69,12 +152,13 @@ final readonly class LlmsTxtPages
         ));
     }
 
-    /** @return list<LlmsTxtLink> */
-    private function links(string $type, string $locale): array
+    /**
+     * @param  iterable<Page>  $pages
+     * @return list<LlmsTxtLink>
+     */
+    private function links(iterable $pages, string $locale): array
     {
         $limit = $this->settings->perType();
-        $pages = $type === 'article' ? $this->newestFirst($type, $locale, $limit) : $this->treeOrder($type, $locale);
-
         $links = [];
 
         foreach ($pages as $page) {
@@ -93,10 +177,13 @@ final readonly class LlmsTxtPages
         return $links;
     }
 
-    /** @return Collection<int, Page> */
-    private function newestFirst(string $type, string $locale, int $limit): Collection
+    /**
+     * @param  Builder<Page>  $query
+     * @return Collection<int, Page>
+     */
+    private function newestFirst(Builder $query, int $limit): Collection
     {
-        return $this->query($type, $locale)
+        return $query
             ->orderByDesc('published_at')
             ->orderByDesc('id')
             ->limit($limit)
@@ -113,16 +200,9 @@ final readonly class LlmsTxtPages
             ->get()
             ->all();
 
-        $keys = [];
+        usort($pages, static fn (Page $a, Page $b): int => self::treeKey($a, $locale) <=> self::treeKey($b, $locale));
 
-        foreach ($pages as $i => $page) {
-            $path = trim((string) $page->pathFor($locale), '/');
-            $keys[$i] = [$path === '' ? 0 : 1, substr_count($path, '/'), $page->sort_order, $i];
-        }
-
-        asort($keys);
-
-        return array_map(static fn (int $i): Page => $pages[$i], array_keys($keys));
+        return $pages;
     }
 
     /**

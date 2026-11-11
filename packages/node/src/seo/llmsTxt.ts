@@ -1,5 +1,5 @@
 import type { Page } from "../content/page";
-import { pageFromRow } from "../content/page";
+import { firstText, pageFromRow } from "../content/page";
 import { whereLive } from "../content/pages";
 import type { Site } from "../site";
 import { translate } from "../support/strings";
@@ -116,32 +116,78 @@ function query(site: Site, type: string, locale: string) {
 		.where("tbtop_pages.id", "in", (eb) => eb.selectFrom("tbtop_page_slugs").select("page_id").where("locale", "=", locale));
 }
 
-/** Articles newest first; every other type home first, then shallower before deeper, then the editor's order. */
-async function pagesOf(site: Site, type: string, locale: string, limit: number): Promise<{ page: Page; path: string }[]> {
-	if (type === "article") {
-		const rows = await query(site, type, locale).orderBy("tbtop_pages.published_at", "desc").orderBy("tbtop_pages.id", "desc").limit(limit).execute();
-		const pages = rows.map(pageFromRow);
-		const paths = await site.pages.slugs.pathsFor(pages.map((page) => page.id), locale);
-		return pages.map((page) => ({ page, path: paths.get(page.id) ?? "" }));
+type Listed = { page: Page; path: string };
+
+/** Pages with their path in the locale, in the given order. */
+async function withPaths(site: Site, pages: Page[], locale: string): Promise<Listed[]> {
+	const paths = await site.pages.slugs.pathsFor(pages.map((page) => page.id), locale);
+	return pages.map((page) => ({ page, path: paths.get(page.id) ?? "" }));
+}
+
+/** Articles newest first (LlmsTxtPages::newestFirst). */
+async function newestFirst(site: Site, qb: ReturnType<typeof query>, locale: string, limit: number): Promise<Listed[]> {
+	const rows = await qb.orderBy("tbtop_pages.published_at", "desc").orderBy("tbtop_pages.id", "desc").limit(limit).execute();
+	return withPaths(site, rows.map(pageFromRow), locale);
+}
+
+/** LlmsTxtPages::treeKey: home first, then depth, sort order and id; a page without a path in the locale last. */
+function treeKey(page: Page, path: string | undefined): number[] {
+	if (path === undefined) {
+		return [2, 0, page.sortOrder, page.id];
 	}
+	const trimmed = path.replace(/^\/+|\/+$/g, "");
+	return [trimmed === "" ? 0 : 1, trimmed.split("/").length - 1, page.sortOrder, page.id];
+}
+
+function byTreeKey(a: number[], b: number[]): number {
+	for (let i = 0; i < a.length; i++) {
+		const diff = (a[i] ?? 0) - (b[i] ?? 0);
+		if (diff !== 0) {
+			return diff;
+		}
+	}
+	return 0;
+}
+
+/** Every type but articles: home first, then shallower before deeper, then the editor's order. */
+async function treeOrder(site: Site, type: string, locale: string, limit: number): Promise<Listed[]> {
 	const rows = await query(site, type, locale).orderBy("tbtop_pages.sort_order").orderBy("tbtop_pages.id").limit(TREE_CANDIDATES).execute();
 	const pages = rows.map(pageFromRow);
 	const paths = await site.pages.slugs.pathsFor(pages.map((page) => page.id), locale);
-	const keyed = pages.map((page, index) => {
-		const path = paths.get(page.id) ?? "";
-		const trimmed = path.replace(/^\/+|\/+$/g, "");
-		return { page, path, key: [trimmed === "" ? 0 : 1, trimmed.split("/").length - 1, page.sortOrder, index] };
-	});
-	keyed.sort((a, b) => {
-		for (let i = 0; i < a.key.length; i++) {
-			const diff = (a.key[i] ?? 0) - (b.key[i] ?? 0);
-			if (diff !== 0) {
-				return diff;
-			}
-		}
-		return 0;
-	});
-	return keyed.slice(0, limit);
+	return pages
+		.map((page) => ({ page, path: paths.get(page.id) ?? "", key: treeKey(page, paths.get(page.id)) }))
+		.sort((a, b) => byTreeKey(a.key, b.key))
+		.slice(0, limit)
+		.map(({ page, path }) => ({ page, path }));
+}
+
+/** LlmsTxtPages::articleCategories: the category pages (any subtype) that are parents of listed articles, in the category list's order. */
+async function articleCategories(site: Site, locale: string): Promise<Page[]> {
+	const parents = await query(site, "article", locale).clearSelect().select("tbtop_pages.parent_id").distinct().where("tbtop_pages.parent_id", "is not", null).execute();
+	const ids = parents.map((row) => Number(row.parent_id));
+	if (ids.length === 0) {
+		return [];
+	}
+	const rows = await site.pages.query().selectAll("tbtop_pages").where("tbtop_pages.id", "in", ids).where("tbtop_pages.type", "=", "category").execute();
+	const categories = rows.map(pageFromRow);
+	const paths = await site.pages.slugs.pathsFor(categories.map((page) => page.id), locale);
+	return categories.sort((a, b) => byTreeKey(treeKey(a, paths.get(a.id)), treeKey(b, paths.get(b.id))));
+}
+
+/** LlmsTxtPages::articleSections: one section per category, titled with its name, then the articles without a category parent. */
+async function articleSections(site: Site, locale: string, limit: number, genericTitle: string): Promise<{ title: string; pages: Listed[] }[]> {
+	const fallback = await site.languages.defaultLocale();
+	const categories = await articleCategories(site, locale);
+	const sections: { title: string; pages: Listed[] }[] = [];
+	for (const category of categories) {
+		const pages = await newestFirst(site, query(site, "article", locale).where("tbtop_pages.parent_id", "=", category.id), locale, limit);
+		sections.push({ title: firstText(category, ["name"], locale, fallback) || genericTitle, pages });
+	}
+	const ids = categories.map((category) => category.id);
+	const articles = query(site, "article", locale);
+	const uncategorised = ids.length === 0 ? articles : articles.where((eb) => eb.or([eb("tbtop_pages.parent_id", "is", null), eb("tbtop_pages.parent_id", "not in", ids)]));
+	sections.push({ title: genericTitle, pages: await newestFirst(site, uncategorised, locale, limit) });
+	return sections;
 }
 
 async function pageSections(site: Site, locale: string): Promise<{ title: string; links: LlmsTxtLink[] }[]> {
@@ -149,15 +195,19 @@ async function pageSections(site: Site, locale: string): Promise<{ title: string
 	const markdown = await markdownEnabled(site);
 	const sections: { title: string; links: LlmsTxtLink[] }[] = [];
 	for (const key of await listedTypes(site)) {
-		const links: LlmsTxtLink[] = [];
-		for (const { page, path } of await pagesOf(site, key, locale, limit)) {
-			// Links point at the page's `.md` while markdown versions are on.
-			const url = markdown ? await markdownPath(site, path, locale) : await site.url(path, locale);
-			links.push({ name: await ownTitle(site, page, locale), url, notes: await ownDescription(site, page, locale) });
-		}
-		if (links.length > 0) {
-			const builtIn = STRINGS.en?.[`sections.${key}`] !== undefined;
-			sections.push({ title: builtIn ? t(`sections.${key}`, locale) : site.pageTypes.get(key).label, links });
+		const builtIn = STRINGS.en?.[`sections.${key}`] !== undefined;
+		const title = builtIn ? t(`sections.${key}`, locale) : site.pageTypes.get(key).label;
+		const listed = key === "article" ? await articleSections(site, locale, limit, title) : [{ title, pages: await treeOrder(site, key, locale, limit) }];
+		for (const section of listed) {
+			const links: LlmsTxtLink[] = [];
+			for (const { page, path } of section.pages) {
+				// Links point at the page's `.md` while markdown versions are on.
+				const url = markdown ? await markdownPath(site, path, locale) : await site.url(path, locale);
+				links.push({ name: await ownTitle(site, page, locale), url, notes: await ownDescription(site, page, locale) });
+			}
+			if (links.length > 0) {
+				sections.push({ title: section.title, links });
+			}
 		}
 	}
 	return sections;

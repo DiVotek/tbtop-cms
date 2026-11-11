@@ -10,7 +10,9 @@ use Tbtop\Cms\Frontend\Seo\LlmsTxt\LlmsTxtSection;
 use Tbtop\Cms\Language\Models\Language;
 use Tbtop\Cms\Page\Enums\PageStatus;
 use Tbtop\Cms\Page\Models\Page;
+use Tbtop\Cms\Page\PageTypeRegistry;
 use Tbtop\Cms\Settings\Settings;
+use Tbtop\Cms\Tests\Fixtures\SectionType;
 
 uses(RefreshDatabase::class);
 
@@ -142,9 +144,27 @@ it('lists articles newest first, capped per type', function (): void {
 
     $body = $this->get('/llms.txt')->getContent();
 
-    expect($body)->toContain('## Articles')
+    expect($body)->toContain('## Blog')
         ->and(strpos($body, 'Newest'))->toBeLessThan(strpos($body, 'Middle'))
         ->and($body)->not->toContain('Oldest');
+});
+
+it('lists articles under their category in the category order, then the uncategorised ones', function (): void {
+    PageTypeRegistry::extend(fn (): array => [SectionType::class]);
+    llmsTxtOn();
+
+    $guides = llmsCategory(['name' => ['en' => 'Guides'], 'sort_order' => 2]);
+    $services = llmsCategory(['name' => ['en' => 'Services'], 'sort_order' => 1]);
+    $brakes = llmsArticle(['name' => ['en' => 'Brake repair'], 'parent_id' => $services->id]);
+    $storage = llmsArticle(['name' => ['en' => 'Winter storage'], 'parent_id' => $guides->id]);
+    $section = llmsPage(['type' => 'section', 'name' => ['en' => 'News']]);
+    $news = llmsArticle(['name' => ['en' => 'We moved'], 'parent_id' => $section->id]);
+
+    expect($this->get('/llms.txt')->getContent())->toContain(
+        "## Services\n- [Brake repair](" . url('/' . $brakes->pathFor('en')) . ")\n\n"
+        . "## Guides\n- [Winter storage](" . url('/' . $storage->pathFor('en')) . ")\n\n"
+        . "## Articles\n- [We moved](" . url('/' . $news->pathFor('en')) . ")\n\n",
+    );
 });
 
 it('lists the home page first', function (): void {
