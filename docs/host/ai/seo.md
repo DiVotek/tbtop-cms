@@ -563,6 +563,12 @@ The file, in order:
    then `sort_order`, picked from that type's first 1000 pages by
    `sort_order`. Built-in types use the plural names in
    `tbtop-cms::llms.sections.*`, other types their `label()`.
+   Articles are split by parent: one `## {category name}` list per page of
+   base type `category` (any subtype) that has listed articles, named in the
+   locale (else the default one) and in the order of the categories list,
+   each up to `per_type`; then the generic article list for those whose
+   parent is not a category. The category only names the list: its
+   articles show even while it is unpublished or noindex.
 6. Host sections from `config('tbtop-cms.seo.llms_txt.sections')`:
 
 ```php

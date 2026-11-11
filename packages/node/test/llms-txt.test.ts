@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LlmsTxtSection } from "../src";
+import { definePageType, type LlmsTxtSection } from "../src";
 import { get, makeCms } from "./support";
 import { panel } from "./panel";
 
@@ -51,7 +51,7 @@ describe("llms.txt", () => {
 				"## Categories",
 				"- [Blog](https://site.test/blog)",
 				"",
-				"## Articles",
+				"## Blog",
 				"- [First post](https://site.test/blog/first-post): The first article.",
 				"",
 				"## Optional",
@@ -93,9 +93,39 @@ describe("llms.txt", () => {
 		await article("Draft", 0.1, { status: "draft" });
 		const body = (await llms(cms)) ?? "";
 		expect(body).not.toContain("## Pages");
-		expect(body).toContain("## Articles\n- [Newest](https://site.test/blog/newest)\n- [First post]");
+		expect(body).toContain("## Blog\n- [Newest](https://site.test/blog/newest)\n- [First post]");
 		expect(body).not.toContain("Hidden");
 		expect(body).not.toContain("Draft");
+	});
+
+	test("articles under their category in the category order, then those without a category", async () => {
+		const section = definePageType({ key: "section", allowedChildren: ["page", "article"] });
+		const { cms } = await on({ pageTypes: [section] });
+		const site = cms.site();
+		const page = (type: string, name: string, extra: Record<string, unknown> = {}) => site.pages.create({ type, status: "published", name: { en: name }, ...extra });
+		const guides = await page("category", "Guides", { sortOrder: 5 });
+		const services = await page("category", "Services", { sortOrder: 2 });
+		const news = await page("section", "News");
+		await page("article", "Brake repair", { parentId: services.id });
+		await page("article", "Winter storage", { parentId: guides.id });
+		await page("article", "We moved", { parentId: news.id });
+		expect((await llms(cms)) ?? "").toContain(
+			[
+				"## Blog",
+				"- [First post](https://site.test/blog/first-post): The first article.",
+				"",
+				"## Services",
+				"- [Brake repair](https://site.test/services/brake-repair)",
+				"",
+				"## Guides",
+				"- [Winter storage](https://site.test/guides/winter-storage)",
+				"",
+				"## Articles",
+				"- [We moved](https://site.test/news/we-moved)",
+				"",
+				"",
+			].join("\n"),
+		);
 	});
 
 	test("host sections follow the page types; relative links are made absolute and stay one link", async () => {
