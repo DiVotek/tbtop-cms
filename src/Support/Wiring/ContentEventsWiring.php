@@ -11,6 +11,7 @@ use Tbtop\Cms\Collection\CollectionEntries;
 use Tbtop\Cms\Collection\Events\EntriesUpdated;
 use Tbtop\Cms\Collection\Events\EntryDeleted;
 use Tbtop\Cms\Collection\Events\EntrySaved;
+use Tbtop\Cms\Frontend\Seo\IndexNow\IndexNowListener;
 use Tbtop\Cms\Language\Events\LanguagesChanged;
 use Tbtop\Cms\Language\Languages;
 use Tbtop\Cms\Language\Models\Language;
@@ -34,7 +35,7 @@ use Tbtop\Cms\SharedBlock\SharedBlocks;
 /**
  * Observers and listeners that keep derived content data in step with saves:
  * slugs for a newly active locale, redirects, revisions, the references index,
- * and the content cache version.
+ * the content cache version, and IndexNow submissions.
  *
  * Called from CmsServiceProvider::packageBooted().
  */
@@ -47,6 +48,7 @@ final class ContentEventsWiring
         self::wirePageRevisions();
         self::wirePageRefs();
         self::wireContentCacheInvalidation($app);
+        self::wireIndexNow();
     }
 
     private static function wireLocaleSlugBackfill(): void
@@ -83,6 +85,14 @@ final class ContentEventsWiring
     private static function wirePageRefs(): void
     {
         Page::observe(PageRefs::class);
+    }
+
+    /** Search engines hear about public page changes; IndexNowListener decides which. */
+    private static function wireIndexNow(): void
+    {
+        foreach ([PageSaved::class, PageUnpublished::class, PageDeleted::class] as $event) {
+            Event::listen($event, IndexNowListener::class);
+        }
     }
 
     /**

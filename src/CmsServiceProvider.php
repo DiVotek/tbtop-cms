@@ -34,6 +34,7 @@ use Tbtop\Cms\Frontend\Errors\ErrorPageResolver;
 use Tbtop\Cms\Frontend\Errors\ErrorResponse;
 use Tbtop\Cms\Frontend\Http\Middleware\EnableSsr;
 use Tbtop\Cms\Frontend\PageResolver;
+use Tbtop\Cms\Frontend\Seo\IndexNow\IndexNowSubmitter;
 use Tbtop\Cms\Frontend\Seo\RobotsRegistry;
 use Tbtop\Cms\Frontend\Seo\Schema\SchemaTypeRegistry;
 use Tbtop\Cms\Frontend\Support\CurrentPage;
@@ -149,6 +150,7 @@ class CmsServiceProvider extends PackageServiceProvider
         $this->app->scoped(ErrorPageResolver::class);
         $this->app->scoped(ErrorResponse::class);
         $this->app->scoped(CurrentPage::class);
+        $this->app->scoped(IndexNowSubmitter::class);
         $this->app->scoped(Settings::class);
         $this->app->scoped(CmsMailer::class);
         $this->app->scoped(Cms::class);

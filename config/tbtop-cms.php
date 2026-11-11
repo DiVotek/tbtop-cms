@@ -124,6 +124,13 @@ return [
             // (off until turned on).
             'enabled' => true,
         ],
+        'indexnow' => [
+            // Where page changes are submitted while IndexNow is on (SEO
+            // settings, «Indexing» tab). api.indexnow.org shares them with
+            // every participating engine (Bing, Yandex, …). Read with an
+            // inline default — published host configs override whole sections.
+            'endpoint' => 'https://api.indexnow.org/indexnow',
+        ],
     ],
     'preview' => [
         // Hours a signed draft-preview link stays valid for. Read with an
