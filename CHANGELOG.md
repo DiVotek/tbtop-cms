@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 — 2026-11-12
+
+### Features
+
+- **seo:** List llms.txt articles under their category (#362)
+- **seo:** Ping IndexNow when public pages change (#363)
+
 ## 0.10.0 — 2026-11-05
 
 First public release. `tbtop/cms` (Packagist) and `@tbtop/cms` (npm) ship

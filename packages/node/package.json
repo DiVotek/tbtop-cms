@@ -1,6 +1,6 @@
 {
 	"name": "@tbtop/cms",
-	"version": "0.10.0",
+	"version": "0.11.0",
 	"description": "Code-first site CMS for Bun, Node and Cloudflare Workers: pages, blocks and SEO over Kysely, edited in @tbtop/admin.",
 	"license": "MIT",
 	"author": "DiVotek <support@divotek.com>",
