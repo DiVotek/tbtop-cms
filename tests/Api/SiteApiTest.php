@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Gate;
 use Tbtop\Cms\Admin\Models\CmsUserProfile;
 use Tbtop\Cms\Cms;
 use Tbtop\Cms\Language\Models\Language;
@@ -111,4 +112,26 @@ it('created redirect answers and marks the hit', function (): void {
         ->assertJsonPath('data.0.id', $hit->id)
         ->assertJsonPath('data.0.has_redirect', true)
         ->assertJsonPath('data.0.is_ignored', true);
+});
+
+it('site routes need the redirects role and page routes the pages role', function (): void {
+    config(['tbtop-cms.roles' => true]);
+    $granted = [];
+    foreach (['tbtop-cms.pages', 'tbtop-cms.redirects'] as $role) {
+        Gate::define($role, static function () use (&$granted, $role): bool {
+            return in_array($role, $granted, true);
+        });
+    }
+    $token = issueSiteToken(['--site' => SITE_ALL, '--pages' => (string) $this->lenses->id, '--actions' => 'read']);
+    $page = '/api/cms/v1/pages/' . $this->lenses->id;
+
+    $granted = ['tbtop-cms.pages'];
+    $this->withToken($token)->getJson($page)->assertOk();
+    $this->withToken($token)->getJson('/api/cms/v1/not-found')->assertForbidden();
+    $this->withToken($token)->getJson('/api/cms/v1/redirects')->assertForbidden();
+
+    $granted = ['tbtop-cms.redirects'];
+    $this->withToken($token)->getJson($page)->assertForbidden();
+    $this->withToken($token)->getJson('/api/cms/v1/not-found')->assertOk();
+    $this->withToken($token)->getJson('/api/cms/v1/redirects')->assertOk();
 });
