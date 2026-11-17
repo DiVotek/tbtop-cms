@@ -125,13 +125,26 @@ class ApiTokenCommand extends Command
 
             return false;
         }
-        if (! $scope->allowsGroup(FieldGroup::Type) && $this->hasRequiredTypeFields([...$scope->parentIds, ...$scope->treeIds])) {
+        if (! $scope->allowsGroup(FieldGroup::Type) && $this->hasRequiredTypeFields($this->createParents($scope))) {
             $this->error(__('tbtop-cms::api.command.create_needs_type'));
 
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Every category a create may name: the parents and each category inside a tree, since the
+     * child type follows from the category it is created under, not from the tree root.
+     *
+     * @return list<int>
+     */
+    private function createParents(TokenScope $scope): array
+    {
+        $inTrees = $scope->treeMembers() === [] ? [] : Page::query()->whereIn('id', $scope->treeMembers())->where('type', 'category')->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+
+        return array_values(array_unique([...$scope->parentIds, ...$inTrees]));
     }
 
     /** @param  list<int>  $parentIds */

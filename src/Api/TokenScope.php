@@ -41,7 +41,7 @@ final class TokenScope
      * @param  list<string>  $childTypes
      * @param  list<int>  $pageIds
      * @param  list<int>  $treeIds
-     * @param  list<TokenAction>  $actions
+     * @param  list<TokenAction>|null  $actions  Null: every action, as a token issued before actions were split.
      * @param  list<FieldGroup>  $fieldGroups  Empty: every field.
      */
     public function __construct(
@@ -49,9 +49,14 @@ final class TokenScope
         public readonly array $childTypes,
         public readonly array $pageIds = [],
         public readonly array $treeIds = [],
-        public readonly array $actions = [],
+        ?array $actions = null,
         public readonly array $fieldGroups = [],
-    ) {}
+    ) {
+        $this->actions = $actions ?? TokenAction::cases();
+    }
+
+    /** @var list<TokenAction> */
+    public readonly array $actions;
 
     /** @param  list<mixed>  $abilities */
     public static function fromAbilities(array $abilities): self
@@ -70,7 +75,8 @@ final class TokenScope
             }
         }
 
-        $actions = array_values(array_filter(
+        // Sanctum lets `*` through every route middleware, so it is reported as every action.
+        $actions = in_array('*', $abilities, true) ? TokenAction::cases() : array_values(array_filter(
             TokenAction::cases(),
             static fn (TokenAction $action): bool => array_intersect($action->accepted(), $abilities) !== [],
         ));
@@ -194,22 +200,23 @@ final class TokenScope
      *
      * @return list<int>
      */
-    private function treeMembers(): array
+    public function treeMembers(): array
     {
         if ($this->treeMembers !== null) {
             return $this->treeMembers;
         }
 
         $members = $this->treeIds === [] ? [] : array_map(intval(...), Page::query()->whereIn('id', $this->treeIds)->where('is_system', false)->pluck('id')->all());
+        // The walk passes through a system page so its children stay in the tree, but the system page itself never joins.
+        $seen = $members;
         $frontier = $members;
         while ($frontier !== []) {
-            $frontier = array_values(array_diff(
-                array_map(intval(...), Page::query()->whereIn('parent_id', $frontier)->pluck('id')->all()),
-                $members,
-            ));
-            $members = [...$members, ...$frontier];
+            $children = Page::query()->whereIn('parent_id', $frontier)->whereNotIn('id', $seen)->get(['id', 'is_system']);
+            $frontier = array_map(static fn (Page $page): int => (int) $page->getKey(), $children->all());
+            $seen = [...$seen, ...$frontier];
+            $members = [...$members, ...array_map(static fn (Page $page): int => (int) $page->getKey(), $children->reject(static fn (Page $page): bool => $page->is_system)->all())];
         }
 
-        return $this->treeMembers = $members;
+        return $this->treeMembers = array_values($members);
     }
 }

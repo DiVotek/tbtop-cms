@@ -66,6 +66,9 @@ it('tree grant reaches descendants but not system pages', function (): void {
     $this->withToken($token)
         ->postJson('/api/cms/v1/pages', ['parent_id' => $outside->id, 'translations' => ['en' => ['name' => 'Nope']]])
         ->assertForbidden();
+    $this->withToken($token)
+        ->postJson('/api/cms/v1/pages', ['parent_id' => $system->id, 'translations' => ['en' => ['name' => 'Under error']]])
+        ->assertForbidden();
 });
 
 it('page grant reaches a system page, parent and tree never do', function (): void {
