@@ -12,6 +12,8 @@ return [
         'delete_published' => 'Через API можна видалити лише чернетку. Спершу зніміть сторінку з публікації в адмінці.',
         'name_missing' => 'Сторінка не має назви мовою «:locale», яку показує сайт.',
         'field_denied' => 'Цей токен не може записувати ці поля.',
+        'no_ability' => 'У цього ключа немає права, потрібного для цього запиту.',
+        'not_own_redirect' => 'Редирект, створений в адмінці, іншим ключем або автоматично, не можна видалити цим ключем.',
     ],
     'validation' => [
         'html_tags' => 'У HTML можна використовувати лише :allowed; знайдено: :tags.',
@@ -20,6 +22,7 @@ return [
         'html_head' => 'HTML має містити лише вміст body: без title, meta, style та інших елементів head.',
         'unknown_key' => 'API не приймає :key.',
         'system_slug' => 'Системна сторінка зберігає свою адресу; її slug не можна змінити.',
+        'redirect_target' => 'Ціллю має бути шлях опублікованої сторінки цього сайту з адресою в цій мові.',
     ],
     'command' => [
         'no_sanctum' => 'API сторінок потребує laravel/sanctum: виконайте composer require laravel/sanctum і опублікуйте його міграцію.',
@@ -42,6 +45,8 @@ return [
         'scope_types' => 'типи :value',
         'scope_actions' => 'дії :value',
         'scope_fields' => 'поля :value',
+        'scope_site' => 'сайт: :value',
+        'site_has_no_actions' => '--actions потребує сторінок: додайте --pages, --trees або --parents, або приберіть --actions.',
         'all_fields' => 'всі',
     ],
 ];

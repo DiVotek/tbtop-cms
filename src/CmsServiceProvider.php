@@ -115,6 +115,7 @@ class CmsServiceProvider extends PackageServiceProvider
             ->hasMigration('2026_10_26_000000_copy_page_title_to_seo_title')
             ->hasMigration('2026_10_28_000000_create_entries_table')
             ->hasMigration('2026_10_28_000001_move_contacts_to_collections')
+            ->hasMigration('2026_11_17_000000_add_created_via_token_id_to_redirects_table')
             ->hasCommands([
                 InstallCommand::class,
                 CreateAdminCommand::class,

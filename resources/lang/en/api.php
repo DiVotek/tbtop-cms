@@ -12,6 +12,8 @@ return [
         'delete_published' => 'Only a draft can be deleted through the API. Unpublish the page in the admin first.',
         'name_missing' => 'The page has no name in ":locale", which the site shows.',
         'field_denied' => 'This token may not write these fields.',
+        'no_ability' => 'This token lacks the ability this endpoint needs.',
+        'not_own_redirect' => 'A redirect made in the admin, by another token or on its own cannot be deleted through this token.',
     ],
     'validation' => [
         'html_tags' => 'The HTML may use only :allowed; found: :tags.',
@@ -20,6 +22,7 @@ return [
         'html_head' => 'The HTML must be body content only: no title, meta, style or other head elements.',
         'unknown_key' => 'The API does not accept :key.',
         'system_slug' => 'A system page keeps its fixed address; its slug cannot be changed.',
+        'redirect_target' => 'The target must be the path of a published page of this site with an address in this locale.',
     ],
     'command' => [
         'no_sanctum' => 'The pages API needs laravel/sanctum: run composer require laravel/sanctum and publish its migration.',
@@ -42,6 +45,8 @@ return [
         'scope_types' => 'types :value',
         'scope_actions' => 'actions :value',
         'scope_fields' => 'fields :value',
+        'scope_site' => 'site: :value',
+        'site_has_no_actions' => '--actions needs pages: add --pages, --trees or --parents, or drop --actions.',
         'all_fields' => 'all',
     ],
 ];

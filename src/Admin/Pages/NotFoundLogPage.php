@@ -22,7 +22,7 @@ use Tbtop\Cms\Admin\Pages\Support\RedirectFormOptions;
 use Tbtop\Cms\Admin\Support\CmsAbilities;
 use Tbtop\Cms\Audit\AuditContext;
 use Tbtop\Cms\NotFound\Models\NotFoundHit;
-use Tbtop\Cms\Redirect\Models\Redirect;
+use Tbtop\Cms\NotFound\Support\NotFoundHits;
 
 /**
  * Redirect-adjacent, deliberately: the operator working the 404 log is the
@@ -140,16 +140,7 @@ class NotFoundLogPage extends AdminPage
      */
     private function query(): Builder
     {
-        $redirectExists = Redirect::query()->selectRaw('1')
-            ->whereColumn('tbtop_redirects.from_path', 'tbtop_not_found_hits.path')
-            ->where(static fn (Builder $q): Builder => $q
-                ->whereColumn('tbtop_redirects.locale', 'tbtop_not_found_hits.locale')
-                ->orWhereNull('tbtop_redirects.locale'))
-            ->limit(1);
-
-        return NotFoundHit::query()
-            ->select('tbtop_not_found_hits.*')
-            ->selectSub($redirectExists, 'has_redirect');
+        return NotFoundHits::withRedirectFlag();
     }
 
     /**

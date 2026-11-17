@@ -13,6 +13,7 @@ use Tbtop\Cms\Api\ApiWiring;
 use Tbtop\Cms\Api\FieldGroup;
 use Tbtop\Cms\Api\Fields\PageFields;
 use Tbtop\Cms\Api\PageApiWriter;
+use Tbtop\Cms\Api\SiteAbility;
 use Tbtop\Cms\Api\TokenAction;
 use Tbtop\Cms\Api\TokenScope;
 use Tbtop\Cms\Page\Models\Page;
@@ -21,7 +22,8 @@ use Tbtop\Cms\Page\PageTypeRegistry;
 /**
  * Issues a pages-API token for a CMS admin, limited to the given pages,
  * trees or categories, the actions and the field groups, prints that scope
- * and then the token once: Sanctum keeps only its hash. Without the new
+ * and then the token once: Sanctum keeps only its hash. `--site` adds the
+ * 404 log and redirect abilities, alone or beside pages. Without the new
  * options it issues the abilities it always did.
  */
 class ApiTokenCommand extends Command
@@ -35,6 +37,7 @@ class ApiTokenCommand extends Command
         {--types=article : Comma-separated child types written under the parents and trees}
         {--actions= : Comma-separated read, create, update, publish, delete, media (default: all)}
         {--fields= : Comma-separated field groups seo, heading, text, url, type, media that may be written (default: all)}
+        {--site= : Comma-separated site abilities notfound:read, notfound:write, redirects:read, redirects:write (alone, the token reaches no pages)}
         {--name=cms-api : The token\'s name}';
 
     protected $description = 'Issue a pages-API token limited to the given pages, actions and field groups.';
@@ -92,14 +95,25 @@ class ApiTokenCommand extends Command
         $types = $this->choices('types', $this->baseTypes());
         $actions = $this->choices('actions', TokenAction::values(), TokenAction::values());
         $groups = $this->choices('fields', FieldGroup::values(), []);
-        if (in_array(null, [$parentIds, $pageIds, $treeIds, $types, $actions, $groups], true)) {
+        $site = $this->choices('site', SiteAbility::values(), []);
+        if (in_array(null, [$parentIds, $pageIds, $treeIds, $types, $actions, $groups, $site], true)) {
             return null;
         }
 
         if ($parentIds === [] && $pageIds === [] && $treeIds === []) {
-            $this->error(__('tbtop-cms::api.command.no_scope'));
+            if ($site === []) {
+                $this->error(__('tbtop-cms::api.command.no_scope'));
 
-            return null;
+                return null;
+            }
+            if ($this->csv('actions') !== []) {
+                $this->error(__('tbtop-cms::api.command.site_has_no_actions'));
+
+                return null;
+            }
+            // Pages are not reached, so no pages:* ability is stored for a default that would grant it.
+            $actions = [];
+            $types = [];
         }
 
         $scope = new TokenScope(
@@ -109,6 +123,7 @@ class ApiTokenCommand extends Command
             treeIds: $treeIds,
             actions: array_map(TokenAction::from(...), $actions),
             fieldGroups: array_map(FieldGroup::from(...), $groups),
+            site: array_map(SiteAbility::from(...), $site),
         );
 
         return $this->isCreateConsistent($scope) ? $scope : null;
@@ -180,7 +195,8 @@ class ApiTokenCommand extends Command
             'scope_parents' => $scope->parentIds,
             'scope_types' => $isDefaultType ? [] : $scope->childTypes,
             'scope_actions' => array_map(static fn (TokenAction $action): string => $action->value, $scope->actions),
-            'scope_fields' => $scope->fieldGroups === [] ? [__('tbtop-cms::api.command.all_fields')] : $scope->writableGroups(),
+            'scope_fields' => $scope->actions === [] || $scope->fieldGroups !== [] ? $scope->writableGroups() : [__('tbtop-cms::api.command.all_fields')],
+            'scope_site' => array_map(static fn (SiteAbility $ability): string => $ability->value, $scope->site),
         ];
 
         $lines = [];

@@ -60,6 +60,7 @@ actions, which fields.
 | `media:upload` | `POST /media` |
 | `pages:write` | all four write actions and `media:upload` (the pre-existing, all-or-nothing form; tokens issued with it keep working) |
 | `fields:seo`, `fields:heading`, `fields:text`, `fields:url`, `fields:type`, `fields:media` | the field groups a write may touch; none of them: every field |
+| `notfound:read`, `notfound:write`, `redirects:read`, `redirects:write` | the site's [404 log](#404-log) and [redirects](#redirects); independent of pages, and neither `pages:write` nor `*` grants them |
 
 System pages are reached only through an explicit `pages:page`: never through
 a parent or a tree. A tree or parent root stays read-only unless it is also
@@ -79,13 +80,16 @@ on what a key may rewrite: `pages:page:<home>` with `fields:text` rewrites the
 home page's text. A `slug` sent for a system page is a 422. Publishing or
 deleting a system page is a 409.
 
-Issue one with `cms:api-token {user} --parents= --pages= --trees= --types=article --actions= --fields= --name=`:
-at least one of `--parents`, `--pages`, `--trees`; `--actions` from `read,
+Issue one with `cms:api-token {user} --parents= --pages= --trees= --types=article --actions= --fields= --site= --name=`:
+at least one of `--parents`, `--pages`, `--trees` or `--site`; `--actions` from `read,
 create, update, publish, delete, media` (default all, stored as `pages:read` +
 `pages:write`); `--fields` from the six groups (default all, none stored).
 `create` needs the `text` group, and the `type` group when the article type
 has required fields. The command prints the resulting scope, then the token
-once. Without the new options it issues what it always did.
+once. Without the new options it issues what it always did. `--site` takes
+the four site abilities; with no page, tree or parent beside it the token
+stores no `pages:*` ability at all (and `--actions` is refused), so it reaches
+no page.
 
 ## Endpoints
 
@@ -93,7 +97,7 @@ All bodies are JSON; errors are Laravel's `{message, errors?}`.
 
 | Method, path | Ability | Answer |
 |---|---|---|
-| `GET /token` | any token | `{pages, trees, parents, types, actions, fields}`: the calling token's reach; `actions` is expanded (`pages:write` lists create, update, publish, delete, media), `fields: []` means every field; 401 without a token |
+| `GET /token` | any token | `{pages, trees, parents, types, actions, fields, site}`: the calling token's reach, `site` its site abilities; `actions` is expanded (`pages:write` lists create, update, publish, delete, media), `fields: []` means every field; 401 without a token |
 | `GET /pages?parent_id=&type=&status=&per_page=&page=` | read | `{data: [Page], meta: {current_page, last_page, per_page, total}}`, `per_page` 1–100 (50) |
 | `GET /pages/{id}` | read | `Page`; 404 missing or trashed, 403 out of reach |
 | `POST /pages` | create | 201 `Page`, always an `article` draft with the type's starter blocks. Its subtype follows from the parent as in the admin's create form (`PageLeafType`); the body has no `type`. A missing or non-integer `parent_id`, or a parent of the token (a `pages:parent`, or the root or any category of a `pages:tree`) that takes no article, is 422 on `parent_id`; any other id, existing or not, is 403 |
@@ -103,6 +107,8 @@ All bodies are JSON; errors are Laravel's `{message, errors?}`.
 | `GET /types/{type}/fields` | read | `[Field]` for a base type or subtype key; 404 unknown, 403 when its base type is not writable for the token |
 | `GET /locales` | read | `{default, active: [locale]}` — `active` is the frontend-active locales publish checks |
 | `POST /media` | media | 201 `{id, url}`; 403 for a token with no page, tree or parent. `url` (http/https, downloaded through the admin's SSRF guard and size cap), plus `name?`, `alt?`. No file upload: the caller hands over a public URL. A refused URL or file type is 422 with the media library's own message |
+
+The site routes, [below](#404-log), are in the same prefix.
 
 **Write body** — `POST` takes exactly `parent_id, translations, image, og_image, fields`; `PATCH` the same without `parent_id`, every key optional. Any other top-level key is 422; a known key outside the token's field groups is 403 (see above). Blocks (`content`) are not written or returned in v1.
 
@@ -147,6 +153,48 @@ present, as `true`, only on a select, media or ref field that holds a list.
 repeater. Common fields come first (`title`, `seo.description`, `image`…),
 then the type's own as `fields.<name>`. Labels are in the admin panel's
 default locale, the key when a field has none.
+
+## 404 log
+
+The log the admin shows under «Not found». Needs `notfound:read` or
+`notfound:write` and, with roles on, `tbtop-cms.redirects`.
+
+| Method, path | Ability | Answer |
+|---|---|---|
+| `GET /not-found?state=&min_hits=&since=&locale=&has_redirect=&per_page=&page=` | `notfound:read` | `{data: [NotFound], meta}`, newest `last_seen_at` first. `state` is `active` (default), `ignored` or `all`, anything else 422; `min_hits` keeps hits at or above it; `since` is a date on `last_seen_at`; `has_redirect` is a boolean; `per_page` 1–100 (50) |
+| `POST /not-found/{id}/ignore`, `POST /not-found/{id}/unignore` | `notfound:write` | `NotFound`; 404 when there is no such row. Repeating it changes nothing and writes no audit entry; a change is audited as the token's user |
+
+**NotFound**: `{id, locale, path, hits, last_referer, last_user_agent, first_seen_at, last_seen_at, is_ignored, has_redirect}`.
+`has_redirect` is true when a redirect for the hit's path and locale (or for
+every locale) exists, as in the admin (`NotFoundHits`). A row is never deleted
+through the API: `cms:not-found:prune` does that.
+
+## Redirects
+
+Needs the `redirects:*` abilities and, with roles on, `tbtop-cms.redirects`.
+
+| Method, path | Ability | Answer |
+|---|---|---|
+| `GET /redirects?locale=&per_page=&page=` | `redirects:read` | `{data: [Redirect], meta}`, newest first, every redirect, whoever made it |
+| `POST /redirects {from_path, to_path, locale, status_code?}` | `redirects:write` | 201 `Redirect`. Saved through the admin's `RedirectForm::save()`, so its normalisation and rules (`RedirectValidator`: path taken, shadows a live page, cycle, status other than 301 or 302) answer in its words, as 422 on the field. `status_code` is 301 by default. Unknown body keys are 422 |
+| `DELETE /redirects/{id}` | `redirects:write` | 204 when this token created it; 403 for a redirect made in the admin (even by the token's own user), by another token, or automatic (`is_auto`); 404 when there is none |
+
+**API-only rules.** `locale` is required (no all-locales redirect), one of the
+writable locales. `to_path` must be the path of a published page of this site
+(`live`) that has a slug in `locale`: the home page as `/`, never an error
+page, a draft, a dead path or an external URL, whatever
+`redirects.allowed_external_hosts` says. That is a 422 on `to_path`. The
+target is a page, not another redirect, so chains cannot form.
+
+Creating also ignores the 404 log row of the same path and locale, with its
+audit entry, as the admin's «create redirect» does, so it leaves the active
+list. The redirect remembers its token in `tbtop_redirects.created_via_token_id`
+(no foreign key: the redirect outlives a revoked token), which is what `DELETE`
+and `is_own` compare; `created_by` cannot, since it holds the user, and a
+redirect an editor made would look the token's own.
+
+**Redirect**: `{id, locale, from_path, to_path, status_code, is_auto, is_own, created_at}`;
+`is_own` is true for a redirect created by the calling token.
 
 ## Why the field list matches the validation
 

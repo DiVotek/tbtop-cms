@@ -18,6 +18,8 @@ use Tbtop\Cms\Page\Models\Page;
  * `pages:page`, never through a parent or a tree. What the token may do is
  * `TokenAction`, and which fields it may write `FieldGroup` (none: all).
  * A token with no page, tree or parent (a host's `*` token) reaches nothing.
+ * The site's 404 log and redirects are `SiteAbility`, named one by one: `*` and
+ * `pages:write` grant none of them.
  */
 final class TokenScope
 {
@@ -43,6 +45,7 @@ final class TokenScope
      * @param  list<int>  $treeIds
      * @param  list<TokenAction>|null  $actions  Null: every action, as a token issued before actions were split.
      * @param  list<FieldGroup>  $fieldGroups  Empty: every field.
+     * @param  list<SiteAbility>  $site
      */
     public function __construct(
         public readonly array $parentIds,
@@ -51,6 +54,7 @@ final class TokenScope
         public readonly array $treeIds = [],
         ?array $actions = null,
         public readonly array $fieldGroups = [],
+        public readonly array $site = [],
     ) {
         $this->actions = $actions ?? TokenAction::cases();
     }
@@ -92,6 +96,10 @@ final class TokenScope
             treeIds: array_values(array_unique($ids[self::TREE])),
             actions: $actions,
             fieldGroups: $groups,
+            site: array_values(array_filter(
+                SiteAbility::cases(),
+                static fn (SiteAbility $ability): bool => in_array($ability->value, $abilities, true),
+            )),
         );
     }
 
@@ -113,6 +121,7 @@ final class TokenScope
             ...array_map(static fn (int $id): string => self::PARENT . $id, $this->parentIds),
             ...array_map(static fn (string $type): string => self::TYPE . $type, $this->childTypes),
             ...array_map(static fn (FieldGroup $group): string => $group->ability(), $this->fieldGroups),
+            ...array_map(static fn (SiteAbility $ability): string => $ability->value, $this->site),
         ];
     }
 
@@ -183,6 +192,11 @@ final class TokenScope
     public function can(TokenAction $action): bool
     {
         return in_array($action, $this->actions, true);
+    }
+
+    public function canSite(SiteAbility $ability): bool
+    {
+        return in_array($ability, $this->site, true);
     }
 
     public function allowsGroup(FieldGroup $group): bool
