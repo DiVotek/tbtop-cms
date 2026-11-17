@@ -47,7 +47,7 @@ frame, block, layout slot.
 | A form that sends somewhere | `HandlesFormSubmission` on the block; admin fan-out (mail/telegram/bell) is automatic | [blocks.md](./blocks.md#form-handling-blocks), [notifications.md](./notifications.md) |
 | A new notification type or channel | `Notifications::type()` / `::channel()` from a provider's `boot()` | [notifications.md](./notifications.md) |
 | Host wiring (routes, Vite entries, `<head>`, SSR, admin access) | the host's own files — `cms:install` prints the list, `cms:doctor` checks it | [wiring.md](./wiring.md) |
-| Another service writing articles (import, social) | the pages API: Sanctum, `tbtop-cms.api.enabled`, a token from `cms:api-token` limited to categories | [api.md](./api.md) |
+| Another service writing articles (import, social) | the pages API: Sanctum, `tbtop-cms.api.enabled`, a token from `cms:api-token` limited to pages, trees or categories, actions and field groups | [api.md](./api.md) |
 | Something the CMS "doesn't have" | check [recipes.md](./recipes.md) first — most compositions exist; the rest is listed as verified absent | [recipes.md](./recipes.md) |
 | A config key, command, route, prop, event, Settings key, table | look it up, don't guess | [inventory.md](./inventory.md) |
 

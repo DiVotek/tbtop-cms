@@ -7,6 +7,7 @@ namespace Tbtop\Cms\Api\Http\Requests;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Tbtop\Cms\Api\ApiAccess;
+use Tbtop\Cms\Api\FieldGroupGate;
 use Tbtop\Cms\Api\Fields\CommonFields;
 use Tbtop\Cms\Api\Fields\PageFields;
 use Tbtop\Cms\Api\PageApiWriter;
@@ -14,8 +15,8 @@ use Tbtop\Cms\Page\Models\Page;
 use Tbtop\Cms\Page\PageTypeRegistry;
 
 /**
- * `POST /pages`: a draft under one of the token's parents, of the type the
- * parent gives it. A parent that is missing or takes no such child is a 422
+ * `POST /pages`: a draft under one of the token's parents or any category in
+ * one of its trees, of the type the parent gives it. A parent that is missing or takes no such child is a 422
  * on `parent_id`; a valid parent outside the token's reach is a 403, checked
  * after validation so the two never blur.
  */
@@ -40,6 +41,12 @@ final class StorePageRequest extends FormRequest
             'parent_id' => ['bail', 'required', 'integer', $this->parentTakesChild(...)],
             ...PageFields::for($type, $subtype)->rules(isCreate: true),
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        ['type' => $type, 'subtype' => $subtype] = $this->resolved();
+        FieldGroupGate::enforce(ApiAccess::scope($this), $this->all(), PageFields::for($type, $subtype));
     }
 
     /** @return array{type: string, subtype: ?string} */
@@ -71,7 +78,7 @@ final class StorePageRequest extends FormRequest
      */
     private function parentTakesChild(string $attribute, mixed $value, Closure $fail): void
     {
-        abort_unless(in_array($this->parentId(), ApiAccess::scope($this)->parentIds, true), 403, __('tbtop-cms::api.errors.out_of_scope'));
+        abort_unless(ApiAccess::scope($this)->reachesParent($this->parentId()), 403, __('tbtop-cms::api.errors.out_of_scope'));
 
         $parent = Page::query()->find($this->parentId());
         if ($parent === null) {
