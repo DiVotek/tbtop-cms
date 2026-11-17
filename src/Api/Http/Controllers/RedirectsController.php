@@ -54,7 +54,7 @@ final class RedirectsController
             // A query, not a model save: the row's audit entry is the create, not a second edit.
             Redirect::query()->whereKey($redirect->getKey())->update(['created_via_token_id' => $tokenId]);
 
-            $hit = NotFoundHit::query()->where('locale', $redirect->locale)->where('path', $redirect->from_path)->first();
+            $hit = NotFoundHit::query()->where('locale', $redirect->locale)->where('path_hash', hash('sha256', $redirect->from_path))->first();
             if ($hit !== null) {
                 NotFoundHits::setIgnored($hit, true);
             }
