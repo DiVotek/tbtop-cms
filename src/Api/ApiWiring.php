@@ -6,12 +6,13 @@ namespace Tbtop\Cms\Api;
 
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
-use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 use Laravel\Sanctum\Sanctum;
 use Tbtop\Cms\Admin\Support\CurrentAdmin;
 use Tbtop\Cms\Api\Http\Controllers\LocalesController;
 use Tbtop\Cms\Api\Http\Controllers\MediaController;
 use Tbtop\Cms\Api\Http\Controllers\PagesController;
+use Tbtop\Cms\Api\Http\Controllers\TokenController;
 use Tbtop\Cms\Api\Http\Controllers\TypeFieldsController;
 use Tbtop\Cms\Api\Http\Middleware\AcceptsJson;
 use Tbtop\Cms\Api\Http\Middleware\ActAsPanelUser;
@@ -61,8 +62,7 @@ final class ApiWiring
 
     private static function registerRoutes(): void
     {
-        $read = CheckAbilities::class . ':' . TokenScope::READ;
-        $write = CheckAbilities::class . ':' . TokenScope::WRITE;
+        $can = static fn (TokenAction $action): string => CheckForAnyAbility::class . ':' . implode(',', $action->accepted());
         $throttle = (string) config('tbtop-cms.api.throttle', '60,1');
 
         Route::prefix(self::PREFIX)
@@ -75,17 +75,18 @@ final class ApiWiring
                 ...($throttle === '' ? [] : ['throttle:' . $throttle]),
             ])
             ->name('tbtop-cms.api.')
-            ->group(static function () use ($read, $write): void {
-                Route::get('pages', [PagesController::class, 'index'])->middleware($read)->name('pages.index');
-                Route::get('pages/{page}', [PagesController::class, 'show'])->middleware($read)->whereNumber('page')->name('pages.show');
-                Route::get('types/{type}/fields', TypeFieldsController::class)->middleware($read)->name('types.fields');
-                Route::get('locales', LocalesController::class)->middleware($read)->name('locales');
+            ->group(static function () use ($can): void {
+                Route::get('pages', [PagesController::class, 'index'])->middleware($can(TokenAction::Read))->name('pages.index');
+                Route::get('pages/{page}', [PagesController::class, 'show'])->middleware($can(TokenAction::Read))->whereNumber('page')->name('pages.show');
+                Route::get('types/{type}/fields', TypeFieldsController::class)->middleware($can(TokenAction::Read))->name('types.fields');
+                Route::get('token', TokenController::class)->name('token');
+                Route::get('locales', LocalesController::class)->middleware($can(TokenAction::Read))->name('locales');
 
-                Route::post('pages', [PagesController::class, 'store'])->middleware($write)->name('pages.store');
-                Route::patch('pages/{page}', [PagesController::class, 'update'])->middleware($write)->whereNumber('page')->name('pages.update');
-                Route::delete('pages/{page}', [PagesController::class, 'destroy'])->middleware($write)->whereNumber('page')->name('pages.destroy');
-                Route::post('pages/{page}/publish', [PagesController::class, 'publish'])->middleware($write)->whereNumber('page')->name('pages.publish');
-                Route::post('media', MediaController::class)->middleware($write)->name('media.store');
+                Route::post('pages', [PagesController::class, 'store'])->middleware($can(TokenAction::Create))->name('pages.store');
+                Route::patch('pages/{page}', [PagesController::class, 'update'])->middleware($can(TokenAction::Update))->whereNumber('page')->name('pages.update');
+                Route::delete('pages/{page}', [PagesController::class, 'destroy'])->middleware($can(TokenAction::Delete))->whereNumber('page')->name('pages.destroy');
+                Route::post('pages/{page}/publish', [PagesController::class, 'publish'])->middleware($can(TokenAction::Publish))->whereNumber('page')->name('pages.publish');
+                Route::post('media', MediaController::class)->middleware($can(TokenAction::Media))->name('media.store');
             });
     }
 }

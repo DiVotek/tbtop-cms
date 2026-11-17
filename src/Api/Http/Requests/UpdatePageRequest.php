@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Api\Http\Requests;
 
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Tbtop\Cms\Api\ApiAccess;
+use Tbtop\Cms\Api\FieldGroupGate;
 use Tbtop\Cms\Api\Fields\CommonFields;
 use Tbtop\Cms\Api\Fields\PageFields;
 use Tbtop\Cms\Page\Models\Page;
@@ -29,8 +31,31 @@ final class UpdatePageRequest extends FormRequest
     public function rules(): array
     {
         $page = $this->page();
+        $rules = PageFields::for($page->type, $page->subtype)->rules(isCreate: false);
+        if ($page->is_system) {
+            foreach ($rules as $key => $entries) {
+                if (str_ends_with($key, '.slug')) {
+                    $rules[$key] = [...$entries, $this->refuseSystemSlug(...)];
+                }
+            }
+        }
 
-        return PageFields::for($page->type, $page->subtype)->rules(isCreate: false);
+        return $rules;
+    }
+
+    /** A system page keeps its fixed path; the writer would ignore a slug, so a client is told instead. */
+    private function refuseSystemSlug(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (is_string($value) && trim($value) !== '') {
+            $fail(__('tbtop-cms::api.validation.system_slug'));
+        }
+    }
+
+    /** Loads the page first (404, 403) so the field gate never answers for a page the token cannot reach. */
+    protected function prepareForValidation(): void
+    {
+        $page = $this->page();
+        FieldGroupGate::enforce(ApiAccess::scope($this), $this->all(), PageFields::for($page->type, $page->subtype));
     }
 
     /** @return list<string> */
