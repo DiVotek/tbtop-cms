@@ -97,7 +97,7 @@ All bodies are JSON; errors are Laravel's `{message, errors?}`.
 
 | Method, path | Ability | Answer |
 |---|---|---|
-| `GET /token` | any token | `{pages, trees, parents, types, actions, fields, site}`: the calling token's reach, `site` its site abilities; `actions` is expanded (`pages:write` lists create, update, publish, delete, media), `fields: []` means every field; 401 without a token |
+| `GET /token` | any token (with roles on, its user needs the pages or the redirects role) | `{pages, trees, parents, types, actions, fields, site}`: the calling token's reach, `site` its site abilities; `actions` is expanded (`pages:write` lists create, update, publish, delete, media), `fields: []` means every field; 401 without a token |
 | `GET /pages?parent_id=&type=&status=&per_page=&page=` | read | `{data: [Page], meta: {current_page, last_page, per_page, total}}`, `per_page` 1–100 (50) |
 | `GET /pages/{id}` | read | `Page`; 404 missing or trashed, 403 out of reach |
 | `POST /pages` | create | 201 `Page`, always an `article` draft with the type's starter blocks. Its subtype follows from the parent as in the admin's create form (`PageLeafType`); the body has no `type`. A missing or non-integer `parent_id`, or a parent of the token (a `pages:parent`, or the root or any category of a `pages:tree`) that takes no article, is 422 on `parent_id`; any other id, existing or not, is 403 |
