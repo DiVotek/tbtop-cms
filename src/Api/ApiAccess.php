@@ -24,6 +24,15 @@ final class ApiAccess
         return TokenScope::fromAbilities(is_array($abilities) ? array_values($abilities) : []);
     }
 
+    /** The calling token's own id, null for a session or transient token. */
+    public static function tokenId(Request $request): ?int
+    {
+        $user = $request->user(self::GUARD);
+        $token = is_object($user) && method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
+
+        return $token instanceof PersonalAccessToken ? (int) $token->getKey() : null;
+    }
+
     public static function page(Request $request, mixed $id, bool $isWrite): Page
     {
         $page = is_numeric($id) ? Page::query()->find((int) $id) : null;

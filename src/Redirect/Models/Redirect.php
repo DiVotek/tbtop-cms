@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tbtop\Cms\Redirect\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Tbtop\Cms\Audit\Concerns\LogsCmsActivity;
 use Tbtop\Cms\Support\Concerns\TracksAuthors;
 
@@ -15,8 +16,10 @@ use Tbtop\Cms\Support\Concerns\TracksAuthors;
  * @property string $to_path
  * @property int $status_code
  * @property bool $is_auto
+ * @property int|null $created_via_token_id
  * @property int|null $created_by
  * @property int|null $updated_by
+ * @property Carbon|null $created_at
  */
 class Redirect extends Model
 {
@@ -37,6 +40,7 @@ class Redirect extends Model
     protected $casts = [
         'status_code' => 'integer',
         'is_auto' => 'boolean',
+        'created_via_token_id' => 'integer',
     ];
 
     /** @return list<string> */

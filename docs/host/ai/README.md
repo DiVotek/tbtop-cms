@@ -47,7 +47,7 @@ frame, block, layout slot.
 | A form that sends somewhere | `HandlesFormSubmission` on the block; admin fan-out (mail/telegram/bell) is automatic | [blocks.md](./blocks.md#form-handling-blocks), [notifications.md](./notifications.md) |
 | A new notification type or channel | `Notifications::type()` / `::channel()` from a provider's `boot()` | [notifications.md](./notifications.md) |
 | Host wiring (routes, Vite entries, `<head>`, SSR, admin access) | the host's own files — `cms:install` prints the list, `cms:doctor` checks it | [wiring.md](./wiring.md) |
-| Another service writing articles (import, social) | the pages API: Sanctum, `tbtop-cms.api.enabled`, a token from `cms:api-token` limited to pages, trees or categories, actions and field groups | [api.md](./api.md) |
+| Another service writing articles (import, social) | the pages API: Sanctum, `tbtop-cms.api.enabled`, a token from `cms:api-token` limited to pages, trees or categories, actions and field groups; the same API reads the 404 log and manages redirects (`--site`) | [api.md](./api.md) |
 | Something the CMS "doesn't have" | check [recipes.md](./recipes.md) first — most compositions exist; the rest is listed as verified absent | [recipes.md](./recipes.md) |
 | A config key, command, route, prop, event, Settings key, table | look it up, don't guess | [inventory.md](./inventory.md) |
 
@@ -63,7 +63,7 @@ If the table can't place it, ask.
 6. **[seo.md](./seo.md)** — what the `seo` prop contains and where each value is edited, structured data, sitemap, robots, GTM, the audit/checklist, 404 log.
 7. **[notifications.md](./notifications.md)** — submission lifecycle, the type/channel registry, built-in channels and their Settings keys, templates, where to register.
 8. **[recipes.md](./recipes.md)** — compositions real hosts built from existing parts, and what is verified absent with the least-bad workaround.
-9. **[api.md](./api.md)** — the token-authenticated pages API: turning it on, what a token reaches, endpoints and shapes, the field description.
+9. **[api.md](./api.md)** — the token-authenticated pages API: turning it on, what a token reaches, endpoints and shapes, the 404 log and redirects, the field description.
 10. **[inventory.md](./inventory.md)** — every config key, command, route, Inertia prop, contract, event, Settings key, ability, table, facade method.
 
 ## Ground rules

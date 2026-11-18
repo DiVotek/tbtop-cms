@@ -76,7 +76,7 @@ Source of truth: command classes under `src/Console/`, `src/Admin/Commands/`, `s
 |---|---|---|---|
 | `cms:install` | `{--force : Overwrite published config files} {--skip-migrations : Do not run database migrations}` | Publish config, run migrations, seed default languages and home page, rebuild the page references index | No |
 | `cms:doctor` | (none) | Run CMS health checks and report issues (`HealthCheckRunner::defaultChecks()`; among them `untyped_blocks`, `block_discovery` — a `blocks.discover` entry that registers no class or is malformed — `broken_shared_references` — page/layout rows per container whose `shared` points at a missing shared block or one of another kind — and `unregistered_block_rows` — rows whose kind is no longer registered; both count trashed pages and inactive rows, and both are the rows the editor lists under Problem blocks; `page_type_pairs` — stored pages whose `type` is a subtype key or whose `subtype` is not a registered subtype of their `type`, per pair with a count and the first ids, trashed included; `page_subtype_bases` — subtypes whose `base()` is unregistered or itself a subtype; `unknown_schema_types` — page types whose `schemaTypes()` list a key `SchemaTypeRegistry` does not know, which the page skips; `pages_api` — `api.enabled` on without Sanctum or with a user model lacking `HasApiTokens`). Exit 1 only on an error-level check | No |
-| `cms:api-token` | `{user : email} {--parents= : category ids} {--pages= : page ids} {--trees= : tree root ids} {--types=article} {--actions= : read,create,update,publish,delete,media} {--fields= : seo,heading,text,url,type,media} {--name=cms-api}` | Issue a pages-API token for a CMS admin limited to the given pages, trees and categories, actions and field groups (api.md); without the new options its abilities are `pages:read`, `pages:write`, the parents and `pages:type:article`; refuses unknown ids and values and a create without the `text` field group, naming them; prints the scope, then the token once | No |
+| `cms:api-token` | `{user : email} {--parents= : category ids} {--pages= : page ids} {--trees= : tree root ids} {--types=article} {--actions= : read,create,update,publish,delete,media} {--fields= : seo,heading,text,url,type,media} {--site= : notfound:read,notfound:write,redirects:read,redirects:write} {--name=cms-api}` | Issue a pages-API token for a CMS admin limited to the given pages, trees and categories, actions and field groups, and the site abilities of the 404 log and redirects (api.md); `--site` alone stores no `pages:*` ability; without the new options its abilities are `pages:read`, `pages:write`, the parents and `pages:type:article`; refuses unknown ids and values and a create without the `text` field group, naming them; prints the scope, then the token once | No |
 | `cms:admin:create` | `{email} {--name=} {--password=}` | Create or reuse a user and grant CMS admin access (a new user needs a valid email) | No |
 | `cms:admin:grant` | `{email}` | Grant CMS admin access to an existing user | No |
 | `cms:admin:revoke` | `{email}` | Revoke CMS admin access from a user (refuses the protected owner; a user with no CMS access gets a warning, exit 0) | No |
@@ -118,7 +118,7 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | `tbtop.cms.entry-search` | POST | `{admin.prefix}/entry-search` | `EntrySearchController` — the `collection` field's picker; `{collection, search}` → `{options:[{value,label,draft}]}` (20, editor's order, by the `title` column), `{collection, ids}` → the same for those ids in that order. Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; drafts included |
 | `tbtop.cms.link.page-search` | POST | `{admin.prefix}/link/page-search` | `LinkPageSearchController` — the `link` field's page picker; `{search}` → `{options:[{value,label,names}]}`, `{value}` → `{option}` (`names` is the page's name per content locale, feeding the label placeholders). Middleware `['web','auth:{admin.guard}',EnsureCmsAdmin]`; not scoped to `live()`, capped by `tbtop-admin.relation.search_cap` (default 50) |
 
-**Pages API** (`Api/ApiWiring.php`, only when `tbtop-cms.api.enabled` and Sanctum is installed) — prefix `api/cms/v1`, middleware `[AcceptsJson, SubstituteBindings, 'auth:cms-api', ActAsPanelUser, 'throttle:' . api.throttle]` plus `CheckForAnyAbility` per route (the route's action ability, or `pages:write` for a write); shapes in api.md:
+**Pages API** (`Api/ApiWiring.php`, only when `tbtop-cms.api.enabled` and Sanctum is installed) — prefix `api/cms/v1`, middleware `[AcceptsJson, SubstituteBindings, 'auth:cms-api', ActAsPanelUser, 'throttle:' . api.throttle]` plus per route `RequiresCmsRole` (roles on: `tbtop-cms.pages`, or `tbtop-cms.redirects` on the site routes) and `CheckForAnyAbility` (the route's action ability, or `pages:write` for a write) or, on the site routes, `RequiresSiteAbility` (the named ability only, `*` does not pass); shapes in api.md:
 
 | Name | Method | Path | Ability |
 |---|---|---|---|
@@ -132,6 +132,11 @@ Source of truth: `src/Cms.php` (`Cms::frontendRoutes()`) for the frontend; `src/
 | `tbtop-cms.api.pages.destroy` | DELETE | `api/cms/v1/pages/{page}` | `pages:delete` or `pages:write` |
 | `tbtop-cms.api.pages.publish` | POST | `api/cms/v1/pages/{page}/publish` | `pages:publish` or `pages:write` |
 | `tbtop-cms.api.media.store` | POST | `api/cms/v1/media` | `media:upload` or `pages:write` |
+| `tbtop-cms.api.not-found.index` | GET | `api/cms/v1/not-found` | `notfound:read` |
+| `tbtop-cms.api.not-found.ignore`, `.unignore` | POST | `api/cms/v1/not-found/{hit}/ignore`, `/unignore` | `notfound:write` |
+| `tbtop-cms.api.redirects.index` | GET | `api/cms/v1/redirects` | `redirects:read` |
+| `tbtop-cms.api.redirects.store` | POST | `api/cms/v1/redirects` | `redirects:write` |
+| `tbtop-cms.api.redirects.destroy` | DELETE | `api/cms/v1/redirects/{redirect}` | `redirects:write`, and a redirect created by the calling token |
 
 **Admin panel pages** (`CmsPanel`, prefix = `config('tbtop-cms.admin.prefix','admin')`, guard = `config('tbtop-cms.admin.guard','web')`):
 
@@ -352,7 +357,7 @@ Source: `src/Admin/Support/CmsAbilities.php`. Gates are host-answered only when 
 | `tbtop-cms.pages` | `src/Admin/Pages/PagesPage.php`, `src/Admin/Pages/PageEditPage.php` |
 | `tbtop-cms.media` | `src/Admin/Pages/MediaLibraryPage.php` |
 | `tbtop-cms.submissions` | `src/Admin/Pages/FormSubmissionsPage.php`, `src/Admin/Pages/FormSubmissionPage.php` |
-| `tbtop-cms.redirects` | `src/Admin/Pages/RedirectsPage.php`, `src/Admin/Pages/NotFoundLogPage.php`, `src/Admin/Pages/SeoReportPage.php` |
+| `tbtop-cms.redirects` | `src/Admin/Pages/RedirectsPage.php`, `src/Admin/Pages/NotFoundLogPage.php`, `src/Admin/Pages/SeoReportPage.php`; the API's 404 log and redirect routes (`Api/Http/Middleware/RequiresCmsRole.php`) |
 | `tbtop-cms.settings` | `src/Admin/Pages/SettingsPageBase.php` (inherited by `SiteSettingsPage`, `SeoSettingsPage`, `NotificationSettingsPage`), `src/Admin/Pages/SiteHealthPage.php` |
 | `tbtop-cms.design` | `src/Admin/Pages/BlocksPage.php`, `src/Admin/Pages/LayoutPage.php`, `src/Admin/Pages/LayoutEditPage.php`, `src/Admin/Pages/SharedBlocksPage.php`, `src/Admin/Pages/SharedBlockEditPage.php` |
 | `tbtop-cms.languages` | `src/Admin/Pages/LanguagesPage.php` |
@@ -374,7 +379,7 @@ Source: `database/migrations/`. CREATE migrations target `tbtop_`-prefixed names
 | `tbtop_pages` | `src/Page/Models/Page.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define`; gained `body`/`excerpt`, `image`, `source_id`, scheduling columns, a starter-blocks flag, a nullable unique `error_class` column (`ErrorClass` enum, migration `2026_09_15_000000_add_error_class_to_pages_table.php`), and `subtype` (nullable, indexed) + `fields` (JSON, type fields' values; migration `2026_10_06_000000_add_subtype_and_fields_to_pages_table.php`, which also moves a subtype key out of `type` and strips `owner` from content rows) over later ALTER migrations. `title` is deprecated and no longer edited in the admin; migration `2026_10_26_000000_copy_page_title_to_seo_title.php` copies each locale's non-blank `title` into an empty `seo.title` |
 | `tbtop_page_slugs` | `src/Page/Models/PageSlug.php` | Yes | |
 | `tbtop_user_profiles` | `src/Admin/Models/CmsUserProfile.php` | Yes | `user_id` via `UserKeyColumn::define` (unique); gained a `user_id` FK, then `role` (added, later dropped), then `is_owner` |
-| `tbtop_redirects` | `src/Redirect/Models/Redirect.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define` |
+| `tbtop_redirects` | `src/Redirect/Models/Redirect.php` | Yes | `created_by`/`updated_by` via `UserKeyColumn::define`; gained `created_via_token_id` (nullable, indexed, no FK: the API token that created the row; migration `2026_11_17_000000_add_created_via_token_id_to_redirects_table.php`) |
 | `tbtop_settings` | `src/Settings/Models/Setting.php` | Yes | |
 | `tbtop_form_submissions` | `src/Form/Models/FormSubmission.php` | Yes | gained `lead_status` in a later migration |
 | `tbtop_layouts` | `src/Layout/Models/Layout.php` | Yes | |
