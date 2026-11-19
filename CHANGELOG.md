@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0 — 2026-11-19
+
+### Features
+
+- **api:** Scope tokens by page, action and field group (#364)
+- **api:** Expose the 404 log and redirects to scoped tokens (#365)
+
 ## 0.11.0 — 2026-11-12
 
 ### Features
