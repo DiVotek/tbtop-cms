@@ -35,3 +35,15 @@ it('renders the panel through its own root view, not the frontend one', function
     // panel would 500 on every request.
     expect($config->getRootView())->toBe('admin');
 });
+
+it('defaults the admin UI locale to the configured one', function (): void {
+    config()->set('tbtop-cms.admin.locale', 'uk');
+
+    expect((new CmsPanel)->configure(new PanelConfig)->getDefaultLocale())->toBe('uk');
+});
+
+it('falls back to English for an admin locale the panel does not ship', function (): void {
+    config()->set('tbtop-cms.admin.locale', 'de');
+
+    expect((new CmsPanel)->configure(new PanelConfig)->getDefaultLocale())->toBe('en');
+});

@@ -244,6 +244,10 @@ return [
         'autoregister' => true,
         'prefix' => 'admin',
         'guard' => 'web',
+        // The admin UI's default locale, one of the panel's ('en', 'uk'): an
+        // admin with no saved preference sees it, and staff mail and Telegram
+        // notifications are written in it. Another value falls back to 'en'.
+        'locale' => env('TBTOP_CMS_ADMIN_LOCALE', 'en'),
         'model' => 'App\\Models\\User',
         'pages' => [
             'dashboard' => DashboardPage::class,

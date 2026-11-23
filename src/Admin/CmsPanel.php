@@ -17,6 +17,9 @@ use Tbtop\Cms\Admin\Http\Middleware\SyncContentLocales;
 
 class CmsPanel extends Panel
 {
+    /** @var list<string> the admin UI translations the package ships */
+    private const array LOCALES = ['en', 'uk'];
+
     public function configure(PanelConfig $panel): PanelConfig
     {
         $prefix = (string) config('tbtop-cms.admin.prefix', 'admin');
@@ -39,7 +42,8 @@ class CmsPanel extends Panel
             // Product brand (the CMS itself, not the host site) shown in the topbar
             // and on the login card. A logo will replace/accompany it later.
             ->brand('TableTop CMS')
-            ->locales(['en', 'uk'])
+            ->locales(self::LOCALES)
+            ->defaultLocale(self::defaultLocale())
             ->density('compact')
             ->maxContentWidth('full')
             ->navigation('topbar-sidebar')
@@ -81,5 +85,12 @@ class CmsPanel extends Panel
         $pages = (array) config('tbtop-cms.admin.pages', []);
 
         return array_values(array_filter($pages));
+    }
+
+    private static function defaultLocale(): string
+    {
+        $locale = config('tbtop-cms.admin.locale');
+
+        return is_string($locale) && in_array($locale, self::LOCALES, true) ? $locale : self::LOCALES[0];
     }
 }

@@ -65,6 +65,7 @@ Source of truth: `config/tbtop-cms.php` itself, published via `vendor:publish --
 | `admin.autoregister` | `bool` | `true` | Whether `CmsServiceProvider` auto-registers the admin panel/routes itself | wiring.md |
 | `admin.prefix` | `string` | `'admin'` | URL prefix the admin panel and its routes mount under | §3 below |
 | `admin.guard` | `string` | `'web'` | Auth guard the admin panel, login, and `EnsureCmsAdmin` use | wiring.md |
+| `admin.locale` | `string` | `env('TBTOP_CMS_ADMIN_LOCALE', 'en')` | Default admin UI locale, one of the panel's `en`/`uk` (else `en`): an admin with no saved preference sees it, and staff mail and Telegram notifications are written in it (`Admin/CmsPanel.php`) | notifications.md |
 | `admin.model` | `class-string` | `'App\\Models\\User'` | Host user model class; read wherever the package needs the host's user type (`UserKeyColumn`, `AdminUsers`, `AuthorNames`, profiles) | wiring.md |
 | `admin.pages.*` | `array<string,class-string>` | 26 slots, one per built-in admin page (dashboard, profile, login, languages, pages, page_edit, collection_entries, collection_entry_edit, redirects, not_found, seo_report, media_library, site_settings, seo_settings, notification_settings, site_health, layout, layout_edit, shared_blocks, shared_block_edit, blocks, form_submissions, form_submission, users, audit_log, audit_activity) | Maps a logical admin page slot to the class that implements it; swap a value to override the built-in page | wiring.md |
 
