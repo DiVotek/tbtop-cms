@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tbtop\Cms\Page\Support;
 
+use Error;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 use PDO;
 use Pdo\Sqlite;
 use Tbtop\Cms\Page\Models\Page;
+use WeakMap;
 
 /**
  * Narrows a page query to names containing a search term, ignoring case in
@@ -25,6 +28,9 @@ use Tbtop\Cms\Page\Models\Page;
 final class PageNameSearch
 {
     private const SQLITE_LOWER = 'tbtop_lower';
+
+    /** @var WeakMap<PDO, true>|null connections already warned about, so a request logs once */
+    private static ?WeakMap $warned = null;
 
     /**
      * @param  Builder<Page>  $query
@@ -77,24 +83,52 @@ final class PageNameSearch
             return 'lower';
         }
 
-        self::registerSqliteLower($connection->getPdo());
-        if ($connection->getReadPdo() !== $connection->getPdo()) {
-            self::registerSqliteLower($connection->getReadPdo());
+        $pdos = [$connection->getPdo()];
+        if ($connection->getReadPdo() !== $pdos[0]) {
+            $pdos[] = $connection->getReadPdo();
+        }
+
+        foreach ($pdos as $pdo) {
+            if (! self::registerSqliteLower($pdo)) {
+                self::warnPlainLower($pdo);
+
+                return 'lower';
+            }
         }
 
         return self::SQLITE_LOWER;
     }
 
-    private static function registerSqliteLower(PDO $pdo): void
+    /**
+     * False when the connection takes no user function: some PHP 8.4 builds
+     * hand Laravel a plain PDO for `sqlite:` that has neither createFunction()
+     * nor sqliteCreateFunction(). Search then runs on SQLite's own lower()
+     * instead of failing the request.
+     */
+    private static function registerSqliteLower(PDO $pdo): bool
     {
         $lower = static fn (mixed $value): ?string => $value === null ? null : mb_strtolower((string) $value);
 
         if ($pdo instanceof Sqlite) {
-            $pdo->createFunction(self::SQLITE_LOWER, $lower, 1, Sqlite::DETERMINISTIC);
+            return $pdo->createFunction(self::SQLITE_LOWER, $lower, 1, Sqlite::DETERMINISTIC);
+        }
 
+        try {
+            return $pdo->sqliteCreateFunction(self::SQLITE_LOWER, $lower, 1, PDO::SQLITE_DETERMINISTIC);
+        } catch (Error) {
+            // "Call to undefined method": the method is resolved per driver at runtime.
+            return false;
+        }
+    }
+
+    private static function warnPlainLower(PDO $pdo): void
+    {
+        self::$warned ??= new WeakMap;
+        if (isset(self::$warned[$pdo])) {
             return;
         }
 
-        $pdo->sqliteCreateFunction(self::SQLITE_LOWER, $lower, 1, PDO::SQLITE_DETERMINISTIC);
+        self::$warned[$pdo] = true;
+        Log::warning('tbtop-cms: the SQLite connection takes no user functions, so page search falls back to SQLite lower(), which ignores case in ASCII only. Bind a connector that returns Pdo\\Sqlite to restore it.');
     }
 }
