@@ -49,11 +49,11 @@ it('falls back to SQLite lower() when the connection takes no user function', fu
 })->with([
     'registration refused' => NoUserFunctionsPdo::class,
     'method missing' => MissingUserFunctionsPdo::class,
-]);
+])->skip(runsOnMySql(), 'SQLite only: on MySQL the search uses its own lower()');
 
 it('lower-cases through tbtop_lower when the connection takes one', function (): void {
     $query = Page::query();
     PageNameSearch::apply($query, 'мобіл', ['uk']);
 
     expect($query->toSql())->toContain('tbtop_lower(');
-});
+})->skip(runsOnMySql(), 'SQLite only: on MySQL the search uses its own lower()');
