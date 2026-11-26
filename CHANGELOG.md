@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.0 — 2026-11-26
+
+### Features
+
+- **admin:** Set the admin default locale with tbtop-cms.admin.locale
+
+### Fixes
+
+- **page:** Search pages on SQLite without user functions instead of failing (#366)
+
 ## 0.12.0 — 2026-11-19
 
 ### Features
